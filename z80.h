@@ -29,6 +29,18 @@ static const fast_u16 mask16 = 0xffff;
 
 static inline void unused(...) {}
 
+static inline fast_u8 get_low8(fast_u16 n) {
+    return static_cast<fast_u8>(n & mask8);
+}
+
+static inline fast_u8 get_high8(fast_u16 n) {
+    return static_cast<fast_u8>((n >> 8) & mask8);
+}
+
+static inline fast_u16 make16(fast_u8 hi, fast_u8 lo) {
+    return (static_cast<fast_u16>(hi) << 8) | lo;
+}
+
 static inline fast_u16 add16(fast_u16 a, fast_u16 b) {
     return (a + b) & mask16;
 }
@@ -37,69 +49,43 @@ static inline fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
-enum class memory_access_kind {
-    transparent,
-    fetch_opcode,
-    access_data,
-};
-
-class memory_interface {
+class simple_memory_interface {
 public:
-    memory_interface(bool use_custom_read_handler = false,
-                     bool use_custom_write_handler = false);
-
-    virtual ~memory_interface() {}
+    simple_memory_interface()
+        : image()
+    {}
 
     least_u8 &operator [] (fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
     }
 
-    least_u8 *begin() { return image; }
-    least_u8 *end() { return begin() + image_size; }
-
-    fast_u8 read8(fast_u16 addr, memory_access_kind kind) {
-        if(!use_custom_read_handler)
-            return (*this)[addr];
-        return on_read(addr, kind);
+    fast_u8 fetch_opcode(fast_u16 addr) {
+        return (*this)[addr];
     }
 
-    void write8(fast_u16 addr, fast_u8 value, memory_access_kind kind) {
-        if(!use_custom_write_handler) {
-            (*this)[addr] = value;
-            return;
-        }
-        on_write(addr, value, kind);
+    fast_u8 read8(fast_u16 addr) {
+        return (*this)[addr];
     }
 
-    fast_u16 read16(fast_u16 addr, memory_access_kind kind) {
-        fast_u8 lo = read8(addr, kind);
-        fast_u8 hi = read8(inc16(addr), kind);
-        return (static_cast<fast_u16>(hi) << 8) | lo;
+    void write8(fast_u16 addr, fast_u8 value) {
+        (*this)[addr] = value;
     }
 
-    void write16(fast_u16 addr, fast_u16 value, memory_access_kind kind) {
-        fast_u8 lo = static_cast<fast_u8>(value & mask8);
-        write8(addr, lo, kind);
-
-        fast_u8 hi = static_cast<fast_u8>((value >> 8) & mask8);
-        write8(inc16(addr), hi, kind);
+    fast_u16 read16(fast_u16 addr) {
+        // It is important that we read the low byte first.
+        fast_u8 lo = read8(addr);
+        fast_u8 hi = read8(inc16(addr));
+        return make16(hi, lo);
     }
 
-    void clear();
-
-protected:
-    virtual fast_u8 on_read(fast_u16 addr, memory_access_kind kind);
-
-    virtual void on_write(fast_u16 addr, fast_u8 value,
-                          memory_access_kind kind);
+    void write16(fast_u16 addr, fast_u16 value) {
+        // It is important that we write the low byte first.
+        write8(addr, get_low8(value));
+        write8(inc16(addr), get_high8(value));
+    }
 
 private:
-    // The purpose of these flags is to avoid unnecessary calls to custom
-    // access handler.
-    bool use_custom_read_handler;
-    bool use_custom_write_handler;
-
     static const size_type image_size = 0x10000;  // 64K bytes.
     least_u8 image[image_size];
 };
@@ -108,26 +94,39 @@ enum class opcode_kind {
     nop,
 };
 
-class instructions_decoder {
+class instructions_decoder_base {
+protected:
+    static opcode_kind decode(fast_u8 op, fast_u16 addr);
+};
+
+template<typename memory_interface>
+class instructions_decoder : public instructions_decoder_base {
 public:
-    instructions_decoder(memory_interface &memory);
+    typedef memory_interface memory_interface_type;
 
-    opcode_kind decode_opcode();
+    instructions_decoder(memory_interface_type &memory)
+        : memory(memory)
+    {}
 
-private:
+    opcode_kind decode_opcode() {
+        fast_u16 addr = current_addr;
+        fast_u8 op = fetch_opcode();
+        return decode(op, addr);
+    }
+
+protected:
     fast_u8 fetch_opcode() {
-        auto access_kind = transparent ? memory_access_kind::transparent :
-                                         memory_access_kind::fetch_opcode;
-        fast_u8 op = memory.read8(current_addr, access_kind);
+        fast_u8 op = memory.fetch_opcode(current_addr);
         current_addr = inc16(current_addr);
         return op;
     }
 
+private:
     fast_u16 current_addr;
-    bool transparent;
-    memory_interface &memory;
+    memory_interface_type &memory;
 };
 
+#if 0  // TODO
 class cpu_instance {
 public:
     cpu_instance(memory_interface &memory);
@@ -135,6 +134,7 @@ public:
 private:
     instructions_decoder decoder;
 };
+#endif
 
 }  // namespace z80
 
