@@ -10,8 +10,9 @@
 #include "z80.h"
 
 int main() {
-    z80::simple_memory_interface memory;
-    z80::instructions_decoder<z80::simple_memory_interface> decoder(memory);
+    typedef z80::simple_memory_implementation memory_type;
+    memory_type memory;
+    z80::instructions_decoder<memory_type> decoder(memory);
     z80::opcode_kind opcode = decoder.decode_opcode();
     assert(opcode == z80::opcode_kind::nop);
 }
