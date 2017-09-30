@@ -40,12 +40,10 @@ void memory_interface::on_write(fast_u16 addr, fast_u8 value,
     assert(0);
 }
 
-instructions_decoder::instructions_decoder(memory_interface &memory)
-    : memory(memory), current_addr(0)
+instructions_decoder::instructions_decoder()
 {}
 
-cpu_instance::cpu_instance(memory_interface &memory)
-    : memory(memory), decoder(memory)
+cpu_instance::cpu_instance()
 {}
 
 }  // namespace z80

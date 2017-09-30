@@ -48,6 +48,8 @@ public:
     memory_interface(bool use_custom_read_handler = false,
                      bool use_custom_write_handler = false);
 
+    virtual ~memory_interface() {}
+
     least_u8 &operator [] (fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
@@ -104,19 +106,18 @@ private:
 
 class instructions_decoder {
 public:
-    instructions_decoder(memory_interface &memory);
+    instructions_decoder();
 
 private:
-    memory_interface &memory;
-    fast_u16 current_addr;
+    // TODO: memory_interface &memory;
+    // TODO: fast_u16 current_addr;
 };
 
 class cpu_instance {
 public:
-    cpu_instance(memory_interface &memory);
+    cpu_instance();
 
 private:
-    memory_interface &memory;
     instructions_decoder decoder;
 };
 
