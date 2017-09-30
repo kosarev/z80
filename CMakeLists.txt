@@ -58,5 +58,6 @@ append_if(G_FLAG "-g" CMAKE_CXX_FLAGS)
 add_library(z80 STATIC z80.cpp)
 
 add_executable(tester tester.cpp)
+target_link_libraries(tester z80)
 
 add_test(opcodes_decoding tester)

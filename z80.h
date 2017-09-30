@@ -104,18 +104,33 @@ private:
     least_u8 image[image_size];
 };
 
+enum class opcode_kind {
+    nop,
+};
+
 class instructions_decoder {
 public:
-    instructions_decoder();
+    instructions_decoder(memory_interface &memory);
+
+    opcode_kind decode_opcode();
 
 private:
-    // TODO: memory_interface &memory;
-    // TODO: fast_u16 current_addr;
+    fast_u8 fetch_opcode() {
+        auto access_kind = transparent ? memory_access_kind::transparent :
+                                         memory_access_kind::fetch_opcode;
+        fast_u8 op = memory.read8(current_addr, access_kind);
+        current_addr = inc16(current_addr);
+        return op;
+    }
+
+    fast_u16 current_addr;
+    bool transparent;
+    memory_interface &memory;
 };
 
 class cpu_instance {
 public:
-    cpu_instance();
+    cpu_instance(memory_interface &memory);
 
 private:
     instructions_decoder decoder;

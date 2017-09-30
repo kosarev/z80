@@ -7,6 +7,9 @@
     Published under the MIT license.
 */
 
+#include <cstdio>
+#include <cstdlib>
+
 #include "z80.h"
 
 namespace z80 {
@@ -40,10 +43,24 @@ void memory_interface::on_write(fast_u16 addr, fast_u8 value,
     assert(0);
 }
 
-instructions_decoder::instructions_decoder()
+instructions_decoder::instructions_decoder(memory_interface &memory)
+    : current_addr(0), transparent(true), memory(memory)
 {}
 
-cpu_instance::cpu_instance()
+opcode_kind instructions_decoder::decode_opcode() {
+    fast_u16 addr = current_addr;
+    fast_u8 op = fetch_opcode();
+    if(op == 0)
+        return opcode_kind::nop;
+
+    // TODO
+    std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
+                 static_cast<unsigned>(op), static_cast<unsigned>(addr));
+    std::abort();
+}
+
+cpu_instance::cpu_instance(memory_interface &memory)
+    : decoder(memory)
 {}
 
 }  // namespace z80
