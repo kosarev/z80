@@ -9,3 +9,5 @@ It is currently in its early development phase.
 
 Any notes on overall design, improving performance and testing approaches are
 highly appreciated.
+
+[![Build Status](https://travis-ci.org/kosarev/z80.svg?branch=master)](https://travis-ci.org/kosarev/z80)
