@@ -23,7 +23,7 @@ void memory_interface::clear() {
         cell = 0;
 }
 
-fast_u8 memory_interface::on_read(fast_u16 addr, access_kind kind) {
+fast_u8 memory_interface::on_read(fast_u16 addr, memory_access_kind kind) {
     unused(addr, kind);
 
     // When a custom read handler is in use, it must override this default
@@ -32,7 +32,7 @@ fast_u8 memory_interface::on_read(fast_u16 addr, access_kind kind) {
 }
 
 void memory_interface::on_write(fast_u16 addr, fast_u8 value,
-                                access_kind kind) {
+                                memory_access_kind kind) {
     unused(addr, value, kind);
 
     // When a custom write handler is in use, it must override this default
