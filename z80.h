@@ -73,14 +73,12 @@ public:
     }
 
     fast_u16 read16(fast_u16 addr) {
-        // It is important that we read the low byte first.
         fast_u8 lo = read8(addr);
         fast_u8 hi = read8(inc16(addr));
         return make16(hi, lo);
     }
 
     void write16(fast_u16 addr, fast_u16 value) {
-        // It is important that we write the low byte first.
         write8(addr, get_low8(value));
         write8(inc16(addr), get_high8(value));
     }
