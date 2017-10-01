@@ -58,9 +58,9 @@ public:
 };
 
 template<typename T>
-class trivial_ticks_handler {
+class trivial_ticks_counter {
 public:
-    trivial_ticks_handler() : ticks(0) {}
+    trivial_ticks_counter() : ticks(0) {}
 
     T get_ticks() const { return ticks; }
 
@@ -70,110 +70,65 @@ private:
     T ticks;
 };
 
-template<typename ticks_handler>
-class trivial_memory_handler {
+template<typename D>
+class memory_interface {
 public:
-    trivial_memory_handler(ticks_handler &ticks)
-        : ticks(ticks), image()
-    {}
-
-    least_u8 &operator [] (fast_u16 addr) {
-        assert(addr < image_size);
-        return image[addr];
-    }
+    memory_interface() {}
 
     fast_u8 fetch_opcode(fast_u16 addr) {
-        ticks.tick(4);
-        return (*this)[addr];
+        (*this)->tick(4);
+        return (*this)->at(addr);
     }
 
     fast_u8 read8(fast_u16 addr) {
-        ticks.tick(3);
-        return (*this)[addr];
+        (*this)->tick(3);
+        return (*this)->at(addr);
     }
 
     void write8(fast_u16 addr, fast_u8 value) {
-        ticks.tick(3);
-        (*this)[addr] = value;
+        (*this)->tick(3);
+        (*this)->at(addr) = static_cast<least_u8>(value);
     }
 
     fast_u16 read16(fast_u16 addr) {
-        fast_u8 lo = read8(addr);
-        fast_u8 hi = read8(inc16(addr));
+        fast_u8 lo = (*this)->read8(addr);
+        fast_u8 hi = (*this)->read8(inc16(addr));
         return make16(hi, lo);
     }
 
     void write16(fast_u16 addr, fast_u16 value) {
-        write8(addr, get_low8(value));
-        write8(inc16(addr), get_high8(value));
+        (*this)->write8(addr, get_low8(value));
+        (*this)->write8(inc16(addr), get_high8(value));
     }
 
-private:
-    ticks_handler &ticks;
-
-    static const size_type image_size = 0x10000;  // 64K bytes.
-    least_u8 image[image_size];
+protected:
+    D *operator -> () { return static_cast<D*>(this); }
 };
 
-class disassembling_handler {
+class instructions_decoder_base {
 public:
-    disassembling_handler()
-        : instr_addr(0), output()
+    instructions_decoder_base()
+        : current_addr(0)
     {}
 
-    const char *get_output() const {
-        return output;
-    }
-
-    fast_u16 get_instr_addr() const { return instr_addr; }
-    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
-
-    void set_pc(fast_u16 new_pc) { unused(new_pc); }
-
-    void nop();
-
-private:
-    fast_u16 instr_addr;
-
-    static const std::size_t max_output_size = 32;
-    char output[max_output_size];
+protected:
+    fast_u16 current_addr;
 };
 
-class cpu_instance {
+template<typename D>
+class instructions_decoder : public instructions_decoder_base {
 public:
-    cpu_instance()
-        : instr_addr(0), pc(0)
-    {}
-
-    fast_u16 get_instr_addr() const { return instr_addr; }
-    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
-
-    fast_u16 get_pc() const { return pc; }
-    void set_pc(fast_u16 new_pc) { pc = new_pc; }
-
-    void nop() {}
-
-private:
-    fast_u16 instr_addr;
-    fast_u16 pc;
-};
-
-template<typename memory_handler, typename instructions_handler>
-class instructions_decoder {
-public:
-    instructions_decoder(memory_handler &memory, instructions_handler &instrs)
-        : current_addr(0), memory(memory), instrs(instrs)
-    {}
+    instructions_decoder() {}
 
     void decode() {
         fast_u16 instr_addr = current_addr;
-        instrs.set_instr_addr(instr_addr);
+        (*this)->set_instr_addr(instr_addr);
 
-        fast_u8 op = fetch_opcode();
-        instrs.set_pc(current_addr);
+        fast_u8 op = (*this)->fetch_next_opcode();
+        (*this)->set_pc(current_addr);
 
         if(op == 0)
-            return instrs.nop();
+            return (*this)->handle_nop();
 
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
@@ -183,16 +138,82 @@ public:
     }
 
 protected:
-    fast_u8 fetch_opcode() {
-        fast_u8 op = memory.fetch_opcode(current_addr);
+    fast_u8 fetch_next_opcode() {
+        fast_u8 op = (*this)->fetch_opcode(current_addr);
         current_addr = inc16(current_addr);
         return op;
     }
 
+    D *operator -> () { return static_cast<D*>(this); }
+};
+
+class disassembler_base {
+public:
+    disassembler_base()
+        : instr_addr(0), output()
+    {}
+
+    const char *get_output() const { return output; }
+
+    fast_u16 get_instr_addr() const { return instr_addr; }
+    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
+
+    void set_pc(fast_u16 new_pc) { unused(new_pc); }
+
+    void tick(unsigned t) { unused(t); }
+
+    void handle_nop();
+
 private:
-    fast_u16 current_addr;
-    memory_handler &memory;
-    instructions_handler &instrs;
+    fast_u16 instr_addr;
+
+    static const std::size_t max_output_size = 32;
+    char output[max_output_size];
+};
+
+template<typename D>
+class disassembler : public disassembler_base {
+public:
+    disassembler() {}
+
+    void disassemble() {
+        (*this)->decode();
+    }
+
+protected:
+    D *operator -> () { return static_cast<D*>(this); }
+};
+
+class processor_base {
+public:
+    processor_base()
+        : instr_addr(0), pc(0)
+    {}
+
+    fast_u16 get_instr_addr() const { return instr_addr; }
+    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
+
+    fast_u16 get_pc() const { return pc; }
+    void set_pc(fast_u16 new_pc) { pc = new_pc; }
+
+    void handle_nop() {}
+
+private:
+    fast_u16 instr_addr;
+    fast_u16 pc;
+};
+
+template<typename D>
+class processor : public processor_base {
+public:
+    processor() {}
+
+    void step() {
+        (*this)->decode();
+    }
+
+protected:
+    D *operator -> () { return static_cast<D*>(this); }
 };
 
 }  // namespace z80

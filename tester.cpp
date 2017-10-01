@@ -11,37 +11,63 @@
 
 #include "z80.h"
 
+namespace {
+
+class disassembler : public z80::memory_interface<disassembler>,
+                     public z80::instructions_decoder<disassembler>,
+                     public z80::disassembler<disassembler> {
+public:
+    disassembler() {}
+
+    z80::least_u8 &at(z80::fast_u16 addr) {
+        assert(addr < image_size);
+        return image[addr];
+    }
+
+private:
+    static const z80::size_type image_size = 0x10000;  // 64K bytes.
+    z80::least_u8 image[image_size];
+};
+
+class machine : public z80::memory_interface<machine>,
+                public z80::instructions_decoder<machine>,
+                public z80::processor<machine> {
+public:
+    typedef uint_fast32_t ticks_type;
+
+    machine() {}
+
+    void tick(unsigned t) { ticks.tick(t); }
+
+    ticks_type get_ticks() const { return ticks.get_ticks(); }
+
+    z80::least_u8 &at(z80::fast_u16 addr) {
+        assert(addr < image_size);
+        return image[addr];
+    }
+
+private:
+    z80::trivial_ticks_counter<ticks_type> ticks;
+
+    static const z80::size_type image_size = 0x10000;  // 64K bytes.
+    z80::least_u8 image[image_size];
+};
+
+}  // anonymous namespace
+
 static void test_disassembling() {
-    typedef z80::dummy_ticks_handler ticks_handler;
-    ticks_handler ticks;
-
-    typedef z80::trivial_memory_handler<ticks_handler> memory_handler;
-    memory_handler memory(ticks);
-
-    typedef z80::disassembling_handler disasm_type;
-    disasm_type disasm;
-
-    z80::instructions_decoder<memory_handler,
-                              disasm_type> decoder(memory, disasm);
-    decoder.decode();
+    disassembler disasm;
+    disasm.disassemble();
     assert(std::strcmp(disasm.get_output(), "nop") == 0);
 }
 
 static void test_execution() {
-    typedef z80::trivial_ticks_handler<uint_fast32_t> ticks_handler;
-    ticks_handler ticks;
-
-    typedef z80::trivial_memory_handler<ticks_handler> memory_handler;
-    memory_handler memory(ticks);
-
-    typedef z80::cpu_instance cpu_type;
-    cpu_type cpu;
-
-    z80::instructions_decoder<memory_handler,
-                              cpu_type> decoder(memory, cpu);
-    assert(cpu.get_pc() == 0);
-    decoder.decode();
-    assert(cpu.get_pc() == 1);
+    machine mach;
+    assert(mach.get_pc() == 0);
+    assert(mach.get_ticks() == 0);
+    mach.step();
+    assert(mach.get_pc() == 1);
+    assert(mach.get_ticks() == 4);
 }
 
 int main() {

@@ -11,7 +11,7 @@
 
 namespace z80 {
 
-void disassembling_handler::nop() {
+void disassembler_base::handle_nop() {
     std::snprintf(output, max_output_size, "nop");
 }
 
