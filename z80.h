@@ -123,7 +123,7 @@ template<typename memory_handler, typename instructions_handler>
 class instructions_decoder {
 public:
     instructions_decoder(memory_handler &memory, instructions_handler &instrs)
-        : memory(memory), instrs(instrs)
+        : current_addr(0), memory(memory), instrs(instrs)
     {}
 
     void decode() {
