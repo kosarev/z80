@@ -12,6 +12,8 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 namespace z80 {
 
@@ -102,26 +104,39 @@ private:
     least_u8 image[image_size];
 };
 
-enum class opcode_kind {
-    nop,
-};
-
-class instructions_decoder_base {
-protected:
-    static opcode_kind decode(fast_u8 op, fast_u16 addr);
-};
-
-template<typename memory_handler>
-class instructions_decoder : public instructions_decoder_base {
+class disassembling_handler {
 public:
-    instructions_decoder(memory_handler &memory)
-        : memory(memory)
+    disassembling_handler() {}
+
+    const char *get_output() const {
+        return output;
+    }
+
+    void nop(fast_u16 addr);
+
+private:
+    static const std::size_t max_output_size = 32;
+    char output[max_output_size];
+};
+
+template<typename memory_handler, typename instructions_handler>
+class instructions_decoder {
+public:
+    instructions_decoder(memory_handler &memory, instructions_handler &instrs)
+        : memory(memory), instrs(instrs)
     {}
 
-    opcode_kind decode_opcode() {
+    void decode() {
         fast_u16 addr = current_addr;
         fast_u8 op = fetch_opcode();
-        return decode(op, addr);
+
+        if(op == 0)
+            return instrs.nop(addr);
+
+        // TODO
+        std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
+                     static_cast<unsigned>(op), static_cast<unsigned>(addr));
+        std::abort();
     }
 
 protected:
@@ -134,6 +149,7 @@ protected:
 private:
     fast_u16 current_addr;
     memory_handler &memory;
+    instructions_handler &instrs;
 };
 
 #if 0  // TODO

@@ -7,6 +7,8 @@
     Published under the MIT license.
 */
 
+#include <cstring>
+
 #include "z80.h"
 
 int main() {
@@ -16,7 +18,11 @@ int main() {
     typedef z80::trivial_memory_handler<ticks_handler> memory_handler;
     memory_handler memory(ticks);
 
-    z80::instructions_decoder<memory_handler> decoder(memory);
-    z80::opcode_kind opcode = decoder.decode_opcode();
-    assert(opcode == z80::opcode_kind::nop);
+    typedef z80::disassembling_handler instrs_handler;
+    instrs_handler instrs;
+
+    z80::instructions_decoder<memory_handler,
+                              instrs_handler> decoder(memory, instrs);
+    decoder.decode();
+    assert(std::strcmp(instrs.get_output(), "nop") == 0);
 }
