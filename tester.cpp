@@ -10,7 +10,7 @@
 #include "z80.h"
 
 int main() {
-    typedef z80::simple_memory_implementation memory_type;
+    typedef z80::trivial_memory_implementation memory_type;
     memory_type memory;
     z80::instructions_decoder<memory_type> decoder(memory);
     z80::opcode_kind opcode = decoder.decode_opcode();

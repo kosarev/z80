@@ -49,9 +49,9 @@ static inline fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
-class simple_memory_implementation {
+class trivial_memory_implementation {
 public:
-    simple_memory_implementation()
+    trivial_memory_implementation()
         : image()
     {}
 
