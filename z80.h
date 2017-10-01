@@ -54,9 +54,20 @@ class dummy_ticks_handler {
 public:
     dummy_ticks_handler() {}
 
-    void tick(unsigned t) {
-        unused(t);
-    }
+    void tick(unsigned t) { unused(t); }
+};
+
+template<typename T>
+class trivial_ticks_handler {
+public:
+    trivial_ticks_handler() : ticks(0) {}
+
+    T get_ticks() const { return ticks; }
+
+    void tick(unsigned t) { ticks += t; }
+
+private:
+    T ticks;
 };
 
 template<typename ticks_handler>
@@ -106,17 +117,45 @@ private:
 
 class disassembling_handler {
 public:
-    disassembling_handler() {}
+    disassembling_handler()
+        : instr_addr(0), output()
+    {}
 
     const char *get_output() const {
         return output;
     }
 
-    void nop(fast_u16 addr);
+    fast_u16 get_instr_addr() const { return instr_addr; }
+    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
+
+    void set_pc(fast_u16 new_pc) { unused(new_pc); }
+
+    void nop();
 
 private:
+    fast_u16 instr_addr;
+
     static const std::size_t max_output_size = 32;
     char output[max_output_size];
+};
+
+class cpu_instance {
+public:
+    cpu_instance()
+        : instr_addr(0), pc(0)
+    {}
+
+    fast_u16 get_instr_addr() const { return instr_addr; }
+    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
+
+    fast_u16 get_pc() const { return pc; }
+    void set_pc(fast_u16 new_pc) { pc = new_pc; }
+
+    void nop() {}
+
+private:
+    fast_u16 instr_addr;
+    fast_u16 pc;
 };
 
 template<typename memory_handler, typename instructions_handler>
@@ -127,15 +166,19 @@ public:
     {}
 
     void decode() {
-        fast_u16 addr = current_addr;
+        fast_u16 instr_addr = current_addr;
+        instrs.set_instr_addr(instr_addr);
+
         fast_u8 op = fetch_opcode();
+        instrs.set_pc(current_addr);
 
         if(op == 0)
-            return instrs.nop(addr);
+            return instrs.nop();
 
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
-                     static_cast<unsigned>(op), static_cast<unsigned>(addr));
+                     static_cast<unsigned>(op),
+                     static_cast<unsigned>(instr_addr));
         std::abort();
     }
 
@@ -151,16 +194,6 @@ private:
     memory_handler &memory;
     instructions_handler &instrs;
 };
-
-#if 0  // TODO
-class cpu_instance {
-public:
-    cpu_instance(memory_handler &memory);
-
-private:
-    instructions_decoder decoder;
-};
-#endif
 
 }  // namespace z80
 

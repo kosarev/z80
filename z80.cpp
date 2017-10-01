@@ -11,8 +11,7 @@
 
 namespace z80 {
 
-void disassembling_handler::nop(fast_u16 addr) {
-    unused(addr);
+void disassembling_handler::nop() {
     std::snprintf(output, max_output_size, "nop");
 }
 
