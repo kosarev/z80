@@ -22,7 +22,6 @@ typedef uint_fast16_t fast_u16;
 typedef uint_least16_t least_u16;
 
 typedef uint_fast32_t size_type;
-typedef uint_fast32_t ticks_type;
 
 static const fast_u8 mask8 = 0xff;
 static const fast_u16 mask16 = 0xffff;
@@ -49,10 +48,20 @@ static inline fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
-class trivial_memory_implementation {
+class dummy_ticks_handler {
 public:
-    trivial_memory_implementation()
-        : image()
+    dummy_ticks_handler() {}
+
+    void tick(unsigned t) {
+        unused(t);
+    }
+};
+
+template<typename ticks_handler>
+class trivial_memory_handler {
+public:
+    trivial_memory_handler(ticks_handler &ticks)
+        : ticks(ticks), image()
     {}
 
     least_u8 &operator [] (fast_u16 addr) {
@@ -61,14 +70,17 @@ public:
     }
 
     fast_u8 fetch_opcode(fast_u16 addr) {
+        ticks.tick(4);
         return (*this)[addr];
     }
 
     fast_u8 read8(fast_u16 addr) {
+        ticks.tick(3);
         return (*this)[addr];
     }
 
     void write8(fast_u16 addr, fast_u8 value) {
+        ticks.tick(3);
         (*this)[addr] = value;
     }
 
@@ -84,6 +96,8 @@ public:
     }
 
 private:
+    ticks_handler &ticks;
+
     static const size_type image_size = 0x10000;  // 64K bytes.
     least_u8 image[image_size];
 };
@@ -97,12 +111,10 @@ protected:
     static opcode_kind decode(fast_u8 op, fast_u16 addr);
 };
 
-template<typename memory_interface>
+template<typename memory_handler>
 class instructions_decoder : public instructions_decoder_base {
 public:
-    typedef memory_interface memory_interface_type;
-
-    instructions_decoder(memory_interface_type &memory)
+    instructions_decoder(memory_handler &memory)
         : memory(memory)
     {}
 
@@ -121,13 +133,13 @@ protected:
 
 private:
     fast_u16 current_addr;
-    memory_interface_type &memory;
+    memory_handler &memory;
 };
 
 #if 0  // TODO
 class cpu_instance {
 public:
-    cpu_instance(memory_interface &memory);
+    cpu_instance(memory_handler &memory);
 
 private:
     instructions_decoder decoder;
