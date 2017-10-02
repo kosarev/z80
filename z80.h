@@ -105,20 +105,12 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-class instructions_decoder_base {
+template<typename D>
+class instructions_decoder {
 public:
-    instructions_decoder_base()
+    instructions_decoder()
         : current_addr(0)
     {}
-
-protected:
-    fast_u16 current_addr;
-};
-
-template<typename D>
-class instructions_decoder : public instructions_decoder_base {
-public:
-    instructions_decoder() {}
 
     void decode() {
         fast_u16 instr_addr = current_addr;
@@ -145,15 +137,16 @@ protected:
     }
 
     D *operator -> () { return static_cast<D*>(this); }
+
+    fast_u16 current_addr;
 };
 
-class disassembler_base {
+template<typename D>
+class disassembler {
 public:
-    disassembler_base()
-        : instr_addr(0), output()
+    disassembler()
+        : instr_addr(0)
     {}
-
-    const char *get_output() const { return output; }
 
     fast_u16 get_instr_addr() const { return instr_addr; }
     void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
@@ -162,19 +155,9 @@ public:
 
     void tick(unsigned t) { unused(t); }
 
-    void handle_nop();
-
-private:
-    fast_u16 instr_addr;
-
-    static const std::size_t max_output_size = 32;
-    char output[max_output_size];
-};
-
-template<typename D>
-class disassembler : public disassembler_base {
-public:
-    disassembler() {}
+    void handle_nop() {
+        (*this)->output("nop");
+    }
 
     void disassemble() {
         (*this)->decode();
@@ -182,11 +165,14 @@ public:
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
+
+    fast_u16 instr_addr;
 };
 
-class processor_base {
+template<typename D>
+class processor {
 public:
-    processor_base()
+    processor()
         : instr_addr(0), pc(0)
     {}
 
@@ -198,22 +184,15 @@ public:
 
     void handle_nop() {}
 
-private:
-    fast_u16 instr_addr;
-    fast_u16 pc;
-};
-
-template<typename D>
-class processor : public processor_base {
-public:
-    processor() {}
-
     void step() {
         (*this)->decode();
     }
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
+
+    fast_u16 instr_addr;
+    fast_u16 pc;
 };
 
 }  // namespace z80

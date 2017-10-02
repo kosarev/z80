@@ -24,9 +24,20 @@ public:
         return image[addr];
     }
 
+    const char *get_output() const {
+        return output_buff;
+    }
+
+    void output(const char *str) {
+        std::snprintf(output_buff, max_output_buff_size, "%s", str);
+    }
+
 private:
     static const z80::size_type image_size = 0x10000;  // 64K bytes.
     z80::least_u8 image[image_size];
+
+    static const std::size_t max_output_buff_size = 32;
+    char output_buff[max_output_buff_size];
 };
 
 class machine : public z80::memory_interface<machine>,
