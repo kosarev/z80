@@ -13,16 +13,10 @@
 
 namespace {
 
-class disassembler : public z80::memory_interface<disassembler>,
-                     public z80::instructions_decoder<disassembler>,
+class disassembler : public z80::instructions_decoder<disassembler>,
                      public z80::disassembler<disassembler> {
 public:
     disassembler() {}
-
-    z80::least_u8 &at(z80::fast_u16 addr) {
-        assert(addr < image_size);
-        return image[addr];
-    }
 
     const char *get_output() const {
         return output_buff;
@@ -32,10 +26,11 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", str);
     }
 
-private:
-    static const z80::size_type image_size = 0x10000;  // 64K bytes.
-    z80::least_u8 image[image_size];
+    z80::fast_u8 fetch_next_opcode() {
+        return 0;
+    }
 
+private:
     static const std::size_t max_output_buff_size = 32;
     char output_buff[max_output_buff_size];
 };
