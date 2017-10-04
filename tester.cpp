@@ -26,6 +26,10 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", str);
     }
 
+    z80::fast_u16 get_instr_addr() const {
+        return 0;
+    }
+
     z80::fast_u8 fetch_next_opcode() {
         return 0;
     }

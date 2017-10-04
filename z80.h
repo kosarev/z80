@@ -108,52 +108,28 @@ protected:
 template<typename D>
 class instructions_decoder {
 public:
-    instructions_decoder()
-        : current_addr(0)
-    {}
+    instructions_decoder() {}
 
     void decode() {
-        fast_u16 instr_addr = current_addr;
-        (*this)->set_instr_addr(instr_addr);
-
         fast_u8 op = (*this)->fetch_next_opcode();
-        (*this)->set_pc(current_addr);
-
         if(op == 0)
             return (*this)->handle_nop();
 
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>(instr_addr));
+                     static_cast<unsigned>((*this)->get_instr_addr()));
         std::abort();
     }
 
 protected:
-    fast_u8 fetch_next_opcode() {
-        fast_u8 op = (*this)->fetch_opcode(current_addr);
-        current_addr = inc16(current_addr);
-        return op;
-    }
-
     D *operator -> () { return static_cast<D*>(this); }
-
-    fast_u16 current_addr;
 };
 
 template<typename D>
 class disassembler {
 public:
-    disassembler()
-        : instr_addr(0)
-    {}
-
-    fast_u16 get_instr_addr() const { return instr_addr; }
-    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
-
-    void set_pc(fast_u16 new_pc) { unused(new_pc); }
-
-    void tick(unsigned t) { unused(t); }
+    disassembler() {}
 
     void handle_nop() {
         (*this)->output("nop");
@@ -165,8 +141,6 @@ public:
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
-
-    fast_u16 instr_addr;
 };
 
 template<typename D>
@@ -183,6 +157,12 @@ public:
     void set_pc(fast_u16 new_pc) { pc = new_pc; }
 
     void handle_nop() {}
+
+    fast_u8 fetch_next_opcode() {
+        fast_u8 op = (*this)->fetch_opcode(pc);
+        (*this)->set_pc(inc16((*this)->get_pc()));
+        return op;
+    }
 
     void step() {
         (*this)->decode();
