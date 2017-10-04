@@ -85,9 +85,24 @@ public:
         return line;
     }
 
+    LIKE_PRINTF(2, 3)
+    void read_and_match(const char *format, ...) {
+        read_line();
+
+        char buff[max_line_size];
+        va_list args;
+        va_start(args, format);
+        std::vsnprintf(buff, max_line_size, format, args);
+        buff[max_line_size - 1] = '\0';
+        va_end(args);
+
+        if(std::strcmp(buff, line) != 0)
+            error("mismatch: expected '%s'", buff);
+    }
+
     void quote_line() const {
         assert(read);
-        std::fprintf(stderr, "%s: line %lu: %s\n", program_name,
+        std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
                      static_cast<unsigned long>(line_no), line);
     }
 
@@ -158,19 +173,37 @@ class machine : public z80::memory_interface<machine>,
 public:
     typedef uint_fast32_t ticks_type;
 
-    machine() {}
+    machine(test_input &input)
+        : input(input)
+    {}
 
     void tick(unsigned t) { ticks.tick(t); }
 
     ticks_type get_ticks() const { return ticks.get_ticks(); }
 
-    least_u8 &at(z80::fast_u16 addr) {
+    least_u8 &at(fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
     }
 
+    void set_instr_code(const least_u8 *code, unsigned size) {
+        fast_u16 pc = get_pc();
+        for(unsigned i = 0; i != size; ++i)
+            at(z80::add16(pc, i)) = code[i];
+    }
+
+    fast_u8 fetch_opcode(fast_u16 addr) {
+        input.read_and_match("%2u fetch %04x %02x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(addr),
+                             static_cast<unsigned>(at(addr)));
+        return memory_interface<machine>::fetch_opcode(addr);
+    }
+
 private:
     z80::trivial_ticks_counter<ticks_type> ticks;
+
+    test_input &input;
 
     static const z80::size_type image_size = 0x10000;  // 64K bytes.
     least_u8 image[image_size];
@@ -232,24 +265,13 @@ void handle_test_entry(test_input &input) {
     if(std::strcmp(instr, p) != 0)
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     instr, p);
+
+    machine mach(input);
+    mach.set_instr_code(instr_code, instr_size);
+    mach.step();
 }
 
 }  // anonymous namespace
-
-static void test_disassembling() {
-    disassembler disasm;
-    disasm.disassemble();
-    assert(std::strcmp(disasm.get_output(), "nop") == 0);
-}
-
-static void test_execution() {
-    machine mach;
-    assert(mach.get_pc() == 0);
-    assert(mach.get_ticks() == 0);
-    mach.step();
-    assert(mach.get_pc() == 1);
-    assert(mach.get_ticks() == 4);
-}
 
 int main(int argc, char *argv[]) {
     if(argc != 2)
@@ -269,9 +291,6 @@ int main(int argc, char *argv[]) {
 
         handle_test_entry(input);
     }
-
-    test_disassembling();
-    test_execution();
 
     if(fclose(f) != 0)
         error("cannot close test input '%s': %s", argv[1],
