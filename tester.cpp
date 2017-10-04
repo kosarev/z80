@@ -165,8 +165,12 @@ int main(int argc, char *argv[]) {
 
     test_input input(f);
     while(input) {
-        input.read_line();
+        const char *line = input.read_line();
         input.quote_line();
+
+        // Skip empty lines and comments.
+        if(line[0] == '\0' || line[0] == '#')
+            continue;
     }
 
     test_disassembling();
