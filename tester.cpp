@@ -7,11 +7,32 @@
     Published under the MIT license.
 */
 
+#include <cerrno>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 
 #include "z80.h"
 
 namespace {
+
+#if defined(__GNUC__) || defined(__clang__)
+# define LIKE_PRINTF(format, args) \
+      __attribute__((__format__(__printf__, format, args)))
+#else
+# define LIKE_PRINTF(format, args) /* nothing */
+#endif
+
+[[noreturn]] LIKE_PRINTF(1, 2)
+void error(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    std::fprintf(stderr, "tester: ");
+    std::vfprintf(stderr, format, args);
+    std::fprintf(stderr, "\n");
+    va_end(args);
+    exit(EXIT_FAILURE);
+}
 
 class disassembler : public z80::instructions_decoder<disassembler>,
                      public z80::disassembler<disassembler> {
@@ -80,7 +101,19 @@ static void test_execution() {
     assert(mach.get_ticks() == 4);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if(argc != 2)
+        error("usage: tester <test-input>\n");
+
+    FILE *f = fopen(argv[1], "r");
+    if(!f)
+        error("cannot open test input '%s': %s\n", argv[1],
+              std::strerror(errno));
+
     test_disassembling();
     test_execution();
+
+    if(fclose(f) != 0)
+        error("cannot close test input '%s': %s\n", argv[1],
+              std::strerror(errno));
 }
