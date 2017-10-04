@@ -23,11 +23,13 @@ namespace {
 # define LIKE_PRINTF(format, args) /* nothing */
 #endif
 
+const char program_name[] = "tester";
+
 [[noreturn]] LIKE_PRINTF(1, 2)
 void error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    std::fprintf(stderr, "tester: ");
+    std::fprintf(stderr, "%s: ", program_name);
     std::vfprintf(stderr, format, args);
     std::fprintf(stderr, "\n");
     va_end(args);
@@ -37,7 +39,7 @@ void error(const char *format, ...) {
 class test_input {
 public:
     test_input(FILE *stream)
-        : stream(stream), read(false)
+        : stream(stream), read(false), eof(false), line_no(0)
     {}
 
     const char *read_line() {
@@ -45,9 +47,16 @@ public:
         if(ferror(stream))
             error("cannot read test input: %s", std::strerror(errno));
         read = true;
+
+        if(!eof)
+            ++line_no;
+
         // Return empty string instead of null.
-        if(!res)
+        if(!res) {
+            eof = true;
             return "";
+        }
+
         // Strip trailing new-line marker.
         line[std::strlen(line) - 1] = '\0';
         return line;
@@ -62,9 +71,17 @@ public:
         return !is_eof();
     }
 
+    void quote_line() const {
+        assert(read);
+        std::fprintf(stderr, "%s: line %lu: %s\n", program_name,
+                     static_cast<unsigned long>(line_no), line);
+    }
+
 private:
     FILE *stream;
     bool read;
+    bool eof;
+    unsigned long line_no;
 
     static const std::size_t max_line_size = 1024;
     char line[max_line_size];
@@ -147,8 +164,10 @@ int main(int argc, char *argv[]) {
               std::strerror(errno));
 
     test_input input(f);
-    while(input)
-        std::printf("%s\n", input.read_line());
+    while(input) {
+        input.read_line();
+        input.quote_line();
+    }
 
     test_disassembling();
     test_execution();
