@@ -25,16 +25,26 @@ namespace {
 
 const char program_name[] = "tester";
 
+[[noreturn]] LIKE_PRINTF(1, 0)
+void verror(const char *format, va_list args) {
+    std::fprintf(stderr, "%s: ", program_name);
+    std::vfprintf(stderr, format, args);
+    std::fprintf(stderr, "\n");
+    exit(EXIT_FAILURE);
+}
+
 [[noreturn]] LIKE_PRINTF(1, 2)
 void error(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    std::fprintf(stderr, "%s: ", program_name);
-    std::vfprintf(stderr, format, args);
-    std::fprintf(stderr, "\n");
+    verror(format, args);
     va_end(args);
-    exit(EXIT_FAILURE);
 }
+
+using z80::fast_u8;
+using z80::least_u8;
+
+using z80::fast_u16;
 
 class test_input {
 public:
@@ -71,10 +81,24 @@ public:
         return !is_eof();
     }
 
+    const char *get_line() const {
+        return line;
+    }
+
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: %s\n", program_name,
                      static_cast<unsigned long>(line_no), line);
+    }
+
+    [[noreturn]] LIKE_PRINTF(2, 3)
+    void error(const char *format, ...) {
+        quote_line();
+
+        va_list args;
+        va_start(args, format);
+        ::verror(format, args);
+        va_end(args);
     }
 
 private:
@@ -87,10 +111,14 @@ private:
     char line[max_line_size];
 };
 
+static const unsigned max_instr_size = 1;
+
 class disassembler : public z80::instructions_decoder<disassembler>,
                      public z80::disassembler<disassembler> {
 public:
-    disassembler() {}
+    disassembler()
+        : index(0), instr_size(0)
+    {}
 
     const char *get_output() const {
         return output_buff;
@@ -100,15 +128,26 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", str);
     }
 
-    z80::fast_u16 get_instr_addr() const {
+    fast_u16 get_instr_addr() const {
         return 0;
     }
 
-    z80::fast_u8 fetch_next_opcode() {
+    fast_u8 fetch_next_opcode() {
         return 0;
+    }
+
+    void set_instr_code(const least_u8 *code, unsigned size) {
+        assert(size <= max_instr_size);
+        std::memcpy(instr_code, code, size);
+        instr_size = size;
+        index = 0;
     }
 
 private:
+    unsigned index;
+    least_u8 instr_code[max_instr_size];
+    unsigned instr_size;
+
     static const std::size_t max_output_buff_size = 32;
     char output_buff[max_output_buff_size];
 };
@@ -125,7 +164,7 @@ public:
 
     ticks_type get_ticks() const { return ticks.get_ticks(); }
 
-    z80::least_u8 &at(z80::fast_u16 addr) {
+    least_u8 &at(z80::fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
     }
@@ -134,8 +173,66 @@ private:
     z80::trivial_ticks_counter<ticks_type> ticks;
 
     static const z80::size_type image_size = 0x10000;  // 64K bytes.
-    z80::least_u8 image[image_size];
+    least_u8 image[image_size];
 };
+
+bool parse_hex_digit(const char *&p, fast_u8 &res) {
+    auto c = static_cast<unsigned char>(*p);
+    if(c >= static_cast<unsigned char>('0') &&
+           c <= static_cast<unsigned char>('9')) {
+        res = static_cast<fast_u8>(c - '0');
+        ++p;
+        return true;
+    }
+    if(c >= static_cast<unsigned char>('a') &&
+           c <= static_cast<unsigned char>('f')) {
+        res = static_cast<fast_u8>(c - 'a');
+        ++p;
+        return true;
+    }
+    return false;
+}
+
+bool parse_u8(const char *&p, fast_u8 &res) {
+    const char *original_p = p;
+    fast_u8 hi, lo;
+    if(!parse_hex_digit(p, hi) || !parse_hex_digit(p, lo)) {
+        p = original_p;
+        return false;
+    }
+    res = static_cast<fast_u8>((hi << 4) | lo);
+    return true;
+}
+
+void skip_whitespace(const char *&p) {
+    while(*p == ' ')
+        ++p;
+}
+
+void handle_test_entry(test_input &input) {
+    // Parse instruction bytes.
+    least_u8 instr_code[max_instr_size];
+    unsigned instr_size = 0;
+    const char *p = input.get_line();
+    fast_u8 instr_byte;
+    while(parse_u8(p, instr_byte)) {
+        if(instr_size == max_instr_size)
+            input.error("intstruction code is too large");
+        instr_code[instr_size++] = static_cast<least_u8>(instr_byte);
+    }
+    if(instr_size == 0)
+        input.error("expected instruction code");
+    skip_whitespace(p);
+
+    // Test instruction disassembly.
+    disassembler disasm;
+    disasm.set_instr_code(instr_code, instr_size);
+    disasm.disassemble();
+    const char *instr = disasm.get_output();
+    if(std::strcmp(instr, p) != 0)
+        input.error("instruction disassembly mismatch: '%s' vs '%s'",
+                    instr, p);
+}
 
 }  // anonymous namespace
 
@@ -165,12 +262,12 @@ int main(int argc, char *argv[]) {
 
     test_input input(f);
     while(input) {
-        const char *line = input.read_line();
-        input.quote_line();
-
         // Skip empty lines and comments.
+        const char *line = input.read_line();
         if(line[0] == '\0' || line[0] == '#')
             continue;
+
+        handle_test_entry(input);
     }
 
     test_disassembling();
