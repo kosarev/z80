@@ -34,6 +34,42 @@ void error(const char *format, ...) {
     exit(EXIT_FAILURE);
 }
 
+class test_input {
+public:
+    test_input(FILE *stream)
+        : stream(stream), read(false)
+    {}
+
+    const char *read_line() {
+        const char *res = fgets(line, max_line_size, stream);
+        if(ferror(stream))
+            error("cannot read test input: %s", std::strerror(errno));
+        read = true;
+        // Return empty string instead of null.
+        if(!res)
+            return "";
+        // Strip trailing new-line marker.
+        line[std::strlen(line) - 1] = '\0';
+        return line;
+    }
+
+    bool is_eof() const {
+        // Note that we cannot rely on feof() until we tried to read.
+        return read && feof(stream);
+    }
+
+    explicit operator bool () const {
+        return !is_eof();
+    }
+
+private:
+    FILE *stream;
+    bool read;
+
+    static const std::size_t max_line_size = 1024;
+    char line[max_line_size];
+};
+
 class disassembler : public z80::instructions_decoder<disassembler>,
                      public z80::disassembler<disassembler> {
 public:
@@ -103,17 +139,21 @@ static void test_execution() {
 
 int main(int argc, char *argv[]) {
     if(argc != 2)
-        error("usage: tester <test-input>\n");
+        error("usage: tester <test-input>");
 
     FILE *f = fopen(argv[1], "r");
     if(!f)
-        error("cannot open test input '%s': %s\n", argv[1],
+        error("cannot open test input '%s': %s", argv[1],
               std::strerror(errno));
+
+    test_input input(f);
+    while(input)
+        std::printf("%s\n", input.read_line());
 
     test_disassembling();
     test_execution();
 
     if(fclose(f) != 0)
-        error("cannot close test input '%s': %s\n", argv[1],
+        error("cannot close test input '%s': %s", argv[1],
               std::strerror(errno));
 }
