@@ -71,41 +71,6 @@ private:
 };
 
 template<typename D>
-class memory_interface {
-public:
-    memory_interface() {}
-
-    fast_u8 fetch_opcode(fast_u16 addr) {
-        (*this)->tick(4);
-        return (*this)->at(addr);
-    }
-
-    fast_u8 read8(fast_u16 addr) {
-        (*this)->tick(3);
-        return (*this)->at(addr);
-    }
-
-    void write8(fast_u16 addr, fast_u8 value) {
-        (*this)->tick(3);
-        (*this)->at(addr) = static_cast<least_u8>(value);
-    }
-
-    fast_u16 read16(fast_u16 addr) {
-        fast_u8 lo = (*this)->read8(addr);
-        fast_u8 hi = (*this)->read8(inc16(addr));
-        return make16(hi, lo);
-    }
-
-    void write16(fast_u16 addr, fast_u16 value) {
-        (*this)->write8(addr, get_low8(value));
-        (*this)->write8(inc16(addr), get_high8(value));
-    }
-
-protected:
-    D *operator -> () { return static_cast<D*>(this); }
-};
-
-template<typename D>
 class instructions_decoder {
 public:
     instructions_decoder() {}
@@ -158,6 +123,11 @@ public:
 
     fast_u16 get_pc_on_fetch() const { return (*this)->get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->set_pc(pc); }
+
+    fast_u8 fetch_opcode(fast_u16 addr) {
+        (*this)->tick(4);
+        return (*this)->at(addr);
+    }
 
     void handle_nop() {}
 

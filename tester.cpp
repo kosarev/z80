@@ -167,10 +167,10 @@ private:
     char output_buff[max_output_buff_size];
 };
 
-class machine : public z80::memory_interface<machine>,
-                public z80::instructions_decoder<machine>,
+class machine : public z80::instructions_decoder<machine>,
                 public z80::processor<machine> {
 public:
+    typedef processor<machine> processor;
     typedef uint_fast32_t ticks_type;
 
     machine(test_input &input)
@@ -196,7 +196,7 @@ public:
         input.read_and_match("%2u get_pc_on_fetch %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(get_pc()));
-        return processor<machine>::get_pc_on_fetch();
+        return processor::get_pc_on_fetch();
     }
 
     void set_pc_on_fetch(fast_u16 pc) {
@@ -204,7 +204,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(get_pc()),
                              static_cast<unsigned>(pc));
-        processor<machine>::set_pc_on_fetch(pc);
+        processor::set_pc_on_fetch(pc);
     }
 
     fast_u8 fetch_opcode(fast_u16 addr) {
@@ -212,7 +212,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(at(addr)),
                              static_cast<unsigned>(addr));
-        return memory_interface<machine>::fetch_opcode(addr);
+        return processor::fetch_opcode(addr);
     }
 
 private:
