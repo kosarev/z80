@@ -50,26 +50,6 @@ static inline fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
-class dummy_ticks_handler {
-public:
-    dummy_ticks_handler() {}
-
-    void tick(unsigned t) { unused(t); }
-};
-
-template<typename T>
-class trivial_ticks_counter {
-public:
-    trivial_ticks_counter() : ticks(0) {}
-
-    T get_ticks() const { return ticks; }
-
-    void tick(unsigned t) { ticks += t; }
-
-private:
-    T ticks;
-};
-
 template<typename D>
 class instructions_decoder {
 public:

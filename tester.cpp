@@ -174,12 +174,12 @@ public:
     typedef uint_fast32_t ticks_type;
 
     machine(test_input &input)
-        : input(input)
+        : ticks(0), input(input)
     {}
 
-    void tick(unsigned t) { ticks.tick(t); }
+    void tick(unsigned t) { ticks += t; }
 
-    ticks_type get_ticks() const { return ticks.get_ticks(); }
+    ticks_type get_ticks() const { return ticks; }
 
     least_u8 &at(fast_u16 addr) {
         assert(addr < image_size);
@@ -216,7 +216,7 @@ public:
     }
 
 private:
-    z80::trivial_ticks_counter<ticks_type> ticks;
+    ticks_type ticks;
 
     test_input &input;
 
