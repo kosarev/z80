@@ -147,20 +147,24 @@ template<typename D>
 class processor {
 public:
     processor()
-        : instr_addr(0), pc(0)
+        : instr_addr(0)
     {}
 
     fast_u16 get_instr_addr() const { return instr_addr; }
     void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
 
-    fast_u16 get_pc() const { return pc; }
-    void set_pc(fast_u16 new_pc) { pc = new_pc; }
+    fast_u16 get_pc() const { return regs.pc; }
+    void set_pc(fast_u16 pc) { regs.pc = pc; }
+
+    fast_u16 get_pc_on_fetch() const { return (*this)->get_pc(); }
+    void set_pc_on_fetch(fast_u16 pc) { (*this)->set_pc(pc); }
 
     void handle_nop() {}
 
     fast_u8 fetch_next_opcode() {
+        fast_u16 pc = (*this)->get_pc_on_fetch();
         fast_u8 op = (*this)->fetch_opcode(pc);
-        (*this)->set_pc(inc16((*this)->get_pc()));
+        (*this)->set_pc_on_fetch(inc16(pc));
         return op;
     }
 
@@ -170,9 +174,15 @@ public:
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
+    const D *operator -> () const { return static_cast<const D*>(this); }
 
     fast_u16 instr_addr;
-    fast_u16 pc;
+
+    struct register_file {
+        register_file() : pc(0) {}
+
+        fast_u16 pc;
+    } regs;
 };
 
 }  // namespace z80

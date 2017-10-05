@@ -192,11 +192,26 @@ public:
             at(z80::add16(pc, i)) = code[i];
     }
 
-    fast_u8 fetch_opcode(fast_u16 addr) {
-        input.read_and_match("%2u fetch %04x %02x",
+    fast_u16 get_pc_on_fetch() const {
+        input.read_and_match("%2u get_pc_on_fetch %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr),
-                             static_cast<unsigned>(at(addr)));
+                             static_cast<unsigned>(get_pc()));
+        return processor<machine>::get_pc_on_fetch();
+    }
+
+    void set_pc_on_fetch(fast_u16 pc) {
+        input.read_and_match("%2u set_pc_on_fetch %04x -> %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_pc()),
+                             static_cast<unsigned>(pc));
+        processor<machine>::set_pc_on_fetch(pc);
+    }
+
+    fast_u8 fetch_opcode(fast_u16 addr) {
+        input.read_and_match("%2u fetch %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(at(addr)),
+                             static_cast<unsigned>(addr));
         return memory_interface<machine>::fetch_opcode(addr);
     }
 
