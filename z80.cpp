@@ -91,7 +91,7 @@ void disassembler_base::on_format(const char *fmt, ...) {
     for(const char *p = fmt; *p != '\0'; ++p) {
         switch(*p) {
         case 'A': { // ALU mnemonic.
-            alu k = va_arg(args, alu);
+            auto k = static_cast<alu>(va_arg(args, int));
             out.append(get_alu_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");

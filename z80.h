@@ -149,7 +149,7 @@ public:
     void on_exec5_cycle(fast_u16 addr) { unused(addr); }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        (*this)->on_format("AR", k, static_cast<int>(r),
+        (*this)->on_format("AR", static_cast<int>(k), static_cast<int>(r),
                            static_cast<int>((*this)->get_index_reg()),
                            static_cast<int>(d)); }
     void on_di() { (*this)->on_format("di"); }
