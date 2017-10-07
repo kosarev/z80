@@ -122,7 +122,9 @@ protected:
     static const fast_u8 x_mask = 0300;
 
     static const fast_u8 y_mask = 0070;
-    fast_u8 get_y_part(fast_u8 op) { return (op & y_mask) >> 3; }
+    fast_u8 get_y_part(fast_u8 op) {
+        return static_cast<fast_u8>((op & y_mask) >> 3);
+    }
 
     static const fast_u8 z_mask = 0007;
     fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
@@ -433,7 +435,8 @@ public:
         case alu::and_a: assert(0); break;  // TODO
         case alu::xor_a:
             a ^= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+            f = static_cast<fast_u8>((a & (sf_mask | yf_mask | xf_mask)) |
+                                         zf_ari(a) | pf_log(a));
             break;
         case alu::or_a: assert(0); break;  // TODO
         case alu::cp: assert(0); break;  // TODO
