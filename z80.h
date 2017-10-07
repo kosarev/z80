@@ -55,11 +55,11 @@ class instructions_decoder {
 public:
     instructions_decoder() {}
 
-    void decode() {
-        fast_u8 op = (*this)->fetch_next_opcode();
+    void on_decode() {
+        fast_u8 op = (*this)->on_fetch();
         switch(op) {
-        case 0x00: return (*this)->handle_nop();
-        case 0xf3: return (*this)->handle_di();
+        case 0x00: return (*this)->on_nop();
+        case 0xf3: return (*this)->on_di();
         }
 
         // TODO
@@ -68,6 +68,8 @@ public:
                      static_cast<unsigned>((*this)->get_last_fetch_addr()));
         std::abort();
     }
+
+    void decode() { (*this)->on_decode(); }
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
@@ -78,12 +80,10 @@ class disassembler {
 public:
     disassembler() {}
 
-    void handle_nop() { (*this)->output("nop"); }
-    void handle_di() { (*this)->output("di"); }
+    void on_nop() { (*this)->on_output("nop"); }
+    void on_di() { (*this)->on_output("di"); }
 
-    void disassemble() {
-        (*this)->decode();
-    }
+    void disassemble() { (*this)->decode(); }
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
@@ -97,43 +97,51 @@ public:
     fast_u16 get_pc() const { return state.pc; }
     void set_pc(fast_u16 pc) { state.pc = pc; }
 
-    fast_u16 get_pc_on_fetch() const { return (*this)->get_pc(); }
-    void set_pc_on_fetch(fast_u16 pc) { (*this)->set_pc(pc); }
+    fast_u16 on_get_pc() const { return get_pc(); }
+    void on_set_pc(fast_u16 pc) { set_pc(pc); }
+
+    fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
+    void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     bool get_iff1() const { return state.iff1; }
     void set_iff1(bool iff1) { state.iff1 = iff1; }
 
-    bool get_iff1_on_di() const { return get_iff1(); }
-    void set_iff1_on_di(bool iff1) { set_iff1(iff1); }
+    bool on_get_iff1() const { return get_iff1(); }
+    void on_set_iff1(bool iff1) { set_iff1(iff1); }
+
+    bool get_iff1_on_di() const { return (*this)->on_get_iff1(); }
+    void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
 
     bool get_iff2() const { return state.iff2; }
     void set_iff2(bool iff2) { state.iff2 = iff2; }
 
-    bool get_iff2_on_di() const { return get_iff2(); }
-    void set_iff2_on_di(bool iff2) { set_iff2(iff2); }
+    bool on_get_iff2() const { return get_iff2(); }
+    void on_set_iff2(bool iff2) { set_iff2(iff2); }
+
+    bool get_iff2_on_di() const { return (*this)->on_get_iff2(); }
+    void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     fast_u16 get_last_fetch_addr() const { return state.last_fetch_addr; }
 
-    fast_u8 fetch_opcode(fast_u16 addr) {
+    fast_u8 on_fetch_at(fast_u16 addr) {
         (*this)->tick(4);
-        return (*this)->at(addr);
+        return (*this)->on_access(addr);
     }
 
-    void handle_nop() {}
-    void handle_di() { (*this)->set_iff1_on_di(false);
-                       (*this)->set_iff2_on_di(false); }
+    void on_nop() {}
+    void on_di() { (*this)->set_iff1_on_di(false);
+                   (*this)->set_iff2_on_di(false); }
 
-    fast_u8 fetch_next_opcode() {
+    fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
-        fast_u8 op = (*this)->fetch_opcode(pc);
+        fast_u8 op = (*this)->on_fetch_at(pc);
         state.last_fetch_addr = pc;
         (*this)->set_pc_on_fetch(inc16(pc));
         return op;
     }
 
-    void step() {
-        (*this)->decode();
-    }
+    void on_step() { (*this)->decode(); }
+    void step() { return (*this)->on_step(); }
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }

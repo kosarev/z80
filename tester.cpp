@@ -140,11 +140,11 @@ public:
         return output_buff;
     }
 
-    void output(const char *str) {
+    void on_output(const char *str) {
         std::snprintf(output_buff, max_output_buff_size, "%s", str);
     }
 
-    fast_u8 fetch_next_opcode() {
+    fast_u8 on_fetch() {
         assert(index < instr_size);
         return instr_code[index++];
     }
@@ -184,7 +184,7 @@ public:
 
     ticks_type get_ticks() const { return ticks; }
 
-    least_u8 &at(fast_u16 addr) {
+    least_u8 &on_access(fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
     }
@@ -192,7 +192,7 @@ public:
     void set_instr_code(const least_u8 *code, unsigned size) {
         fast_u16 pc = get_pc();
         for(unsigned i = 0; i != size; ++i)
-            at(z80::add16(pc, i)) = code[i];
+            on_access(z80::add16(pc, i)) = code[i];
     }
 
     fast_u16 get_pc_on_fetch() const {
@@ -210,12 +210,12 @@ public:
         processor::set_pc_on_fetch(pc);
     }
 
-    fast_u8 fetch_opcode(fast_u16 addr) {
+    fast_u8 on_fetch_at(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(at(addr)),
+                             static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::fetch_opcode(addr);
+        return processor::on_fetch_at(addr);
     }
 
     void set_iff1_on_di(bool iff1) {
