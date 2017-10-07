@@ -91,26 +91,26 @@ void disassembler_base::on_format(const char *fmt, ...) {
     for(const char *p = fmt; *p != '\0'; ++p) {
         switch(*p) {
         case 'A': { // ALU mnemonic.
-                    alu k = va_arg(args, alu);
-                    out.append(get_alu_mnemonic(k));
-                    if(is_two_operand_alu_instr(k))
-                        out.append(" a,");
-                    out.append(' ');
-                    break; }
+            alu k = va_arg(args, alu);
+            out.append(get_alu_mnemonic(k));
+            if(is_two_operand_alu_instr(k))
+                out.append(" a,");
+            out.append(' ');
+            break; }
         case 'R': { // A register.
-                    reg r = va_arg(args, reg);
-                    index_reg ip = va_arg(args, index_reg);
-                    auto d = static_cast<fast_u8>(va_arg(args, int));
-                    if(r != reg::at_hl || ip == index_reg::hl) {
-                        out.append(get_reg_name(r));
-                    } else {
-                        out.append('(');
-                        out.append(get_index_reg_name(ip));
-                        out.append(!get_sign8(d) ? '+' : '-');
-                        out.append(abs8(d));
-                        out.append(')');
-                    }
-                    break; }
+            auto r = static_cast<reg>(va_arg(args, int));
+            auto ip = static_cast<index_reg>(va_arg(args, int));
+            auto d = static_cast<fast_u8>(va_arg(args, int));
+            if(r != reg::at_hl || ip == index_reg::hl) {
+                out.append(get_reg_name(r));
+            } else {
+                out.append('(');
+                out.append(get_index_reg_name(ip));
+                out.append(!get_sign8(d) ? '+' : '-');
+                out.append(abs8(d));
+                out.append(')');
+            }
+            break; }
         default:
             out.append(*p);
         }

@@ -150,7 +150,8 @@ public:
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
         (*this)->on_format("AR", k, static_cast<int>(r),
-                           (*this)->get_index_reg(), d); }
+                           static_cast<int>((*this)->get_index_reg()),
+                           static_cast<int>(d)); }
     void on_di() { (*this)->on_format("di"); }
     void on_nop() { (*this)->on_format("nop"); }
 
@@ -193,7 +194,7 @@ protected:
 
     fast_u8 pf_log(fast_u8 n) {
         bool lo = pf_log4(n);
-        bool hi = pf_log4(n >> 4);
+        bool hi = pf_log4(static_cast<fast_u8>(n >> 4));
         return static_cast<fast_u8>((lo == hi ? 1 : 0) << pf_bit);
     }
 
