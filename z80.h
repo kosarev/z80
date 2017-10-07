@@ -65,7 +65,7 @@ public:
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>((*this)->get_instr_addr()));
+                     static_cast<unsigned>((*this)->get_last_fetch_addr()));
         std::abort();
     }
 
@@ -92,12 +92,7 @@ protected:
 template<typename D>
 class processor {
 public:
-    processor()
-        : instr_addr(0)
-    {}
-
-    fast_u16 get_instr_addr() const { return instr_addr; }
-    void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
+    processor() {}
 
     fast_u16 get_pc() const { return state.pc; }
     void set_pc(fast_u16 pc) { state.pc = pc; }
@@ -117,6 +112,8 @@ public:
     bool get_iff2_on_di() const { return get_iff2(); }
     void set_iff2_on_di(bool iff2) { set_iff2(iff2); }
 
+    fast_u16 get_last_fetch_addr() const { return state.last_fetch_addr; }
+
     fast_u8 fetch_opcode(fast_u16 addr) {
         (*this)->tick(4);
         return (*this)->at(addr);
@@ -129,6 +126,7 @@ public:
     fast_u8 fetch_next_opcode() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
         fast_u8 op = (*this)->fetch_opcode(pc);
+        state.last_fetch_addr = pc;
         (*this)->set_pc_on_fetch(inc16(pc));
         return op;
     }
@@ -141,15 +139,13 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
     const D *operator -> () const { return static_cast<const D*>(this); }
 
-    fast_u16 instr_addr;
-
     struct processor_state {
         processor_state()
-            : pc(0), iff1(false), iff2(false)
+            : last_fetch_addr(0), pc(0), iff1(false), iff2(false)
         {}
 
+        fast_u16 last_fetch_addr;
         fast_u16 pc;
-
         bool iff1, iff2;
     } state;
 };

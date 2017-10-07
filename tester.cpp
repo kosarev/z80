@@ -144,13 +144,14 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", str);
     }
 
-    fast_u16 get_instr_addr() const {
-        return 0;
-    }
-
     fast_u8 fetch_next_opcode() {
         assert(index < instr_size);
         return instr_code[index++];
+    }
+
+    fast_u16 get_last_fetch_addr() const {
+        assert(index != 0);
+        return index - 1;
     }
 
     void set_instr_code(const least_u8 *code, unsigned size) {
