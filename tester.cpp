@@ -64,7 +64,8 @@ public:
         // Return empty string instead of null.
         if(!res) {
             eof = true;
-            return "";
+            line[0] = '\0';
+            return line;
         }
 
         // Strip trailing new-line marker.
@@ -148,7 +149,8 @@ public:
     }
 
     fast_u8 fetch_next_opcode() {
-        return 0;
+        assert(index < instr_size);
+        return instr_code[index++];
     }
 
     void set_instr_code(const least_u8 *code, unsigned size) {
@@ -215,6 +217,22 @@ public:
         return processor::fetch_opcode(addr);
     }
 
+    void set_iff1_on_di(bool iff1) {
+        input.read_and_match("%2u set_iff1_on_di %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_iff1()),
+                             static_cast<unsigned>(iff1));
+        processor::set_iff1_on_di(iff1);
+    }
+
+    void set_iff2_on_di(bool iff2) {
+        input.read_and_match("%2u set_iff2_on_di %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_iff2()),
+                             static_cast<unsigned>(iff2));
+        processor::set_iff2_on_di(iff2);
+    }
+
 private:
     ticks_type ticks;
 
@@ -234,7 +252,7 @@ bool parse_hex_digit(const char *&p, fast_u8 &res) {
     }
     if(c >= static_cast<unsigned char>('a') &&
            c <= static_cast<unsigned char>('f')) {
-        res = static_cast<fast_u8>(c - 'a');
+        res = static_cast<fast_u8>(c - 'a' + 10);
         ++p;
         return true;
     }

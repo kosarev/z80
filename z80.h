@@ -57,8 +57,10 @@ public:
 
     void decode() {
         fast_u8 op = (*this)->fetch_next_opcode();
-        if(op == 0)
-            return (*this)->handle_nop();
+        switch(op) {
+        case 0x00: return (*this)->handle_nop();
+        case 0xf3: return (*this)->handle_di();
+        }
 
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
@@ -76,9 +78,8 @@ class disassembler {
 public:
     disassembler() {}
 
-    void handle_nop() {
-        (*this)->output("nop");
-    }
+    void handle_nop() { (*this)->output("nop"); }
+    void handle_di() { (*this)->output("di"); }
 
     void disassemble() {
         (*this)->decode();
@@ -98,11 +99,23 @@ public:
     fast_u16 get_instr_addr() const { return instr_addr; }
     void set_instr_addr(fast_u16 addr) { instr_addr = addr; }
 
-    fast_u16 get_pc() const { return regs.pc; }
-    void set_pc(fast_u16 pc) { regs.pc = pc; }
+    fast_u16 get_pc() const { return state.pc; }
+    void set_pc(fast_u16 pc) { state.pc = pc; }
 
     fast_u16 get_pc_on_fetch() const { return (*this)->get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->set_pc(pc); }
+
+    bool get_iff1() const { return state.iff1; }
+    void set_iff1(bool iff1) { state.iff1 = iff1; }
+
+    bool get_iff1_on_di() const { return get_iff1(); }
+    void set_iff1_on_di(bool iff1) { set_iff1(iff1); }
+
+    bool get_iff2() const { return state.iff2; }
+    void set_iff2(bool iff2) { state.iff2 = iff2; }
+
+    bool get_iff2_on_di() const { return get_iff2(); }
+    void set_iff2_on_di(bool iff2) { set_iff2(iff2); }
 
     fast_u8 fetch_opcode(fast_u16 addr) {
         (*this)->tick(4);
@@ -110,6 +123,8 @@ public:
     }
 
     void handle_nop() {}
+    void handle_di() { (*this)->set_iff1_on_di(false);
+                       (*this)->set_iff2_on_di(false); }
 
     fast_u8 fetch_next_opcode() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
@@ -128,11 +143,15 @@ protected:
 
     fast_u16 instr_addr;
 
-    struct register_file {
-        register_file() : pc(0) {}
+    struct processor_state {
+        processor_state()
+            : pc(0), iff1(false), iff2(false)
+        {}
 
         fast_u16 pc;
-    } regs;
+
+        bool iff1, iff2;
+    } state;
 };
 
 }  // namespace z80
