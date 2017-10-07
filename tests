@@ -1,12 +1,17 @@
 
-00 nop
- 0 get_pc_on_fetch 0000
- 0 fetch 00 at 0000
- 4 set_pc_on_fetch 0000 -> 0001
-
 f3 di
  0 get_pc_on_fetch 0000
  0 fetch f3 at 0000
  4 set_pc_on_fetch 0000 -> 0001
  4 set_iff1_on_di 0 -> 0
  4 set_iff2_on_di 0 -> 0
+
+00 nop
+ 0 get_pc_on_fetch 0000
+ 0 fetch 00 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+
+af xor a
+ 0 get_pc_on_fetch 0000
+ 0 fetch af at 0000
+ 4 set_pc_on_fetch 0000 -> 0001

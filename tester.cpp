@@ -140,11 +140,11 @@ public:
         return output_buff;
     }
 
-    void on_output(const char *str) {
-        std::snprintf(output_buff, max_output_buff_size, "%s", str);
+    void on_output(const char *out) override {
+        std::snprintf(output_buff, max_output_buff_size, "%s", out);
     }
 
-    fast_u8 on_fetch() {
+    fast_u8 on_fetch_cycle() {
         assert(index < instr_size);
         return instr_code[index++];
     }
