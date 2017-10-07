@@ -7,6 +7,8 @@
     Published under the MIT license.
 */
 
+#include <cstdarg>
+
 #include "z80.h"
 
 namespace z80 {
