@@ -455,7 +455,7 @@ public:
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
-        fast_u8 f;
+        unsigned f;
         switch(k) {
         case alu::add: assert(0); break;  // TODO
         case alu::adc: assert(0); break;  // TODO
@@ -464,14 +464,13 @@ public:
         case alu::and_a: assert(0); break;  // TODO
         case alu::xor_a:
             a ^= n;
-            f = static_cast<fast_u8>((a & (sf_mask | yf_mask | xf_mask)) |
-                                         zf_ari(a) | pf_log(a));
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
             break;
         case alu::or_a: assert(0); break;  // TODO
         case alu::cp: assert(0); break;  // TODO
         }
         (*this)->on_set_a(a);
-        (*this)->on_set_f(f);
+        (*this)->on_set_f(static_cast<fast_u8>(f));
     }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
