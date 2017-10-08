@@ -6,6 +6,18 @@ f3 di
  4 set_iff1_on_di 0 -> 0
  4 set_iff2_on_di 0 -> 0
 
+115634 ld de, 0x3456
+ 0 get_pc_on_fetch 0000
+ 0 fetch 11 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_pc_on_imm 0001
+ 4 read3 56 at 0001
+ 7 set_pc_on_imm 0001 -> 0002
+ 7 get_pc_on_imm 0002
+ 7 read3 34 at 0002
+10 set_pc_on_imm 0002 -> 0003
+10 set_de 0000 -> 3456
+
 00 nop
  0 get_pc_on_fetch 0000
  0 fetch 00 at 0000

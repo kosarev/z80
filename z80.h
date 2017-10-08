@@ -69,6 +69,8 @@ static inline fast_u16 inc16(fast_u16 n) {
 
 enum class reg { b, c, d, e, h, l, at_hl, a };
 
+enum class regp { bc, de, hl, sp };
+
 enum class index_reg { hl, ix, iy };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
@@ -92,6 +94,7 @@ public:
         fast_u8 op = (*this)->on_fetch_cycle();
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
+        fast_u8 p = get_p_part(op);
 
         switch(op & x_mask) {
         case 0200: { // alu[y] r[z]
@@ -101,6 +104,14 @@ public:
                      auto r = static_cast<reg>(z);
                      auto k = static_cast<alu>(y);
                      return (*this)->on_alu_r(k, r, fetch_disp_or_null(r)); }
+        }
+        switch(op & (x_mask | z_mask | q_mask)) {
+        case 0001: { // LD rp[p], nn
+                     // LD rr, nn        f(4) r(3) r(3)
+                     // LD i, nn    f(4) f(4) r(3) r(3)
+                     auto rp = static_cast<regp>(p);
+                     fast_u16 nn = (*this)->on_imm16_read();
+                     return (*this)->on_ld_rp_nn(rp, nn); }
         }
         switch(op) {
         case 0x00: return (*this)->on_nop();
@@ -129,11 +140,17 @@ protected:
     static const fast_u8 z_mask = 0007;
     fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
 
+    static const fast_u8 p_mask = 0060;
+    fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
+
+    static const fast_u8 q_mask = 0010;
+
 private:
     index_reg index_r;
 };
 
 const char *get_reg_name(reg r);
+const char *get_reg_name(regp r);
 
 class disassembler_base {
 public:
@@ -150,13 +167,22 @@ class disassembler : public disassembler_base {
 public:
     disassembler() {}
 
+    fast_u8 on_fetch_cycle() { return (*this)->on_read(); }
+
+    fast_u16 on_imm16_read() { fast_u8 lo = (*this)->on_read();
+                               fast_u8 hi = (*this)->on_read();
+                               return make16(hi, lo); }
+
     void on_exec5_cycle(fast_u16 addr) { unused(addr); }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        (*this)->on_format("AR", static_cast<int>(k), static_cast<int>(r),
+        (*this)->on_format("A R", static_cast<int>(k), static_cast<int>(r),
                            static_cast<int>((*this)->get_index_reg()),
                            static_cast<int>(d)); }
     void on_di() { (*this)->on_format("di"); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        (*this)->on_format("ld P, W", static_cast<int>(rp),
+                           static_cast<unsigned>(nn)); }
     void on_nop() { (*this)->on_format("nop"); }
 
     void disassemble() { (*this)->decode(); }
@@ -207,14 +233,14 @@ protected:
             : last_fetch_addr(0),
               bc(0), de(0), hl(0), af(0),
               ix(0), iy(0),
-              pc(0), memptr(0),
+              pc(0), sp(0xffff), memptr(0),
               iff1(false), iff2(false)
         {}
 
         fast_u16 last_fetch_addr;
         fast_u16 bc, de, hl, af;
         fast_u16 ix, iy;
-        fast_u16 pc, memptr;
+        fast_u16 pc, sp, memptr;
         bool iff1, iff2;
     } state;
 };
@@ -296,6 +322,19 @@ public:
     fast_u8 on_get_iyl() const { return get_iyl(); }
     void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
 
+    fast_u16 get_af() const { return state.af; }
+    void set_af(fast_u16 af) { state.af = af; }
+
+    fast_u16 on_get_af() {
+        // Always get the low byte first.
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 a = (*this)->on_get_a();
+        return make16(a, f); }
+    void on_set_af(fast_u16 af) {
+        // Always set the low byte first.
+        (*this)->on_set_f(get_low8(af));
+        (*this)->on_set_a(get_high8(af)); }
+
     fast_u16 get_hl() const { return state.hl; }
     void set_hl(fast_u16 hl) { state.hl = hl; }
 
@@ -309,18 +348,31 @@ public:
         (*this)->on_set_l(get_low8(hl));
         (*this)->on_set_h(get_high8(hl)); }
 
-    fast_u16 get_af() const { return state.af; }
-    void set_af(fast_u16 af) { state.af = af; }
+    fast_u16 get_bc() const { return state.bc; }
+    void set_bc(fast_u16 bc) { state.bc = bc; }
 
-    fast_u16 on_get_af() {
+    fast_u16 on_get_bc() {
         // Always get the low byte first.
-        fast_u8 f = (*this)->on_get_f();
-        fast_u8 a = (*this)->on_get_a();
-        return make16(a, f); }
-    void on_set_af(fast_u16 af) {
+        fast_u8 l = (*this)->on_get_c();
+        fast_u8 h = (*this)->on_get_b();
+        return make16(h, l); }
+    void on_set_bc(fast_u16 bc) {
         // Always set the low byte first.
-        (*this)->on_set_f(get_low8(af));
-        (*this)->on_set_a(get_high8(af)); }
+        (*this)->on_set_c(get_low8(bc));
+        (*this)->on_set_b(get_high8(bc)); }
+
+    fast_u16 get_de() const { return state.de; }
+    void set_de(fast_u16 de) { state.de = de; }
+
+    fast_u16 on_get_de() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_e();
+        fast_u8 h = (*this)->on_get_d();
+        return make16(h, l); }
+    void on_set_de(fast_u16 de) {
+        // Always set the low byte first.
+        (*this)->on_set_e(get_low8(de));
+        (*this)->on_set_d(get_high8(de)); }
 
     fast_u16 get_ix() const { return state.ix; }
     void set_ix(fast_u16 ix) { state.ix = ix; }
@@ -347,6 +399,48 @@ public:
         // Always set the low byte first.
         (*this)->on_set_iyl(get_low8(iy));
         (*this)->on_set_iyh(get_high8(iy)); }
+
+    fast_u16 get_sp() const { return state.sp; }
+    void set_sp(fast_u16 sp) { state.sp = sp; }
+
+    fast_u16 on_get_sp() { return get_sp(); }
+    void on_set_sp(fast_u16 sp) { set_sp(sp); }
+
+    fast_u16 get_pc() const { return state.pc; }
+    void set_pc(fast_u16 pc) { state.pc = pc; }
+
+    fast_u16 on_get_pc() const { return get_pc(); }
+    void on_set_pc(fast_u16 pc) { set_pc(pc); }
+
+    fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
+    void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_pc_on_imm() const { return (*this)->on_get_pc(); }
+    void set_pc_on_imm(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_memptr() const { return state.memptr; }
+    void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
+
+    fast_u16 on_get_memptr() const { return get_memptr(); }
+    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
+
+    bool get_iff1() const { return state.iff1; }
+    void set_iff1(bool iff1) { state.iff1 = iff1; }
+
+    bool on_get_iff1() const { return get_iff1(); }
+    void on_set_iff1(bool iff1) { set_iff1(iff1); }
+
+    bool get_iff1_on_di() const { return (*this)->on_get_iff1(); }
+    void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
+
+    bool get_iff2() const { return state.iff2; }
+    void set_iff2(bool iff2) { state.iff2 = iff2; }
+
+    bool on_get_iff2() const { return get_iff2(); }
+    void on_set_iff2(bool iff2) { set_iff2(iff2); }
+
+    bool get_iff2_on_di() const { return (*this)->on_get_iff2(); }
+    void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -404,6 +498,16 @@ public:
         assert(0);
     }
 
+    void on_set_rp(regp rp, fast_u16 nn) {
+        switch(rp) {
+        case regp::bc: return (*this)->on_set_bc(nn);
+        case regp::de: return (*this)->on_set_de(nn);
+        case regp::hl: assert(0); break;  // TODO
+        case regp::sp: return (*this)->on_set_sp(nn);
+        }
+        assert(0);
+    }
+
     fast_u16 get_index_reg_value(index_reg ip) {
         switch(ip) {
         case index_reg::hl: return (*this)->on_get_hl();
@@ -412,39 +516,6 @@ public:
         }
         assert(0);
     }
-
-    fast_u16 get_pc() const { return state.pc; }
-    void set_pc(fast_u16 pc) { state.pc = pc; }
-
-    fast_u16 on_get_pc() const { return get_pc(); }
-    void on_set_pc(fast_u16 pc) { set_pc(pc); }
-
-    fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
-    void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 get_memptr() const { return state.memptr; }
-    void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
-
-    fast_u16 on_get_memptr() const { return get_memptr(); }
-    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
-
-    bool get_iff1() const { return state.iff1; }
-    void set_iff1(bool iff1) { state.iff1 = iff1; }
-
-    bool on_get_iff1() const { return get_iff1(); }
-    void on_set_iff1(bool iff1) { set_iff1(iff1); }
-
-    bool get_iff1_on_di() const { return (*this)->on_get_iff1(); }
-    void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
-
-    bool get_iff2() const { return state.iff2; }
-    void set_iff2(bool iff2) { state.iff2 = iff2; }
-
-    bool on_get_iff2() const { return get_iff2(); }
-    void on_set_iff2(bool iff2) { set_iff2(iff2); }
-
-    bool get_iff2_on_di() const { return (*this)->on_get_iff2(); }
-    void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     fast_u16 get_last_fetch_addr() const { return state.last_fetch_addr; }
 
@@ -475,8 +546,11 @@ public:
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
-    void on_di() { (*this)->set_iff1_on_di(false);
-                   (*this)->set_iff2_on_di(false); }
+    void on_di() {
+        (*this)->set_iff1_on_di(false);
+        (*this)->set_iff2_on_di(false); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
 
     fast_u8 on_fetch_cycle() {
@@ -500,6 +574,19 @@ public:
     void on_exec5_cycle(fast_u16 addr) {
         unused(addr);
         (*this)->tick(5);
+    }
+
+    fast_u8 on_imm_read() {
+        fast_u16 pc = (*this)->get_pc_on_imm();
+        fast_u8 op = (*this)->on_read3_cycle(pc);
+        (*this)->set_pc_on_imm(inc16(pc));
+        return op;
+    }
+
+    fast_u16 on_imm16_read() {
+        fast_u8 lo = (*this)->on_imm_read();
+        fast_u8 hi = (*this)->on_imm_read();
+        return make16(hi, lo);
     }
 
     void on_step() { (*this)->decode(); }

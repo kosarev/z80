@@ -127,7 +127,7 @@ private:
     char line[max_line_size];
 };
 
-static const unsigned max_instr_size = 1;
+static const unsigned max_instr_size = 3;
 
 class disassembler : public z80::instructions_decoder<disassembler>,
                      public z80::disassembler<disassembler> {
@@ -144,7 +144,7 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", out);
     }
 
-    fast_u8 on_fetch_cycle() {
+    fast_u8 on_read() {
         assert(index < instr_size);
         return instr_code[index++];
     }
@@ -206,6 +206,13 @@ public:
                              static_cast<unsigned>(get_ticks()), name,
                              static_cast<unsigned>(old_n),
                              static_cast<unsigned>(new_n));
+    }
+
+    void match_set_rp(const char *name, fast_u16 old_nn, fast_u16 new_nn) {
+        input.read_and_match("%2u set_%s %04x -> %04x",
+                             static_cast<unsigned>(get_ticks()), name,
+                             static_cast<unsigned>(old_nn),
+                             static_cast<unsigned>(new_nn));
     }
 
     fast_u8 on_get_b() { match_get_r("b", get_b());
@@ -283,20 +290,38 @@ public:
                                    return processor::on_set_iyl(iyl); }
 #endif
 
-    fast_u16 get_pc_on_fetch() const {
-        input.read_and_match("%2u get_pc_on_fetch %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(get_pc()));
-        return processor::get_pc_on_fetch();
-    }
+    void on_set_bc(fast_u16 bc) { match_set_rp("bc", get_bc(), bc);
+                                  return processor::on_set_bc(bc); }
 
-    void set_pc_on_fetch(fast_u16 pc) {
-        input.read_and_match("%2u set_pc_on_fetch %04x -> %04x",
-                             static_cast<unsigned>(get_ticks()),
+    void on_set_de(fast_u16 de) { match_set_rp("de", get_de(), de);
+                                  return processor::on_set_de(de); }
+
+    void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
+                                  return processor::on_set_sp(sp); }
+
+    void match_get_pc(const char *name) const {
+        input.read_and_match("%2u get_pc_on_%s %04x",
+                             static_cast<unsigned>(get_ticks()), name,
+                             static_cast<unsigned>(get_pc())); }
+    void match_set_pc(const char *name, fast_u16 pc) {
+        input.read_and_match("%2u set_pc_on_%s %04x -> %04x",
+                             static_cast<unsigned>(get_ticks()), name,
                              static_cast<unsigned>(get_pc()),
-                             static_cast<unsigned>(pc));
-        processor::set_pc_on_fetch(pc);
-    }
+                             static_cast<unsigned>(pc)); }
+
+    fast_u16 get_pc_on_fetch() const {
+        match_get_pc("fetch");
+        return processor::get_pc_on_fetch(); }
+    void set_pc_on_fetch(fast_u16 pc) {
+        match_set_pc("fetch", pc);
+        processor::set_pc_on_fetch(pc); }
+
+    fast_u16 get_pc_on_imm() const {
+        match_get_pc("imm");
+        return processor::get_pc_on_imm(); }
+    void set_pc_on_imm(fast_u16 pc) {
+        match_set_pc("imm", pc);
+        processor::set_pc_on_imm(pc); }
 
     fast_u8 on_fetch_at(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
@@ -304,6 +329,14 @@ public:
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
         return processor::on_fetch_at(addr);
+    }
+
+    fast_u8 on_read3_cycle(fast_u16 addr) {
+        input.read_and_match("%2u read3 %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return processor::on_read3_cycle(addr);
     }
 
     void set_iff1_on_di(bool iff1) {

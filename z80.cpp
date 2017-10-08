@@ -27,6 +27,16 @@ const char *get_reg_name(reg r) {
     assert(0);
 }
 
+const char *get_reg_name(regp r) {
+    switch(r) {
+    case regp::bc: return "bc";
+    case regp::de: return "de";
+    case regp::hl: assert(0); break; // TODO
+    case regp::sp: return "sp";
+    }
+    assert(0);
+}
+
 namespace {
 
 class output_buff {
@@ -90,14 +100,13 @@ void disassembler_base::on_format(const char *fmt, ...) {
     output_buff out;
     for(const char *p = fmt; *p != '\0'; ++p) {
         switch(*p) {
-        case 'A': { // ALU mnemonic.
+        case 'A': {  // ALU mnemonic.
             auto k = static_cast<alu>(va_arg(args, int));
             out.append(get_alu_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");
-            out.append(' ');
             break; }
-        case 'R': { // A register.
+        case 'R': {  // A register.
             auto r = static_cast<reg>(va_arg(args, int));
             auto ip = static_cast<index_reg>(va_arg(args, int));
             auto d = static_cast<fast_u8>(va_arg(args, int));
@@ -110,6 +119,17 @@ void disassembler_base::on_format(const char *fmt, ...) {
                 out.append(abs8(d));
                 out.append(')');
             }
+            break; }
+        case 'P': {  // A register pair.
+            auto rp = static_cast<regp>(va_arg(args, int));
+            out.append(get_reg_name(rp));
+            break; }
+        case 'W': {  // A 16-bit immediate operand.
+            auto nn = static_cast<fast_u16>(va_arg(args, unsigned));
+            char buff[32];
+            std::snprintf(buff, sizeof(buff), "0x%04x",
+                          static_cast<unsigned>(nn));
+            out.append(buff);
             break; }
         default:
             out.append(*p);
