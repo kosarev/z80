@@ -165,7 +165,9 @@ protected:
     fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
 
     static const fast_u8 p_mask = 0060;
-    fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
+    fast_u8 get_p_part(fast_u8 op) {
+        return static_cast<fast_u8>((op & p_mask) >> 4);
+    }
 
     static const fast_u8 q_mask = 0010;
 
