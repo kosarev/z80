@@ -1,4 +1,5 @@
 
+# DI
 f3 di
  0 get_pc_on_fetch 0000
  0 fetch f3 at 0000
@@ -6,6 +7,7 @@ f3 di
  4 set_iff1_on_di 0 -> 0
  4 set_iff2_on_di 0 -> 0
 
+# JP nn
 c3cdab jp 0xabcd
  0 get_pc_on_fetch 0000
  0 fetch c3 at 0000
@@ -19,6 +21,7 @@ c3cdab jp 0xabcd
 10 set_memptr 0000 -> abcd
 10 set_pc_on_jump 0003 -> abcd
 
+# LD r, r
 47 ld b, a
  0 get_pc_on_fetch 0000
  0 fetch 47 at 0000
@@ -26,6 +29,7 @@ c3cdab jp 0xabcd
  4 get_a 00
  4 set_b 00 -> 00
 
+# LD rp, nn
 115634 ld de, 0x3456
  0 get_pc_on_fetch 0000
  0 fetch 11 at 0000
@@ -39,11 +43,13 @@ c3cdab jp 0xabcd
 10 set_e 00 -> 56
 10 set_d 00 -> 34
 
+# NOP
 00 nop
  0 get_pc_on_fetch 0000
  0 fetch 00 at 0000
  4 set_pc_on_fetch 0000 -> 0001
 
+# XOR r
 af xor a
  0 get_pc_on_fetch 0000
  0 fetch af at 0000
