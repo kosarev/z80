@@ -82,36 +82,59 @@ public:
 
     index_reg get_index_reg() const { return index_r; }
 
-    fast_u8 fetch_disp_or_null(reg r = reg::at_hl) {
-        if(get_index_reg() == index_reg::hl || r != reg::at_hl)
+    fast_u8 read_disp_or_null(bool may_need_disp = true) {
+        if(get_index_reg() == index_reg::hl || !may_need_disp)
             return 0;
-        fast_u8 d = (*this)->on_fetch_cycle();
-        (*this)->on_exec5_cycle((*this)->get_last_fetch_addr());
+        fast_u8 d = (*this)->on_disp_read();
+        (*this)->on_exec5_cycle((*this)->get_last_read_addr());
         return d;
     }
 
+    fast_u8 read_disp_or_null(reg r) {
+        return read_disp_or_null(r == reg::at_hl);
+    }
+
+    fast_u8 read_disp_or_null(reg r1, reg r2) {
+        return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
+    }
+
     void on_decode() {
-        fast_u8 op = (*this)->on_fetch_cycle();
+        fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
 
         switch(op & x_mask) {
-        case 0200: { // alu[y] r[z]
-                     // alu r            f(4)
-                     // alu (HL)         f(4)           r(3)
-                     // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
-                     auto r = static_cast<reg>(z);
-                     auto k = static_cast<alu>(y);
-                     return (*this)->on_alu_r(k, r, fetch_disp_or_null(r)); }
+        case 0100: {
+            // LD r[y], r[z] or HALT (in place of LD (HL), (HL))
+            // LD r, r              f(4)
+            // LD r, (HL)           f(4)           r(3)
+            // LD r, (i+d)     f(4) f(4) r(3) e(5) r(3)
+            // LD (HL), r           f(4)           w(3)
+            // LD (i+d), r     f(4) f(4) r(3) e(5) w(3)
+            // HALT                 f(4)
+            auto rd = static_cast<reg>(y);
+            auto rs = static_cast<reg>(z);
+            if(rd == reg::at_hl && rs == reg::at_hl)
+                assert(0);  // TODO: return (*this)->on_halt();
+            return (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
+        case 0200: {
+            // alu[y] r[z]
+            // alu r            f(4)
+            // alu (HL)         f(4)           r(3)
+            // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
+            auto r = static_cast<reg>(z);
+            auto k = static_cast<alu>(y);
+            return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask | q_mask)) {
-        case 0001: { // LD rp[p], nn
-                     // LD rr, nn        f(4) r(3) r(3)
-                     // LD i, nn    f(4) f(4) r(3) r(3)
-                     auto rp = static_cast<regp>(p);
-                     fast_u16 nn = (*this)->on_read_imm16();
-                     return (*this)->on_ld_rp_nn(rp, nn); }
+        case 0001: {
+            // LD rp[p], nn
+            // LD rr, nn        f(4) r(3) r(3)
+            // LD i, nn    f(4) f(4) r(3) r(3)
+            auto rp = static_cast<regp>(p);
+            fast_u16 nn = (*this)->on_read_imm16();
+            return (*this)->on_ld_rp_nn(rp, nn); }
         }
         switch(op) {
         case 0x00: return (*this)->on_nop();
@@ -122,7 +145,7 @@ public:
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>((*this)->get_last_fetch_addr()));
+                     static_cast<unsigned>((*this)->get_last_read_addr()));
         std::abort();
     }
 
@@ -168,11 +191,13 @@ class disassembler : public disassembler_base {
 public:
     disassembler() {}
 
-    fast_u8 on_fetch_cycle() { return (*this)->on_read(); }
+    fast_u8 on_fetch() { return (*this)->on_read(); }
 
     fast_u16 on_read_imm16() { fast_u8 lo = (*this)->on_read();
                                fast_u8 hi = (*this)->on_read();
                                return make16(hi, lo); }
+
+    fast_u8 on_disp_read() { return (*this)->on_read(); }
 
     void on_exec5_cycle(fast_u16 addr) { unused(addr); }
 
@@ -183,6 +208,13 @@ public:
     void on_di() { (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", static_cast<unsigned>(nn)); }
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
+        index_reg ip = (*this)->get_index_reg();
+        (*this)->on_format("ld R, R",
+                           static_cast<int>(rd), static_cast<int>(ip),
+                           static_cast<int>(d),
+                           static_cast<int>(rs), static_cast<int>(ip),
+                           static_cast<int>(d)); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_format("ld P, W", static_cast<int>(rp),
                            static_cast<unsigned>(nn)); }
@@ -233,14 +265,14 @@ protected:
 
     struct processor_state {
         processor_state()
-            : last_fetch_addr(0),
+            : last_read_addr(0),
               bc(0), de(0), hl(0), af(0),
               ix(0), iy(0),
               pc(0), sp(0xffff), memptr(0),
               iff1(false), iff2(false)
         {}
 
-        fast_u16 last_fetch_addr;
+        fast_u16 last_read_addr;
         fast_u16 bc, de, hl, af;
         fast_u16 ix, iy;
         fast_u16 pc, sp, memptr;
@@ -418,8 +450,11 @@ public:
     fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
-    fast_u16 get_pc_on_imm() const { return (*this)->on_get_pc(); }
-    void set_pc_on_imm(fast_u16 pc) { (*this)->on_set_pc(pc); }
+    fast_u16 get_pc_on_imm_read() const { return (*this)->on_get_pc(); }
+    void set_pc_on_imm_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_pc_on_disp() const { return (*this)->on_get_pc(); }
+    void set_pc_on_disp(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_pc_on_jump() const { return (*this)->on_get_pc(); }
     void set_pc_on_jump(fast_u16 pc) { (*this)->on_set_pc(pc); }
@@ -490,7 +525,7 @@ public:
         assert(0);
     }
 
-    void on_set_r(reg r, fast_u8 n) {
+    void on_set_r(reg r, fast_u8 n, fast_u8 d = 0) {
         switch(r) {
         case reg::b: return (*this)->on_set_b(n);
         case reg::c: return (*this)->on_set_c(n);
@@ -498,7 +533,7 @@ public:
         case reg::e: return (*this)->on_set_e(n);
         case reg::h: return (*this)->on_set_h(n);
         case reg::l: return (*this)->on_set_l(n);
-        case reg::at_hl: assert(0); break;  // TODO
+        case reg::at_hl: unused(d); assert(0); break;  // TODO
         case reg::a: return (*this)->on_set_a(n);
         }
         assert(0);
@@ -523,10 +558,11 @@ public:
         assert(0);
     }
 
-    fast_u16 get_last_fetch_addr() const { return state.last_fetch_addr; }
+    fast_u16 get_last_read_addr() const { return state.last_read_addr; }
 
-    fast_u8 on_fetch_at(fast_u16 addr) {
+    fast_u8 on_fetch_cycle(fast_u16 addr) {
         (*this)->tick(4);
+        state.last_read_addr = addr;
         return (*this)->on_access(addr);
     }
 
@@ -558,25 +594,28 @@ public:
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
+        (*this)->on_set_r(rd, d, (*this)->on_get_r(rs, d)); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
 
-    fast_u8 on_fetch_cycle() {
+    fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
-        fast_u8 op = (*this)->on_fetch_at(pc);
-        state.last_fetch_addr = pc;
+        fast_u8 op = (*this)->on_fetch_cycle(pc);
         (*this)->set_pc_on_fetch(inc16(pc));
         return op;
     }
 
     fast_u8 on_read3_cycle(fast_u16 addr) {
         (*this)->tick(3);
+        state.last_read_addr = addr;
         return (*this)->on_access(addr);
     }
 
     fast_u8 on_read4_cycle(fast_u16 addr) {
         (*this)->tick(4);
+        state.last_read_addr = addr;
         return (*this)->on_access(addr);
     }
 
@@ -590,9 +629,9 @@ public:
     }
 
     fast_u8 on_imm_read() {
-        fast_u16 pc = (*this)->get_pc_on_imm();
+        fast_u16 pc = (*this)->get_pc_on_imm_read();
         fast_u8 op = (*this)->on_imm_read_cycle(pc);
-        (*this)->set_pc_on_imm(inc16(pc));
+        (*this)->set_pc_on_imm_read(inc16(pc));
         return op;
     }
 
@@ -600,6 +639,17 @@ public:
         fast_u8 lo = (*this)->on_imm_read();
         fast_u8 hi = (*this)->on_imm_read();
         return make16(hi, lo);
+    }
+
+    fast_u8 on_disp_read_cycle(fast_u16 addr) {
+        return (*this)->on_read3_cycle(addr);
+    }
+
+    fast_u8 on_disp_read() {
+        fast_u16 pc = (*this)->get_pc_on_disp();
+        fast_u8 op = (*this)->on_disp_read_cycle(pc);
+        (*this)->set_pc_on_disp(inc16(pc));
+        return op;
     }
 
     void on_step() { (*this)->decode(); }

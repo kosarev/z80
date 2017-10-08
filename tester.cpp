@@ -149,7 +149,7 @@ public:
         return instr_code[index++];
     }
 
-    fast_u16 get_last_fetch_addr() const {
+    fast_u16 get_last_read_addr() const {
         assert(index != 0);
         return index - 1;
     }
@@ -217,48 +217,43 @@ public:
 
     fast_u8 on_get_b() { match_get_r("b", get_b());
                          return processor::on_get_b(); }
-    // TODO
-    //void on_set_b(fast_u8 b) { match_set_r("b", get_b(), b);
-    //                           return processor::on_set_b(b); }
+    void on_set_b(fast_u8 b) { match_set_r("b", get_b(), b);
+                               return processor::on_set_b(b); }
 
     fast_u8 on_get_c() { match_get_r("c", get_c());
                          return processor::on_get_c(); }
-    // TODO
-    //void on_set_c(fast_u8 c) { match_set_r("c", get_c(), c);
-    //                           return processor::on_set_c(c); }
+    void on_set_c(fast_u8 c) { match_set_r("c", get_c(), c);
+                               return processor::on_set_c(c); }
 
     fast_u8 on_get_d() { match_get_r("d", get_d());
                          return processor::on_get_d(); }
-    // TODO
-    //void on_set_d(fast_u8 d) { match_set_r("d", get_d(), d);
-    //                           return processor::on_set_d(d); }
+    void on_set_d(fast_u8 d) { match_set_r("d", get_d(), d);
+                               return processor::on_set_d(d); }
 
     fast_u8 on_get_e() { match_get_r("e", get_e());
                          return processor::on_get_e(); }
-    // TODO
-    //void on_set_e(fast_u8 e) { match_set_r("e", get_e(), e);
-    //                           return processor::on_set_e(e); }
+    void on_set_e(fast_u8 e) { match_set_r("e", get_e(), e);
+                               return processor::on_set_e(e); }
 
     fast_u8 on_get_h() { match_get_r("h", get_h());
                          return processor::on_get_h(); }
-    // TODO
-    //void on_set_h(fast_u8 h) { match_set_r("h", get_h(), h);
-    //                           return processor::on_set_h(h); }
+    void on_set_h(fast_u8 h) { match_set_r("h", get_h(), h);
+                               return processor::on_set_h(h); }
 
     fast_u8 on_get_l() { match_get_r("l", get_l());
                          return processor::on_get_l(); }
-    // TODO
-    //void on_set_l(fast_u8 l) { match_set_r("l", get_l(), l);
-    //                           return processor::on_set_l(l); }
+    void on_set_l(fast_u8 l) { match_set_r("l", get_l(), l);
+                               return processor::on_set_l(l); }
 
     fast_u8 on_get_a() { match_get_r("a", get_a());
                          return processor::on_get_a(); }
     void on_set_a(fast_u8 a) { match_set_r("a", get_a(), a);
                                return processor::on_set_a(a); }
 
-    // TODO
-    //fast_u8 on_get_f() { match_get_r("f", get_f());
-    //                     return processor::on_get_f(); }
+#if 0  // TODO
+    fast_u8 on_get_f() { match_get_r("f", get_f());
+                         return processor::on_get_f(); }
+#endif
     void on_set_f(fast_u8 f) { match_set_r("f", get_f(), f);
                                return processor::on_set_f(f); }
 
@@ -290,12 +285,6 @@ public:
                                    return processor::on_set_iyl(iyl); }
 #endif
 
-    void on_set_bc(fast_u16 bc) { match_set_rp("bc", get_bc(), bc);
-                                  return processor::on_set_bc(bc); }
-
-    void on_set_de(fast_u16 de) { match_set_rp("de", get_de(), de);
-                                  return processor::on_set_de(de); }
-
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
                                   return processor::on_set_sp(sp); }
 
@@ -319,23 +308,23 @@ public:
         match_set_pc("fetch", pc);
         processor::set_pc_on_fetch(pc); }
 
-    fast_u16 get_pc_on_imm() const {
-        match_get_pc("imm");
-        return processor::get_pc_on_imm(); }
-    void set_pc_on_imm(fast_u16 pc) {
-        match_set_pc("imm", pc);
-        processor::set_pc_on_imm(pc); }
+    fast_u16 get_pc_on_imm_read() const {
+        match_get_pc("imm_read");
+        return processor::get_pc_on_imm_read(); }
+    void set_pc_on_imm_read(fast_u16 pc) {
+        match_set_pc("imm_read", pc);
+        processor::set_pc_on_imm_read(pc); }
 
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
         processor::set_pc_on_jump(pc); }
 
-    fast_u8 on_fetch_at(fast_u16 addr) {
+    fast_u8 on_fetch_cycle(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_fetch_at(addr);
+        return processor::on_fetch_cycle(addr);
     }
 
     fast_u8 on_imm_read_cycle(fast_u16 addr) {
