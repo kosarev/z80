@@ -13,6 +13,20 @@
 
 namespace z80 {
 
+const char *get_reg_name(reg r) {
+    switch(r) {
+    case reg::b: return "b";
+    case reg::c: return "c";
+    case reg::d: return "d";
+    case reg::e: return "e";
+    case reg::h: return "h";
+    case reg::l: return "l";
+    case reg::at_hl: return "(hl)";
+    case reg::a: return "a";
+    }
+    assert(0);
+}
+
 namespace {
 
 class output_buff {
@@ -57,20 +71,6 @@ const char *get_alu_mnemonic(alu k) {
 
 bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
-}
-
-const char *get_reg_name(reg r) {
-    switch(r) {
-    case reg::b: return "b";
-    case reg::c: return "c";
-    case reg::d: return "d";
-    case reg::e: return "e";
-    case reg::h: return "h";
-    case reg::l: return "l";
-    case reg::at_hl: return "(hl)";
-    case reg::a: return "a";
-    }
-    assert(0);
 }
 
 const char *get_index_reg_name(index_reg ip) {

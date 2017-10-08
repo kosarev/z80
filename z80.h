@@ -133,6 +133,8 @@ private:
     index_reg index_r;
 };
 
+const char *get_reg_name(reg r);
+
 class disassembler_base {
 public:
     disassembler_base() {}
@@ -232,7 +234,7 @@ public:
     void set_c(fast_u8 c) { state.bc = make16(get_b(), c); }
 
     fast_u8 on_get_c() const { return get_c(); }
-    void on_set_c(fast_u8 c) const { set_c(c); }
+    void on_set_c(fast_u8 c) { set_c(c); }
 
     fast_u8 get_d() const { return get_high8(state.de); }
     void set_d(fast_u8 d) { state.de = make16(d, get_e()); }
@@ -244,7 +246,7 @@ public:
     void set_e(fast_u8 e) { state.de = make16(get_d(), e); }
 
     fast_u8 on_get_e() const { return get_e(); }
-    void on_set_e(fast_u8 e) const { set_e(e); }
+    void on_set_e(fast_u8 e) { set_e(e); }
 
     fast_u8 get_h() const { return get_high8(state.hl); }
     void set_h(fast_u8 h) { state.hl = make16(h, get_l()); }
@@ -256,7 +258,7 @@ public:
     void set_l(fast_u8 l) { state.hl = make16(get_h(), l); }
 
     fast_u8 on_get_l() const { return get_l(); }
-    void on_set_l(fast_u8 l) const { set_l(l); }
+    void on_set_l(fast_u8 l) { set_l(l); }
 
     fast_u8 get_a() const { return get_high8(state.af); }
     void set_a(fast_u8 a) { state.af = make16(a, get_f()); }
@@ -280,7 +282,7 @@ public:
     void set_ixl(fast_u8 ixl) { state.ix = make16(get_ixh(), ixl); }
 
     fast_u8 on_get_ixl() const { return get_ixl(); }
-    void on_set_ixl(fast_u8 ixl) const { set_ixl(ixl); }
+    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
 
     fast_u8 get_iyh() const { return get_high8(state.iy); }
     void set_iyh(fast_u8 iyh) { state.iy = make16(iyh, get_iyl()); }
@@ -292,12 +294,12 @@ public:
     void set_iyl(fast_u8 iyl) { state.iy = make16(get_iyh(), iyl); }
 
     fast_u8 on_get_iyl() const { return get_iyl(); }
-    void on_set_iyl(fast_u8 iyl) const { set_iyl(iyl); }
+    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
 
     fast_u16 get_hl() const { return state.hl; }
     void set_hl(fast_u16 hl) { state.hl = hl; }
 
-    fast_u16 on_get_hl() const {
+    fast_u16 on_get_hl() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_l();
         fast_u8 h = (*this)->on_get_h();
@@ -310,7 +312,7 @@ public:
     fast_u16 get_af() const { return state.af; }
     void set_af(fast_u16 af) { state.af = af; }
 
-    fast_u16 on_get_af() const {
+    fast_u16 on_get_af() {
         // Always get the low byte first.
         fast_u8 f = (*this)->on_get_f();
         fast_u8 a = (*this)->on_get_a();
@@ -323,7 +325,7 @@ public:
     fast_u16 get_ix() const { return state.ix; }
     void set_ix(fast_u16 ix) { state.ix = ix; }
 
-    fast_u16 on_get_ix() const {
+    fast_u16 on_get_ix() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_ixl();
         fast_u8 h = (*this)->on_get_ixh();
@@ -336,7 +338,7 @@ public:
     fast_u16 get_iy() const { return state.iy; }
     void set_iy(fast_u16 iy) { state.iy = iy; }
 
-    fast_u16 on_get_iy() const {
+    fast_u16 on_get_iy() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_iyl();
         fast_u8 h = (*this)->on_get_iyh();
@@ -360,7 +362,21 @@ public:
         return res;
     }
 
-    fast_u8 on_get_r(reg r, fast_u8 d, bool long_read_cycle = false) {
+    fast_u8 get_r(reg r) {
+        switch(r) {
+        case reg::b: return get_b();
+        case reg::c: return get_c();
+        case reg::d: return get_d();
+        case reg::e: return get_e();
+        case reg::h: return get_h();
+        case reg::l: return get_l();
+        case reg::at_hl: return (*this)->on_access(get_hl());
+        case reg::a: return get_a();
+        }
+        assert(0);
+    }
+
+    fast_u8 on_get_r(reg r, fast_u8 d = 0, bool long_read_cycle = false) {
         switch(r) {
         case reg::b: return (*this)->on_get_b();
         case reg::c: return (*this)->on_get_c();
@@ -374,7 +390,21 @@ public:
         assert(0);
     }
 
-    fast_u16 get_index_reg_value(index_reg ip) const {
+    void on_set_r(reg r, fast_u8 n) {
+        switch(r) {
+        case reg::b: return (*this)->on_set_b(n);
+        case reg::c: return (*this)->on_set_c(n);
+        case reg::d: return (*this)->on_set_d(n);
+        case reg::e: return (*this)->on_set_e(n);
+        case reg::h: return (*this)->on_set_h(n);
+        case reg::l: return (*this)->on_set_l(n);
+        case reg::at_hl: assert(0); break;  // TODO
+        case reg::a: return (*this)->on_set_a(n);
+        }
+        assert(0);
+    }
+
+    fast_u16 get_index_reg_value(index_reg ip) {
         switch(ip) {
         case index_reg::hl: return (*this)->on_get_hl();
         case index_reg::ix: return (*this)->on_get_ix();
@@ -424,9 +454,8 @@ public:
     }
 
     void do_alu(alu k, fast_u8 n) {
-        fast_u16 af = (*this)->on_get_af();
-        fast_u8 a = get_high8(af);
-        fast_u8 f = get_low8(af);
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f;
         switch(k) {
         case alu::add: assert(0); break;  // TODO
         case alu::adc: assert(0); break;  // TODO
@@ -441,7 +470,8 @@ public:
         case alu::or_a: assert(0); break;  // TODO
         case alu::cp: assert(0); break;  // TODO
         }
-        (*this)->on_set_af(make16(a, f));
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f);
     }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {

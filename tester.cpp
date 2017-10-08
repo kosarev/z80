@@ -42,9 +42,9 @@ void error(const char *format, ...) {
 }
 
 using z80::fast_u8;
-using z80::least_u8;
-
 using z80::fast_u16;
+using z80::least_u8;
+using z80::reg;
 
 class test_input {
 public:
@@ -194,6 +194,94 @@ public:
         for(unsigned i = 0; i != size; ++i)
             on_access(z80::add16(pc, i)) = code[i];
     }
+
+    void match_get_r(const char *name, fast_u8 n) {
+        input.read_and_match("%2u get_%s %02x",
+                             static_cast<unsigned>(get_ticks()), name,
+                             static_cast<unsigned>(n));
+    }
+
+    void match_set_r(const char *name, fast_u8 old_n, fast_u8 new_n) {
+        input.read_and_match("%2u set_%s %02x -> %02x",
+                             static_cast<unsigned>(get_ticks()), name,
+                             static_cast<unsigned>(old_n),
+                             static_cast<unsigned>(new_n));
+    }
+
+    fast_u8 on_get_b() { match_get_r("b", get_b());
+                         return processor::on_get_b(); }
+    // TODO
+    //void on_set_b(fast_u8 b) { match_set_r("b", get_b(), b);
+    //                           return processor::on_set_b(b); }
+
+    fast_u8 on_get_c() { match_get_r("c", get_c());
+                         return processor::on_get_c(); }
+    // TODO
+    //void on_set_c(fast_u8 c) { match_set_r("c", get_c(), c);
+    //                           return processor::on_set_c(c); }
+
+    fast_u8 on_get_d() { match_get_r("d", get_d());
+                         return processor::on_get_d(); }
+    // TODO
+    //void on_set_d(fast_u8 d) { match_set_r("d", get_d(), d);
+    //                           return processor::on_set_d(d); }
+
+    fast_u8 on_get_e() { match_get_r("e", get_e());
+                         return processor::on_get_e(); }
+    // TODO
+    //void on_set_e(fast_u8 e) { match_set_r("e", get_e(), e);
+    //                           return processor::on_set_e(e); }
+
+    fast_u8 on_get_h() { match_get_r("h", get_h());
+                         return processor::on_get_h(); }
+    // TODO
+    //void on_set_h(fast_u8 h) { match_set_r("h", get_h(), h);
+    //                           return processor::on_set_h(h); }
+
+    fast_u8 on_get_l() { match_get_r("l", get_l());
+                         return processor::on_get_l(); }
+    // TODO
+    //void on_set_l(fast_u8 l) { match_set_r("l", get_l(), l);
+    //                           return processor::on_set_l(l); }
+
+    fast_u8 on_get_a() { match_get_r("a", get_a());
+                         return processor::on_get_a(); }
+    void on_set_a(fast_u8 a) { match_set_r("a", get_a(), a);
+                               return processor::on_set_a(a); }
+
+    // TODO
+    //fast_u8 on_get_f() { match_get_r("f", get_f());
+    //                     return processor::on_get_f(); }
+    void on_set_f(fast_u8 f) { match_set_r("f", get_f(), f);
+                               return processor::on_set_f(f); }
+
+    fast_u8 on_get_ixh() { match_get_r("ixh", get_ixh());
+                           return processor::on_get_ixh(); }
+#if 0  // TODO
+    void on_set_ixh(fast_u8 ixh) { match_set_r("ixh", get_ixh(), ixh);
+                                   return processor::on_set_ixh(ixh); }
+#endif
+
+    fast_u8 on_get_ixl() { match_get_r("ixl", get_ixl());
+                           return processor::on_get_ixl(); }
+#if 0  // TODO
+    void on_set_ixl(fast_u8 ixl) { match_set_r("ixl", get_ixl(), ixl);
+                                   return processor::on_set_ixl(ixl); }
+#endif
+
+    fast_u8 on_get_iyh() { match_get_r("iyh", get_iyh());
+                           return processor::on_get_iyh(); }
+#if 0  // TODO
+    void on_set_iyh(fast_u8 iyh) { match_set_r("iyh", get_iyh(), iyh);
+                                   return processor::on_set_iyh(iyh); }
+#endif
+
+    fast_u8 on_get_iyl() { match_get_r("iyl", get_iyl());
+                           return processor::on_get_iyl(); }
+#if 0  // TODO
+    void on_set_iyl(fast_u8 iyl) { match_set_r("iyl", get_iyl(), iyl);
+                                   return processor::on_set_iyl(iyl); }
+#endif
 
     fast_u16 get_pc_on_fetch() const {
         input.read_and_match("%2u get_pc_on_fetch %04x",
