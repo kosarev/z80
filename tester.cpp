@@ -299,6 +299,9 @@ public:
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
                                   return processor::on_set_sp(sp); }
 
+    void on_set_memptr(fast_u16 mp) { match_set_rp("memptr", get_memptr(), mp);
+                                      return processor::on_set_memptr(mp); }
+
     void match_get_pc(const char *name) const {
         input.read_and_match("%2u get_pc_on_%s %04x",
                              static_cast<unsigned>(get_ticks()), name,
@@ -323,6 +326,10 @@ public:
         match_set_pc("imm", pc);
         processor::set_pc_on_imm(pc); }
 
+    void set_pc_on_jump(fast_u16 pc) {
+        match_set_pc("jump", pc);
+        processor::set_pc_on_jump(pc); }
+
     fast_u8 on_fetch_at(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
@@ -331,12 +338,12 @@ public:
         return processor::on_fetch_at(addr);
     }
 
-    fast_u8 on_read3_cycle(fast_u16 addr) {
-        input.read_and_match("%2u read3 %02x at %04x",
+    fast_u8 on_imm_read_cycle(fast_u16 addr) {
+        input.read_and_match("%2u imm_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_read3_cycle(addr);
+        return processor::on_imm_read_cycle(addr);
     }
 
     void set_iff1_on_di(bool iff1) {
