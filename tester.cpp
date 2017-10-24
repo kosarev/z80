@@ -350,6 +350,14 @@ public:
         return processor::on_5t_read_cycle(addr);
     }
 
+    void on_output_cycle(fast_u16 addr, fast_u8 b) {
+        input.read_and_match("%2u output %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(b),
+                             static_cast<unsigned>(addr));
+        processor::on_output_cycle(addr, b);
+    }
+
     fast_u8 on_3t_imm8_read() {
         fast_u16 addr = get_pc();
         input.read_and_match("%2u 3t_imm8_read %02x at %04x",

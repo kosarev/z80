@@ -11,16 +11,27 @@
 #define Z80_H
 
 #include <cassert>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
 namespace z80 {
 
+#if UINT_FAST8_MAX < UINT_MAX
+typedef unsigned fast_u8;
+#else
 typedef uint_fast8_t fast_u8;
-typedef uint_least8_t least_u8;
+#endif
 
+#if UINT_FAST16_MAX < UINT_MAX
+x
+typedef unsigned fast_u16;
+#else
 typedef uint_fast16_t fast_u16;
+#endif
+
+typedef uint_least8_t least_u8;
 typedef uint_least16_t least_u16;
 
 typedef uint_fast32_t size_type;
@@ -33,6 +44,14 @@ static inline void unused(...) {}
 
 static inline bool get_sign8(fast_u8 n) {
     return (n & sign8_mask) != 0;
+}
+
+static inline fast_u8 add8(fast_u8 a, fast_u8 b) {
+    return (a + b) & mask8;
+}
+
+static inline fast_u8 inc8(fast_u8 n) {
+    return add8(n, 1);
 }
 
 static inline bool neg8(fast_u8 n) {
@@ -154,9 +173,15 @@ public:
             return (*this)->on_ld_rp_nn(rp, nn); }
         }
         switch(op) {
-        case 0x00: return (*this)->on_nop();
-        case 0xc3: return (*this)->on_jp_nn((*this)->on_imm16_read());
-        case 0xf3: return (*this)->on_di();
+        case 0x00:
+            return (*this)->on_nop();
+        case 0xc3:
+            return (*this)->on_jp_nn((*this)->on_imm16_read());
+        case 0xd3:
+            // OUT (n), A  f(4) r(3) o(4)
+            return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
+        case 0xf3:
+            return (*this)->on_di();
         }
 
         // TODO
@@ -245,6 +270,7 @@ public:
         (*this)->on_format("ld P, W", static_cast<int>(rp),
                            static_cast<unsigned>(nn)); }
     void on_nop() { (*this)->on_format("nop"); }
+    void on_out_n_a(fast_u8 n) { (*this)->on_format("out (N), a", n); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -628,6 +654,10 @@ public:
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
+    void on_out_n_a(fast_u8 n) {
+        fast_u8 a = (*this)->on_get_a();
+        (*this)->on_output_cycle(make16(a, n), a);
+        (*this)->on_set_memptr(make16(a, inc8(n))); }
 
     fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
@@ -657,9 +687,18 @@ public:
         return b;
     }
 
+    fast_u8 on_disp_read_cycle(fast_u16 addr) {
+        return (*this)->on_3t_read_cycle(addr);
+    }
+
     void on_5t_exec_cycle(fast_u16 addr) {
         unused(addr);
         (*this)->tick(5);
+    }
+
+    void on_output_cycle(fast_u16 addr, fast_u8 b) {
+        unused(addr, b);
+        (*this)->tick(4);
     }
 
     fast_u8 on_3t_imm8_read() {
@@ -683,10 +722,6 @@ public:
         fast_u8 hi = (*this)->on_3t_read_cycle(pc);
         (*this)->set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo);
-    }
-
-    fast_u8 on_disp_read_cycle(fast_u16 addr) {
-        return (*this)->on_3t_read_cycle(addr);
     }
 
     fast_u8 on_disp_read() {

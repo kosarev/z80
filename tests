@@ -58,6 +58,19 @@ c3cdab jp 0xabcd
  0 fetch 00 at 0000
  4 set_pc_on_fetch 0000 -> 0001
 
+# OUT (n), r
+d3ab out (0xab), a
+ 0 get_pc_on_fetch 0000
+ 0 fetch d3 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read ab at 0001
+ 4 get_pc_on_imm8_read 0001
+ 4 3t_read ab at 0001
+ 7 set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 output 00 at 00ab
+11 set_memptr 0000 -> 00ac
+
 # XOR r
 af xor a
  0 get_pc_on_fetch 0000
