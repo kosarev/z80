@@ -124,6 +124,13 @@ void disassembler_base::on_format(const char *fmt, ...) {
             auto rp = static_cast<regp>(va_arg(args, int));
             out.append(get_reg_name(rp));
             break; }
+        case 'N': {  // An 8-bit immediate operand.
+            auto n = static_cast<fast_u8>(va_arg(args, unsigned));
+            char buff[32];
+            std::snprintf(buff, sizeof(buff), "0x%02x",
+                          static_cast<unsigned>(n));
+            out.append(buff);
+            break; }
         case 'W': {  // A 16-bit immediate operand.
             auto nn = static_cast<fast_u16>(va_arg(args, unsigned));
             char buff[32];

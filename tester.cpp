@@ -308,12 +308,19 @@ public:
         match_set_pc("fetch", pc);
         processor::set_pc_on_fetch(pc); }
 
-    fast_u16 get_pc_on_imm_read() const {
-        match_get_pc("imm_read");
-        return processor::get_pc_on_imm_read(); }
-    void set_pc_on_imm_read(fast_u16 pc) {
-        match_set_pc("imm_read", pc);
-        processor::set_pc_on_imm_read(pc); }
+    fast_u16 get_pc_on_imm8_read() const {
+        match_get_pc("imm8_read");
+        return processor::get_pc_on_imm8_read(); }
+    void set_pc_on_imm8_read(fast_u16 pc) {
+        match_set_pc("imm8_read", pc);
+        processor::set_pc_on_imm8_read(pc); }
+
+    fast_u16 get_pc_on_imm16_read() const {
+        match_get_pc("imm16_read");
+        return processor::get_pc_on_imm16_read(); }
+    void set_pc_on_imm16_read(fast_u16 pc) {
+        match_set_pc("imm16_read", pc);
+        processor::set_pc_on_imm16_read(pc); }
 
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
@@ -327,12 +334,48 @@ public:
         return processor::on_fetch_cycle(addr);
     }
 
-    fast_u8 on_imm_read_cycle(fast_u16 addr) {
-        input.read_and_match("%2u imm_read %02x at %04x",
+    fast_u8 on_3t_read_cycle(fast_u16 addr) {
+        input.read_and_match("%2u 3t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_imm_read_cycle(addr);
+        return processor::on_3t_read_cycle(addr);
+    }
+
+    fast_u8 on_5t_read_cycle(fast_u16 addr) {
+        input.read_and_match("%2u 5t_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return processor::on_5t_read_cycle(addr);
+    }
+
+    fast_u8 on_3t_imm8_read() {
+        fast_u16 addr = get_pc();
+        input.read_and_match("%2u 3t_imm8_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return processor::on_3t_imm8_read();
+    }
+
+    fast_u8 on_5t_imm8_read() {
+        fast_u16 addr = get_pc();
+        input.read_and_match("%2u 5t_imm8_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return processor::on_5t_imm8_read();
+    }
+
+    fast_u16 on_imm16_read() {
+        fast_u16 addr = get_pc();
+        fast_u16 v = z80::make16(on_access(z80::inc16(addr)), on_access(addr));
+        input.read_and_match("%2u imm16_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(v),
+                             static_cast<unsigned>(addr));
+        return processor::on_imm16_read();
     }
 
     void set_iff1_on_di(bool iff1) {

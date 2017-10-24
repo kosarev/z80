@@ -12,12 +12,11 @@ c3cdab jp 0xabcd
  0 get_pc_on_fetch 0000
  0 fetch c3 at 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_imm_read 0001
- 4 imm_read cd at 0001
- 7 set_pc_on_imm_read 0001 -> 0002
- 7 get_pc_on_imm_read 0002
- 7 imm_read ab at 0002
-10 set_pc_on_imm_read 0002 -> 0003
+ 4 imm16_read abcd at 0001
+ 4 get_pc_on_imm16_read 0001
+ 4 3t_read cd at 0001
+ 7 3t_read ab at 0002
+10 set_pc_on_imm16_read 0001 -> 0003
 10 set_memptr 0000 -> abcd
 10 set_pc_on_jump 0003 -> abcd
 
@@ -29,17 +28,27 @@ c3cdab jp 0xabcd
  4 get_a 00
  4 set_b 00 -> 00
 
+# LD r, n
+3eaf ld a, 0xaf
+ 0 get_pc_on_fetch 0000
+ 0 fetch 3e at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read af at 0001
+ 4 get_pc_on_imm8_read 0001
+ 4 3t_read af at 0001
+ 7 set_pc_on_imm8_read 0001 -> 0002
+ 7 set_a 00 -> af
+
 # LD rp, nn
 115634 ld de, 0x3456
  0 get_pc_on_fetch 0000
  0 fetch 11 at 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_imm_read 0001
- 4 imm_read 56 at 0001
- 7 set_pc_on_imm_read 0001 -> 0002
- 7 get_pc_on_imm_read 0002
- 7 imm_read 34 at 0002
-10 set_pc_on_imm_read 0002 -> 0003
+ 4 imm16_read 3456 at 0001
+ 4 get_pc_on_imm16_read 0001
+ 4 3t_read 56 at 0001
+ 7 3t_read 34 at 0002
+10 set_pc_on_imm16_read 0001 -> 0003
 10 set_e 00 -> 56
 10 set_d 00 -> 34
 
