@@ -83,11 +83,11 @@ bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
 }
 
-const char *get_index_reg_name(index_reg ip) {
+const char *get_index_reg_name(index_regp ip) {
     switch(ip) {
-    case index_reg::hl: return "hl";
-    case index_reg::ix: return "ix";
-    case index_reg::iy: return "iy";
+    case index_regp::hl: return "hl";
+    case index_regp::ix: return "ix";
+    case index_regp::iy: return "iy";
     }
     assert(0);
 }
@@ -108,9 +108,9 @@ void disassembler_base::on_format(const char *fmt, ...) {
             break; }
         case 'R': {  // A register.
             auto r = static_cast<reg>(va_arg(args, int));
-            auto ip = static_cast<index_reg>(va_arg(args, int));
+            auto ip = static_cast<index_regp>(va_arg(args, int));
             auto d = static_cast<fast_u8>(va_arg(args, int));
-            if(r != reg::at_hl || ip == index_reg::hl) {
+            if(r != reg::at_hl || ip == index_regp::hl) {
                 out.append(get_reg_name(r));
             } else {
                 out.append('(');

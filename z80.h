@@ -25,7 +25,6 @@ typedef uint_fast8_t fast_u8;
 #endif
 
 #if UINT_FAST16_MAX < UINT_MAX
-x
 typedef unsigned fast_u16;
 #else
 typedef uint_fast16_t fast_u16;
@@ -90,7 +89,7 @@ enum class reg { b, c, d, e, h, l, at_hl, a };
 
 enum class regp { bc, de, hl, sp };
 
-enum class index_reg { hl, ix, iy };
+enum class index_regp { hl, ix, iy };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 
@@ -99,10 +98,10 @@ class instructions_decoder {
 public:
     instructions_decoder() {}
 
-    index_reg get_index_reg() const { return index_r; }
+    index_regp get_index_reg() const { return index_rp; }
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(get_index_reg() == index_reg::hl || !may_need_disp)
+        if(get_index_reg() == index_regp::hl || !may_need_disp)
             return 0;
         fast_u8 d = (*this)->on_disp_read();
         (*this)->on_5t_exec_cycle((*this)->get_last_read_addr());
@@ -154,7 +153,7 @@ public:
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
             auto r = static_cast<reg>(y);
             fast_u8 d, n;
-            if(r != reg::at_hl || get_index_reg() == index_reg::hl) {
+            if(r != reg::at_hl || get_index_reg() == index_regp::hl) {
                 d = 0;
                 n = (*this)->on_3t_imm8_read();
             } else {
@@ -214,7 +213,7 @@ protected:
     static const fast_u8 q_mask = 0010;
 
 private:
-    index_reg index_r;
+    index_regp index_rp;
 };
 
 const char *get_reg_name(reg r);
@@ -256,14 +255,14 @@ public:
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", static_cast<unsigned>(nn)); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_reg ip = (*this)->get_index_reg();
+        index_regp ip = (*this)->get_index_reg();
         (*this)->on_format("ld R, R",
                            static_cast<int>(rd), static_cast<int>(ip),
                            static_cast<int>(d),
                            static_cast<int>(rs), static_cast<int>(ip),
                            static_cast<int>(d)); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_reg ip = (*this)->get_index_reg();
+        index_regp ip = (*this)->get_index_reg();
         (*this)->on_format("ld R, N", r, ip, d, n);
     }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
@@ -541,11 +540,11 @@ public:
     }
 
     fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
-        index_reg ip = (*this)->get_index_reg();
+        index_regp ip = (*this)->get_index_reg();
         fast_u16 addr = get_disp_target(get_index_reg_value(ip), d);
         fast_u8 res = long_read_cycle ? (*this)->on_4t_read_cycle(addr) :
                                         (*this)->on_3t_read_cycle(addr);
-        if(ip != index_reg::hl)
+        if(ip != index_regp::hl)
             (*this)->on_set_memptr(addr);
         return res;
     }
@@ -602,11 +601,11 @@ public:
         assert(0);
     }
 
-    fast_u16 get_index_reg_value(index_reg ip) {
+    fast_u16 get_index_reg_value(index_regp ip) {
         switch(ip) {
-        case index_reg::hl: return (*this)->on_get_hl();
-        case index_reg::ix: return (*this)->on_get_ix();
-        case index_reg::iy: return (*this)->on_get_iy();
+        case index_regp::hl: return (*this)->on_get_hl();
+        case index_regp::ix: return (*this)->on_get_ix();
+        case index_regp::iy: return (*this)->on_get_iy();
         }
         assert(0);
     }
