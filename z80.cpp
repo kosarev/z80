@@ -7,8 +7,6 @@
     Published under the MIT license.
 */
 
-#include <cstdarg>
-
 #include "z80.h"
 
 namespace z80 {
@@ -92,24 +90,29 @@ const char *get_index_reg_name(index_regp ip) {
     assert(0);
 }
 
+template<typename T>
+T get_arg(const void **&args) {
+    const T &value = *static_cast<const T*>(*args);
+    ++args;
+    return value;
+}
+
 }  // anonymous namespace
 
-void disassembler_base::on_format(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
+void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
     output_buff out;
     for(const char *p = fmt; *p != '\0'; ++p) {
         switch(*p) {
         case 'A': {  // ALU mnemonic.
-            auto k = va_arg(args, alu);
+            auto k = get_arg<alu>(args);
             out.append(get_alu_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");
             break; }
         case 'R': {  // A register.
-            auto r = va_arg(args, reg);
-            auto ip = va_arg(args, index_regp);
-            auto d = va_arg(args, fast_u8);
+            auto r = get_arg<reg>(args);
+            auto ip = get_arg<index_regp>(args);
+            auto d = get_arg<fast_u8>(args);
             if(r != reg::at_hl || ip == index_regp::hl) {
                 out.append(get_reg_name(r));
             } else {
@@ -121,18 +124,18 @@ void disassembler_base::on_format(const char *fmt, ...) {
             }
             break; }
         case 'P': {  // A register pair.
-            auto rp = va_arg(args, regp);
+            auto rp = get_arg<regp>(args);
             out.append(get_reg_name(rp));
             break; }
         case 'N': {  // An 8-bit immediate operand.
-            auto n = va_arg(args, fast_u8);
+            auto n = get_arg<fast_u8>(args);
             char buff[32];
             std::snprintf(buff, sizeof(buff), "0x%02x",
                           static_cast<unsigned>(n));
             out.append(buff);
             break; }
         case 'W': {  // A 16-bit immediate operand.
-            auto nn = va_arg(args, fast_u16);
+            auto nn = get_arg<fast_u16>(args);
             char buff[32];
             std::snprintf(buff, sizeof(buff), "0x%04x",
                           static_cast<unsigned>(nn));
@@ -142,7 +145,6 @@ void disassembler_base::on_format(const char *fmt, ...) {
             out.append(*p);
         }
     }
-    va_end(args);
     out.append('\0');
 
     on_output(out.get_buff());

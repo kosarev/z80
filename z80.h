@@ -287,7 +287,17 @@ public:
 
     virtual void on_output(const char *out) = 0;
 
-    virtual void on_format(const char *fmt, ...);
+    void on_format(const char *fmt) {
+        on_format_impl(fmt, /* args= */ nullptr);
+    }
+
+    template<typename... types>
+    void on_format(const char *fmt, const types &... args) {
+        const void *ptrs[] = { static_cast<const void*>(&args)... };
+        on_format_impl(fmt, ptrs);
+    }
+
+    virtual void on_format_impl(const char *fmt, const void *args[]);
 };
 
 template<typename D>
