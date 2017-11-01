@@ -91,12 +91,16 @@ enum class regp { bc, de, hl, sp };
 
 enum class index_regp { hl, ix, iy };
 
+enum class instruction_prefix { none, cb, ed };
+
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 
 template<typename D>
 class instructions_decoder {
 public:
-    instructions_decoder() {}
+    instructions_decoder()
+      : index_rp(index_regp::hl), prefix(instruction_prefix::none)
+    {}
 
     index_regp get_index_reg() const { return index_rp; }
 
@@ -116,7 +120,11 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    void on_decode() {
+    void on_ed_prefix() {
+        prefix = instruction_prefix::ed;
+    }
+
+    void decode_unprefixed() {
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
@@ -179,6 +187,8 @@ public:
         case 0xd3:
             // OUT (n), A  f(4) r(3) o(4)
             return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
+        case 0xed:
+            return (*this)->on_ed_prefix();
         case 0xf3:
             return (*this)->on_di();
         }
@@ -188,6 +198,36 @@ public:
                      static_cast<unsigned>(op),
                      static_cast<unsigned>((*this)->get_last_read_addr()));
         std::abort();
+    }
+
+    void decode_cb_prefixed() {
+        fast_u8 op = (*this)->on_fetch();
+
+        std::fprintf(stderr, "Unknown CB-prefixed opcode 0x%02x at 0x%04x.\n",
+                     static_cast<unsigned>(op),
+                     static_cast<unsigned>((*this)->get_last_read_addr()));
+        std::abort();
+    }
+
+    void decode_ed_prefixed() {
+        fast_u8 op = (*this)->on_fetch();
+
+        std::fprintf(stderr, "Unknown ED-prefixed opcode 0x%02x at 0x%04x.\n",
+                     static_cast<unsigned>(op),
+                     static_cast<unsigned>((*this)->get_last_read_addr()));
+        std::abort();
+    }
+
+    void on_decode() {
+        switch(prefix) {
+        case instruction_prefix::none:
+            return decode_unprefixed();
+        case instruction_prefix::cb:
+            return decode_cb_prefixed();
+        case instruction_prefix::ed:
+            return decode_ed_prefixed();
+        }
+        assert(0);
     }
 
     void decode() { (*this)->on_decode(); }
@@ -214,6 +254,7 @@ protected:
 
 private:
     index_regp index_rp;
+    instruction_prefix prefix;
 };
 
 const char *get_reg_name(reg r);

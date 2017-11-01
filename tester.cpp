@@ -159,6 +159,7 @@ public:
         std::memcpy(instr_code, code, size);
         instr_size = size;
         index = 0;
+        output_buff[0] = '\0';
     }
 
 private:
