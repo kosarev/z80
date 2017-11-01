@@ -371,6 +371,15 @@ public:
         return base::on_5t_read_cycle(addr);
     }
 
+    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+        input.read_and_match("%2u 3t_write %02x -> %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(n),
+                             static_cast<unsigned>(addr));
+        base::on_3t_write_cycle(addr, n);
+    }
+
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
         input.read_and_match("%2u output %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
@@ -440,6 +449,8 @@ public:
         base::step();
         while(get_prefix() != z80::instruction_prefix::none)
             base::step();
+
+        input.read_and_match("%2u done", static_cast<unsigned>(get_ticks()));
     }
 
 private:

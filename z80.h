@@ -634,6 +634,14 @@ public:
         return res;
     }
 
+    void write_at_disp(fast_u8 d, fast_u8 n) {
+        index_regp ip = (*this)->get_index_reg();
+        fast_u16 addr = get_disp_target(get_index_reg_value(ip), d);
+        (*this)->on_3t_write_cycle(addr, n);
+        if(ip != index_regp::hl)
+            (*this)->on_set_memptr(addr);
+    }
+
     fast_u8 get_r(reg r) {
         switch(r) {
         case reg::b: return get_b();
@@ -670,7 +678,7 @@ public:
         case reg::e: return (*this)->on_set_e(n);
         case reg::h: return (*this)->on_set_h(n);
         case reg::l: return (*this)->on_set_l(n);
-        case reg::at_hl: unused(d); assert(0); break;  // TODO
+        case reg::at_hl: return write_at_disp(d, n);
         case reg::a: return (*this)->on_set_a(n);
         }
         assert(0);
@@ -779,6 +787,11 @@ public:
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return (*this)->on_3t_read_cycle(addr);
+    }
+
+    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_access(addr) = static_cast<least_u8>(n);
+        (*this)->tick(3);
     }
 
     void on_5t_exec_cycle(fast_u16 addr) {
