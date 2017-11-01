@@ -62,11 +62,11 @@ static inline bool abs8(fast_u8 n) {
 }
 
 static inline fast_u8 get_low8(fast_u16 n) {
-    return static_cast<fast_u8>(n & mask8);
+    return n & mask8;
 }
 
 static inline fast_u8 get_high8(fast_u16 n) {
-    return static_cast<fast_u8>((n >> 8) & mask8);
+    return (n >> 8) & mask8;
 }
 
 static inline fast_u16 make16(fast_u8 hi, fast_u8 lo) {
@@ -238,17 +238,13 @@ protected:
     static const fast_u8 x_mask = 0300;
 
     static const fast_u8 y_mask = 0070;
-    fast_u8 get_y_part(fast_u8 op) {
-        return static_cast<fast_u8>((op & y_mask) >> 3);
-    }
+    fast_u8 get_y_part(fast_u8 op) { return (op & y_mask) >> 3; }
 
     static const fast_u8 z_mask = 0007;
     fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
 
     static const fast_u8 p_mask = 0060;
-    fast_u8 get_p_part(fast_u8 op) {
-        return static_cast<fast_u8>((op & p_mask) >> 4);
-    }
+    fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
 
     static const fast_u8 q_mask = 0010;
 
@@ -290,28 +286,23 @@ public:
     void on_5t_exec_cycle(fast_u16 addr) { unused(addr); }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        (*this)->on_format("A R", static_cast<int>(k), static_cast<int>(r),
-                           static_cast<int>((*this)->get_index_reg()),
-                           static_cast<int>(d)); }
-    void on_di() { (*this)->on_format("di"); }
+        (*this)->on_format("A R", k, r, (*this)->get_index_reg(), d); }
+    void on_di() {
+        (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
-        (*this)->on_format("jp W", static_cast<unsigned>(nn)); }
+        (*this)->on_format("jp W", nn); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
         index_regp ip = (*this)->get_index_reg();
-        (*this)->on_format("ld R, R",
-                           static_cast<int>(rd), static_cast<int>(ip),
-                           static_cast<int>(d),
-                           static_cast<int>(rs), static_cast<int>(ip),
-                           static_cast<int>(d)); }
+        (*this)->on_format("ld R, R", rd, ip, d, rs, ip, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
         index_regp ip = (*this)->get_index_reg();
-        (*this)->on_format("ld R, N", r, ip, d, n);
-    }
+        (*this)->on_format("ld R, N", r, ip, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        (*this)->on_format("ld P, W", static_cast<int>(rp),
-                           static_cast<unsigned>(nn)); }
-    void on_nop() { (*this)->on_format("nop"); }
-    void on_out_n_a(fast_u8 n) { (*this)->on_format("out (N), a", n); }
+        (*this)->on_format("ld P, W", rp, nn); }
+    void on_nop() {
+        (*this)->on_format("nop"); }
+    void on_out_n_a(fast_u8 n) {
+        (*this)->on_format("out (N), a", n); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -343,7 +334,7 @@ protected:
     static const fast_u8 cf_mask = 1 << cf_bit;
 
     fast_u8 zf_ari(fast_u8 n) {
-        return static_cast<fast_u8>((n == 0 ? 1 : 0) << zf_bit);
+        return (n == 0 ? 1u : 0u) << zf_bit;
     }
 
     bool pf_log4(fast_u8 n) {
@@ -352,8 +343,8 @@ protected:
 
     fast_u8 pf_log(fast_u8 n) {
         bool lo = pf_log4(n);
-        bool hi = pf_log4(static_cast<fast_u8>(n >> 4));
-        return static_cast<fast_u8>((lo == hi ? 1 : 0) << pf_bit);
+        bool hi = pf_log4(n >> 4);
+        return (lo == hi ? 1u : 0u) << pf_bit;
     }
 
     struct processor_state {
@@ -663,7 +654,7 @@ public:
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
-        unsigned f;
+        fast_u8 f;
         switch(k) {
         case alu::add: assert(0); break;  // TODO
         case alu::adc: assert(0); break;  // TODO
@@ -678,7 +669,7 @@ public:
         case alu::cp: assert(0); break;  // TODO
         }
         (*this)->on_set_a(a);
-        (*this)->on_set_f(static_cast<fast_u8>(f));
+        (*this)->on_set_f(f);
     }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
