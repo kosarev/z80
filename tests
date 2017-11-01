@@ -39,6 +39,20 @@ c3cdab jp 0xabcd
  7 set_pc_on_imm8_read 0001 -> 0002
  7 set_a 00 -> af
 
+# LD I, A
+ed47 ld i, a
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 47 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 5t_fetch
+ 9 get_a 00
+ 9 set_i 00 -> 00
+ 9 prefix_reset
+
 # LD rp, nn
 115634 ld de, 0x3456
  0 get_pc_on_fetch 0000

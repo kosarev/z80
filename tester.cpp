@@ -131,6 +131,8 @@ static const unsigned max_instr_size = 3;
 
 class disassembler : public z80::disassembler<disassembler> {
 public:
+    typedef z80::disassembler<disassembler> base;
+
     disassembler()
         : index(0), instr_size(0)
     {}
@@ -161,6 +163,13 @@ public:
         output_buff[0] = '\0';
     }
 
+    void disassemble() {
+        // Skip prefixes.
+        base::disassemble();
+        while(get_prefix() != z80::instruction_prefix::none)
+            base::disassemble();
+    }
+
 private:
     unsigned index;
     least_u8 instr_code[max_instr_size];
@@ -172,7 +181,7 @@ private:
 
 class machine : public z80::processor<machine> {
 public:
-    typedef processor<machine> processor;
+    typedef processor<machine> base;
     typedef uint_fast32_t ticks_type;
 
     machine(test_input &input)
@@ -215,80 +224,87 @@ public:
     }
 
     fast_u8 on_get_b() { match_get_r("b", get_b());
-                         return processor::on_get_b(); }
+                         return base::on_get_b(); }
     void on_set_b(fast_u8 b) { match_set_r("b", get_b(), b);
-                               return processor::on_set_b(b); }
+                               return base::on_set_b(b); }
 
     fast_u8 on_get_c() { match_get_r("c", get_c());
-                         return processor::on_get_c(); }
+                         return base::on_get_c(); }
     void on_set_c(fast_u8 c) { match_set_r("c", get_c(), c);
-                               return processor::on_set_c(c); }
+                               return base::on_set_c(c); }
 
     fast_u8 on_get_d() { match_get_r("d", get_d());
-                         return processor::on_get_d(); }
+                         return base::on_get_d(); }
     void on_set_d(fast_u8 d) { match_set_r("d", get_d(), d);
-                               return processor::on_set_d(d); }
+                               return base::on_set_d(d); }
 
     fast_u8 on_get_e() { match_get_r("e", get_e());
-                         return processor::on_get_e(); }
+                         return base::on_get_e(); }
     void on_set_e(fast_u8 e) { match_set_r("e", get_e(), e);
-                               return processor::on_set_e(e); }
+                               return base::on_set_e(e); }
 
     fast_u8 on_get_h() { match_get_r("h", get_h());
-                         return processor::on_get_h(); }
+                         return base::on_get_h(); }
     void on_set_h(fast_u8 h) { match_set_r("h", get_h(), h);
-                               return processor::on_set_h(h); }
+                               return base::on_set_h(h); }
 
     fast_u8 on_get_l() { match_get_r("l", get_l());
-                         return processor::on_get_l(); }
+                         return base::on_get_l(); }
     void on_set_l(fast_u8 l) { match_set_r("l", get_l(), l);
-                               return processor::on_set_l(l); }
+                               return base::on_set_l(l); }
 
     fast_u8 on_get_a() { match_get_r("a", get_a());
-                         return processor::on_get_a(); }
+                         return base::on_get_a(); }
     void on_set_a(fast_u8 a) { match_set_r("a", get_a(), a);
-                               return processor::on_set_a(a); }
+                               return base::on_set_a(a); }
 
 #if 0  // TODO
     fast_u8 on_get_f() { match_get_r("f", get_f());
-                         return processor::on_get_f(); }
+                         return base::on_get_f(); }
 #endif
     void on_set_f(fast_u8 f) { match_set_r("f", get_f(), f);
-                               return processor::on_set_f(f); }
+                               return base::on_set_f(f); }
 
     fast_u8 on_get_ixh() { match_get_r("ixh", get_ixh());
-                           return processor::on_get_ixh(); }
+                           return base::on_get_ixh(); }
 #if 0  // TODO
     void on_set_ixh(fast_u8 ixh) { match_set_r("ixh", get_ixh(), ixh);
-                                   return processor::on_set_ixh(ixh); }
+                                   return base::on_set_ixh(ixh); }
 #endif
 
     fast_u8 on_get_ixl() { match_get_r("ixl", get_ixl());
-                           return processor::on_get_ixl(); }
+                           return base::on_get_ixl(); }
 #if 0  // TODO
     void on_set_ixl(fast_u8 ixl) { match_set_r("ixl", get_ixl(), ixl);
-                                   return processor::on_set_ixl(ixl); }
+                                   return base::on_set_ixl(ixl); }
 #endif
 
     fast_u8 on_get_iyh() { match_get_r("iyh", get_iyh());
-                           return processor::on_get_iyh(); }
+                           return base::on_get_iyh(); }
 #if 0  // TODO
     void on_set_iyh(fast_u8 iyh) { match_set_r("iyh", get_iyh(), iyh);
-                                   return processor::on_set_iyh(iyh); }
+                                   return base::on_set_iyh(iyh); }
 #endif
 
     fast_u8 on_get_iyl() { match_get_r("iyl", get_iyl());
-                           return processor::on_get_iyl(); }
+                           return base::on_get_iyl(); }
 #if 0  // TODO
     void on_set_iyl(fast_u8 iyl) { match_set_r("iyl", get_iyl(), iyl);
-                                   return processor::on_set_iyl(iyl); }
+                                   return base::on_set_iyl(iyl); }
 #endif
 
+#if 0  // TODO
+    fast_u8 on_get_i() { match_get_r("i", get_i());
+                         return base::on_get_i(); }
+#endif
+    void on_set_i(fast_u8 i) { match_set_r("i", get_i(), i);
+                               return base::on_set_a(i); }
+
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
-                                  return processor::on_set_sp(sp); }
+                                  return base::on_set_sp(sp); }
 
     void on_set_memptr(fast_u16 mp) { match_set_rp("memptr", get_memptr(), mp);
-                                      return processor::on_set_memptr(mp); }
+                                      return base::on_set_memptr(mp); }
 
     void match_get_pc(const char *name) const {
         input.read_and_match("%2u get_pc_on_%s %04x",
@@ -302,35 +318,41 @@ public:
 
     fast_u16 get_pc_on_fetch() const {
         match_get_pc("fetch");
-        return processor::get_pc_on_fetch(); }
+        return base::get_pc_on_fetch(); }
     void set_pc_on_fetch(fast_u16 pc) {
         match_set_pc("fetch", pc);
-        processor::set_pc_on_fetch(pc); }
+        base::set_pc_on_fetch(pc); }
 
     fast_u16 get_pc_on_imm8_read() const {
         match_get_pc("imm8_read");
-        return processor::get_pc_on_imm8_read(); }
+        return base::get_pc_on_imm8_read(); }
     void set_pc_on_imm8_read(fast_u16 pc) {
         match_set_pc("imm8_read", pc);
-        processor::set_pc_on_imm8_read(pc); }
+        base::set_pc_on_imm8_read(pc); }
 
     fast_u16 get_pc_on_imm16_read() const {
         match_get_pc("imm16_read");
-        return processor::get_pc_on_imm16_read(); }
+        return base::get_pc_on_imm16_read(); }
     void set_pc_on_imm16_read(fast_u16 pc) {
         match_set_pc("imm16_read", pc);
-        processor::set_pc_on_imm16_read(pc); }
+        base::set_pc_on_imm16_read(pc); }
 
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
-        processor::set_pc_on_jump(pc); }
+        base::set_pc_on_jump(pc); }
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_fetch_cycle(addr);
+        return base::on_fetch_cycle(addr);
+    }
+
+    void on_5t_fetch_cycle() {
+        input.read_and_match("%2u 5t_fetch",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_5t_fetch_cycle();
     }
 
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
@@ -338,7 +360,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_3t_read_cycle(addr);
+        return base::on_3t_read_cycle(addr);
     }
 
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
@@ -346,7 +368,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_5t_read_cycle(addr);
+        return base::on_5t_read_cycle(addr);
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
@@ -354,7 +376,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(b),
                              static_cast<unsigned>(addr));
-        processor::on_output_cycle(addr, b);
+        base::on_output_cycle(addr, b);
     }
 
     fast_u8 on_3t_imm8_read() {
@@ -363,7 +385,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_3t_imm8_read();
+        return base::on_3t_imm8_read();
     }
 
     fast_u8 on_5t_imm8_read() {
@@ -372,7 +394,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_access(addr)),
                              static_cast<unsigned>(addr));
-        return processor::on_5t_imm8_read();
+        return base::on_5t_imm8_read();
     }
 
     fast_u16 on_imm16_read() {
@@ -382,7 +404,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(v),
                              static_cast<unsigned>(addr));
-        return processor::on_imm16_read();
+        return base::on_imm16_read();
     }
 
     void set_iff1_on_di(bool iff1) {
@@ -390,7 +412,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(get_iff1()),
                              static_cast<unsigned>(iff1));
-        processor::set_iff1_on_di(iff1);
+        base::set_iff1_on_di(iff1);
     }
 
     void set_iff2_on_di(bool iff2) {
@@ -398,7 +420,26 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(get_iff2()),
                              static_cast<unsigned>(iff2));
-        processor::set_iff2_on_di(iff2);
+        base::set_iff2_on_di(iff2);
+    }
+
+    void on_ed_prefix() {
+        input.read_and_match("%2u ed_prefix",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_ed_prefix();
+    }
+
+    void on_prefix_reset() {
+        input.read_and_match("%2u prefix_reset",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_prefix_reset();
+    }
+
+    void step() {
+        // Skip prefixes.
+        base::step();
+        while(get_prefix() != z80::instruction_prefix::none)
+            base::step();
     }
 
 private:

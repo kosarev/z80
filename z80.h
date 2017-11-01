@@ -99,7 +99,7 @@ template<typename D>
 class instructions_decoder {
 public:
     instructions_decoder()
-      : index_rp(index_regp::hl), prefix(instruction_prefix::none)
+        : index_rp(index_regp::hl), prefix(instruction_prefix::none)
     {}
 
     index_regp get_index_reg() const { return index_rp; }
@@ -120,9 +120,11 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    void on_ed_prefix() {
-        prefix = instruction_prefix::ed;
-    }
+    instruction_prefix get_prefix() const { return prefix; }
+    void set_prefix(instruction_prefix p) { prefix = p; }
+
+    void on_ed_prefix() { set_prefix(instruction_prefix::ed); }
+    void on_prefix_reset() { set_prefix(instruction_prefix::none); }
 
     void decode_unprefixed() {
         fast_u8 op = (*this)->on_fetch();
@@ -210,7 +212,15 @@ public:
     }
 
     void decode_ed_prefixed() {
+        prefix_reset_guard guard(this);
         fast_u8 op = (*this)->on_fetch();
+
+        switch(op) {
+        case 0x47: {
+            // LD I, A  f(4) f(5)
+            (*this)->on_5t_fetch_cycle();
+            return (*this)->on_ld_i_a(); }
+        }
 
         std::fprintf(stderr, "Unknown ED-prefixed opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
@@ -219,7 +229,7 @@ public:
     }
 
     void on_decode() {
-        switch(prefix) {
+        switch(get_prefix()) {
         case instruction_prefix::none:
             return decode_unprefixed();
         case instruction_prefix::cb:
@@ -233,6 +243,20 @@ public:
     void decode() { (*this)->on_decode(); }
 
 protected:
+    class prefix_reset_guard {
+    public:
+        prefix_reset_guard(instructions_decoder *decoder)
+            : decoder(decoder)
+        {}
+
+        ~prefix_reset_guard() {
+            (*decoder)->on_prefix_reset();
+        }
+
+    private:
+        instructions_decoder *decoder;
+    };
+
     D *operator -> () { return static_cast<D*>(this); }
 
     static const fast_u8 x_mask = 0300;
@@ -270,9 +294,12 @@ template<typename D>
 class disassembler : public instructions_decoder<D>,
                      public disassembler_base {
 public:
+    typedef instructions_decoder<D> decoder;
+
     disassembler() {}
 
     fast_u8 on_fetch() { return (*this)->on_read(); }
+    void on_5t_fetch_cycle() {}
 
     fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
@@ -285,12 +312,17 @@ public:
 
     void on_5t_exec_cycle(fast_u16 addr) { unused(addr); }
 
+    void on_ed_prefix() { decoder::on_ed_prefix();
+                          (*this)->on_format("noni 0xed"); }
+
     void on_alu_r(alu k, reg r, fast_u8 d) {
         (*this)->on_format("A R", k, r, (*this)->get_index_reg(), d); }
     void on_di() {
         (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
+    void on_ld_i_a() {
+        (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
         index_regp ip = (*this)->get_index_reg();
         (*this)->on_format("ld R, R", rd, ip, d, rs, ip, d); }
@@ -350,16 +382,14 @@ protected:
     struct processor_state {
         processor_state()
             : last_read_addr(0),
-              bc(0), de(0), hl(0), af(0),
-              ix(0), iy(0),
-              pc(0), sp(0xffff), memptr(0),
+              bc(0), de(0), hl(0), af(0), ix(0), iy(0),
+              pc(0), sp(0xffff), ir(0), memptr(0),
               iff1(false), iff2(false)
         {}
 
         fast_u16 last_read_addr;
-        fast_u16 bc, de, hl, af;
-        fast_u16 ix, iy;
-        fast_u16 pc, sp, memptr;
+        fast_u16 bc, de, hl, af, ix, iy;
+        fast_u16 pc, sp, ir, memptr;
         bool iff1, iff2;
     } state;
 };
@@ -441,6 +471,17 @@ public:
 
     fast_u8 on_get_iyl() const { return get_iyl(); }
     void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
+
+    fast_u8 get_i() const { return get_high8(state.ir); }
+    void set_i(fast_u8 i) { state.ir = make16(i, get_r_reg()); }
+
+    fast_u8 on_get_i() const { return get_i(); }
+    void on_set_i(fast_u8 i) { set_i(i); }
+
+    void set_i_on_ld(fast_u8 i) { (*this)->on_set_i(i); }
+
+    fast_u8 get_r_reg() const { return get_low8(state.ir); }
+    void set_r_reg(fast_u8 r) { state.ir = make16(get_i(), r); }
 
     fast_u16 get_af() const { return state.af; }
     void set_af(fast_u16 af) { state.af = af; }
@@ -652,6 +693,10 @@ public:
         return (*this)->on_access(addr);
     }
 
+    void on_5t_fetch_cycle() {
+        (*this)->tick(1);
+    }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f;
@@ -680,6 +725,8 @@ public:
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
+    void on_ld_i_a() {
+        (*this)->set_i_on_ld((*this)->on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
         (*this)->on_set_r(rd, d, (*this)->on_get_r(rs, d)); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
