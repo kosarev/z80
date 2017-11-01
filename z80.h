@@ -271,7 +271,8 @@ public:
 };
 
 template<typename D>
-class disassembler : public disassembler_base {
+class disassembler : public instructions_decoder<D>,
+                     public disassembler_base {
 public:
     disassembler() {}
 
@@ -373,7 +374,8 @@ protected:
 };
 
 template<typename D>
-class processor : public processor_base {
+class processor : public instructions_decoder<D>,
+                  public processor_base {
 public:
     processor() {}
 

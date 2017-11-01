@@ -129,8 +129,7 @@ private:
 
 static const unsigned max_instr_size = 3;
 
-class disassembler : public z80::instructions_decoder<disassembler>,
-                     public z80::disassembler<disassembler> {
+class disassembler : public z80::disassembler<disassembler> {
 public:
     disassembler()
         : index(0), instr_size(0)
@@ -171,8 +170,7 @@ private:
     char output_buff[max_output_buff_size];
 };
 
-class machine : public z80::instructions_decoder<machine>,
-                public z80::processor<machine> {
+class machine : public z80::processor<machine> {
 public:
     typedef processor<machine> processor;
     typedef uint_fast32_t ticks_type;
