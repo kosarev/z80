@@ -25,11 +25,20 @@ const char *get_reg_name(reg r) {
     assert(0);
 }
 
-const char *get_reg_name(regp r) {
-    switch(r) {
+const char *get_reg_name(index_regp irp) {
+    switch(irp) {
+    case index_regp::hl: return "hl";
+    case index_regp::ix: return "ix";
+    case index_regp::iy: return "iy";
+    }
+    assert(0);
+}
+
+const char *get_reg_name(regp rp, index_regp irp) {
+    switch(rp) {
     case regp::bc: return "bc";
     case regp::de: return "de";
-    case regp::hl: assert(0); break; // TODO
+    case regp::hl: return get_reg_name(irp);
     case regp::sp: return "sp";
     }
     assert(0);

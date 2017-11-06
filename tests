@@ -1,4 +1,16 @@
 
+# DEC rp
+2b dec hl
+ 0 get_pc_on_fetch 0000
+ 0 fetch 2b at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 6t_fetch
+ 6 get_l 00
+ 6 get_h 00
+ 6 set_l 00 -> ff
+ 6 set_h 00 -> ff
+ 6 done
+
 # DI
 f3 di
  0 get_pc_on_fetch 0000

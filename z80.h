@@ -85,6 +85,10 @@ static inline fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
+static inline fast_u16 dec16(fast_u16 n) {
+    return sub16(n, 1);
+}
+
 enum class reg { b, c, d, e, h, l, at_hl, a };
 
 enum class regp { bc, de, hl, sp };
@@ -102,10 +106,10 @@ public:
         : index_rp(index_regp::hl), prefix(instruction_prefix::none)
     {}
 
-    index_regp get_index_reg() const { return index_rp; }
+    index_regp get_index_rp_kind() const { return index_rp; }
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(get_index_reg() == index_regp::hl || !may_need_disp)
+        if(get_index_rp_kind() == index_regp::hl || !may_need_disp)
             return 0;
         fast_u8 d = (*this)->on_disp_read();
         (*this)->on_5t_exec_cycle((*this)->get_last_read_addr());
@@ -163,7 +167,7 @@ public:
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
             auto r = static_cast<reg>(y);
             fast_u8 d, n;
-            if(r != reg::at_hl || get_index_reg() == index_regp::hl) {
+            if(r != reg::at_hl || get_index_rp_kind() == index_regp::hl) {
                 d = 0;
                 n = (*this)->on_3t_imm8_read();
             } else {
@@ -180,6 +184,13 @@ public:
             auto rp = static_cast<regp>(p);
             fast_u16 nn = (*this)->on_imm16_read();
             return (*this)->on_ld_rp_nn(rp, nn); }
+        case 0013: {
+            // DEC rp[p]:
+            // DEC rr           f(6)
+            // DEC i       f(4) f(6)
+            (*this)->on_6t_fetch_cycle();
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_dec_rp(rp); }
         }
         switch(op) {
         case 0x00:
@@ -278,7 +289,8 @@ private:
 };
 
 const char *get_reg_name(reg r);
-const char *get_reg_name(regp r);
+const char *get_reg_name(index_regp irp);
+const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
 
 class disassembler_base {
 public:
@@ -310,6 +322,7 @@ public:
 
     fast_u8 on_fetch() { return (*this)->on_read(); }
     void on_5t_fetch_cycle() {}
+    void on_6t_fetch_cycle() {}
 
     fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
@@ -326,7 +339,9 @@ public:
                           (*this)->on_format("noni 0xed"); }
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        (*this)->on_format("A R", k, r, (*this)->get_index_reg(), d); }
+        (*this)->on_format("A R", k, r, (*this)->get_index_rp_kind(), d); }
+    void on_dec_rp(regp rp) {
+        (*this)->on_format("dec P", rp); }
     void on_di() {
         (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
@@ -334,10 +349,10 @@ public:
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp ip = (*this)->get_index_reg();
+        index_regp ip = (*this)->get_index_rp_kind();
         (*this)->on_format("ld R, R", rd, ip, d, rs, ip, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp ip = (*this)->get_index_reg();
+        index_regp ip = (*this)->get_index_rp_kind();
         (*this)->on_format("ld R, N", r, ip, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_format("ld P, W", rp, nn); }
@@ -625,20 +640,18 @@ public:
     }
 
     fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
-        index_regp ip = (*this)->get_index_reg();
-        fast_u16 addr = get_disp_target(get_index_reg_value(ip), d);
+        fast_u16 addr = get_disp_target((*this)->on_get_index_rp(), d);
         fast_u8 res = long_read_cycle ? (*this)->on_4t_read_cycle(addr) :
                                         (*this)->on_3t_read_cycle(addr);
-        if(ip != index_regp::hl)
+        if((*this)->get_index_rp_kind() != index_regp::hl)
             (*this)->on_set_memptr(addr);
         return res;
     }
 
     void write_at_disp(fast_u8 d, fast_u8 n) {
-        index_regp ip = (*this)->get_index_reg();
-        fast_u16 addr = get_disp_target(get_index_reg_value(ip), d);
+        fast_u16 addr = get_disp_target((*this)->on_get_index_rp(), d);
         (*this)->on_3t_write_cycle(addr, n);
-        if(ip != index_regp::hl)
+        if((*this)->get_index_rp_kind() != index_regp::hl)
             (*this)->on_set_memptr(addr);
     }
 
@@ -684,21 +697,49 @@ public:
         assert(0);
     }
 
+    fast_u16 on_get_rp(regp rp) {
+        switch(rp) {
+        case regp::bc: return (*this)->on_get_bc();
+        case regp::de: return (*this)->on_get_de();
+        case regp::hl: return (*this)->on_get_index_rp();
+        case regp::sp: return (*this)->on_get_sp();
+        }
+        assert(0);
+    }
+
     void on_set_rp(regp rp, fast_u16 nn) {
         switch(rp) {
         case regp::bc: return (*this)->on_set_bc(nn);
         case regp::de: return (*this)->on_set_de(nn);
-        case regp::hl: assert(0); break;  // TODO
+        case regp::hl: return (*this)->on_set_index_rp(nn);
         case regp::sp: return (*this)->on_set_sp(nn);
         }
         assert(0);
     }
 
-    fast_u16 get_index_reg_value(index_regp ip) {
+    fast_u16 get_index_rp(index_regp ip) {
         switch(ip) {
+        case index_regp::hl: return get_hl();
+        case index_regp::ix: return get_ix();
+        case index_regp::iy: return get_iy();
+        }
+        assert(0);
+    }
+
+    fast_u16 on_get_index_rp() {
+        switch((*this)->get_index_rp_kind()) {
         case index_regp::hl: return (*this)->on_get_hl();
         case index_regp::ix: return (*this)->on_get_ix();
         case index_regp::iy: return (*this)->on_get_iy();
+        }
+        assert(0);
+    }
+
+    void on_set_index_rp(fast_u16 nn) {
+        switch((*this)->get_index_rp_kind()) {
+        case index_regp::hl: return (*this)->on_set_hl(nn);
+        case index_regp::ix: return (*this)->on_set_ix(nn);
+        case index_regp::iy: return (*this)->on_set_iy(nn);
         }
         assert(0);
     }
@@ -713,6 +754,10 @@ public:
 
     void on_5t_fetch_cycle() {
         (*this)->tick(1);
+    }
+
+    void on_6t_fetch_cycle() {
+        (*this)->tick(2);
     }
 
     void do_alu(alu k, fast_u8 n) {
@@ -737,6 +782,8 @@ public:
 
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
+    void on_dec_rp(regp rp) {
+        (*this)->on_set_rp(rp, dec16((*this)->on_get_rp(rp))); }
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }

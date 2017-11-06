@@ -355,6 +355,12 @@ public:
         base::on_5t_fetch_cycle();
     }
 
+    void on_6t_fetch_cycle() {
+        input.read_and_match("%2u 6t_fetch",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_6t_fetch_cycle();
+    }
+
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         input.read_and_match("%2u 3t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
