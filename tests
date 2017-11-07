@@ -44,6 +44,31 @@ c3cdab jp 0xabcd
 10 set_pc_on_jump 0003 -> abcd
 10 done
 
+# JR cc, d
+20fa jr nz, $-4
+ 0 get_pc_on_fetch 0000
+ 0 fetch 20 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 disp_read fa at 0001
+ 4 get_pc_on_disp_read 0001
+ 4 3t_read fa at 0001
+ 7 set_pc_on_disp_read 0001 -> 0002
+ 7 get_f 00
+ 7 done
+
+280a jr z, $+12
+ 0 get_pc_on_fetch 0000
+ 0 fetch 28 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 disp_read 0a at 0001
+ 4 get_pc_on_disp_read 0001
+ 4 3t_read 0a at 0001
+ 7 set_pc_on_disp_read 0001 -> 0002
+ 7 get_f 00
+12 set_memptr 0000 -> 000c
+12 set_pc_on_jump 0002 -> 000c
+12 done
+
 # LD r, r
 47 ld b, a
  0 get_pc_on_fetch 0000

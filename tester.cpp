@@ -258,10 +258,8 @@ public:
     void on_set_a(fast_u8 a) { match_set_r("a", get_a(), a);
                                return base::on_set_a(a); }
 
-#if 0  // TODO
     fast_u8 on_get_f() { match_get_r("f", get_f());
                          return base::on_get_f(); }
-#endif
     void on_set_f(fast_u8 f) { match_set_r("f", get_f(), f);
                                return base::on_set_f(f); }
 
@@ -336,6 +334,13 @@ public:
     void set_pc_on_imm16_read(fast_u16 pc) {
         match_set_pc("imm16_read", pc);
         base::set_pc_on_imm16_read(pc); }
+
+    fast_u16 get_pc_on_disp_read() const {
+        match_get_pc("disp_read");
+        return base::get_pc_on_disp_read(); }
+    void set_pc_on_disp_read(fast_u16 pc) {
+        match_set_pc("disp_read", pc);
+        base::set_pc_on_disp_read(pc); }
 
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
@@ -420,6 +425,15 @@ public:
                              static_cast<unsigned>(v),
                              static_cast<unsigned>(addr));
         return base::on_imm16_read();
+    }
+
+    fast_u8 on_disp_read() {
+        fast_u16 addr = get_pc();
+        input.read_and_match("%2u disp_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return base::on_disp_read();
     }
 
     void set_iff1_on_di(bool iff1) {

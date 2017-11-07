@@ -44,34 +44,6 @@ const char *get_reg_name(regp rp, index_regp irp) {
     assert(0);
 }
 
-namespace {
-
-class output_buff {
-public:
-    output_buff()
-        : size(0)
-    {}
-
-    const char *get_buff() const {
-        return buff;
-    }
-
-    void append(char c) {
-        assert(size < max_size);
-        buff[size++] = c;
-    }
-
-    void append(const char *str) {
-        for(const char *p = str; *p != '\0'; ++p)
-            append(*p);
-    }
-
-private:
-    static const unsigned max_size = 32;
-    unsigned size;
-    char buff[max_size];
-};
-
 const char *get_alu_mnemonic(alu k) {
     switch(k) {
     case alu::add: return "add";
@@ -98,6 +70,69 @@ const char *get_index_reg_name(index_regp ip) {
     }
     assert(0);
 }
+
+const char *get_condition_name(condition cc) {
+    switch(cc) {
+    case condition::nz: return "nz";
+    case condition::z: return "z";
+    case condition::nc: return "nc";
+    case condition::c: return "c";
+    case condition::po: return "po";
+    case condition::pe: return "pe";
+    case condition::p: return "p";
+    case condition::m: return "m";
+    }
+    assert(0);
+}
+
+namespace {
+
+class output_buff {
+public:
+    output_buff()
+        : size(0)
+    {}
+
+    const char *get_buff() const {
+        return buff;
+    }
+
+    void append(char c) {
+        assert(size < max_size);
+        buff[size++] = c;
+    }
+
+    void append(const char *str) {
+        for(const char *p = str; *p != '\0'; ++p)
+            append(*p);
+    }
+
+    void append_u8(fast_u8 n) {
+        char pad[32];
+        std::snprintf(pad, sizeof(pad), "0x%02x",
+                      static_cast<unsigned>(n));
+        append(pad);
+    }
+
+    void append_u16(fast_u16 n) {
+        char pad[32];
+        std::snprintf(pad, sizeof(pad), "0x%04x",
+                      static_cast<unsigned>(n));
+        append(pad);
+    }
+
+    void append_disp(int d) {
+        char pad[32];
+        std::snprintf(pad, sizeof(pad), "%+d",
+                      static_cast<int>(d));
+        append(pad);
+    }
+
+private:
+    static const unsigned max_size = 32;
+    unsigned size;
+    char buff[max_size];
+};
 
 template<typename T>
 T get_arg(const void **&args) {
@@ -127,8 +162,7 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             } else {
                 out.append('(');
                 out.append(get_index_reg_name(ip));
-                out.append(!get_sign8(d) ? '+' : '-');
-                out.append(abs8(d));
+                out.append_disp(sign_extend8(d));
                 out.append(')');
             }
             break; }
@@ -138,17 +172,20 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
-            char buff[32];
-            std::snprintf(buff, sizeof(buff), "0x%02x",
-                          static_cast<unsigned>(n));
-            out.append(buff);
+            out.append_u8(n);
             break; }
         case 'W': {  // A 16-bit immediate operand.
             auto nn = get_arg<fast_u16>(args);
-            char buff[32];
-            std::snprintf(buff, sizeof(buff), "0x%04x",
-                          static_cast<unsigned>(nn));
-            out.append(buff);
+            out.append_u16(nn);
+            break; }
+        case 'C': {  // A condition operand.
+            auto cc = get_arg<condition>(args);
+            out.append(get_condition_name(cc));
+            break; }
+        case 'D': {  // A relative address.
+            auto d = get_arg<int>(args);
+            out.append('$');
+            out.append_disp(d);
             break; }
         default:
             out.append(*p);

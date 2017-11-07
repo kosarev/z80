@@ -57,12 +57,17 @@ static inline fast_u8 inc8(fast_u8 n) {
     return add8(n, 1);
 }
 
-static inline bool neg8(fast_u8 n) {
+static inline fast_u8 neg8(fast_u8 n) {
     return ((n ^ mask8) + 1) & mask8;
 }
 
-static inline bool abs8(fast_u8 n) {
+static inline fast_u8 abs8(fast_u8 n) {
     return !get_sign8(n) ? n : neg8(n);
+}
+
+static inline int sign_extend8(fast_u8 n) {
+    auto a = static_cast<int>(abs8(n));
+    return !get_sign8(n) ? a : -a;
 }
 
 static inline fast_u8 get_low8(fast_u16 n) {
@@ -102,6 +107,8 @@ enum class index_regp { hl, ix, iy };
 enum class instruction_prefix { none, cb, ed };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
+
+enum condition { nz, z, nc, c, po, pe, p, m };
 
 template<typename D>
 class instructions_decoder {
@@ -179,6 +186,11 @@ public:
                 n = (*this)->on_5t_imm8_read();
             }
             return (*this)->on_ld_r_n(r, d, n); }
+        }
+        if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
+            // JR cc[y-4], d  f(4) r(3) + e(5)
+            auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
+            return (*this)->on_jr_cc(cc, (*this)->on_disp_read());
         }
         switch(op & (x_mask | z_mask | q_mask)) {
         case 0001: {
@@ -295,6 +307,10 @@ private:
 const char *get_reg_name(reg r);
 const char *get_reg_name(index_regp irp);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
+const char *get_alu_mnemonic(alu k);
+bool is_two_operand_alu_instr(alu k);
+const char *get_index_reg_name(index_regp ip);
+const char *get_condition_name(condition cc);
 
 class disassembler_base {
 public:
@@ -350,6 +366,8 @@ public:
         (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
+    void on_jr_cc(condition cc, fast_u8 d) {
+        (*this)->on_format("jr C, D", cc, sign_extend8(d) + 2); }
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
@@ -624,8 +642,8 @@ public:
     fast_u16 get_pc_on_imm16_read() const { return (*this)->on_get_pc(); }
     void set_pc_on_imm16_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
-    fast_u16 get_pc_on_disp() const { return (*this)->on_get_pc(); }
-    void set_pc_on_disp(fast_u16 pc) { (*this)->on_set_pc(pc); }
+    fast_u16 get_pc_on_disp_read() const { return (*this)->on_get_pc(); }
+    void set_pc_on_disp_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_pc_on_jump() const { return (*this)->on_get_pc(); }
     void set_pc_on_jump(fast_u16 pc) { (*this)->on_set_pc(pc); }
@@ -803,6 +821,22 @@ public:
         (*this)->on_set_f(f);
     }
 
+    fast_u8 get_flag_mask(condition cc) {
+        switch(cc / 2) {
+        case 0: return zf_mask;
+        case 1: return cf_mask;
+        case 2: return pf_mask;
+        case 3: return sf_mask;
+        }
+        assert(0);
+    }
+
+    bool check_condition(condition cc) {
+        bool actual = (*this)->on_get_f() & get_flag_mask(cc);
+        bool expected = !(cc & 1);
+        return actual == expected;
+    }
+
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
     void on_dec_rp(regp rp) {
@@ -813,6 +847,13 @@ public:
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
+    void on_jr_cc(condition cc, fast_u8 d) {
+        if(!check_condition(cc))
+            return;
+        (*this)->on_5t_exec_cycle((*this)->get_last_read_addr());
+        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
+        (*this)->on_set_memptr(memptr);
+        (*this)->set_pc_on_jump(memptr); }
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
@@ -898,9 +939,9 @@ public:
     }
 
     fast_u8 on_disp_read() {
-        fast_u16 pc = (*this)->get_pc_on_disp();
+        fast_u16 pc = (*this)->get_pc_on_disp_read();
         fast_u8 op = (*this)->on_disp_read_cycle(pc);
-        (*this)->set_pc_on_disp(inc16(pc));
+        (*this)->set_pc_on_disp_read(inc16(pc));
         return op;
     }
 
