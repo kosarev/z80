@@ -833,7 +833,7 @@ public:
 
     bool check_condition(condition cc) {
         bool actual = (*this)->on_get_f() & get_flag_mask(cc);
-        bool expected = !(cc & 1);
+        bool expected = cc & 1;
         return actual == expected;
     }
 

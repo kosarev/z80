@@ -45,9 +45,9 @@ c3cdab jp 0xabcd
 10 done
 
 # JR cc, d
-20fa jr nz, $-4
+28fa jr z, $-4
  0 get_pc_on_fetch 0000
- 0 fetch 20 at 0000
+ 0 fetch 28 at 0000
  4 set_pc_on_fetch 0000 -> 0001
  4 disp_read fa at 0001
  4 get_pc_on_disp_read 0001
@@ -56,9 +56,9 @@ c3cdab jp 0xabcd
  7 get_f 00
  7 done
 
-280a jr z, $+12
+200a jr nz, $+12
  0 get_pc_on_fetch 0000
- 0 fetch 28 at 0000
+ 0 fetch 20 at 0000
  4 set_pc_on_fetch 0000 -> 0001
  4 disp_read 0a at 0001
  4 get_pc_on_disp_read 0001
