@@ -803,7 +803,11 @@ public:
         case alu::adc: assert(0); break;  // TODO
         case alu::sub: assert(0); break;  // TODO
         case alu::sbc: assert(0); break;  // TODO
-        case alu::and_a: assert(0); break;  // TODO
+        case alu::and_a:
+            a &= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a) |
+                    hf_mask;
+            break;
         case alu::xor_a:
             a ^= n;
             f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);

@@ -1,4 +1,15 @@
 
+# AND r
+a7 and a
+ 0 get_pc_on_fetch 0000
+ 0 fetch a7 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_a 00
+ 4 get_a 00
+ 4 set_a 00 -> 00
+ 4 set_f 00 -> 54
+ 4 done
+
 # CP r
 bc cp h
  0 get_pc_on_fetch 0000
