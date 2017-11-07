@@ -1,4 +1,14 @@
 
+# CP r
+bc cp h
+ 0 get_pc_on_fetch 0000
+ 0 fetch bc at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_h 00
+ 4 get_a 00
+ 4 set_f 00 -> 42
+ 4 done
+
 # DEC rp
 2b dec hl
  0 get_pc_on_fetch 0000

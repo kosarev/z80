@@ -49,6 +49,10 @@ static inline fast_u8 add8(fast_u8 a, fast_u8 b) {
     return (a + b) & mask8;
 }
 
+static inline fast_u8 sub8(fast_u8 a, fast_u8 b) {
+    return (a - b) & mask8;
+}
+
 static inline fast_u8 inc8(fast_u8 n) {
     return add8(n, 1);
 }
@@ -394,6 +398,15 @@ protected:
         return (n == 0 ? 1u : 0u) << zf_bit;
     }
 
+    fast_u8 hf_ari(fast_u8 r, fast_u8 a, fast_u8 b) {
+        return (r ^ a ^ b) & hf_mask;
+    }
+
+    fast_u8 pf_ari(fast_u16 r, fast_u8 a, fast_u8 b) {
+        fast_u16 x = r ^ a ^ b;
+        return ((x >> 6) ^ (x >> 5)) & pf_mask;
+    }
+
     bool pf_log4(fast_u8 n) {
         return 0x9669 & (1 << (n & 0xf));
     }
@@ -402,6 +415,10 @@ protected:
         bool lo = pf_log4(n);
         bool hi = pf_log4(n >> 4);
         return (lo == hi ? 1u : 0u) << pf_bit;
+    }
+
+    fast_u8 cf_ari(bool c) {
+        return c ? cf_mask : 0;
     }
 
     struct processor_state {
@@ -774,9 +791,15 @@ public:
             f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
             break;
         case alu::or_a: assert(0); break;  // TODO
-        case alu::cp: assert(0); break;  // TODO
+        case alu::cp: {
+            fast_u8 d = sub8(a, n);
+            f = (d & sf_mask) | zf_ari(d) | (n & (yf_mask | xf_mask)) |
+                    hf_ari(d, a, n) | pf_ari(a - n, a, n) | cf_ari(d > a) |
+                    nf_mask;
+            break; }
         }
-        (*this)->on_set_a(a);
+        if(k != alu::cp)
+            (*this)->on_set_a(a);
         (*this)->on_set_f(f);
     }
 
