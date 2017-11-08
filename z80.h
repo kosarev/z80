@@ -113,6 +113,8 @@ enum class instruction_prefix { none, cb, ed };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 
+enum class block_ld { ldi, ldd, ldir, lddr };
+
 enum condition { nz, z, nc, c, po, pe, p, m };
 
 template<typename D>
@@ -284,6 +286,7 @@ public:
     void decode_ed_prefixed() {
         prefix_reset_guard guard(this);
         fast_u8 op = (*this)->on_fetch();
+        fast_u8 y = get_y_part(op);
         fast_u8 p = get_p_part(op);
 
         switch(op & (x_mask | z_mask)) {
@@ -300,6 +303,12 @@ public:
             fast_u16 nn = (*this)->on_imm16_read();
             return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
                                  (*this)->on_ld_at_nn_rp(nn, rp); }
+        case 0200: {
+            // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
+            if(y < 4)
+                return (*this)->on_noni_ed(op);
+            auto k = static_cast<block_ld>(y - 4);
+            return (*this)->on_block_ld(k); }
         }
         switch(op) {
         case 0x47: {
@@ -366,7 +375,8 @@ private:
 const char *get_reg_name(reg r);
 const char *get_reg_name(index_regp irp);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
-const char *get_alu_mnemonic(alu k);
+const char *get_mnemonic(alu k);
+const char *get_mnemonic(block_ld k);
 bool is_two_operand_alu_instr(alu k);
 const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
@@ -419,6 +429,9 @@ public:
     void on_ed_prefix() { decoder::on_ed_prefix();
                           (*this)->on_format("noni 0xed"); }
 
+    void on_noni_ed(fast_u8 op) {
+        (*this)->on_format("noni N, N", 0xed, op); }
+
     void on_add_irp_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("add P, P", regp::hl, irp, rp, irp); }
@@ -427,6 +440,8 @@ public:
     void on_alu_r(alu k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("A R", k, r, irp, d); }
+    void on_block_ld(block_ld k) {
+        (*this)->on_format("L", k); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -770,6 +785,9 @@ public:
     fast_u16 get_pc_on_jump() const { return (*this)->on_get_pc(); }
     void set_pc_on_jump(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    fast_u16 get_pc_on_block_instr() const { return (*this)->on_get_pc(); }
+    void set_pc_on_block_instr(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
     fast_u16 get_memptr() const { return state.memptr; }
     void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
 
@@ -963,6 +981,11 @@ public:
         return actual == expected;
     }
 
+    void on_noni_ed(fast_u8 op) {
+        // TODO: Forbid INT after this instruction.
+        unused(op);
+    }
+
     void on_add_irp_rp(regp rp) {
         fast_u16 i = (*this)->on_get_index_rp();
         fast_u16 n = (*this)->on_get_rp(rp);
@@ -999,6 +1022,44 @@ public:
         (*this)->on_set_f(f); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
+    void on_block_ld(block_ld k) {
+        fast_u16 bc = (*this)->on_get_bc();
+        fast_u16 de = (*this)->on_get_de();
+        fast_u16 hl = (*this)->on_get_hl();
+        // TODO: Block loads implicitly depend on the register 'a'. We probably
+        // want to request its value here with a special handler.
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+
+        fast_u8 t = (*this)->on_3t_read_cycle(hl);
+        (*this)->on_5t_write_cycle(de, t);
+
+        bc = dec16(bc);
+        t += a;
+        f = (f & (sf_mask | zf_mask | cf_mask)) |
+                ((t << 4) & yf_mask) | (t & xf_mask) | (bc != 0 ? pf_mask : 0);
+        if(static_cast<unsigned>(k) & 1) {
+            // LDI, LDIR
+            hl = dec16(hl);
+            de = dec16(de);
+        } else {
+            // LDD, LDDR
+            hl = inc16(hl);
+            de = inc16(de);
+        }
+
+        (*this)->on_set_bc(bc);
+        (*this)->on_set_de(de);
+        (*this)->on_set_hl(hl);
+        (*this)->on_set_f(f);
+
+        if((static_cast<unsigned>(k) & 2) && bc) {
+            // LDIR, LDDR
+            (*this)->on_5t_de_exec_cycle();
+            fast_u16 pc = (*this)->get_pc_on_block_instr();
+            (*this)->on_set_memptr(inc16(pc));
+            (*this)->set_pc_on_block_instr(sub16(pc, 2));
+        } }
     void on_dec_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
@@ -1124,6 +1185,11 @@ public:
         (*this)->tick(3);
     }
 
+    void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_access(addr) = static_cast<least_u8>(n);
+        (*this)->tick(5);
+    }
+
     void on_5t_pc_exec_cycle() {
         (*this)->tick(5);
     }
@@ -1134,6 +1200,10 @@ public:
 
     void on_4t_ir_exec_cycle() {
         (*this)->tick(4);
+    }
+
+    void on_5t_de_exec_cycle() {
+        (*this)->tick(5);
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {

@@ -44,7 +44,7 @@ const char *get_reg_name(regp rp, index_regp irp) {
     assert(0);
 }
 
-const char *get_alu_mnemonic(alu k) {
+const char *get_mnemonic(alu k) {
     switch(k) {
     case alu::add: return "add";
     case alu::adc: return "adc";
@@ -54,6 +54,16 @@ const char *get_alu_mnemonic(alu k) {
     case alu::xor_a: return "xor";
     case alu::or_a: return "or";
     case alu::cp: return "cp";
+    }
+    assert(0);
+}
+
+const char *get_mnemonic(block_ld k) {
+    switch(k) {
+    case block_ld::ldi: return "ldi";
+    case block_ld::ldd: return "ldd";
+    case block_ld::ldir: return "ldir";
+    case block_ld::lddr: return "lddr";
     }
     assert(0);
 }
@@ -149,7 +159,7 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
         switch(*p) {
         case 'A': {  // ALU mnemonic.
             auto k = get_arg<alu>(args);
-            out.append(get_alu_mnemonic(k));
+            out.append(get_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");
             break; }
@@ -187,6 +197,10 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             auto d = get_arg<int>(args);
             out.append('$');
             out.append_disp(d);
+            break; }
+        case 'L': {  // A block transfer instruction.
+            auto k = get_arg<block_ld>(args);
+            out.append(get_mnemonic(k));
             break; }
         default:
             out.append(*p);

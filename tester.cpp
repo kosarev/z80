@@ -342,9 +342,19 @@ public:
         match_set_pc("disp_read", pc);
         base::set_pc_on_disp_read(pc); }
 
+    fast_u16 get_pc_on_jump() const {
+        match_get_pc("jump");
+        return base::get_pc_on_jump(); }
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
         base::set_pc_on_jump(pc); }
+
+    fast_u16 get_pc_on_block_instr() const {
+        match_get_pc("block_instr");
+        return base::get_pc_on_block_instr(); }
+    void set_pc_on_block_instr(fast_u16 pc) {
+        match_set_pc("block_instr", pc);
+        base::set_pc_on_block_instr(pc); }
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
@@ -399,6 +409,15 @@ public:
         base::on_3t_write_cycle(addr, n);
     }
 
+    void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
+        input.read_and_match("%2u 5t_write %02x -> %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(n),
+                             static_cast<unsigned>(addr));
+        base::on_5t_write_cycle(addr, n);
+    }
+
     void on_5t_pc_exec_cycle() {
         input.read_and_match("%2u 5t_pc_exec",
                              static_cast<unsigned>(get_ticks()));
@@ -415,6 +434,12 @@ public:
         input.read_and_match("%2u 4t_ir_exec",
                              static_cast<unsigned>(get_ticks()));
         base::on_4t_ir_exec_cycle();
+    }
+
+    void on_5t_de_exec_cycle() {
+        input.read_and_match("%2u 5t_de_exec",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_5t_de_exec_cycle();
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {

@@ -169,6 +169,7 @@ c3cdab jp 0xabcd
  7 set_pc_on_disp_read 0001 -> 0002
  7 get_f 00
  7 5t_pc_exec
+12 get_pc_on_jump 0002
 12 set_memptr 0000 -> 000c
 12 set_pc_on_jump 0002 -> 000c
 12 done
@@ -296,6 +297,39 @@ ed43b45c ld (0x5cb4), bc
 17 3t_write 00 -> 00 at 5cb5
 20 prefix_reset
 20 done
+
+# Block transfers.
+edb8 lddr
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch b8 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_c 00
+ 8 get_b 00
+ 8 get_e 00
+ 8 get_d 00
+ 8 get_l 00
+ 8 get_h 00
+ 8 get_a 00
+ 8 get_f 00
+ 8 3t_read ed at 0000
+11 5t_write ed -> ed at 0000
+16 set_c 00 -> ff
+16 set_b 00 -> ff
+16 set_e 00 -> ff
+16 set_d 00 -> ff
+16 set_l 00 -> ff
+16 set_h 00 -> ff
+16 set_f 00 -> 0c
+16 5t_de_exec
+21 get_pc_on_block_instr 0002
+21 set_memptr 0000 -> 0003
+21 set_pc_on_block_instr 0002 -> 0000
+21 prefix_reset
+21 done
 
 # NOP
 00 nop
