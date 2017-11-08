@@ -256,6 +256,9 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
+        case 0xeb:
+            // EX DE, HL  f(4)
+            return (*this)->on_ex_de_hl();
         case 0xed:
             return (*this)->on_ed_prefix();
         case 0xf3:
@@ -432,6 +435,8 @@ public:
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
+    void on_ex_de_hl() {
+        (*this)->on_format("ex de, hl"); }
     void on_exx() {
         (*this)->on_format("exx"); }
     void on_inc_r(reg r, fast_u8 d) {
@@ -552,6 +557,10 @@ protected:
               pc(0), sp(0xffff), ir(0), memptr(0),
               iff1(false), iff2(false)
         {}
+
+        void ex_de_hl() {
+            std::swap(de, hl);
+        }
 
         void exx() {
             std::swap(bc, alt_bc);
@@ -1003,6 +1012,8 @@ public:
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
+    void on_ex_de_hl() {
+        state.ex_de_hl(); }
     void on_exx() {
         state.exx(); }
     void on_inc_r(reg r, fast_u8 d) {
