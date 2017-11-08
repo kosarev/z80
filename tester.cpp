@@ -374,6 +374,14 @@ public:
         return base::on_3t_read_cycle(addr);
     }
 
+    fast_u8 on_4t_read_cycle(fast_u16 addr) {
+        input.read_and_match("%2u 4t_read %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(addr));
+        return base::on_4t_read_cycle(addr);
+    }
+
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
         input.read_and_match("%2u 5t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),

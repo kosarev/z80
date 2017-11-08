@@ -57,6 +57,10 @@ static inline fast_u8 inc8(fast_u8 n) {
     return add8(n, 1);
 }
 
+static inline fast_u8 dec8(fast_u8 n) {
+    return sub8(n, 1);
+}
+
 static inline fast_u8 neg8(fast_u8 n) {
     return ((n ^ mask8) + 1) & mask8;
 }
@@ -171,6 +175,13 @@ public:
             return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask)) {
+        case 0005: {
+            // DEC r[y]
+            // DEC r            f(4)
+            // DEC (HL)         f(4)           r(4) w(3)
+            // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
+            auto r = static_cast<reg>(y);
+            return (*this)->on_dec_r(r, read_disp_or_null(r)); }
         case 0006: {
             // LD r[y], n
             // LD r, n              f(4)      r(3)
@@ -390,6 +401,9 @@ public:
     void on_alu_r(alu k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("A R", k, r, irp, d); }
+    void on_dec_r(reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("dec R", r, irp, d); }
     void on_dec_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec P", rp, irp); }
@@ -459,6 +473,10 @@ protected:
         return (r ^ a ^ b) & hf_mask;
     }
 
+    fast_u8 hf_dec(fast_u8 n) {
+        return (n & 0xf) == 0xf ? hf_mask : 0;
+    }
+
     template<typename T>
     fast_u8 pf_ari(T r, T a, T b) {
         fast_u16 x = r ^ a ^ b;
@@ -472,7 +490,11 @@ protected:
     fast_u8 pf_log(fast_u8 n) {
         bool lo = pf_log4(n);
         bool hi = pf_log4(n >> 4);
-        return (lo == hi ? 1u : 0u) << pf_bit;
+        return lo == hi ? pf_mask : 0;
+    }
+
+    fast_u8 pf_dec(fast_u8 n) {
+        return n == 0x7f ? pf_mask : 0;
     }
 
     fast_u8 cf_ari(bool c) {
@@ -917,6 +939,14 @@ public:
         (*this)->on_set_f(f); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
+    void on_dec_r(reg r, fast_u8 d) {
+        fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
+        fast_u8 f = (*this)->on_get_f();
+        v = dec8(v);
+        f = (f & cf_mask) | (v & (sf_mask | yf_mask | xf_mask)) | zf_ari(v) |
+                hf_dec(v) | pf_dec(v) | nf_mask;
+        (*this)->on_set_r(r, d, v);
+        (*this)->on_set_f(f); }
     void on_dec_rp(regp rp) {
         (*this)->on_set_rp(rp, dec16((*this)->on_get_rp(rp))); }
     void on_di() {
