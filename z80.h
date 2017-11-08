@@ -200,6 +200,13 @@ public:
             auto rp = static_cast<regp>(p);
             fast_u16 nn = (*this)->on_imm16_read();
             return (*this)->on_ld_rp_nn(rp, nn); }
+        case 0003: {
+            // INC rp[p]
+            // INC rr           f(6)
+            // INC i       f(4) f(6)
+            (*this)->on_6t_fetch_cycle();
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_inc_rp(rp); }
         case 0011: {
             // ADD HL, rp[p]
             // ADD HL, rr           f(4) e(4) e(3)
@@ -388,6 +395,9 @@ public:
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
+    void on_inc_rp(regp rp) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("inc P", rp, irp); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -912,6 +922,8 @@ public:
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
+    void on_inc_rp(regp rp) {
+        (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }

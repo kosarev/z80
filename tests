@@ -81,6 +81,18 @@ f3 di
  4 set_iff2_on_di 0 -> 0
  4 done
 
+# INC rp
+23 inc hl
+ 0 get_pc_on_fetch 0000
+ 0 fetch 23 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 6t_fetch
+ 6 get_l 00
+ 6 get_h 00
+ 6 set_l 00 -> 01
+ 6 set_h 00 -> 00
+ 6 done
+
 # JP nn
 c3cdab jp 0xabcd
  0 get_pc_on_fetch 0000
