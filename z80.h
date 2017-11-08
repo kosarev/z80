@@ -123,7 +123,7 @@ public:
         if(get_index_rp_kind() == index_regp::hl || !may_need_disp)
             return 0;
         fast_u8 d = (*this)->on_disp_read();
-        (*this)->on_5t_exec_cycle((*this)->get_last_read_addr());
+        (*this)->on_5t_pc_exec_cycle();
         return d;
     }
 
@@ -241,7 +241,16 @@ public:
     void decode_ed_prefixed() {
         prefix_reset_guard guard(this);
         fast_u8 op = (*this)->on_fetch();
+        fast_u8 p = get_p_part(op);
 
+        switch(op & (x_mask | z_mask)) {
+        case 0102: {
+            // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
+            // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
+            bool q = op & q_mask;
+            auto rp = static_cast<regp>(p);
+            return q ? (*this)->on_adc_hl(rp) : (*this)->on_sbc_hl(rp); }
+        }
         switch(op) {
         case 0x47: {
             // LD I, A  f(4) f(5)
@@ -353,11 +362,15 @@ public:
 
     fast_u8 on_disp_read() { return (*this)->on_read(); }
 
-    void on_5t_exec_cycle(fast_u16 addr) { unused(addr); }
+    void on_5t_pc_exec_cycle() {}
+    void on_3t_ir_exec_cycle() {}
+    void on_4t_ir_exec_cycle() {}
 
     void on_ed_prefix() { decoder::on_ed_prefix();
                           (*this)->on_format("noni 0xed"); }
 
+    void on_adc_hl(regp rp) {
+        (*this)->on_format("adc hl, P", rp); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         (*this)->on_format("A R", k, r, (*this)->get_index_rp_kind(), d); }
     void on_dec_rp(regp rp) {
@@ -382,6 +395,8 @@ public:
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
+    void on_sbc_hl(regp rp) {
+        (*this)->on_format("sbc hl, P", rp); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -412,15 +427,18 @@ protected:
     static const fast_u8 nf_mask = 1 << nf_bit;
     static const fast_u8 cf_mask = 1 << cf_bit;
 
-    fast_u8 zf_ari(fast_u8 n) {
+    template<typename T>
+    fast_u8 zf_ari(T n) {
         return (n == 0 ? 1u : 0u) << zf_bit;
     }
 
-    fast_u8 hf_ari(fast_u8 r, fast_u8 a, fast_u8 b) {
+    template<typename T>
+    fast_u8 hf_ari(T r, T a, T b) {
         return (r ^ a ^ b) & hf_mask;
     }
 
-    fast_u8 pf_ari(fast_u16 r, fast_u8 a, fast_u8 b) {
+    template<typename T>
+    fast_u8 pf_ari(T r, T a, T b) {
         fast_u16 x = r ^ a ^ b;
         return ((x >> 6) ^ (x >> 5)) & pf_mask;
     }
@@ -841,6 +859,25 @@ public:
         return actual == expected;
     }
 
+    void on_adc_hl(regp rp) {
+        fast_u16 hl = (*this)->on_get_hl();
+        fast_u16 n = (*this)->on_get_rp(rp);
+        bool cf = (*this)->on_get_f() & cf_mask;
+
+        (*this)->on_4t_ir_exec_cycle();
+        (*this)->on_3t_ir_exec_cycle();
+
+        fast_u16 t = add16(n, cf);
+        bool of = cf && t == 0;
+        fast_u16 r = add16(hl, t);
+        fast_u8 f = (get_high8(r) & (sf_mask | yf_mask | xf_mask)) | zf_ari(r) |
+                        hf_ari(r >> 8, hl >> 8, n >> 8) |
+                        (pf_ari(r >> 8, hl >> 8, n >> 8) ^ (of ? pf_mask : 0)) |
+                        cf_ari(r < hl || of);
+
+        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_hl(r);
+        (*this)->on_set_f(f); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
     void on_dec_rp(regp rp) {
@@ -854,7 +891,7 @@ public:
     void on_jr_cc(condition cc, fast_u8 d) {
         if(!check_condition(cc))
             return;
-        (*this)->on_5t_exec_cycle((*this)->get_last_read_addr());
+        (*this)->on_5t_pc_exec_cycle();
         fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
         (*this)->on_set_memptr(memptr);
         (*this)->set_pc_on_jump(memptr); }
@@ -871,6 +908,25 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
+    void on_sbc_hl(regp rp) {
+        fast_u16 hl = (*this)->on_get_hl();
+        fast_u16 n = (*this)->on_get_rp(rp);
+        bool cf = (*this)->on_get_f() & cf_mask;
+
+        (*this)->on_4t_ir_exec_cycle();
+        (*this)->on_3t_ir_exec_cycle();
+
+        fast_u16 t = add16(n, cf);
+        bool of = cf && t == 0;
+        fast_u16 r = sub16(hl, t);
+        fast_u8 f = (get_high8(r) & (sf_mask | yf_mask | xf_mask)) | zf_ari(r) |
+                        hf_ari(r >> 8, hl >> 8, n >> 8) |
+                        (pf_ari(r >> 8, hl >> 8, n >> 8) ^ (of ? pf_mask : 0)) |
+                        cf_ari(r > hl || of) | nf_mask;
+
+        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_hl(r);
+        (*this)->on_set_f(f); }
 
     fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
@@ -909,9 +965,16 @@ public:
         (*this)->tick(3);
     }
 
-    void on_5t_exec_cycle(fast_u16 addr) {
-        unused(addr);
+    void on_5t_pc_exec_cycle() {
         (*this)->tick(5);
+    }
+
+    void on_3t_ir_exec_cycle() {
+        (*this)->tick(3);
+    }
+
+    void on_4t_ir_exec_cycle() {
+        (*this)->tick(4);
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {

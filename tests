@@ -1,4 +1,27 @@
 
+# ADC HL, rp
+ed5a adc hl, de
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 5a at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_l 00
+ 8 get_h 00
+ 8 get_e 00
+ 8 get_d 00
+ 8 get_f 00
+ 8 4t_ir_exec
+12 3t_ir_exec
+15 set_memptr 0000 -> 0001
+15 set_l 00 -> 00
+15 set_h 00 -> 00
+15 set_f 00 -> 40
+15 prefix_reset
+15 done
+
 # AND r
 a7 and a
  0 get_pc_on_fetch 0000
@@ -76,6 +99,7 @@ c3cdab jp 0xabcd
  4 3t_read 0a at 0001
  7 set_pc_on_disp_read 0001 -> 0002
  7 get_f 00
+ 7 5t_pc_exec
 12 set_memptr 0000 -> 000c
 12 set_pc_on_jump 0002 -> 000c
 12 done
@@ -163,6 +187,29 @@ d3ab out (0xab), a
  7 output 00 at 00ab
 11 set_memptr 0000 -> 00ac
 11 done
+
+# SBC HL, rp
+ed52 sbc hl, de
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 52 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_l 00
+ 8 get_h 00
+ 8 get_e 00
+ 8 get_d 00
+ 8 get_f 00
+ 8 4t_ir_exec
+12 3t_ir_exec
+15 set_memptr 0000 -> 0001
+15 set_l 00 -> 00
+15 set_h 00 -> 00
+15 set_f 00 -> 42
+15 prefix_reset
+15 done
 
 # XOR r
 af xor a

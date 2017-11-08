@@ -391,6 +391,24 @@ public:
         base::on_3t_write_cycle(addr, n);
     }
 
+    void on_5t_pc_exec_cycle() {
+        input.read_and_match("%2u 5t_pc_exec",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_5t_pc_exec_cycle();
+    }
+
+    void on_3t_ir_exec_cycle() {
+        input.read_and_match("%2u 3t_ir_exec",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_3t_ir_exec_cycle();
+    }
+
+    void on_4t_ir_exec_cycle() {
+        input.read_and_match("%2u 4t_ir_exec",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_4t_ir_exec_cycle();
+    }
+
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
         input.read_and_match("%2u output %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
