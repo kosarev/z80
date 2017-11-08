@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 namespace z80 {
 
@@ -240,6 +241,9 @@ public:
         case 0xd3:
             // OUT (n), A  f(4) r(3) o(4)
             return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
+        case 0xd9:
+            // EXX  f(4)
+            return (*this)->on_exx();
         case 0xed:
             return (*this)->on_ed_prefix();
         case 0xf3:
@@ -409,6 +413,8 @@ public:
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
+    void on_exx() {
+        (*this)->on_format("exx"); }
     void on_inc_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc P", rp, irp); }
@@ -505,12 +511,20 @@ protected:
         processor_state()
             : last_read_addr(0),
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
+              alt_bc(0), alt_de(0), alt_hl(0),
               pc(0), sp(0xffff), ir(0), memptr(0),
               iff1(false), iff2(false)
         {}
 
+        void exx() {
+            std::swap(bc, alt_bc);
+            std::swap(de, alt_de);
+            std::swap(hl, alt_hl);
+        }
+
         fast_u16 last_read_addr;
         fast_u16 bc, de, hl, af, ix, iy;
+        fast_u16 alt_bc, alt_de, alt_hl;
         fast_u16 pc, sp, ir, memptr;
         bool iff1, iff2;
     } state;
@@ -952,6 +966,8 @@ public:
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
+    void on_exx() {
+        state.exx(); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_jp_nn(fast_u16 nn) {
