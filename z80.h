@@ -270,6 +270,12 @@ public:
             return (*this)->on_ed_prefix();
         case 0xf3:
             return (*this)->on_di();
+        case 0xf9:
+            // LD SP, HL
+            // LD SP, HL        f(6)
+            // LD SP, i    f(4) f(6)
+            (*this)->on_6t_fetch_cycle();
+            return (*this)->on_ld_sp_irp();
         }
 
         // TODO
@@ -490,6 +496,9 @@ public:
         (*this)->on_format("ld (W), P", nn, regp::hl, irp); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         (*this)->on_format("ld (W), P", nn, rp, index_regp::hl); }
+    void on_ld_sp_irp() {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ld sp, P", regp::hl, irp); }
     void on_nop() {
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
@@ -1138,6 +1147,8 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
+    void on_ld_sp_irp() {
+        (*this)->on_set_sp((*this)->on_get_index_rp()); }
     void on_nop() {}
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();

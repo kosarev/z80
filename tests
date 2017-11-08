@@ -315,6 +315,17 @@ ed43b45c ld (0x5cb4), bc
 20 prefix_reset
 20 done
 
+# LD SP, irp
+f9 ld sp, hl
+ 0 get_pc_on_fetch 0000
+ 0 fetch f9 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 6t_fetch
+ 6 get_l 00
+ 6 get_h 00
+ 6 set_sp ffff -> 0000
+ 6 done
+
 # Block transfers.
 edb8 lddr
  0 get_pc_on_fetch 0000
