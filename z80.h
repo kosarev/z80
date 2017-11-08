@@ -275,9 +275,16 @@ public:
         case 0102: {
             // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
             // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
-            bool q = op & q_mask;
             auto rp = static_cast<regp>(p);
-            return q ? (*this)->on_adc_hl_rp(rp) : (*this)->on_sbc_hl_rp(rp); }
+            return op & q_mask ? (*this)->on_adc_hl_rp(rp) :
+                                 (*this)->on_sbc_hl_rp(rp); }
+        case 0103: {
+            // LD rp[p], (nn)  f(4) f(4) r(3) r(3) r(3) r(3)
+            // LD (nn), rp[p]  f(4) f(4) r(3) r(3) w(3) w(3)
+            auto rp = static_cast<regp>(p);
+            fast_u16 nn = (*this)->on_imm16_read();
+            return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
+                                 (*this)->on_ld_at_nn_rp(nn, rp); }
         }
         switch(op) {
         case 0x47: {
@@ -433,6 +440,10 @@ public:
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("ld P, W", rp, irp, nn); }
+    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
+        (*this)->on_format("ld P, (W)", rp, index_regp::hl, nn); }
+    void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
+        (*this)->on_format("ld (W), P", nn, rp, index_regp::hl); }
     void on_nop() {
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
@@ -988,6 +999,18 @@ public:
         (*this)->on_set_r(r, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
+    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
+        fast_u8 lo = (*this)->on_3t_read_cycle(nn);
+        nn = inc16(nn);
+        (*this)->on_set_memptr(nn);
+        fast_u8 hi = (*this)->on_3t_read_cycle(nn);
+        (*this)->on_set_rp(rp, make16(hi, lo)); }
+    void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
+        fast_u16 rpv = (*this)->on_get_rp(rp);
+        (*this)->on_3t_write_cycle(nn, get_low8(rpv));
+        nn = inc16(nn);
+        (*this)->on_set_memptr(nn);
+        (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
     void on_nop() {}
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();

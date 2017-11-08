@@ -127,7 +127,7 @@ private:
     char line[max_line_size];
 };
 
-static const unsigned max_instr_size = 3;
+static const unsigned max_instr_size = 4;
 
 class disassembler : public z80::disassembler<disassembler> {
 public:

@@ -218,6 +218,50 @@ ed47 ld i, a
 10 set_d 00 -> 34
 10 done
 
+# LD rp, (nn)
+ed4bb45c ld bc, (0x5cb4)
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 4b at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 imm16_read 5cb4 at 0002
+ 8 get_pc_on_imm16_read 0002
+ 8 3t_read b4 at 0002
+11 3t_read 5c at 0003
+14 set_pc_on_imm16_read 0002 -> 0004
+14 3t_read 00 at 5cb4
+17 set_memptr 0000 -> 5cb5
+17 3t_read 00 at 5cb5
+20 set_c 00 -> 00
+20 set_b 00 -> 00
+20 prefix_reset
+20 done
+
+# LD (nn), rp
+ed43b45c ld (0x5cb4), bc
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 43 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 imm16_read 5cb4 at 0002
+ 8 get_pc_on_imm16_read 0002
+ 8 3t_read b4 at 0002
+11 3t_read 5c at 0003
+14 set_pc_on_imm16_read 0002 -> 0004
+14 get_c 00
+14 get_b 00
+14 3t_write 00 -> 00 at 5cb4
+17 set_memptr 0000 -> 5cb5
+17 3t_write 00 -> 00 at 5cb5
+20 prefix_reset
+20 done
+
 # NOP
 00 nop
  0 get_pc_on_fetch 0000
