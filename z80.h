@@ -236,6 +236,11 @@ public:
         switch(op) {
         case 0x00:
             return (*this)->on_nop();
+        case 0x22:
+            // LD (nn), HL
+            // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
+            // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
+            return (*this)->on_ld_at_nn_irp((*this)->on_imm16_read());
         case 0xc3:
             return (*this)->on_jp_nn((*this)->on_imm16_read());
         case 0xd3:
@@ -442,6 +447,9 @@ public:
         (*this)->on_format("ld P, W", rp, irp, nn); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         (*this)->on_format("ld P, (W)", rp, index_regp::hl, nn); }
+    void on_ld_at_nn_irp(fast_u16 nn) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ld (W), P", nn, regp::hl, irp); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         (*this)->on_format("ld (W), P", nn, rp, index_regp::hl); }
     void on_nop() {
@@ -1005,6 +1013,12 @@ public:
         (*this)->on_set_memptr(nn);
         fast_u8 hi = (*this)->on_3t_read_cycle(nn);
         (*this)->on_set_rp(rp, make16(hi, lo)); }
+    void on_ld_at_nn_irp(fast_u16 nn) {
+        fast_u16 irp = (*this)->on_get_index_rp();
+        (*this)->on_3t_write_cycle(nn, get_low8(irp));
+        nn = inc16(nn);
+        (*this)->on_set_memptr(nn);
+        (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         fast_u16 rpv = (*this)->on_get_rp(rp);
         (*this)->on_3t_write_cycle(nn, get_low8(rpv));

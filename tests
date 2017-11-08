@@ -240,6 +240,23 @@ ed4bb45c ld bc, (0x5cb4)
 20 prefix_reset
 20 done
 
+# LD (nn), irp
+227b5c ld (0x5c7b), hl
+ 0 get_pc_on_fetch 0000
+ 0 fetch 22 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 imm16_read 5c7b at 0001
+ 4 get_pc_on_imm16_read 0001
+ 4 3t_read 7b at 0001
+ 7 3t_read 5c at 0002
+10 set_pc_on_imm16_read 0001 -> 0003
+10 get_l 00
+10 get_h 00
+10 3t_write 00 -> 00 at 5c7b
+13 set_memptr 0000 -> 5c7c
+13 3t_write 00 -> 00 at 5c7c
+16 done
+
 # LD (nn), rp
 ed43b45c ld (0x5cb4), bc
  0 get_pc_on_fetch 0000
