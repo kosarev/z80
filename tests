@@ -103,6 +103,17 @@ d9 exx
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# INC r
+04 inc b
+ 0 get_pc_on_fetch 0000
+ 0 fetch 04 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_b 00
+ 4 get_f 00
+ 4 set_b 00 -> 01
+ 4 set_f 00 -> 00
+ 4 done
+
 # INC rp
 23 inc hl
  0 get_pc_on_fetch 0000

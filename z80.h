@@ -176,6 +176,13 @@ public:
             return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask)) {
+        case 0004: {
+            // INC r[y]
+            // INC r            f(4)
+            // INC (HL)         f(4)           r(4) w(3)
+            // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
+            auto r = static_cast<reg>(y);
+            return (*this)->on_inc_r(r, read_disp_or_null(r)); }
         case 0005: {
             // DEC r[y]
             // DEC r            f(4)
@@ -427,6 +434,9 @@ public:
         (*this)->on_format("di"); }
     void on_exx() {
         (*this)->on_format("exx"); }
+    void on_inc_r(reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("inc R", r, irp, d); }
     void on_inc_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc P", rp, irp); }
@@ -502,6 +512,10 @@ protected:
         return (n & 0xf) == 0xf ? hf_mask : 0;
     }
 
+    fast_u8 hf_inc(fast_u8 n) {
+        return (n & 0xf) == 0x0 ? hf_mask : 0;
+    }
+
     template<typename T>
     fast_u8 pf_ari(T r, T a, T b) {
         fast_u16 x = r ^ a ^ b;
@@ -520,6 +534,10 @@ protected:
 
     fast_u8 pf_dec(fast_u8 n) {
         return n == 0x7f ? pf_mask : 0;
+    }
+
+    fast_u8 pf_inc(fast_u8 n) {
+        return n == 0x80 ? pf_mask : 0;
     }
 
     fast_u8 cf_ari(bool c) {
@@ -987,6 +1005,14 @@ public:
         (*this)->set_iff2_on_di(false); }
     void on_exx() {
         state.exx(); }
+    void on_inc_r(reg r, fast_u8 d) {
+        fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
+        fast_u8 f = (*this)->on_get_f();
+        v = inc8(v);
+        f = (f & cf_mask) | (v & (sf_mask | yf_mask | xf_mask)) | zf_ari(v) |
+                hf_inc(v) | pf_inc(v);
+        (*this)->on_set_r(r, d, v);
+        (*this)->on_set_f(f); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_jp_nn(fast_u16 nn) {
