@@ -1,4 +1,21 @@
 
+# ADD HL, rp
+19 add hl, de
+ 0 get_pc_on_fetch 0000
+ 0 fetch 19 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_l 00
+ 4 get_h 00
+ 4 get_e 00
+ 4 get_d 00
+ 4 get_f 00
+ 4 4t_ir_exec
+ 8 3t_ir_exec
+11 set_memptr 0000 -> 0001
+11 set_l 00 -> 00
+11 set_h 00 -> 00
+11 done
+
 # ADC HL, rp
 ed5a adc hl, de
  0 get_pc_on_fetch 0000

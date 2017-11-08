@@ -200,6 +200,12 @@ public:
             auto rp = static_cast<regp>(p);
             fast_u16 nn = (*this)->on_imm16_read();
             return (*this)->on_ld_rp_nn(rp, nn); }
+        case 0011: {
+            // ADD HL, rp[p]
+            // ADD HL, rr           f(4) e(4) e(3)
+            // ADD i, rr       f(4) f(4) e(4) e(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_add_irp_rp(rp); }
         case 0013: {
             // DEC rp[p]:
             // DEC rr           f(6)
@@ -249,7 +255,7 @@ public:
             // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
             bool q = op & q_mask;
             auto rp = static_cast<regp>(p);
-            return q ? (*this)->on_adc_hl(rp) : (*this)->on_sbc_hl(rp); }
+            return q ? (*this)->on_adc_hl_rp(rp) : (*this)->on_sbc_hl_rp(rp); }
         }
         switch(op) {
         case 0x47: {
@@ -318,7 +324,7 @@ const char *get_reg_name(index_regp irp);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
 const char *get_alu_mnemonic(alu k);
 bool is_two_operand_alu_instr(alu k);
-const char *get_index_reg_name(index_regp ip);
+const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
 
 class disassembler_base {
@@ -369,12 +375,17 @@ public:
     void on_ed_prefix() { decoder::on_ed_prefix();
                           (*this)->on_format("noni 0xed"); }
 
-    void on_adc_hl(regp rp) {
-        (*this)->on_format("adc hl, P", rp); }
+    void on_add_irp_rp(regp rp) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("add P, P", regp::hl, irp, rp, irp); }
+    void on_adc_hl_rp(regp rp) {
+        (*this)->on_format("adc hl, P", rp, index_regp::hl); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        (*this)->on_format("A R", k, r, (*this)->get_index_rp_kind(), d); }
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("A R", k, r, irp, d); }
     void on_dec_rp(regp rp) {
-        (*this)->on_format("dec P", rp); }
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
     void on_jp_nn(fast_u16 nn) {
@@ -384,19 +395,20 @@ public:
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp ip = (*this)->get_index_rp_kind();
-        (*this)->on_format("ld R, R", rd, ip, d, rs, ip, d); }
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ld R, R", rd, irp, d, rs, irp, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp ip = (*this)->get_index_rp_kind();
-        (*this)->on_format("ld R, N", r, ip, d, n); }
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ld R, N", r, irp, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        (*this)->on_format("ld P, W", rp, nn); }
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ld P, W", rp, irp, nn); }
     void on_nop() {
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
-    void on_sbc_hl(regp rp) {
-        (*this)->on_format("sbc hl, P", rp); }
+    void on_sbc_hl_rp(regp rp) {
+        (*this)->on_format("sbc hl, P", rp, index_regp::hl); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -770,8 +782,8 @@ public:
         assert(0);
     }
 
-    fast_u16 get_index_rp(index_regp ip) {
-        switch(ip) {
+    fast_u16 get_index_rp(index_regp irp) {
+        switch(irp) {
         case index_regp::hl: return get_hl();
         case index_regp::ix: return get_ix();
         case index_regp::iy: return get_iy();
@@ -859,7 +871,22 @@ public:
         return actual == expected;
     }
 
-    void on_adc_hl(regp rp) {
+    void on_add_irp_rp(regp rp) {
+        fast_u16 i = (*this)->on_get_index_rp();
+        fast_u16 n = (*this)->on_get_rp(rp);
+        fast_u8 f = (*this)->on_get_f();
+
+        (*this)->on_4t_ir_exec_cycle();
+        (*this)->on_3t_ir_exec_cycle();
+
+        fast_u16 r = add16(i, n);
+        f = (f & (sf_mask | zf_mask | pf_mask)) |
+                (get_high8(r) & (yf_mask | xf_mask)) |
+                hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
+
+        (*this)->on_set_memptr(inc16(i));
+        (*this)->on_set_index_rp(r); }
+    void on_adc_hl_rp(regp rp) {
         fast_u16 hl = (*this)->on_get_hl();
         fast_u16 n = (*this)->on_get_rp(rp);
         bool cf = (*this)->on_get_f() & cf_mask;
@@ -908,7 +935,7 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
-    void on_sbc_hl(regp rp) {
+    void on_sbc_hl_rp(regp rp) {
         fast_u16 hl = (*this)->on_get_hl();
         fast_u16 n = (*this)->on_get_rp(rp);
         bool cf = (*this)->on_get_f() & cf_mask;

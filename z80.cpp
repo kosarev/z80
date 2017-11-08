@@ -62,8 +62,8 @@ bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
 }
 
-const char *get_index_reg_name(index_regp ip) {
-    switch(ip) {
+const char *get_index_reg_name(index_regp irp) {
+    switch(irp) {
     case index_regp::hl: return "hl";
     case index_regp::ix: return "ix";
     case index_regp::iy: return "iy";
@@ -155,20 +155,21 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
-            auto ip = get_arg<index_regp>(args);
+            auto irp = get_arg<index_regp>(args);
             auto d = get_arg<fast_u8>(args);
-            if(r != reg::at_hl || ip == index_regp::hl) {
+            if(r != reg::at_hl || irp == index_regp::hl) {
                 out.append(get_reg_name(r));
             } else {
                 out.append('(');
-                out.append(get_index_reg_name(ip));
+                out.append(get_index_reg_name(irp));
                 out.append_disp(sign_extend8(d));
                 out.append(')');
             }
             break; }
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
-            out.append(get_reg_name(rp));
+            auto irp = get_arg<index_regp>(args);
+            out.append(get_reg_name(rp, irp));
             break; }
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
