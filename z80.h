@@ -129,7 +129,7 @@ public:
         if(get_index_rp_kind() == index_regp::hl || !may_need_disp)
             return 0;
         fast_u8 d = (*this)->on_disp_read();
-        (*this)->on_5t_pc_exec_cycle();
+        (*this)->on_5t_exec_cycle();
         return d;
     }
 
@@ -265,6 +265,10 @@ public:
         switch(op) {
         case 0x00:
             return (*this)->on_nop();
+        case 0x10:
+            // DJNZ  f(5) r(3) + e(5)
+            (*this)->on_5t_fetch_cycle();
+            return (*this)->on_djnz((*this)->on_disp_read());
         case 0x22:
             // LD (nn), HL
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
@@ -512,9 +516,9 @@ public:
 
     fast_u8 on_disp_read() { return (*this)->on_read(); }
 
-    void on_5t_pc_exec_cycle() {}
-    void on_3t_ir_exec_cycle() {}
-    void on_4t_ir_exec_cycle() {}
+    void on_3t_exec_cycle() {}
+    void on_4t_exec_cycle() {}
+    void on_5t_exec_cycle() {}
 
     void on_ed_prefix() { decoder::on_ed_prefix();
                           (*this)->on_format("noni 0xed"); }
@@ -542,6 +546,8 @@ public:
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
+    void on_djnz(fast_u8 d) {
+        (*this)->on_format("djnz D", sign_extend8(d) + 2); }
     void on_ei() {
         (*this)->on_format("ei"); }
     void on_ex_de_hl() {
@@ -905,6 +911,12 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    fast_u16 get_ir() const { return state.ir; }
+
+    fast_u16 on_get_ir() const { return (*this)->get_ir(); }
+
+    fast_u16 get_ir_on_refresh() const { return (*this)->on_get_ir(); }
+
     fast_u16 get_memptr() const { return state.memptr; }
     void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
 
@@ -1054,20 +1066,6 @@ public:
 
     fast_u16 get_last_read_addr() const { return state.last_read_addr; }
 
-    fast_u8 on_fetch_cycle(fast_u16 addr) {
-        (*this)->tick(4);
-        state.last_read_addr = addr;
-        return (*this)->on_access(addr);
-    }
-
-    void on_5t_fetch_cycle() {
-        (*this)->tick(1);
-    }
-
-    void on_6t_fetch_cycle() {
-        (*this)->tick(2);
-    }
-
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f;
@@ -1138,8 +1136,8 @@ public:
         fast_u16 n = (*this)->on_get_rp(rp);
         fast_u8 f = (*this)->on_get_f();
 
-        (*this)->on_4t_ir_exec_cycle();
-        (*this)->on_3t_ir_exec_cycle();
+        (*this)->on_4t_exec_cycle();
+        (*this)->on_3t_exec_cycle();
 
         fast_u16 r = add16(i, n);
         f = (f & (sf_mask | zf_mask | pf_mask)) |
@@ -1153,8 +1151,8 @@ public:
         fast_u16 n = (*this)->on_get_rp(rp);
         bool cf = (*this)->on_get_f() & cf_mask;
 
-        (*this)->on_4t_ir_exec_cycle();
-        (*this)->on_3t_ir_exec_cycle();
+        (*this)->on_4t_exec_cycle();
+        (*this)->on_3t_exec_cycle();
 
         fast_u16 t = add16(n, cf);
         bool of = cf && t == 0;
@@ -1202,7 +1200,7 @@ public:
 
         if((static_cast<unsigned>(k) & 2) && bc) {
             // LDIR, LDDR
-            (*this)->on_5t_de_exec_cycle();
+            (*this)->on_5t_exec_cycle();
             fast_u16 pc = (*this)->get_pc_on_block_instr();
             (*this)->on_set_memptr(inc16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
@@ -1222,6 +1220,16 @@ public:
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
+    void on_djnz(fast_u8 d) {
+        fast_u8 b = (*this)->on_get_b();
+        b = dec8(b);
+        (*this)->on_set_b(b);
+        if(b) {
+            (*this)->on_5t_exec_cycle();
+            fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
+            (*this)->on_set_memptr(memptr);
+            (*this)->set_pc_on_jump(memptr);
+        } }
     void on_ei() {
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
@@ -1248,7 +1256,7 @@ public:
     void on_jr_cc(condition cc, fast_u8 d) {
         if(!check_condition(cc))
             return;
-        (*this)->on_5t_pc_exec_cycle();
+        (*this)->on_5t_exec_cycle();
         fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
         (*this)->on_set_memptr(memptr);
         (*this)->set_pc_on_jump(memptr); }
@@ -1308,8 +1316,8 @@ public:
         fast_u16 n = (*this)->on_get_rp(rp);
         bool cf = (*this)->on_get_f() & cf_mask;
 
-        (*this)->on_4t_ir_exec_cycle();
-        (*this)->on_3t_ir_exec_cycle();
+        (*this)->on_4t_exec_cycle();
+        (*this)->on_3t_exec_cycle();
 
         fast_u16 t = add16(n, cf);
         bool of = cf && t == 0;
@@ -1330,7 +1338,30 @@ public:
         return op;
     }
 
+    void on_set_addr_bus(fast_u16 addr) {
+        unused(addr);
+    }
+
+    fast_u8 on_fetch_cycle(fast_u16 addr) {
+        (*this)->on_set_addr_bus(addr);
+        fast_u8 b = (*this)->on_access(addr);
+        (*this)->tick(2);
+        (*this)->on_set_addr_bus((*this)->get_ir_on_refresh());
+        (*this)->tick(2);
+        state.last_read_addr = addr;
+        return b;
+    }
+
+    void on_5t_fetch_cycle() {
+        (*this)->tick(1);
+    }
+
+    void on_6t_fetch_cycle() {
+        (*this)->tick(2);
+    }
+
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
+        (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_access(addr);
         (*this)->tick(3);
         state.last_read_addr = addr;
@@ -1338,6 +1369,7 @@ public:
     }
 
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
+        (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_access(addr);
         (*this)->tick(4);
         state.last_read_addr = addr;
@@ -1345,6 +1377,7 @@ public:
     }
 
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
+        (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_access(addr);
         (*this)->tick(5);
         state.last_read_addr = addr;
@@ -1356,32 +1389,31 @@ public:
     }
 
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_set_addr_bus(addr);
         (*this)->on_access(addr) = static_cast<least_u8>(n);
         (*this)->tick(3);
     }
 
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_set_addr_bus(addr);
         (*this)->on_access(addr) = static_cast<least_u8>(n);
         (*this)->tick(5);
     }
 
-    void on_5t_pc_exec_cycle() {
-        (*this)->tick(5);
-    }
-
-    void on_3t_ir_exec_cycle() {
+    void on_3t_exec_cycle() {
         (*this)->tick(3);
     }
 
-    void on_4t_ir_exec_cycle() {
+    void on_4t_exec_cycle() {
         (*this)->tick(4);
     }
 
-    void on_5t_de_exec_cycle() {
+    void on_5t_exec_cycle() {
         (*this)->tick(5);
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
+        // TODO: Shall we set the address bus here?
         unused(addr, b);
         (*this)->tick(4);
     }
