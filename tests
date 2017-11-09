@@ -50,6 +50,22 @@ a7 and a
  4 set_f 00 -> 54
  4 done
 
+# CALL nn
+cddf0e call 0x0edf
+ 0 get_pc_on_fetch 0000
+ 0 fetch cd at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 imm16_read 0edf at 0001
+ 4 get_pc_on_imm16_read 0001
+ 4 3t_read df at 0001
+ 7 4t_read 0e at 0002
+11 set_pc_on_imm16_read 0001 -> 0003
+11 get_sp 0000
+11 3t_write 00 -> 00 at ffff
+14 3t_write 00 -> 03 at fffe
+17 set_pc_on_call 0003 -> 0edf
+17 done
+
 # CP r
 bc cp h
  0 get_pc_on_fetch 0000
@@ -379,7 +395,7 @@ f9 ld sp, hl
  4 6t_fetch
  6 get_l 00
  6 get_h 00
- 6 set_sp ffff -> 0000
+ 6 set_sp 0000 -> 0000
  6 done
 
 # Block transfers.

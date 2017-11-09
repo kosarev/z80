@@ -217,6 +217,12 @@ public:
                              static_cast<unsigned>(new_n));
     }
 
+    void match_get_rp(const char *name, fast_u16 nn) {
+        input.read_and_match("%2u get_%s %04x",
+                             static_cast<unsigned>(get_ticks()), name,
+                             static_cast<unsigned>(nn));
+    }
+
     void match_set_rp(const char *name, fast_u16 old_nn, fast_u16 new_nn) {
         input.read_and_match("%2u set_%s %04x -> %04x",
                              static_cast<unsigned>(get_ticks()), name,
@@ -291,6 +297,8 @@ public:
     void on_set_i(fast_u8 i) { match_set_r("i", get_i(), i);
                                return base::on_set_a(i); }
 
+    fast_u16 on_get_sp() { match_get_rp("sp", get_sp());
+                           return base::on_get_sp(); }
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
                                   return base::on_set_sp(sp); }
 
@@ -348,6 +356,10 @@ public:
     void set_pc_on_block_instr(fast_u16 pc) {
         match_set_pc("block_instr", pc);
         base::set_pc_on_block_instr(pc); }
+
+    void set_pc_on_call(fast_u16 pc) {
+        match_set_pc("call", pc);
+        base::set_pc_on_call(pc); }
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         input.read_and_match("%2u fetch %02x at %04x",
@@ -461,14 +473,14 @@ public:
         return base::on_5t_imm8_read();
     }
 
-    fast_u16 on_imm16_read() {
+    fast_u16 on_imm16_read(bool long_second_cycle = false) {
         fast_u16 addr = get_pc();
         fast_u16 v = z80::make16(on_access(z80::inc16(addr)), on_access(addr));
-        input.read_and_match("%2u imm16_read %02x at %04x",
+        input.read_and_match("%2u imm16_read %04x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(v),
                              static_cast<unsigned>(addr));
-        return base::on_imm16_read();
+        return base::on_imm16_read(long_second_cycle);
     }
 
     fast_u8 on_disp_read() {

@@ -283,6 +283,10 @@ public:
         case 0xcb:
             // CB prefix.
             return (*this)->on_cb_prefix();
+        case 0xcd: {
+            // CALL nn  f(4) r(3) r(4) w(3) w(3)
+            fast_u16 nn = (*this)->on_imm16_read(/* long_second_cycle= */ true);
+            return (*this)->on_call_nn(nn); }
         case 0xd3:
             // OUT (n), A  f(4) r(3) o(4)
             return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
@@ -500,9 +504,11 @@ public:
     fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
 
-    fast_u16 on_imm16_read() { fast_u8 lo = (*this)->on_read();
-                               fast_u8 hi = (*this)->on_read();
-                               return make16(hi, lo); }
+    fast_u16 on_imm16_read(bool long_second_cycle = false) {
+        unused(long_second_cycle);
+        fast_u8 lo = (*this)->on_read();
+        fast_u8 hi = (*this)->on_read();
+        return make16(hi, lo); }
 
     fast_u8 on_disp_read() { return (*this)->on_read(); }
 
@@ -526,6 +532,8 @@ public:
         (*this)->on_format("A R", k, r, irp, d); }
     void on_block_ld(block_ld k) {
         (*this)->on_format("L", k); }
+    void on_call_nn(fast_u16 nn) {
+        (*this)->on_format("call W", nn); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -672,7 +680,7 @@ protected:
             : last_read_addr(0), disable_int(false),
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
               alt_bc(0), alt_de(0), alt_hl(0),
-              pc(0), sp(0xffff), ir(0), memptr(0),
+              pc(0), sp(0), ir(0), memptr(0),
               iff1(false), iff2(false), int_mode(0)
         {}
 
@@ -895,6 +903,8 @@ public:
     fast_u16 get_pc_on_block_instr() const { return (*this)->on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
     fast_u16 get_memptr() const { return state.memptr; }
     void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
 
@@ -1109,6 +1119,20 @@ public:
         unused(op);
     }
 
+    void on_push(fast_u16 nn) {
+        fast_u16 sp = (*this)->on_get_sp();
+        sp = dec16(sp);
+        (*this)->on_3t_write_cycle(sp, get_high8(nn));
+        sp = dec16(sp);
+        (*this)->on_3t_write_cycle(sp, get_low8(nn));
+    }
+
+    void on_call(fast_u16 nn) {
+        (*this)->on_push((*this)->on_get_pc());
+        (*this)->set_memptr(nn);
+        (*this)->set_pc_on_call(nn);
+    }
+
     void on_add_irp_rp(regp rp) {
         fast_u16 i = (*this)->on_get_index_rp();
         fast_u16 n = (*this)->on_get_rp(rp);
@@ -1183,6 +1207,8 @@ public:
             (*this)->on_set_memptr(inc16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
+    void on_call_nn(fast_u16 nn) {
+        (*this)->on_call(nn); }
     void on_dec_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
@@ -1374,11 +1400,12 @@ public:
         return op;
     }
 
-    fast_u16 on_imm16_read() {
+    fast_u16 on_imm16_read(bool long_second_cycle = false) {
         fast_u16 pc = (*this)->get_pc_on_imm16_read();
         fast_u8 lo = (*this)->on_3t_read_cycle(pc);
         pc = inc16(pc);
-        fast_u8 hi = (*this)->on_3t_read_cycle(pc);
+        fast_u8 hi = long_second_cycle ? (*this)->on_4t_read_cycle(pc) :
+                                         (*this)->on_3t_read_cycle(pc);
         (*this)->set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo);
     }
