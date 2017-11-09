@@ -250,6 +250,24 @@ ed47 ld i, a
 10 set_d 00 -> 34
 10 done
 
+fd213a5c ld iy, 0x5c3a
+ 0 get_pc_on_fetch 0000
+ 0 fetch fd at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> iy
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 21 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 imm16_read 5c3a at 0002
+ 8 get_pc_on_imm16_read 0002
+ 8 3t_read 3a at 0002
+11 3t_read 5c at 0003
+14 set_pc_on_imm16_read 0002 -> 0004
+14 set_iyl 00 -> 3a
+14 set_iyh 00 -> 5c
+14 done
+
 # LD rp, (nn)
 ed4bb45c ld bc, (0x5cb4)
  0 get_pc_on_fetch 0000

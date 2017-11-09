@@ -120,11 +120,10 @@ enum condition { nz, z, nc, c, po, pe, p, m };
 template<typename D>
 class instructions_decoder {
 public:
-    instructions_decoder()
-        : index_rp(index_regp::hl), prefix(instruction_prefix::none)
-    {}
+    instructions_decoder() {}
 
-    index_regp get_index_rp_kind() const { return index_rp; }
+    index_regp get_index_rp_kind() const { return state.index_rp; }
+    index_regp get_next_index_rp_kind() const { return state.next_index_rp; }
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
         if(get_index_rp_kind() == index_regp::hl || !may_need_disp)
@@ -142,11 +141,22 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    instruction_prefix get_prefix() const { return prefix; }
-    void set_prefix(instruction_prefix p) { prefix = p; }
+    instruction_prefix get_prefix() const { return state.prefix; }
+    void set_prefix(instruction_prefix p) { state.prefix = p; }
 
-    void on_ed_prefix() { set_prefix(instruction_prefix::ed); }
-    void on_prefix_reset() { set_prefix(instruction_prefix::none); }
+    void on_ed_prefix() {
+        // TODO: Should we reset the index register pair here?
+        set_prefix(instruction_prefix::ed);
+    }
+
+    void on_prefix_reset() {
+        set_prefix(instruction_prefix::none);
+    }
+
+    void on_set_next_index_rp(index_regp irp) {
+        // TODO: Should we reset the prefix here?
+        state.next_index_rp = irp;
+    }
 
     unsigned decode_int_mode(fast_u8 y) {
         y &= 3;
@@ -272,8 +282,10 @@ public:
             // EX DE, HL  f(4)
             return (*this)->on_ex_de_hl();
         case 0xed:
+            // ED prefix.
             return (*this)->on_ed_prefix();
         case 0xf3:
+            // DI  f(4)
             return (*this)->on_di();
         case 0xf9:
             // LD SP, HL
@@ -281,6 +293,9 @@ public:
             // LD SP, i    f(4) f(6)
             (*this)->on_6t_fetch_cycle();
             return (*this)->on_ld_sp_irp();
+        case 0xfd:
+            // FD prefix (IY-indexed instructions).
+            return (*this)->on_set_next_index_rp(index_regp::iy);
         }
 
         // TODO
@@ -343,6 +358,9 @@ public:
     }
 
     void on_decode() {
+        state.index_rp = state.next_index_rp;
+        state.next_index_rp = index_regp::hl;
+
         switch(get_prefix()) {
         case instruction_prefix::none:
             return decode_unprefixed();
@@ -387,8 +405,18 @@ protected:
     static const fast_u8 q_mask = 0010;
 
 private:
-    index_regp index_rp;
-    instruction_prefix prefix;
+    struct decoder_state {
+        decoder_state()
+            : index_rp(index_regp::hl), next_index_rp(index_regp::hl),
+              prefix(instruction_prefix::none)
+        {}
+
+        index_regp index_rp;
+        index_regp next_index_rp;
+        instruction_prefix prefix;
+    };
+
+    decoder_state state;
 };
 
 const char *get_reg_name(reg r);
@@ -593,7 +621,7 @@ protected:
 
     struct processor_state {
         processor_state()
-            : last_read_addr(0),
+            : last_read_addr(0), disable_int(false),
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
               alt_bc(0), alt_de(0), alt_hl(0),
               pc(0), sp(0xffff), ir(0), memptr(0),
@@ -611,6 +639,7 @@ protected:
         }
 
         fast_u16 last_read_addr;
+        bool disable_int;
         fast_u16 bc, de, hl, af, ix, iy;
         fast_u16 alt_bc, alt_de, alt_hl;
         fast_u16 pc, sp, ir, memptr;
@@ -623,6 +652,8 @@ template<typename D>
 class processor : public instructions_decoder<D>,
                   public processor_base {
 public:
+    typedef instructions_decoder<D> decoder;
+
     processor() {}
 
     fast_u8 get_b() const { return get_high8(state.bc); }
@@ -843,6 +874,14 @@ public:
 
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
+
+    void disable_int() { state.disable_int = true; }
+    void on_disable_int() { disable_int(); }
+
+    void on_set_next_index_rp(index_regp irp) {
+        decoder::on_set_next_index_rp(irp);
+        (*this)->on_disable_int();
+    }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));

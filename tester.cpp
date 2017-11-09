@@ -166,7 +166,8 @@ public:
     void disassemble() {
         // Skip prefixes.
         base::disassemble();
-        while(get_prefix() != z80::instruction_prefix::none)
+        while(get_prefix() != z80::instruction_prefix::none ||
+              get_next_index_rp_kind() != z80::index_regp::hl)
             base::disassemble();
     }
 
@@ -265,31 +266,23 @@ public:
 
     fast_u8 on_get_ixh() { match_get_r("ixh", get_ixh());
                            return base::on_get_ixh(); }
-#if 0  // TODO
     void on_set_ixh(fast_u8 ixh) { match_set_r("ixh", get_ixh(), ixh);
                                    return base::on_set_ixh(ixh); }
-#endif
 
     fast_u8 on_get_ixl() { match_get_r("ixl", get_ixl());
                            return base::on_get_ixl(); }
-#if 0  // TODO
     void on_set_ixl(fast_u8 ixl) { match_set_r("ixl", get_ixl(), ixl);
                                    return base::on_set_ixl(ixl); }
-#endif
 
     fast_u8 on_get_iyh() { match_get_r("iyh", get_iyh());
                            return base::on_get_iyh(); }
-#if 0  // TODO
     void on_set_iyh(fast_u8 iyh) { match_set_r("iyh", get_iyh(), iyh);
                                    return base::on_set_iyh(iyh); }
-#endif
 
     fast_u8 on_get_iyl() { match_get_r("iyl", get_iyl());
                            return base::on_get_iyl(); }
-#if 0  // TODO
     void on_set_iyl(fast_u8 iyl) { match_set_r("iyl", get_iyl(), iyl);
                                    return base::on_set_iyl(iyl); }
-#endif
 
 #if 0  // TODO
     fast_u8 on_get_i() { match_get_r("i", get_i());
@@ -523,10 +516,25 @@ public:
         base::on_prefix_reset();
     }
 
+    void on_disable_int() {
+        input.read_and_match("%2u disable_int",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_disable_int();
+    }
+
+    void on_set_next_index_rp(z80::index_regp irp) {
+        input.read_and_match("%2u set_next_index_rp %s -> %s",
+                             static_cast<unsigned>(get_ticks()),
+                             get_reg_name(get_index_rp_kind()),
+                             get_reg_name(irp));
+        base::on_set_next_index_rp(irp);
+    }
+
     void step() {
         // Skip prefixes.
         base::step();
-        while(get_prefix() != z80::instruction_prefix::none)
+        while(get_prefix() != z80::instruction_prefix::none ||
+              get_next_index_rp_kind() != z80::index_regp::hl)
             base::step();
 
         input.read_and_match("%2u done", static_cast<unsigned>(get_ticks()));
