@@ -342,23 +342,28 @@ public:
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
 
+        auto b = static_cast<unsigned>(y);
+        auto r = static_cast<reg>(z);
+
         switch(op & x_mask) {
-        case 0200: {
+        case 0100:
+            // BIT y, r[z]
+            // BIT b, r             f(4)      f(4)
+            // BIT b, (HL)          f(4)      f(4) r(4)
+            // BIT b, (i+d)    f(4) f(4) r(3) f(5) r(4) */
+            return (*this)->on_bit(b, r, d);
+        case 0200:
             // RES y, r[z]
             // RES b, r             f(4)      f(4)
             // RES b, (HL)          f(4)      f(4) r(4) w(3)
             // RES b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            auto b = static_cast<unsigned>(y);
-            auto r = static_cast<reg>(z);
-            return (*this)->on_res(b, r, d); }
-        case 0300: {
+            return (*this)->on_res(b, r, d);
+        case 0300:
             // SET y, r[z]
             // SET b, r             f(4)      f(4)
             // SET b, (HL)          f(4)      f(4) r(4) w(3)
             // SET b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            auto b = static_cast<unsigned>(y);
-            auto r = static_cast<reg>(z);
-            return (*this)->on_set(b, r, d); }
+            return (*this)->on_set(b, r, d);
         }
 
         std::fprintf(stderr, "Unknown CB-prefixed opcode 0x%02x at 0x%04x.\n",
@@ -544,6 +549,9 @@ public:
         (*this)->on_format("A R", k, r, irp, d); }
     void on_block_ld(block_ld k) {
         (*this)->on_format("L", k); }
+    void on_bit(unsigned b, reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("bit U, R", b, r, irp, d); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_format("call W", nn); }
     void on_dec_r(reg r, fast_u8 d) {
@@ -1220,6 +1228,15 @@ public:
             (*this)->on_set_memptr(inc16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
+    void on_bit(unsigned b, reg r, fast_u8 d) {
+        fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 m = v & (1u << b);
+        f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
+        if((*this)->get_index_rp_kind() != index_regp::hl || r == reg::at_hl)
+            v = get_high8((*this)->on_get_memptr());
+        f |= v & (xf_mask | yf_mask);
+        (*this)->on_set_f(f); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
     void on_dec_r(reg r, fast_u8 d) {

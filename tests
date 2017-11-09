@@ -62,6 +62,44 @@ a7 and a
  4 set_f 00 -> 54
  4 done
 
+# BIT b, r
+fdcb014e bit 1, (iy + 1)
+ 0 get_pc_on_fetch 0000
+ 0 fetch fd at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> iy
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch cb at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 disp_read 01 at 0002
+ 8   get_pc_on_disp_read 0002
+ 8   3t_read 01 at 0002
+ 8     set_addr_bus 0000 -> 0002
+11   set_pc_on_disp_read 0002 -> 0003
+11 get_pc_on_fetch 0003
+11 fetch 4e at 0003
+11   set_addr_bus 0002 -> 0003
+13   get_ir_on_refresh 0000
+13   set_addr_bus 0003 -> 0000
+15 set_pc_on_fetch 0003 -> 0004
+15 5t_fetch
+16 get_iyl 00
+16 get_iyh 00
+16 4t_read cb at 0001
+16   set_addr_bus 0000 -> 0001
+20 set_memptr 0000 -> 0001
+20 get_f 00
+20 set_f 00 -> 10
+20 prefix_reset
+20 done
+
 # CALL nn
 cddf0e call 0x0edf
  0 get_pc_on_fetch 0000
