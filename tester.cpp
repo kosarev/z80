@@ -496,6 +496,22 @@ public:
         base::set_iff2_on_di(iff2);
     }
 
+    void set_iff1_on_ei(bool iff1) {
+        input.read_and_match("%2u set_iff1_on_ei %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_iff1()),
+                             static_cast<unsigned>(iff1));
+        base::set_iff1_on_ei(iff1);
+    }
+
+    void set_iff2_on_ei(bool iff2) {
+        input.read_and_match("%2u set_iff2_on_ei %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_iff2()),
+                             static_cast<unsigned>(iff2));
+        base::set_iff2_on_ei(iff2);
+    }
+
     void on_set_int_mode(unsigned mode) {
         input.read_and_match("%2u set_int_mode %u -> %u",
                              static_cast<unsigned>(get_ticks()),

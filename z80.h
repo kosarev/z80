@@ -293,6 +293,9 @@ public:
             // LD SP, i    f(4) f(6)
             (*this)->on_6t_fetch_cycle();
             return (*this)->on_ld_sp_irp();
+        case 0xfb:
+            // EI  f(4)
+            return (*this)->on_ei();
         case 0xfd:
             // FD prefix (IY-indexed instructions).
             return (*this)->on_set_next_index_rp(index_regp::iy);
@@ -497,6 +500,8 @@ public:
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
+    void on_ei() {
+        (*this)->on_format("ei"); }
     void on_ex_de_hl() {
         (*this)->on_format("ex de, hl"); }
     void on_exx() {
@@ -860,6 +865,7 @@ public:
     void on_set_iff1(bool iff1) { set_iff1(iff1); }
 
     void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
+    void set_iff1_on_ei(bool iff1) { (*this)->on_set_iff1(iff1); }
 
     bool get_iff2() const { return state.iff2; }
     void set_iff2(bool iff2) { state.iff2 = iff2; }
@@ -868,6 +874,7 @@ public:
     void on_set_iff2(bool iff2) { set_iff2(iff2); }
 
     void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
+    void set_iff2_on_ei(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     unsigned get_int_mode() const { return state.int_mode; }
     void set_int_mode(unsigned mode) { state.int_mode = mode; }
@@ -1146,6 +1153,10 @@ public:
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
+    void on_ei() {
+        (*this)->set_iff1_on_ei(true);
+        (*this)->set_iff2_on_ei(true);
+        (*this)->on_disable_int(); }
     void on_ex_de_hl() {
         state.ex_de_hl(); }
     void on_exx() {
