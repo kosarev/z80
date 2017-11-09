@@ -391,6 +391,10 @@ public:
         match_set_pc("call", pc);
         base::set_pc_on_call(pc); }
 
+    void set_pc_on_ret(fast_u16 pc) {
+        match_set_pc("ret", pc);
+        base::set_pc_on_ret(pc); }
+
     void match_get_ir(const char *name) const {
         input.read_and_match("get_ir_on_%s %04x",
                              static_cast<unsigned>(get_ticks()), name,

@@ -738,6 +738,23 @@ fdcb308e res 1, (iy + 48)
 23 prefix_reset
 23 done
 
+# RET
+c9 ret
+ 0 get_pc_on_fetch 0000
+ 0 fetch c9 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_sp 0000
+ 4 3t_read c9 at 0000
+ 4   set_addr_bus 0000 -> 0000
+ 7 3t_read cb at 0001
+ 7   set_addr_bus 0000 -> 0001
+10 set_sp 0000 -> 0002
+10 set_pc_on_ret 0001 -> cbc9
+10 done
+
 # SET b, r
 fdcb01ce set 1, (iy + 1)
  0 get_pc_on_fetch 0000
