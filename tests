@@ -317,6 +317,21 @@ ed4bb45c ld bc, (0x5cb4)
 16 set_h 00 -> 00
 16 done
 
+# LD (nn), A
+328d5c ld (0x5c8d), a
+ 0 get_pc_on_fetch 0000
+ 0 fetch 32 at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 imm16_read 5c8d at 0001
+ 4 get_pc_on_imm16_read 0001
+ 4 3t_read 8d at 0001
+ 7 3t_read 5c at 0002
+10 set_pc_on_imm16_read 0001 -> 0003
+10 get_a 00
+10 set_memptr 0000 -> 008e
+10 3t_write 00 -> 00 at 5c8d
+13 done
+
 # LD (nn), irp
 227b5c ld (0x5c7b), hl
  0 get_pc_on_fetch 0000
