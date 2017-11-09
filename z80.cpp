@@ -124,6 +124,13 @@ public:
         append(pad);
     }
 
+    void append_u(unsigned n) {
+        char pad[32];
+        std::snprintf(pad, sizeof(pad), "%u",
+                      static_cast<unsigned>(n));
+        append(pad);
+    }
+
     void append_u16(fast_u16 n) {
         char pad[32];
         std::snprintf(pad, sizeof(pad), "0x%04x",
@@ -188,6 +195,10 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
         case 'W': {  // A 16-bit immediate operand.
             auto nn = get_arg<fast_u16>(args);
             out.append_u16(nn);
+            break; }
+        case 'U': {  // A decimal number.
+            auto u = get_arg<unsigned>(args);
+            out.append_u(u);
             break; }
         case 'C': {  // A condition operand.
             auto cc = get_arg<condition>(args);

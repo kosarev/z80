@@ -503,6 +503,14 @@ public:
         base::set_iff2_on_di(iff2);
     }
 
+    void on_set_int_mode(unsigned mode) {
+        input.read_and_match("%2u set_int_mode %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(get_int_mode()),
+                             static_cast<unsigned>(mode));
+        base::on_set_int_mode(mode);
+    }
+
     void on_ed_prefix() {
         input.read_and_match("%2u ed_prefix",
                              static_cast<unsigned>(get_ticks()));

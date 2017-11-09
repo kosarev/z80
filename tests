@@ -110,6 +110,19 @@ d9 exx
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# IM n
+ed56 im 1
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 get_pc_on_fetch 0001
+ 4 fetch 56 at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 set_int_mode 0 -> 1
+ 8 prefix_reset
+ 8 done
+
 # INC r
 04 inc b
  0 get_pc_on_fetch 0000

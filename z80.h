@@ -148,6 +148,11 @@ public:
     void on_ed_prefix() { set_prefix(instruction_prefix::ed); }
     void on_prefix_reset() { set_prefix(instruction_prefix::none); }
 
+    unsigned decode_int_mode(fast_u8 y) {
+        y &= 3;
+        return y < 2 ? 0 : y - 1;
+    }
+
     void decode_unprefixed() {
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
@@ -314,6 +319,9 @@ public:
             fast_u16 nn = (*this)->on_imm16_read();
             return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
                                  (*this)->on_ld_at_nn_rp(nn, rp); }
+        case 0106: {
+            // IM im[y]  f(4) f(4)
+            return (*this)->on_im(decode_int_mode(y)); }
         case 0200: {
             // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
             if(y < 4)
@@ -465,6 +473,8 @@ public:
         (*this)->on_format("ex de, hl"); }
     void on_exx() {
         (*this)->on_format("exx"); }
+    void on_im(unsigned mode) {
+        (*this)->on_format("im U", mode); }
     void on_inc_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc R", r, irp, d); }
@@ -587,7 +597,7 @@ protected:
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
               alt_bc(0), alt_de(0), alt_hl(0),
               pc(0), sp(0xffff), ir(0), memptr(0),
-              iff1(false), iff2(false)
+              iff1(false), iff2(false), int_mode(0)
         {}
 
         void ex_de_hl() {
@@ -605,6 +615,7 @@ protected:
         fast_u16 alt_bc, alt_de, alt_hl;
         fast_u16 pc, sp, ir, memptr;
         bool iff1, iff2;
+        unsigned int_mode;
     } state;
 };
 
@@ -826,6 +837,12 @@ public:
     void on_set_iff2(bool iff2) { set_iff2(iff2); }
 
     void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
+
+    unsigned get_int_mode() const { return state.int_mode; }
+    void set_int_mode(unsigned mode) { state.int_mode = mode; }
+
+    bool on_get_int_mode() const { return get_int_mode(); }
+    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -1094,6 +1111,8 @@ public:
         state.ex_de_hl(); }
     void on_exx() {
         state.exx(); }
+    void on_im(unsigned mode) {
+        (*this)->on_set_int_mode(mode); }
     void on_inc_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
