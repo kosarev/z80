@@ -140,8 +140,9 @@ public:
 
     void append_disp(int d) {
         char pad[32];
-        std::snprintf(pad, sizeof(pad), "%+d",
-                      static_cast<int>(d));
+        std::snprintf(pad, sizeof(pad), "%c %d",
+                      static_cast<int>(d < 0 ? '-' : '+'),
+                      static_cast<int>(std::abs(d)));
         append(pad);
     }
 
@@ -179,6 +180,7 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             } else {
                 out.append('(');
                 out.append(get_index_reg_name(irp));
+                out.append(' ');
                 out.append_disp(sign_extend8(d));
                 out.append(')');
             }
@@ -206,7 +208,7 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'D': {  // A relative address.
             auto d = get_arg<int>(args);
-            out.append('$');
+            out.append("$ ");
             out.append_disp(d);
             break; }
         case 'L': {  // A block transfer instruction.

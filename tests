@@ -171,7 +171,7 @@ c3cdab jp 0xabcd
 10 done
 
 # JR cc, d
-28fa jr z, $-4
+28fa jr z, $ - 4
  0 get_pc_on_fetch 0000
  0 fetch 28 at 0000
  4 set_pc_on_fetch 0000 -> 0001
@@ -182,7 +182,7 @@ c3cdab jp 0xabcd
  7 get_f 00
  7 done
 
-200a jr nz, $+12
+200a jr nz, $ + 12
  0 get_pc_on_fetch 0000
  0 fetch 20 at 0000
  4 set_pc_on_fetch 0000 -> 0001
@@ -458,6 +458,35 @@ ed52 sbc hl, de
 15 set_f 00 -> 42
 15 prefix_reset
 15 done
+
+# SET b, r
+fdcb01ce set 1, (iy + 1)
+ 0 get_pc_on_fetch 0000
+ 0 fetch fd at 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> iy
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch cb at 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 disp_read 01 at 0002
+ 8 get_pc_on_disp_read 0002
+ 8 3t_read 01 at 0002
+11 set_pc_on_disp_read 0002 -> 0003
+11 get_pc_on_fetch 0003
+11 fetch ce at 0003
+15 set_pc_on_fetch 0003 -> 0004
+15 5t_fetch
+16 get_iyl 00
+16 get_iyh 00
+16 4t_read cb at 0001
+20 set_memptr 0000 -> 0001
+20 get_iyl 00
+20 get_iyh 00
+20 3t_write cb -> cb at 0001
+23 set_memptr 0001 -> 0001
+23 prefix_reset
+23 done
 
 # XOR r
 af xor a
