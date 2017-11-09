@@ -343,6 +343,14 @@ public:
         fast_u8 z = get_z_part(op);
 
         switch(op & x_mask) {
+        case 0200: {
+            // RES y, r[z]
+            // RES b, r             f(4)      f(4)
+            // RES b, (HL)          f(4)      f(4) r(4) w(3)
+            // RES b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
+            auto b = static_cast<unsigned>(y);
+            auto r = static_cast<reg>(z);
+            return (*this)->on_res(b, r, d); }
         case 0300: {
             // SET y, r[z]
             // SET b, r             f(4)      f(4)
@@ -596,6 +604,13 @@ public:
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
+    void on_res(unsigned b, reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        if(irp == index_regp::hl || r == reg::at_hl)
+            (*this)->on_format("res U, R", b, reg::at_hl, irp, d);
+        else
+            (*this)->on_format("res U, R, R", b, reg::at_hl, irp, d,
+                               r, index_regp::hl, 0); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -1303,6 +1318,14 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
+    void on_res(unsigned b, reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        reg access_r = irp == index_regp::hl ? r : reg::at_hl;
+        fast_u8 v = (*this)->on_get_r(access_r, d, /* long_read_cycle= */ true);
+        v &= ~(1u << b);
+        (*this)->on_set_r(access_r, d, v);
+        if(irp != index_regp::hl && r != reg::at_hl)
+            (*this)->on_set_r(r, /* d= */ 0, v); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
