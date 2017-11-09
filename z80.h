@@ -1095,7 +1095,13 @@ public:
         switch(k) {
         case alu::add: assert(0); break;  // TODO
         case alu::adc: assert(0); break;  // TODO
-        case alu::sub: assert(0); break;  // TODO
+        case alu::sub: {
+            fast_u8 t = sub8(a, n);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) |
+                    nf_mask;
+            a = t;
+            break; }
         case alu::sbc: assert(0); break;  // TODO
         case alu::and_a:
             a &= n;
@@ -1108,9 +1114,9 @@ public:
             break;
         case alu::or_a: assert(0); break;  // TODO
         case alu::cp: {
-            fast_u8 d = sub8(a, n);
-            f = (d & sf_mask) | zf_ari(d) | (n & (yf_mask | xf_mask)) |
-                    hf_ari(d, a, n) | pf_ari(a - n, a, n) | cf_ari(d > a) |
+            fast_u8 t = sub8(a, n);
+            f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
+                    hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) |
                     nf_mask;
             break; }
         }
