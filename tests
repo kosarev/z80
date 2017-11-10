@@ -796,11 +796,30 @@ c9 ret
  4 get_sp 0000
  4 3t_read c9 at 0000
  4   set_addr_bus 0000 -> 0000
- 7 3t_read cb at 0001
+ 7 3t_read 00 at 0001
  7   set_addr_bus 0000 -> 0001
 10 set_sp 0000 -> 0002
-10 set_pc_on_ret 0001 -> cbc9
+10 set_pc_on_return 0001 -> 00c9
 10 done
+
+# RET cc
+c0 ret nz
+ 0 get_pc_on_fetch 0000
+ 0 fetch c0 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 5t_fetch
+ 5 get_f 00
+ 5 get_sp 0000
+ 5 3t_read c0 at 0000
+ 5   set_addr_bus 0000 -> 0000
+ 8 3t_read 00 at 0001
+ 8   set_addr_bus 0000 -> 0001
+11 set_sp 0000 -> 0002
+11 set_pc_on_return 0001 -> 00c0
+11 done
 
 # SET b, r
 fdcb01ce set 1, (iy + 1)

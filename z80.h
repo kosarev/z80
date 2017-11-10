@@ -227,6 +227,11 @@ public:
                 n = (*this)->on_5t_imm8_read();
             }
             return (*this)->on_ld_r_n(r, d, n); }
+        case 0300: {
+            // RET cc[y]  f(5) + r(3) r(3)
+            (*this)->on_5t_fetch_cycle();
+            auto cc = static_cast<condition>(y);
+            return (*this)->on_ret_cc(cc); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -632,6 +637,8 @@ public:
                                r, index_regp::hl, 0); }
     void on_ret() {
         (*this)->on_format("ret"); }
+    void on_ret_cc(condition cc) {
+        (*this)->on_format("ret C", cc); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -946,7 +953,7 @@ public:
     void set_pc_on_block_instr(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
-    void set_pc_on_ret(fast_u16 pc) { (*this)->on_set_pc(pc); }
+    void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_ir() const { return state.ir; }
 
@@ -1193,6 +1200,12 @@ public:
         (*this)->set_pc_on_call(nn);
     }
 
+    void on_return() {
+        fast_u16 pc = (*this)->on_pop();
+        (*this)->set_memptr(pc);
+        (*this)->set_pc_on_return(pc);
+    }
+
     void on_add_irp_rp(regp rp) {
         fast_u16 i = (*this)->on_get_index_rp();
         fast_u16 n = (*this)->on_get_rp(rp);
@@ -1384,10 +1397,11 @@ public:
         (*this)->on_set_r(access_r, d, v);
         if(irp != index_regp::hl && r != reg::at_hl)
             (*this)->on_set_r(r, /* d= */ 0, v); }
+    void on_ret_cc(condition cc) {
+        if(check_condition(cc))
+            (*this)->on_return(); }
     void on_ret() {
-        fast_u16 pc = (*this)->on_pop();
-        (*this)->set_memptr(pc);
-        (*this)->set_pc_on_ret(pc); }
+        (*this)->on_return(); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;

@@ -230,6 +230,8 @@ public:
 
     void set_instr_code(const least_u8 *code, unsigned size) {
         fast_u16 pc = get_pc();
+        for(least_u8 &cell : image)
+            cell = 0;
         for(unsigned i = 0; i != size; ++i)
             on_access(z80::add16(pc, i)) = code[i];
     }
@@ -391,9 +393,9 @@ public:
         match_set_pc("call", pc);
         base::set_pc_on_call(pc); }
 
-    void set_pc_on_ret(fast_u16 pc) {
-        match_set_pc("ret", pc);
-        base::set_pc_on_ret(pc); }
+    void set_pc_on_return(fast_u16 pc) {
+        match_set_pc("return", pc);
+        base::set_pc_on_return(pc); }
 
     void match_get_ir(const char *name) const {
         input.read_and_match("get_ir_on_%s %04x",
