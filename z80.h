@@ -294,6 +294,9 @@ public:
         case 0x37:
             // SCF  f(4)
             return (*this)->on_scf();
+        case 0x3f:
+            // CCF  f(4)
+            return (*this)->on_ccf();
         case 0xc3:
             // JP nn  f(4) r(3) r(3)
             return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
@@ -577,6 +580,8 @@ public:
         (*this)->on_format("bit U, R", b, r, irp, d); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_format("call W", nn); }
+    void on_ccf() {
+        (*this)->on_format("ccf"); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -1314,6 +1319,13 @@ public:
         (*this)->on_set_f(f); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
+    void on_ccf() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        bool cf = f & cf_mask;
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                (cf ? hf_mask : 0) | cf_ari(!cf);
+        (*this)->on_set_f(f); }
     void on_dec_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
