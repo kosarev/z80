@@ -1131,7 +1131,10 @@ public:
             a ^= n;
             f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
             break;
-        case alu::or_a: assert(0); break;  // TODO
+        case alu::or_a:
+            a |= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+            break;
         case alu::cp: {
             fast_u8 t = sub8(a, n);
             f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
