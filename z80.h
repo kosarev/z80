@@ -286,6 +286,12 @@ public:
             auto rp = static_cast<regp2>(p);
             return (*this)->on_push_rp(rp); }
         }
+        switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
+        case 0012: {
+            // LD A, (rp[p])  f(4) r(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_ld_a_at_rp(rp); }
+        }
         switch(op) {
         case 0x00:
             return (*this)->on_nop();
@@ -671,6 +677,8 @@ public:
         (*this)->on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
         (*this)->on_format("ld (W), a", nn); }
+    void on_ld_a_at_rp(regp rp) {
+        (*this)->on_format("ld a, (P)", rp, index_regp::hl); }
     void on_ld_sp_irp() {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("ld sp, P", regp::hl, irp); }
@@ -1490,6 +1498,10 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
         (*this)->on_3t_write_cycle(nn, a); }
+    void on_ld_a_at_rp(regp rp) {
+        fast_u16 nn = (*this)->on_get_rp(rp);
+        (*this)->on_set_memptr(inc16(nn));
+        (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_sp_irp() {
         (*this)->on_set_sp((*this)->on_get_index_rp()); }
     void on_nop() {}
