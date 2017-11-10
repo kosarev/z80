@@ -153,7 +153,34 @@ cddf0e call 0x0edf
 14 3t_write 00 -> 03 at fffe
 14   set_addr_bus ffff -> fffe
 17 set_sp 0000 -> fffe
+17 set_memptr 0000 -> 0edf
 17 set_pc_on_call 0003 -> 0edf
+17 done
+
+# CALL cc, nn
+c4550c call nz, 0x0c55
+ 0 get_pc_on_fetch 0000
+ 0 fetch c4 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_f 00
+ 4 3t_4t_imm16_read 0c55 at 0001
+ 4   get_pc_on_imm16_read 0001
+ 4   3t_read 55 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   4t_read 0c at 0002
+ 7     set_addr_bus 0001 -> 0002
+11   set_pc_on_imm16_read 0001 -> 0003
+11 get_sp 0000
+11 3t_write 00 -> 00 at ffff
+11   set_addr_bus 0002 -> ffff
+14 3t_write 00 -> 03 at fffe
+14   set_addr_bus ffff -> fffe
+17 set_sp 0000 -> fffe
+17 set_memptr 0000 -> 0c55
+17 set_pc_on_call 0003 -> 0c55
 17 done
 
 # CCF
@@ -907,6 +934,7 @@ d7 rst 0x0010
  8 3t_write 00 -> 01 at fffe
  8   set_addr_bus ffff -> fffe
 11 set_sp 0000 -> fffe
+11 set_memptr 0000 -> 0010
 11 set_pc_on_call 0001 -> 0010
 11 done
 
@@ -994,6 +1022,7 @@ c9 ret
  7 3t_read 00 at 0001
  7   set_addr_bus 0000 -> 0001
 10 set_sp 0000 -> 0002
+10 set_memptr 0000 -> 00c9
 10 set_pc_on_return 0001 -> 00c9
 10 done
 
@@ -1013,6 +1042,7 @@ c0 ret nz
  8 3t_read 00 at 0001
  8   set_addr_bus 0000 -> 0001
 11 set_sp 0000 -> 0002
+11 set_memptr 0000 -> 00c0
 11 set_pc_on_return 0001 -> 00c0
 11 done
 

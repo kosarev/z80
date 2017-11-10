@@ -239,6 +239,15 @@ public:
             // JP cc[y], nn  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
             return (*this)->on_jp_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
+        case 0304: {
+            // CALL cc[y], nn
+            // cc met:      f(4) r(3) r(4) w(3) w(3)
+            // cc not met:  f(4) r(3) r(3)
+            auto cc = static_cast<condition>(y);
+            bool cc_met = (*this)->check_condition(cc);
+            fast_u16 nn = c ? (*this)->on_3t_4t_imm16_read() :
+                              (*this)->on_3t_3t_imm16_read();
+            return (*this)->on_call_cc_nn(cc_met, cc, nn); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -581,6 +590,14 @@ public:
     void on_5t_fetch_cycle() {}
     void on_6t_fetch_cycle() {}
 
+    // 'call cc, nn' instructions require this function to disambiguate between
+    // read cycles of various lengths. This disambiguation does not affect
+    // disassembling so we just return false here.
+    bool check_condition(condition cc) {
+        unused(cc);
+        return false;
+    }
+
     fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
 
@@ -622,6 +639,9 @@ public:
         (*this)->on_format("bit U, R", b, r, irp, d); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_format("call W", nn); }
+    void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
+        unused(cc_met);
+        (*this)->on_format("call C, W", cc, nn); }
     void on_ccf() {
         (*this)->on_format("ccf"); }
     void on_dec_r(reg r, fast_u8 d) {
@@ -1296,13 +1316,13 @@ public:
 
     void on_call(fast_u16 nn) {
         (*this)->on_push((*this)->on_get_pc());
-        (*this)->set_memptr(nn);
+        (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_call(nn);
     }
 
     void on_return() {
         fast_u16 pc = (*this)->on_pop();
-        (*this)->set_memptr(pc);
+        (*this)->on_set_memptr(pc);
         (*this)->set_pc_on_return(pc);
     }
 
@@ -1403,6 +1423,12 @@ public:
         (*this)->on_set_f(f); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
+    void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
+        unused(cc);
+        if(cc_met)
+            (*this)->on_call(nn);
+        else
+            (*this)->on_set_memptr(nn); }
     void on_ccf() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
@@ -1466,7 +1492,7 @@ public:
         if(check_condition(cc))
             (*this)->on_jump(nn);
         else
-            (*this)->set_memptr(nn); }
+            (*this)->on_set_memptr(nn); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jp_nn(fast_u16 nn) {
@@ -1484,7 +1510,6 @@ public:
         (*this)->on_set_r(r, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
-
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = (*this)->on_3t_read_cycle(nn);
         nn = inc16(nn);
