@@ -586,6 +586,27 @@ ed4bb45c ld bc, (0x5cb4)
 16 set_h 00 -> 00
 16 done
 
+# LD A, (nn)
+3a8d5c ld a, (0x5c8d)
+ 0 get_pc_on_fetch 0000
+ 0 fetch 3a at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_3t_imm16_read 5c8d at 0001
+ 4   get_pc_on_imm16_read 0001
+ 4   3t_read 8d at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   3t_read 5c at 0002
+ 7     set_addr_bus 0001 -> 0002
+10   set_pc_on_imm16_read 0001 -> 0003
+10 set_memptr 0000 -> 5c8e
+10 3t_read 00 at 5c8d
+10   set_addr_bus 0002 -> 5c8d
+13 set_a 00 -> 00
+13 done
+
 # LD (nn), A
 328d5c ld (0x5c8d), a
  0 get_pc_on_fetch 0000
