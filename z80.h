@@ -1100,7 +1100,12 @@ public:
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f;
         switch(k) {
-        case alu::add: assert(0); break;  // TODO
+        case alu::add: {
+            fast_u8 t = add8(a, n);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
+            a = t;
+            break; }
         case alu::adc: assert(0); break;  // TODO
         case alu::sub: {
             fast_u8 t = sub8(a, n);
