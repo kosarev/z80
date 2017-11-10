@@ -1300,11 +1300,14 @@ public:
         (*this)->set_pc_on_return(pc);
     }
 
+    void on_jump(fast_u16 nn) {
+        (*this)->on_set_memptr(nn);
+        (*this)->set_pc_on_jump(nn);
+    }
+
     void on_relative_jump(fast_u8 d) {
         (*this)->on_5t_exec_cycle();
-        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
-        (*this)->on_set_memptr(memptr);
-        (*this)->set_pc_on_jump(memptr);
+        (*this)->on_jump(get_disp_target((*this)->get_pc_on_jump(), d));
     }
 
     void on_add_irp_rp(regp rp) {
@@ -1456,8 +1459,7 @@ public:
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jp_nn(fast_u16 nn) {
-        (*this)->on_set_memptr(nn);
-        (*this)->set_pc_on_jump(nn); }
+        (*this)->on_jump(nn); }
     void on_jr(fast_u8 d) {
         (*this)->on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
