@@ -1159,6 +1159,7 @@ public:
         (*this)->on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         (*this)->on_3t_write_cycle(sp, get_low8(nn));
+        (*this)->on_set_sp(sp);
     }
 
     fast_u16 on_pop() {

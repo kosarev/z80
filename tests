@@ -120,6 +120,7 @@ cddf0e call 0x0edf
 11   set_addr_bus 0002 -> ffff
 14 3t_write 00 -> 03 at fffe
 14   set_addr_bus ffff -> fffe
+17 set_sp 0000 -> fffe
 17 set_pc_on_call 0003 -> 0edf
 17 done
 
