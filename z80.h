@@ -1220,6 +1220,13 @@ public:
         (*this)->set_pc_on_return(pc);
     }
 
+    void on_relative_jump(fast_u8 d) {
+        (*this)->on_5t_exec_cycle();
+        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
+        (*this)->on_set_memptr(memptr);
+        (*this)->set_pc_on_jump(memptr);
+    }
+
     void on_add_irp_rp(regp rp) {
         fast_u16 i = (*this)->on_get_index_rp();
         fast_u16 n = (*this)->on_get_rp(rp);
@@ -1289,8 +1296,8 @@ public:
         (*this)->on_set_hl(hl);
         (*this)->on_set_f(f);
 
+        // LDIR, LDDR
         if((static_cast<unsigned>(k) & 2) && bc) {
-            // LDIR, LDDR
             (*this)->on_5t_exec_cycle();
             fast_u16 pc = (*this)->get_pc_on_block_instr();
             (*this)->on_set_memptr(inc16(pc));
@@ -1324,12 +1331,8 @@ public:
         fast_u8 b = (*this)->on_get_b();
         b = dec8(b);
         (*this)->on_set_b(b);
-        if(b) {
-            (*this)->on_5t_exec_cycle();
-            fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
-            (*this)->on_set_memptr(memptr);
-            (*this)->set_pc_on_jump(memptr);
-        } }
+        if(b)
+            (*this)->on_relative_jump(d); }
     void on_ei() {
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
@@ -1356,17 +1359,10 @@ public:
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
     void on_jr(fast_u8 d) {
-        (*this)->on_5t_exec_cycle();
-        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
-        (*this)->on_set_memptr(memptr);
-        (*this)->set_pc_on_jump(memptr); }
+        (*this)->on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
-        if(!check_condition(cc))
-            return;
-        (*this)->on_5t_exec_cycle();
-        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
-        (*this)->on_set_memptr(memptr);
-        (*this)->set_pc_on_jump(memptr); }
+        if(check_condition(cc))
+            (*this)->on_relative_jump(d); }
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
