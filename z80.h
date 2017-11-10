@@ -277,6 +277,9 @@ public:
             // DJNZ  f(5) r(3) + e(5)
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_djnz((*this)->on_disp_read());
+        case 0x18:
+            // JR d  f(4) r(3) e(5)
+            return (*this)->on_jr((*this)->on_disp_read());
         case 0x22:
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
@@ -603,6 +606,8 @@ public:
         (*this)->on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
+    void on_jr(fast_u8 d) {
+        (*this)->on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         (*this)->on_format("jr C, D", cc, sign_extend8(d) + 2); }
     void on_ld_i_a() {
@@ -1350,6 +1355,11 @@ public:
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
+    void on_jr(fast_u8 d) {
+        (*this)->on_5t_exec_cycle();
+        fast_u16 memptr = get_disp_target((*this)->get_pc_on_jump(), d);
+        (*this)->on_set_memptr(memptr);
+        (*this)->set_pc_on_jump(memptr); }
     void on_jr_cc(condition cc, fast_u8 d) {
         if(!check_condition(cc))
             return;

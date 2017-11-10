@@ -351,6 +351,25 @@ c3cdab jp 0xabcd
 10 set_pc_on_jump 0003 -> abcd
 10 done
 
+# JR d
+1804 jr $ + 6
+ 0 get_pc_on_fetch 0000
+ 0 fetch 18 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 disp_read 04 at 0001
+ 4   get_pc_on_disp_read 0001
+ 4   3t_read 04 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_disp_read 0001 -> 0002
+ 7 5t_exec
+12 get_pc_on_jump 0002
+12 set_memptr 0000 -> 0006
+12 set_pc_on_jump 0002 -> 0006
+12 done
+
 # JR cc, d
 28fa jr z, $ - 4
  0 get_pc_on_fetch 0000
