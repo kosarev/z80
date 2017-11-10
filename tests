@@ -356,6 +356,26 @@ ed56 im 1
  6 set_h 00 -> 00
  6 done
 
+# JP cc, nn
+d2d90a jp nc, 0x0ad9
+ 0 get_pc_on_fetch 0000
+ 0 fetch d2 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_3t_imm16_read 0ad9 at 0001
+ 4   get_pc_on_imm16_read 0001
+ 4   3t_read d9 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   3t_read 0a at 0002
+ 7     set_addr_bus 0001 -> 0002
+10   set_pc_on_imm16_read 0001 -> 0003
+10 get_f 00
+10 set_memptr 0000 -> 0ad9
+10 set_pc_on_jump 0003 -> 0ad9
+10 done
+
 # JP irp
 e9 jp (hl)
  0 get_pc_on_fetch 0000

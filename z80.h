@@ -235,6 +235,10 @@ public:
             (*this)->on_5t_fetch_cycle();
             auto cc = static_cast<condition>(y);
             return (*this)->on_ret_cc(cc); }
+        case 0302: {
+            // JP cc[y], nn  f(4) r(3) r(3)
+            auto cc = static_cast<condition>(y);
+            return (*this)->on_jp_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -647,6 +651,8 @@ public:
     void on_inc_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc P", rp, irp); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        (*this)->on_format("jp C, W", cc, nn); }
     void on_jp_irp() {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("jp (P)", regp::hl, irp); }
@@ -1456,6 +1462,11 @@ public:
         (*this)->on_set_f(f); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            (*this)->on_jump(nn);
+        else
+            (*this)->set_memptr(nn); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jp_nn(fast_u16 nn) {
