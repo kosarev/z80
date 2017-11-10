@@ -193,8 +193,8 @@ public:
             // alu r            f(4)
             // alu (HL)         f(4)           r(3)
             // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
-            auto r = static_cast<reg>(z);
             auto k = static_cast<alu>(y);
+            auto r = static_cast<reg>(z);
             return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask)) {
@@ -227,6 +227,10 @@ public:
                 n = (*this)->on_5t_imm8_read();
             }
             return (*this)->on_ld_r_n(r, d, n); }
+        case 0306: {
+            // alu[y] n  f(4) r(3)
+            auto k = static_cast<alu>(y);
+            return (*this)->on_alu_n(k, (*this)->on_3t_imm8_read()); }
         }
         if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
             // JR cc[y-4], d  f(4) r(3) + e(5)
@@ -548,6 +552,8 @@ public:
         (*this)->on_format("add P, P", regp::hl, irp, rp, irp); }
     void on_adc_hl_rp(regp rp) {
         (*this)->on_format("adc hl, P", rp, index_regp::hl); }
+    void on_alu_n(alu k, fast_u8 n) {
+        (*this)->on_format("A N", k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("A R", k, r, irp, d); }
@@ -1217,6 +1223,8 @@ public:
         (*this)->on_set_memptr(inc16(hl));
         (*this)->on_set_hl(r);
         (*this)->on_set_f(f); }
+    void on_alu_n(alu k, fast_u8 n) {
+        do_alu(k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
     void on_block_ld(block_ld k) {
