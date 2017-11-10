@@ -239,6 +239,10 @@ public:
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
             return (*this)->on_alu_n(k, (*this)->on_3t_imm8_read()); }
+        case 0307:
+            // RST y*8  f(5) w(3) w(3)
+            (*this)->on_5t_fetch_cycle();
+            return (*this)->on_rst(y * 8);
         }
         if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
             // JR cc[y-4], d  f(4) r(3) + e(5)
@@ -705,6 +709,8 @@ public:
         (*this)->on_format("ret C", cc); }
     void on_rrca() {
         (*this)->on_format("rrca"); }
+    void on_rst(fast_u16 nn) {
+        (*this)->on_format("rst W", nn); }
     void on_scf() {
         (*this)->on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
@@ -1534,6 +1540,8 @@ public:
                 cf_ari(a & 0x80);
         (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
+    void on_rst(fast_u16 nn) {
+        (*this)->on_call(nn); }
     void on_scf() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
