@@ -140,7 +140,7 @@ cddf0e call 0x0edf
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read 0edf at 0001
+ 4 3t_4t_imm16_read 0edf at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read df at 0001
  4     set_addr_bus 0000 -> 0001
@@ -327,7 +327,7 @@ c3cdab jp 0xabcd
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read abcd at 0001
+ 4 3t_3t_imm16_read abcd at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read cd at 0001
  4     set_addr_bus 0000 -> 0001
@@ -448,7 +448,7 @@ ed47 ld i, a
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read 3456 at 0001
+ 4 3t_3t_imm16_read 3456 at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 56 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -474,7 +474,7 @@ fd213a5c ld iy, 0x5c3a
  6   get_ir_on_refresh 0000
  6   set_addr_bus 0001 -> 0000
  8 set_pc_on_fetch 0001 -> 0002
- 8 imm16_read 5c3a at 0002
+ 8 3t_3t_imm16_read 5c3a at 0002
  8   get_pc_on_imm16_read 0002
  8   3t_read 3a at 0002
  8     set_addr_bus 0000 -> 0002
@@ -500,7 +500,7 @@ ed4bb45c ld bc, (0x5cb4)
  6   get_ir_on_refresh 0000
  6   set_addr_bus 0001 -> 0000
  8 set_pc_on_fetch 0001 -> 0002
- 8 imm16_read 5cb4 at 0002
+ 8 3t_3t_imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
  8   3t_read b4 at 0002
  8     set_addr_bus 0000 -> 0002
@@ -525,7 +525,7 @@ ed4bb45c ld bc, (0x5cb4)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read 5cb2 at 0001
+ 4 3t_3t_imm16_read 5cb2 at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read b2 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -549,7 +549,7 @@ ed4bb45c ld bc, (0x5cb4)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read 5c8d at 0001
+ 4 3t_3t_imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 8d at 0001
  4     set_addr_bus 0000 -> 0001
@@ -570,7 +570,7 @@ ed4bb45c ld bc, (0x5cb4)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 imm16_read 5c7b at 0001
+ 4 3t_3t_imm16_read 5c7b at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 7b at 0001
  4     set_addr_bus 0000 -> 0001
@@ -601,7 +601,7 @@ ed43b45c ld (0x5cb4), bc
  6   get_ir_on_refresh 0000
  6   set_addr_bus 0001 -> 0000
  8 set_pc_on_fetch 0001 -> 0002
- 8 imm16_read 5cb4 at 0002
+ 8 3t_3t_imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
  8   3t_read b4 at 0002
  8     set_addr_bus 0000 -> 0002

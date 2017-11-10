@@ -243,8 +243,7 @@ public:
             // LD rr, nn        f(4) r(3) r(3)
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
-            fast_u16 nn = (*this)->on_imm16_read();
-            return (*this)->on_ld_rp_nn(rp, nn); }
+            return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
         case 0003: {
             // INC rp[p]
             // INC rr           f(6)
@@ -277,28 +276,27 @@ public:
             // LD (nn), HL
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
-            return (*this)->on_ld_at_nn_irp((*this)->on_imm16_read());
+            return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
         case 0x2a:
             // LD HL, (nn)
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
-            return (*this)->on_ld_irp_at_nn((*this)->on_imm16_read());
+            return (*this)->on_ld_irp_at_nn((*this)->on_3t_3t_imm16_read());
         case 0x32:
             // LD (nn), A  f(4) r(3) r(3) w(3)
-            return (*this)->on_ld_at_nn_a((*this)->on_imm16_read());
+            return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
         case 0xc3:
             // JP nn  f(4) r(3) r(3)
-            return (*this)->on_jp_nn((*this)->on_imm16_read());
+            return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
         case 0xc9:
             // RET  f(4) r(3) r(3)
             return (*this)->on_ret();
         case 0xcb:
             // CB prefix.
             return (*this)->on_cb_prefix();
-        case 0xcd: {
+        case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
-            fast_u16 nn = (*this)->on_imm16_read(/* long_second_cycle= */ true);
-            return (*this)->on_call_nn(nn); }
+            return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
         case 0xd3:
             // OUT (n), A  f(4) r(3) o(4)
             return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
@@ -397,7 +395,7 @@ public:
             // LD rp[p], (nn)  f(4) f(4) r(3) r(3) r(3) r(3)
             // LD (nn), rp[p]  f(4) f(4) r(3) r(3) w(3) w(3)
             auto rp = static_cast<regp>(p);
-            fast_u16 nn = (*this)->on_imm16_read();
+            fast_u16 nn = (*this)->on_3t_3t_imm16_read();
             return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
                                  (*this)->on_ld_at_nn_rp(nn, rp); }
         case 0106: {
@@ -529,8 +527,11 @@ public:
     fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
 
-    fast_u16 on_imm16_read(bool long_second_cycle = false) {
-        unused(long_second_cycle);
+    fast_u16 on_3t_3t_imm16_read() {
+        fast_u8 lo = (*this)->on_read();
+        fast_u8 hi = (*this)->on_read();
+        return make16(hi, lo); }
+    fast_u16 on_3t_4t_imm16_read() {
         fast_u8 lo = (*this)->on_read();
         fast_u8 hi = (*this)->on_read();
         return make16(hi, lo); }
@@ -1513,12 +1514,20 @@ public:
         return op;
     }
 
-    fast_u16 on_imm16_read(bool long_second_cycle = false) {
+    fast_u16 on_3t_3t_imm16_read() {
         fast_u16 pc = (*this)->get_pc_on_imm16_read();
         fast_u8 lo = (*this)->on_3t_read_cycle(pc);
         pc = inc16(pc);
-        fast_u8 hi = long_second_cycle ? (*this)->on_4t_read_cycle(pc) :
-                                         (*this)->on_3t_read_cycle(pc);
+        fast_u8 hi = (*this)->on_3t_read_cycle(pc);
+        (*this)->set_pc_on_imm16_read(inc16(pc));
+        return make16(hi, lo);
+    }
+
+    fast_u16 on_3t_4t_imm16_read() {
+        fast_u16 pc = (*this)->get_pc_on_imm16_read();
+        fast_u8 lo = (*this)->on_3t_read_cycle(pc);
+        pc = inc16(pc);
+        fast_u8 hi = (*this)->on_4t_read_cycle(pc);
         (*this)->set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo);
     }
