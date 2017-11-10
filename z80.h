@@ -272,6 +272,12 @@ public:
             (*this)->on_6t_fetch_cycle();
             auto rp = static_cast<regp>(p);
             return (*this)->on_dec_rp(rp); }
+        case 0301: {
+            // POP rp2[p]
+            // POP rr           f(4) r(3) r(3)
+            // POP i       f(4) f(4) r(3) r(3)
+            auto rp = static_cast<regp2>(p);
+            return (*this)->on_pop_rp(rp); }
         case 0305: {
             // PUSH rp2[p]
             // PUSH rr          f(5) w(3) w(3)
@@ -659,6 +665,9 @@ public:
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
+    void on_pop_rp(regp2 rp) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("pop G", rp, irp); }
     void on_push_rp(regp2 rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("push G", rp, irp); }
@@ -1129,6 +1138,16 @@ public:
         assert(0);
     }
 
+    void on_set_rp2(regp2 rp, fast_u16 nn) {
+        switch(rp) {
+        case regp2::bc: return (*this)->on_set_bc(nn);
+        case regp2::de: return (*this)->on_set_de(nn);
+        case regp2::hl: return (*this)->on_set_index_rp(nn);
+        case regp2::af: return (*this)->on_set_af(nn);
+        }
+        assert(0);
+    }
+
     fast_u16 get_index_rp(index_regp irp) {
         switch(irp) {
         case index_regp::hl: return get_hl();
@@ -1447,6 +1466,8 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
+    void on_pop_rp(regp2 rp) {
+        (*this)->on_set_rp2(rp, (*this)->on_pop()); }
     void on_push_rp(regp2 rp) {
         (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_res(unsigned b, reg r, fast_u8 d) {
