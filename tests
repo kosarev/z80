@@ -319,6 +319,19 @@ ed56 im 1
  6 set_h 00 -> 00
  6 done
 
+# JP irp
+e9 jp (hl)
+ 0 get_pc_on_fetch 0000
+ 0 fetch e9 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_l 00
+ 4 get_h 00
+ 4 set_pc_on_jump 0001 -> 0000
+ 4 done
+
 # JP nn
 c3cdab jp 0xabcd
  0 get_pc_on_fetch 0000

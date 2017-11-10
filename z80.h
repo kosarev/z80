@@ -278,12 +278,10 @@ public:
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_djnz((*this)->on_disp_read());
         case 0x22:
-            // LD (nn), HL
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
             return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
         case 0x2a:
-            // LD HL, (nn)
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
             return (*this)->on_ld_irp_at_nn((*this)->on_3t_3t_imm16_read());
@@ -311,6 +309,10 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
+        case 0xe9:
+            // JP HL            f(4)
+            // JP i        f(4) f(4)
+            return (*this)->on_jp_irp();
         case 0xeb:
             // EX DE, HL  f(4)
             return (*this)->on_ex_de_hl();
@@ -321,7 +323,6 @@ public:
             // DI  f(4)
             return (*this)->on_di();
         case 0xf9:
-            // LD SP, HL
             // LD SP, HL        f(6)
             // LD SP, i    f(4) f(6)
             (*this)->on_6t_fetch_cycle();
@@ -597,6 +598,9 @@ public:
     void on_inc_rp(regp rp) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc P", rp, irp); }
+    void on_jp_irp() {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -1341,6 +1345,8 @@ public:
         (*this)->on_set_f(f); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
+    void on_jp_irp() {
+        (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
