@@ -274,6 +274,30 @@ eb ex de, hl
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# EX (SP), irp
+e3 ex (sp), hl
+ 0 get_pc_on_fetch 0000
+ 0 fetch e3 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_sp 0000
+ 4 3t_read e3 at 0000
+ 4   set_addr_bus 0000 -> 0000
+ 7 4t_read 00 at 0001
+ 7   set_addr_bus 0000 -> 0001
+11 get_l 00
+11 get_h 00
+11 3t_write 00 -> 00 at 0001
+11   set_addr_bus 0001 -> 0001
+14 5t_write e3 -> 00 at 0000
+14   set_addr_bus 0001 -> 0000
+19 set_memptr 0000 -> 00e3
+19 set_l 00 -> e3
+19 set_h 00 -> 00
+19 done
+
 # EXX
 d9 exx
  0 get_pc_on_fetch 0000

@@ -337,6 +337,11 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
+        case 0xe3:
+            // EX (SP), irp
+            // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
+            // EX (SP), i      f(4) f(4) r(3) r(4) w(3) w(5)
+            return (*this)->on_ex_at_sp_irp();
         case 0xe9:
             // JP HL            f(4)
             // JP i        f(4) f(4)
@@ -619,6 +624,9 @@ public:
         (*this)->on_format("ei"); }
     void on_ex_de_hl() {
         (*this)->on_format("ex de, hl"); }
+    void on_ex_at_sp_irp() {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("ex (sp), P", regp::hl, irp); }
     void on_exx() {
         (*this)->on_format("exx"); }
     void on_im(unsigned mode) {
@@ -1404,6 +1412,19 @@ public:
         (*this)->on_disable_int(); }
     void on_ex_de_hl() {
         state.ex_de_hl(); }
+    void on_ex_at_sp_irp() {
+        fast_u16 sp = (*this)->on_get_sp();
+        fast_u8 lo = (*this)->on_3t_read_cycle(sp);
+        sp = inc16(sp);
+        fast_u8 hi = (*this)->on_4t_read_cycle(sp);
+        fast_u16 nn = make16(hi, lo);
+        fast_u16 irp = (*this)->on_get_index_rp();
+        std::swap(nn, irp);
+        (*this)->on_3t_write_cycle(sp, get_high8(nn));
+        sp = dec16(sp);
+        (*this)->on_5t_write_cycle(sp, get_low8(nn));
+        (*this)->on_set_memptr(irp);
+        (*this)->on_set_index_rp(irp); }
     void on_exx() {
         state.exx(); }
     void on_im(unsigned mode) {
