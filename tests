@@ -291,6 +291,16 @@ fb ei
  4 disable_int
  4 done
 
+# EX AF, AF'
+08 ex af, af'
+ 0 get_pc_on_fetch 0000
+ 0 fetch 08 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 done
+
 # EX DE, HL
 eb ex de, hl
  0 get_pc_on_fetch 0000

@@ -311,7 +311,11 @@ public:
         }
         switch(op) {
         case 0x00:
+            // NOP  f(4)
             return (*this)->on_nop();
+        case 0x08:
+            // EX AF, AF'  f(4)
+            return (*this)->on_ex_af_alt_af();
         case 0x0f:
             // RRCA  f(4)
             return (*this)->on_rrca();
@@ -659,6 +663,8 @@ public:
         (*this)->on_format("djnz D", sign_extend8(d) + 2); }
     void on_ei() {
         (*this)->on_format("ei"); }
+    void on_ex_af_alt_af() {
+        (*this)->on_format("ex af, af'"); }
     void on_ex_de_hl() {
         (*this)->on_format("ex de, hl"); }
     void on_ex_at_sp_irp() {
@@ -833,10 +839,14 @@ protected:
         processor_state()
             : last_read_addr(0), disable_int(false),
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
-              alt_bc(0), alt_de(0), alt_hl(0),
+              alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
               pc(0), sp(0), ir(0), memptr(0),
               iff1(false), iff2(false), int_mode(0)
         {}
+
+        void ex_af_alt_af() {
+            std::swap(af, alt_af);
+        }
 
         void ex_de_hl() {
             std::swap(de, hl);
@@ -851,7 +861,7 @@ protected:
         fast_u16 last_read_addr;
         bool disable_int;
         fast_u16 bc, de, hl, af, ix, iy;
-        fast_u16 alt_bc, alt_de, alt_hl;
+        fast_u16 alt_bc, alt_de, alt_hl, alt_af;
         fast_u16 pc, sp, ir, memptr;
         bool iff1, iff2;
         unsigned int_mode;
@@ -1472,6 +1482,8 @@ public:
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
         (*this)->on_disable_int(); }
+    void on_ex_af_alt_af() {
+        state.ex_af_alt_af(); }
     void on_ex_de_hl() {
         state.ex_de_hl(); }
     void on_ex_at_sp_irp() {
