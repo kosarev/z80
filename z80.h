@@ -106,13 +106,12 @@ static inline fast_u16 dec16(fast_u16 n) {
 enum class reg { b, c, d, e, h, l, at_hl, a };
 
 enum class regp { bc, de, hl, sp };
-
+enum class regp2 { bc, de, hl, af };
 enum class index_regp { hl, ix, iy };
 
 enum class instruction_prefix { none, cb, ed };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
-
 enum class block_ld { ldi, ldd, ldir, lddr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
@@ -269,6 +268,13 @@ public:
             (*this)->on_6t_fetch_cycle();
             auto rp = static_cast<regp>(p);
             return (*this)->on_dec_rp(rp); }
+        case 0305: {
+            // PUSH rp2[p]
+            // PUSH rr          f(5) w(3) w(3)
+            // PUSH i      f(4) f(5) w(3) w(3)
+            (*this)->on_5t_fetch_cycle();
+            auto rp = static_cast<regp2>(p);
+            return (*this)->on_push_rp(rp); }
         }
         switch(op) {
         case 0x00:
@@ -499,8 +505,9 @@ private:
 };
 
 const char *get_reg_name(reg r);
-const char *get_reg_name(index_regp irp);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
+const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl);
+const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
 const char *get_mnemonic(block_ld k);
 bool is_two_operand_alu_instr(alu k);
@@ -645,6 +652,9 @@ public:
         (*this)->on_format("nop"); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
+    void on_push_rp(regp2 rp) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        (*this)->on_format("push G", rp, irp); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -1100,6 +1110,16 @@ public:
         assert(0);
     }
 
+    fast_u16 on_get_rp2(regp2 rp) {
+        switch(rp) {
+        case regp2::bc: return (*this)->on_get_bc();
+        case regp2::de: return (*this)->on_get_de();
+        case regp2::hl: return (*this)->on_get_index_rp();
+        case regp2::af: return (*this)->on_get_af();
+        }
+        assert(0);
+    }
+
     fast_u16 get_index_rp(index_regp irp) {
         switch(irp) {
         case index_regp::hl: return get_hl();
@@ -1418,6 +1438,8 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
+    void on_push_rp(regp2 rp) {
+        (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;

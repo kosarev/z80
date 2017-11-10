@@ -25,21 +25,31 @@ const char *get_reg_name(reg r) {
     assert(0);
 }
 
-const char *get_reg_name(index_regp irp) {
-    switch(irp) {
-    case index_regp::hl: return "hl";
-    case index_regp::ix: return "ix";
-    case index_regp::iy: return "iy";
-    }
-    assert(0);
-}
-
 const char *get_reg_name(regp rp, index_regp irp) {
     switch(rp) {
     case regp::bc: return "bc";
     case regp::de: return "de";
     case regp::hl: return get_reg_name(irp);
     case regp::sp: return "sp";
+    }
+    assert(0);
+}
+
+const char *get_reg_name(regp2 rp, index_regp irp) {
+    switch(rp) {
+    case regp2::bc: return "bc";
+    case regp2::de: return "de";
+    case regp2::hl: return get_reg_name(irp);
+    case regp2::af: return "af";
+    }
+    assert(0);
+}
+
+const char *get_reg_name(index_regp irp) {
+    switch(irp) {
+    case index_regp::hl: return "hl";
+    case index_regp::ix: return "ix";
+    case index_regp::iy: return "iy";
     }
     assert(0);
 }
@@ -187,6 +197,11 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
+            auto irp = get_arg<index_regp>(args);
+            out.append(get_reg_name(rp, irp));
+            break; }
+        case 'G': {  // An alternative register pair.
+            auto rp = get_arg<regp2>(args);
             auto irp = get_arg<index_regp>(args);
             out.append(get_reg_name(rp, irp));
             break; }
