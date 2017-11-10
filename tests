@@ -821,6 +821,19 @@ c0 ret nz
 11 set_pc_on_return 0001 -> 00c0
 11 done
 
+# SCF
+37 scf
+ 0 get_pc_on_fetch 0000
+ 0 fetch 37 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_a 00
+ 4 get_f 00
+ 4 set_f 00 -> 01
+ 4 done
+
 # SET b, r
 fdcb01ce set 1, (iy + 1)
  0 get_pc_on_fetch 0000

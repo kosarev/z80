@@ -290,6 +290,9 @@ public:
         case 0x32:
             // LD (nn), A  f(4) r(3) r(3) w(3)
             return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
+        case 0x37:
+            // SCF  f(4)
+            return (*this)->on_scf();
         case 0xc3:
             // JP nn  f(4) r(3) r(3)
             return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
@@ -639,6 +642,8 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_scf() {
+        (*this)->on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -1402,6 +1407,12 @@ public:
             (*this)->on_return(); }
     void on_ret() {
         (*this)->on_return(); }
+    void on_scf() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                cf_mask;
+        (*this)->on_set_f(f); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
