@@ -322,6 +322,9 @@ public:
         case 0x18:
             // JR d  f(4) r(3) e(5)
             return (*this)->on_jr((*this)->on_disp_read());
+        case 0x1f:
+            // RRA  f(4)
+            return (*this)->on_rra();
         case 0x22:
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
@@ -733,6 +736,8 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_rra() {
+        (*this)->on_format("rra"); }
     void on_rrca() {
         (*this)->on_format("rrca"); }
     void on_rst(fast_u16 nn) {
@@ -1570,6 +1575,14 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_rra() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a = (a >> 1) | ((f & cf_mask) ? 0x80 : 0);
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                cf_ari(a & 0x1);
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f); }
     void on_rrca() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
