@@ -62,6 +62,10 @@ static inline fast_u8 dec8(fast_u8 n) {
     return sub8(n, 1);
 }
 
+static inline fast_u8 ror8(fast_u8 n) {
+    return ((n >> 1) | (n << 7)) & mask8;
+}
+
 static inline fast_u8 neg8(fast_u8 n) {
     return ((n ^ mask8) + 1) & mask8;
 }
@@ -279,6 +283,9 @@ public:
         switch(op) {
         case 0x00:
             return (*this)->on_nop();
+        case 0x0f:
+            // RRCA  f(4)
+            return (*this)->on_rrca();
         case 0x10:
             // DJNZ  f(5) r(3) + e(5)
             (*this)->on_5t_fetch_cycle();
@@ -666,6 +673,8 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_rrca() {
+        (*this)->on_format("rrca"); }
     void on_scf() {
         (*this)->on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
@@ -1448,11 +1457,19 @@ public:
         (*this)->on_set_r(access_r, d, v);
         if(irp != index_regp::hl && r != reg::at_hl)
             (*this)->on_set_r(r, /* d= */ 0, v); }
+    void on_ret() {
+        (*this)->on_return(); }
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
-    void on_ret() {
-        (*this)->on_return(); }
+    void on_rrca() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a = ror8(a);
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                cf_ari(a & 0x80);
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f); }
     void on_scf() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
