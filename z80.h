@@ -847,7 +847,7 @@ protected:
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
               alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
               pc(0), sp(0), ir(0), memptr(0),
-              iff1(false), iff2(false), int_mode(0)
+              iff1(false), iff2(false), halted(false), int_mode(0)
         {}
 
         void ex_af_alt_af() {
@@ -869,7 +869,7 @@ protected:
         fast_u16 bc, de, hl, af, ix, iy;
         fast_u16 alt_bc, alt_de, alt_hl, alt_af;
         fast_u16 pc, sp, ir, memptr;
-        bool iff1, iff2;
+        bool iff1, iff2, halted;
         unsigned int_mode;
     } state;
 };
@@ -964,6 +964,16 @@ public:
 
     fast_u8 get_r_reg() const { return get_low8(state.ir); }
     void set_r_reg(fast_u8 r) { state.ir = make16(get_i(), r); }
+
+    fast_u8 on_get_r_reg() const { return get_r_reg(); }
+    void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
+
+    void on_inc_r_reg() {
+        // TODO: Consider splitting R into R[7] and R[6:0].
+        fast_u8 r = (*this)->on_get_r_reg();
+        r = (r & 0x80) | (inc8(r) & 0x7f);
+        (*this)->set_r_reg(r);
+    }
 
     fast_u16 get_af() const { return state.af; }
     void set_af(fast_u16 af) { state.af = af; }
@@ -1784,7 +1794,51 @@ public:
         return op;
     }
 
-    void on_step() { (*this)->decode(); }
+    void handle_active_int() {
+        if(state.interrupt_disabled || !state.iff1)
+            return;
+
+        state.iff1 = false;
+        state.iff2 = false;
+
+        if(state.halted) {
+            assert(0);  // TODO
+            // TODO: pc += 1
+            state.halted = false;
+        }
+
+        (*this)->on_inc_r_reg();
+        (*this)->tick(7);
+        (*this)->on_push((*this)->on_get_pc());
+
+        fast_u16 isr_addr;
+        switch(state.int_mode) {
+        case 0:
+            assert(0);  // TODO
+            break;
+        case 1:
+            // ack(7) w(3) w(3)
+            isr_addr = 0x0038;
+            break;
+        case 2: {
+            // ack(7) w(3) w(3) r(3) r(3)
+            fast_u16 vector_addr = make16((*this)->on_get_i(), 0xff);
+            fast_u8 lo = (*this)->on_3t_read_cycle(vector_addr);
+            fast_u8 hi = (*this)->on_3t_read_cycle(inc16(vector_addr));
+            isr_addr = make16(lo, hi); }
+            break;
+        default:
+            assert(0);
+        }
+
+        (*this)->on_jump(isr_addr);
+    }
+
+    void on_step() {
+        state.interrupt_disabled = false;
+        (*this)->decode();
+    }
+
     void step() { return (*this)->on_step(); }
 
 protected:
