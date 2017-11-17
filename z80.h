@@ -843,7 +843,7 @@ protected:
 
     struct processor_state {
         processor_state()
-            : last_read_addr(0), disable_int(false),
+            : last_read_addr(0), interrupt_disabled(false),
               bc(0), de(0), hl(0), af(0), ix(0), iy(0),
               alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
               pc(0), sp(0), ir(0), memptr(0),
@@ -865,7 +865,7 @@ protected:
         }
 
         fast_u16 last_read_addr;
-        bool disable_int;
+        bool interrupt_disabled;
         fast_u16 bc, de, hl, af, ix, iy;
         fast_u16 alt_bc, alt_de, alt_hl, alt_af;
         fast_u16 pc, sp, ir, memptr;
@@ -1112,12 +1112,12 @@ public:
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
-    void disable_int() { state.disable_int = true; }
-    void on_disable_int() { disable_int(); }
+    void disable_interrupt() { state.interrupt_disabled = true; }
+    void on_disable_interrupt() { disable_interrupt(); }
 
     void on_set_next_index_rp(index_regp irp) {
         decoder::on_set_next_index_rp(irp);
-        (*this)->on_disable_int();
+        (*this)->on_disable_interrupt();
     }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
@@ -1487,7 +1487,7 @@ public:
     void on_ei() {
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
-        (*this)->on_disable_int(); }
+        (*this)->on_disable_interrupt(); }
     void on_ex_af_alt_af() {
         state.ex_af_alt_af(); }
     void on_ex_de_hl() {
