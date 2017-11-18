@@ -500,6 +500,13 @@ public:
         base::on_5t_exec_cycle();
     }
 
+    fast_u8 on_input_cycle(fast_u16 addr) {
+        input.read_and_match("input at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(addr));
+        return base::on_input_cycle(addr);
+    }
+
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
         input.read_and_match("output %02x at %04x",
                              static_cast<unsigned>(get_ticks()),

@@ -461,6 +461,11 @@ public:
         fast_u8 p = get_p_part(op);
 
         switch(op & (x_mask | z_mask)) {
+        case 0100: {
+            // IN r[y], (C)  f(4) f(4) i(4)
+            // IN (C)        f(4) f(4) i(4)
+            auto r = static_cast<reg>(y);
+            return (*this)->on_in_r_c(r); }
         case 0102: {
             // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
             // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
@@ -678,6 +683,11 @@ public:
         (*this)->on_format("exx"); }
     void on_im(unsigned mode) {
         (*this)->on_format("im U", mode); }
+    void on_in_r_c(reg r) {
+        if(r == reg::at_hl)
+            (*this)->on_format("in (c)");
+        else
+            (*this)->on_format("in R, (c)", r, index_regp::hl, 0); }
     void on_inc_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("inc R", r, irp, d); }
@@ -1519,6 +1529,16 @@ public:
         state.exx(); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
+    void on_in_r_c(reg r) {
+        fast_u16 bc = (*this)->on_get_bc();
+        fast_u8 f = (*this)->on_get_f();
+        (*this)->on_set_memptr(inc16(bc));
+        fast_u8 n = (*this)->on_input_cycle(bc);
+        if(r != reg::at_hl)
+            (*this)->on_set_r(r, /* d= */ 0, n);
+        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
+                pf_log(n);
+        (*this)->on_set_f(f); }
     void on_inc_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
@@ -1749,9 +1769,16 @@ public:
         (*this)->tick(5);
     }
 
-    void on_output_cycle(fast_u16 addr, fast_u8 b) {
+    fast_u8 on_input_cycle(fast_u16 addr) {
         // TODO: Shall we set the address bus here?
-        unused(addr, b);
+        unused(addr);
+        (*this)->tick(4);
+        return 0xff;
+    }
+
+    void on_output_cycle(fast_u16 addr, fast_u8 n) {
+        // TODO: Shall we set the address bus here?
+        unused(addr, n);
         (*this)->tick(4);
     }
 
