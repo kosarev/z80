@@ -209,6 +209,20 @@ bc cp h
  4 set_f 00 -> 42
  4 done
 
+# CPL
+2f cpl
+ 0 get_pc_on_fetch 0000
+ 0 fetch 2f at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_a 00
+ 4 get_f 00
+ 4 set_a 00 -> ff
+ 4 set_f 00 -> 3a
+ 4 done
+
 # DEC r
 35 dec (hl)
  0 get_pc_on_fetch 0000

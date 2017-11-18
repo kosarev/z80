@@ -341,6 +341,9 @@ public:
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
             return (*this)->on_ld_irp_at_nn((*this)->on_3t_3t_imm16_read());
+        case 0x2f:
+            // CPL  f(4)
+            return (*this)->on_cpl();
         case 0x32:
             // LD (nn), A  f(4) r(3) r(3) w(3)
             return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
@@ -660,6 +663,8 @@ public:
         (*this)->on_format("call C, W", cc, nn); }
     void on_ccf() {
         (*this)->on_format("ccf"); }
+    void on_cpl() {
+        (*this)->on_format("cpl"); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -1484,6 +1489,14 @@ public:
         bool cf = f & cf_mask;
         f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
                 (cf ? hf_mask : 0) | cf_ari(!cf);
+        (*this)->on_set_f(f); }
+    void on_cpl() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a ^= 0xff;
+        f = (f & (sf_mask | zf_mask | pf_mask | cf_mask)) |
+                (a & (yf_mask | xf_mask)) | hf_mask | nf_mask;
+        (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
     void on_dec_r(reg r, fast_u8 d) {
         fast_u8 v = (*this)->on_get_r(r, d, /* long_read_cycle= */ true);
