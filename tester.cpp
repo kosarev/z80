@@ -223,9 +223,14 @@ public:
 
     ticks_type get_ticks() const { return ticks; }
 
-    least_u8 &on_access(fast_u16 addr) {
+    fast_u8 on_read_access(fast_u16 addr) {
         assert(addr < image_size);
         return image[addr];
+    }
+
+    void on_write_access(fast_u16 addr, fast_u8 n) {
+        assert(addr < image_size);
+        image[addr] = static_cast<least_u8>(n);
     }
 
     void set_instr_code(const least_u8 *code, unsigned size) {
@@ -233,7 +238,7 @@ public:
         for(least_u8 &cell : image)
             cell = 0;
         for(unsigned i = 0; i != size; ++i)
-            on_access(z80::add16(pc, i)) = code[i];
+            on_write_access(z80::add16(pc, i), code[i]);
     }
 
     void match_get_r(const char *name, fast_u8 n) {
@@ -417,7 +422,7 @@ public:
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         input.read_and_match("fetch %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_fetch_cycle(addr);
@@ -438,7 +443,7 @@ public:
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         input.read_and_match("3t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_3t_read_cycle(addr);
@@ -447,7 +452,7 @@ public:
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
         input.read_and_match("4t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_4t_read_cycle(addr);
@@ -456,7 +461,7 @@ public:
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
         input.read_and_match("5t_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_5t_read_cycle(addr);
@@ -465,7 +470,7 @@ public:
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         input.read_and_match("3t_write %02x -> %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(n),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
@@ -475,7 +480,7 @@ public:
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
         input.read_and_match("5t_write %02x -> %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(n),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
@@ -519,7 +524,7 @@ public:
         fast_u16 addr = get_pc();
         input.read_and_match("3t_imm8_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_3t_imm8_read();
@@ -529,7 +534,7 @@ public:
         fast_u16 addr = get_pc();
         input.read_and_match("5t_imm8_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_5t_imm8_read();
@@ -537,7 +542,8 @@ public:
 
     fast_u16 on_3t_3t_imm16_read() {
         fast_u16 addr = get_pc();
-        fast_u16 v = z80::make16(on_access(z80::inc16(addr)), on_access(addr));
+        fast_u16 v = z80::make16(on_read_access(z80::inc16(addr)),
+                                 on_read_access(addr));
         input.read_and_match("3t_3t_imm16_read %04x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(v),
@@ -548,7 +554,8 @@ public:
 
     fast_u16 on_3t_4t_imm16_read() {
         fast_u16 addr = get_pc();
-        fast_u16 v = z80::make16(on_access(z80::inc16(addr)), on_access(addr));
+        fast_u16 v = z80::make16(on_read_access(z80::inc16(addr)),
+                                 on_read_access(addr));
         input.read_and_match("3t_4t_imm16_read %04x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(v),
@@ -561,7 +568,7 @@ public:
         fast_u16 addr = get_pc();
         input.read_and_match("disp_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_access(addr)),
+                             static_cast<unsigned>(on_read_access(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_disp_read();

@@ -1195,7 +1195,7 @@ public:
         case reg::e: return get_e();
         case reg::h: return get_h();
         case reg::l: return get_l();
-        case reg::at_hl: return (*this)->on_access(get_hl());
+        case reg::at_hl: return (*this)->on_read_access(get_hl());
         case reg::a: return get_a();
         }
         assert(0);
@@ -1763,7 +1763,7 @@ public:
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_access(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(2);
         (*this)->on_set_addr_bus((*this)->get_ir_on_refresh());
         (*this)->tick(2);
@@ -1781,7 +1781,7 @@ public:
 
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_access(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(3);
         state.last_read_addr = addr;
         return b;
@@ -1789,7 +1789,7 @@ public:
 
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
         (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_access(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(4);
         state.last_read_addr = addr;
         return b;
@@ -1797,7 +1797,7 @@ public:
 
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
         (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_access(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(5);
         state.last_read_addr = addr;
         return b;
@@ -1809,13 +1809,13 @@ public:
 
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_set_addr_bus(addr);
-        (*this)->on_access(addr) = static_cast<least_u8>(n);
+        (*this)->on_write_access(addr, n);
         (*this)->tick(3);
     }
 
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_set_addr_bus(addr);
-        (*this)->on_access(addr) = static_cast<least_u8>(n);
+        (*this)->on_write_access(addr, n);
         (*this)->tick(5);
     }
 
