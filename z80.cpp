@@ -68,6 +68,19 @@ const char *get_mnemonic(alu k) {
     assert(0);
 }
 
+const char *get_mnemonic(rot k) {
+    switch(k) {
+    case rot::rlc: return "rlc";
+    case rot::rrc: return "rrc";
+    case rot::rl: return "rl";
+    case rot::rr: return "rr";
+    case rot::sla: return "sla";
+    case rot::sra: return "sra";
+    case rot::sll: return "sll";
+    case rot::srl: return "srl";
+    }
+}
+
 const char *get_mnemonic(block_ld k) {
     switch(k) {
     case block_ld::ldi: return "ldi";
@@ -180,6 +193,10 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             out.append(get_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");
+            break; }
+        case 'O': {  // Rotation mnemonic.
+            auto k = get_arg<rot>(args);
+            out.append(get_mnemonic(k));
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);

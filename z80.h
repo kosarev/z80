@@ -62,6 +62,10 @@ static inline fast_u8 dec8(fast_u8 n) {
     return sub8(n, 1);
 }
 
+static inline fast_u8 rol8(fast_u8 n) {
+    return ((n << 1) | (n >> 7)) & mask8;
+}
+
 static inline fast_u8 ror8(fast_u8 n) {
     return ((n >> 1) | (n << 7)) & mask8;
 }
@@ -116,6 +120,7 @@ enum class index_regp { hl, ix, iy };
 enum class instruction_prefix { none, cb, ed };
 
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
+enum class rot { rlc, rrc, rl, rr, sla, sra, sll, srl };
 enum class block_ld { ldi, ldd, ldir, lddr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
@@ -427,28 +432,37 @@ public:
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
 
-        auto b = static_cast<unsigned>(y);
         auto r = static_cast<reg>(z);
 
         switch(op & x_mask) {
-        case 0100:
+        case 0000: {
+            // rot[y] r[z]
+            // rot r                f(4)      f(4)
+            // rot (HL)             f(4)      f(4) r(4) w(3)
+            // rot (i+d)       f(4) f(4) r(3) f(5) r(4) w(3)
+            auto k = static_cast<rot>(y);
+            return (*this)->on_rot(k, r, d); }
+        case 0100: {
             // BIT y, r[z]
             // BIT b, r             f(4)      f(4)
             // BIT b, (HL)          f(4)      f(4) r(4)
-            // BIT b, (i+d)    f(4) f(4) r(3) f(5) r(4) */
-            return (*this)->on_bit(b, r, d);
-        case 0200:
+            // BIT b, (i+d)    f(4) f(4) r(3) f(5) r(4)
+            auto b = static_cast<unsigned>(y);
+            return (*this)->on_bit(b, r, d); }
+        case 0200: {
             // RES y, r[z]
             // RES b, r             f(4)      f(4)
             // RES b, (HL)          f(4)      f(4) r(4) w(3)
             // RES b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            return (*this)->on_res(b, r, d);
-        case 0300:
+            auto b = static_cast<unsigned>(y);
+            return (*this)->on_res(b, r, d); }
+        case 0300: {
             // SET y, r[z]
             // SET b, r             f(4)      f(4)
             // SET b, (HL)          f(4)      f(4) r(4) w(3)
             // SET b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            return (*this)->on_set(b, r, d);
+            auto b = static_cast<unsigned>(y);
+            return (*this)->on_set(b, r, d); }
         }
 
         std::fprintf(stderr, "Unknown CB-prefixed opcode 0x%02x at 0x%04x.\n",
@@ -572,6 +586,7 @@ const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
+const char *get_mnemonic(rot k);
 const char *get_mnemonic(block_ld k);
 bool is_two_operand_alu_instr(alu k);
 const char *get_index_reg_name(index_regp irp);
@@ -755,14 +770,21 @@ public:
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
-            (*this)->on_format("res U, R", b, reg::at_hl, irp, d);
+            (*this)->on_format("res U, R", b, r, irp, d);
         else
             (*this)->on_format("res U, R, R", b, reg::at_hl, irp, d,
-                               r, index_regp::hl, 0); }
+                               r, index_regp::hl, /* d= */ 0); }
     void on_ret() {
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_rot(rot k, reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        if(irp == index_regp::hl || r == reg::at_hl)
+            (*this)->on_format("O R", k, r, irp, d);
+        else
+            (*this)->on_format("O R, R", k, reg::at_hl, irp, d,
+                               r, index_regp::hl, /* d= */ 0); }
     void on_rra() {
         (*this)->on_format("rra"); }
     void on_rrca() {
@@ -774,10 +796,10 @@ public:
     void on_set(unsigned b, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
-            (*this)->on_format("set U, R", b, reg::at_hl, irp, d);
+            (*this)->on_format("set U, R", b, r, irp, d);
         else
             (*this)->on_format("set U, R, R", b, reg::at_hl, irp, d,
-                               r, index_regp::hl, 0); }
+                               r, index_regp::hl, /* d= */ 0); }
     void on_sbc_hl_rp(regp rp) {
         (*this)->on_format("sbc hl, P", rp, index_regp::hl); }
 
@@ -1328,6 +1350,23 @@ public:
         (*this)->on_set_f(f);
     }
 
+    void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
+        switch(k) {
+        case rot::rlc:
+            n = rol8(n);
+            f = (n & (sf_mask | yf_mask | xf_mask | cf_mask)) | zf_ari(n) |
+                    pf_log(n);
+            break;
+        case rot::rrc: assert(0); break;  // TODO
+        case rot::rl: assert(0); break;  // TODO
+        case rot::rr: assert(0); break;  // TODO
+        case rot::sla: assert(0); break;  // TODO
+        case rot::sra: assert(0); break;  // TODO
+        case rot::sll: assert(0); break;  // TODO
+        case rot::srl: assert(0); break;  // TODO
+        }
+    }
+
     fast_u8 get_flag_mask(condition cc) {
         switch(cc / 2) {
         case 0: return zf_mask;
@@ -1649,6 +1688,16 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_rot(rot k, reg r, fast_u8 d) {
+        index_regp irp = (*this)->get_index_rp_kind();
+        reg access_r = irp == index_regp::hl ? r : reg::at_hl;
+        fast_u8 n = (*this)->on_get_r(access_r, d, /* long_read_cycle= */ true);
+        fast_u8 f = (*this)->on_get_f();
+        do_rot(k, n, f);
+        (*this)->on_set_r(access_r, d, n);
+        if(irp != index_regp::hl && r != reg::at_hl)
+            (*this)->on_set_r(r, /* d= */ 0, n);
+        (*this)->on_set_f(f); }
     void on_rra() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();

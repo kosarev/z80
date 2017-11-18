@@ -970,6 +970,27 @@ c5 push bc
 11 set_sp 0000 -> fffe
 11 done
 
+# rot r
+cb00 rlc b
+ 0 get_pc_on_fetch 0000
+ 0 fetch cb at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_pc_on_fetch 0001
+ 4 fetch 00 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_b 00
+ 8 get_f 00
+ 8 set_b 00 -> 00
+ 8 set_f 00 -> 44
+ 8 prefix_reset
+ 8 done
+
 # RRA
 1f rra
  0 get_pc_on_fetch 0000
