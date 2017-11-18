@@ -1779,44 +1779,42 @@ public:
         (*this)->tick(2);
     }
 
-    fast_u8 on_3t_read_cycle(fast_u16 addr) {
+    fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(3);
+        (*this)->tick(ticks);
         state.last_read_addr = addr;
         return b;
+    }
+
+    fast_u8 on_3t_read_cycle(fast_u16 addr) {
+        return (*this)->on_read_cycle(addr, /* ticks= */ 3);
     }
 
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
-        (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(4);
-        state.last_read_addr = addr;
-        return b;
+        return (*this)->on_read_cycle(addr, /* ticks= */ 4);
     }
 
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
-        (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(5);
-        state.last_read_addr = addr;
-        return b;
+        return (*this)->on_read_cycle(addr, /* ticks= */ 5);
     }
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return (*this)->on_3t_read_cycle(addr);
     }
 
-    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+    void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         (*this)->on_write_access(addr, n);
-        (*this)->tick(3);
+        (*this)->tick(ticks);
+    }
+
+    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_write_cycle(addr, n, /* ticks= */ 3);
     }
 
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
-        (*this)->on_set_addr_bus(addr);
-        (*this)->on_write_access(addr, n);
-        (*this)->tick(5);
+        (*this)->on_write_cycle(addr, n, /* ticks= */ 5);
     }
 
     void on_3t_exec_cycle() {
