@@ -175,7 +175,7 @@ public:
         std::snprintf(output_buff, max_output_buff_size, "%s", out);
     }
 
-    fast_u8 on_read() {
+    fast_u8 on_read_next_byte() {
         assert(index < instr_size);
         return instr_code[index++];
     }

@@ -620,7 +620,7 @@ public:
 
     disassembler() {}
 
-    fast_u8 on_fetch() { return (*this)->on_read(); }
+    fast_u8 on_fetch() { return (*this)->on_read_next_byte(); }
     void on_5t_fetch_cycle() {}
     void on_6t_fetch_cycle() {}
 
@@ -632,19 +632,19 @@ public:
         return false;
     }
 
-    fast_u8 on_3t_imm8_read() { return (*this)->on_read(); }
-    fast_u8 on_5t_imm8_read() { return (*this)->on_read(); }
+    fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
+    fast_u8 on_5t_imm8_read() { return (*this)->on_read_next_byte(); }
 
     fast_u16 on_3t_3t_imm16_read() {
-        fast_u8 lo = (*this)->on_read();
-        fast_u8 hi = (*this)->on_read();
+        fast_u8 lo = (*this)->on_read_next_byte();
+        fast_u8 hi = (*this)->on_read_next_byte();
         return make16(hi, lo); }
     fast_u16 on_3t_4t_imm16_read() {
-        fast_u8 lo = (*this)->on_read();
-        fast_u8 hi = (*this)->on_read();
+        fast_u8 lo = (*this)->on_read_next_byte();
+        fast_u8 hi = (*this)->on_read_next_byte();
         return make16(hi, lo); }
 
-    fast_u8 on_disp_read() { return (*this)->on_read(); }
+    fast_u8 on_disp_read() { return (*this)->on_read_next_byte(); }
 
     void on_3t_exec_cycle() {}
     void on_4t_exec_cycle() {}
