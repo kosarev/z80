@@ -79,6 +79,7 @@ const char *get_mnemonic(rot k) {
     case rot::sll: return "sll";
     case rot::srl: return "srl";
     }
+    assert(0);
 }
 
 const char *get_mnemonic(block_ld k) {
