@@ -426,6 +426,25 @@ ed56 im 1
  6 set_h 00 -> 00
  6 done
 
+# IN A, (n)
+dbfe in a, (0xfe)
+ 0 get_pc_on_fetch 0000
+ 0 fetch db at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read fe at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read fe at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_memptr 0000 -> 00ff
+ 7 input at 00fe
+11 set_a 00 -> ff
+11 done
+
 # IN r, (C)
 ed78 in a, (c)
  0 get_pc_on_fetch 0000

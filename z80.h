@@ -390,6 +390,9 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
+        case 0xdb:
+            // IN A, (n)  f(4) r(3) i(4)
+            return (*this)->on_in_a_n((*this)->on_3t_imm8_read());
         case 0xdd:
             // DD prefix (IX-indexed instructions).
             return (*this)->on_set_next_index_rp(index_regp::ix);
@@ -717,6 +720,8 @@ public:
         (*this)->on_format("exx"); }
     void on_im(unsigned mode) {
         (*this)->on_format("im U", mode); }
+    void on_in_a_n(fast_u8 n) {
+        (*this)->on_format("in a, (N)", n); }
     void on_in_r_c(reg r) {
         if(r == reg::at_hl)
             (*this)->on_format("in (c)");
@@ -1622,6 +1627,11 @@ public:
         state.exx(); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
+    void on_in_a_n(fast_u8 n) {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u16 addr = make16(a, n);
+        (*this)->on_set_memptr(inc16(addr));
+        (*this)->on_set_a((*this)->on_input_cycle(addr)); }
     void on_in_r_c(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
         fast_u8 f = (*this)->on_get_f();
