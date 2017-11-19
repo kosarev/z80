@@ -199,7 +199,7 @@ public:
             auto rd = static_cast<reg>(y);
             auto rs = static_cast<reg>(z);
             if(rd == reg::at_hl && rs == reg::at_hl)
-                assert(0);  // TODO: return (*this)->on_halt();
+                return (*this)->on_halt();
             return (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
         case 0200: {
             // alu[y] r[z]
@@ -718,6 +718,8 @@ public:
         (*this)->on_format("ex (sp), P", regp::hl, irp); }
     void on_exx() {
         (*this)->on_format("exx"); }
+    void on_halt() {
+        (*this)->on_format("halt"); }
     void on_im(unsigned mode) {
         (*this)->on_format("im U", mode); }
     void on_in_a_n(fast_u8 n) {
@@ -1148,6 +1150,9 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
+    void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_ir() const { return state.ir; }
 
@@ -1625,6 +1630,9 @@ public:
         (*this)->on_set_index_rp(irp); }
     void on_exx() {
         state.exx(); }
+    void on_halt() {
+        state.halted = true;
+        (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
     void on_in_a_n(fast_u8 n) {

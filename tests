@@ -377,6 +377,18 @@ d9 exx
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# HALT
+76 halt
+ 0 get_pc_on_fetch 0000
+ 0 fetch 76 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_pc_on_halt 0001
+ 4 set_pc_on_halt 0001 -> 0000
+ 4 done
+
 # IM n
 ed56 im 1
  0 get_pc_on_fetch 0000
