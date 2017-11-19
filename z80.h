@@ -1323,7 +1323,15 @@ public:
                     hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
             a = t;
             break; }
-        case alu::adc: assert(0); break;  // TODO
+        case alu::adc: {
+            f = (*this)->on_get_f();
+            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
+            fast_u8 t = (a + n + cfv) & mask8;
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
+                    cf_ari(t < a || (cfv && n == 0xff));
+            a = t;
+            break; }
         case alu::sub: {
             fast_u8 t = sub8(a, n);
             f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
