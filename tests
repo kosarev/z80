@@ -1063,6 +1063,28 @@ cb3c srl h
  8 prefix_reset
  8 done
 
+# RL r
+cb11 rl c
+ 0 get_pc_on_fetch 0000
+ 0 fetch cb at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 11 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_c 00
+ 8 get_f 00
+ 8 set_c 00 -> 00
+ 8 set_f 00 -> 44
+ 8 prefix_reset
+ 8 done
+
 # RLCA
 07 rlca
  0 get_pc_on_fetch 0000

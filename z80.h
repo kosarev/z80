@@ -1375,6 +1375,7 @@ public:
 
     void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
         fast_u8 t = n;
+        bool cf = f & cf_mask;
         switch(k) {
         case rot::rlc:
             n = rol8(n);
@@ -1382,7 +1383,12 @@ public:
                     pf_log(n);
             break;
         case rot::rrc: assert(0); break;  // TODO
-        case rot::rl: assert(0); break;  // TODO
+        case rot::rl:
+            n = ((n << 1) | (cf ? 1 : 0)) & mask8;
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x80);
+            break;
         case rot::rr: assert(0); break;  // TODO
         case rot::sla: assert(0); break;  // TODO
         case rot::sra: assert(0); break;  // TODO
