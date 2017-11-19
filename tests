@@ -656,6 +656,32 @@ fd213a5c ld iy, 0x5c3a
 14 set_iyh 00 -> 5c
 14 done
 
+dd21d103 ld ix, 0x03d1
+ 0 get_pc_on_fetch 0000
+ 0 fetch dd at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> ix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 21 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 3t_3t_imm16_read 03d1 at 0002
+ 8   get_pc_on_imm16_read 0002
+ 8   3t_read d1 at 0002
+ 8     set_addr_bus 0000 -> 0002
+11   3t_read 03 at 0003
+11     set_addr_bus 0002 -> 0003
+14   set_pc_on_imm16_read 0002 -> 0004
+14 set_ixl 00 -> d1
+14 set_ixh 00 -> 03
+14 done
+
 # LD rp, (nn)
 ed4bb45c ld bc, (0x5cb4)
  0 get_pc_on_fetch 0000

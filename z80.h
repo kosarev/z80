@@ -384,6 +384,9 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
+        case 0xdd:
+            // DD prefix (IX-indexed instructions).
+            return (*this)->on_set_next_index_rp(index_regp::ix);
         case 0xe3:
             // EX (SP), irp
             // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
