@@ -1405,7 +1405,12 @@ public:
                     cf_ari(t & 0x80);
             break;
         case rot::rr: assert(0); break;  // TODO
-        case rot::sla: assert(0); break;  // TODO
+        case rot::sla:
+            n = (n << 1) & mask8;
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x80);
+            break;
         case rot::sra: assert(0); break;  // TODO
         case rot::sll: assert(0); break;  // TODO
         case rot::srl:
