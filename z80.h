@@ -340,6 +340,9 @@ public:
             // DJNZ  f(5) r(3) + e(5)
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_djnz((*this)->on_disp_read());
+        case 0x17:
+            // RLA  f(4)
+            return (*this)->on_rla();
         case 0x18:
             // JR d  f(4) r(3) e(5)
             return (*this)->on_jr((*this)->on_disp_read());
@@ -789,6 +792,8 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_rla() {
+        (*this)->on_format("rla"); }
     void on_rlca() {
         (*this)->on_format("rlca"); }
     void on_rot(rot k, reg r, fast_u8 d) {
@@ -1724,6 +1729,15 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_rla() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        bool cf = f & cf_mask;
+        fast_u8 r = ((a << 1) | (cf ? 1 : 0)) & mask8;
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
+                cf_ari(r & 0x80);
+        (*this)->on_set_a(r);
+        (*this)->on_set_f(f); }
     void on_rlca() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
