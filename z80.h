@@ -1015,6 +1015,9 @@ public:
     fast_u16 get_af() const { return state.af; }
     void set_af(fast_u16 af) { state.af = af; }
 
+    fast_u16 get_alt_af() const { return state.alt_af; }
+    void set_alt_af(fast_u16 af) { state.alt_af = af; }
+
     fast_u16 on_get_af() {
         // Always get the low byte first.
         fast_u8 f = (*this)->on_get_f();
