@@ -1503,7 +1503,7 @@ public:
         if((static_cast<unsigned>(k) & 2) && bc) {
             (*this)->on_5t_exec_cycle();
             fast_u16 pc = (*this)->get_pc_on_block_instr();
-            (*this)->on_set_memptr(inc16(pc));
+            (*this)->on_set_memptr(dec16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {

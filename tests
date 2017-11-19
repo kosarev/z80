@@ -887,7 +887,7 @@ edb8 lddr
 16 set_f 00 -> 0c
 16 5t_exec
 21 get_pc_on_block_instr 0002
-21 set_memptr 0000 -> 0003
+21 set_memptr 0000 -> 0001
 21 set_pc_on_block_instr 0002 -> 0000
 21 prefix_reset
 21 done
