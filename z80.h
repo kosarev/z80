@@ -327,6 +327,9 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x07:
+            // RLCA  f(4)
+            return (*this)->on_rlca();
         case 0x08:
             // EX AF, AF'  f(4)
             return (*this)->on_ex_af_alt_af();
@@ -786,6 +789,8 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_rlca() {
+        (*this)->on_format("rlca"); }
     void on_rot(rot k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -1705,6 +1710,14 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_rlca() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a = rol8(a);
+        f = (f & (sf_mask | zf_mask | pf_mask)) |
+                (a & (yf_mask | xf_mask | cf_mask));
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f); }
     void on_rot(rot k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
