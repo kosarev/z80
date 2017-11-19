@@ -149,17 +149,21 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
+    void on_disable_interrupt() {}
+
     instruction_prefix get_prefix() const { return state.prefix; }
     void set_prefix(instruction_prefix p) { state.prefix = p; }
 
     void on_ed_prefix() {
         // TODO: Should we reset the index register pair here?
         set_prefix(instruction_prefix::ed);
+        (*this)->on_disable_interrupt();
     }
 
     void on_cb_prefix() {
         set_prefix(instruction_prefix::cb);
         state.next_index_rp = state.index_rp;
+        (*this)->on_disable_interrupt();
     }
 
     void on_prefix_reset() {
@@ -169,6 +173,7 @@ public:
     void on_set_next_index_rp(index_regp irp) {
         // TODO: Should we reset the prefix here?
         state.next_index_rp = irp;
+        (*this)->on_disable_interrupt();
     }
 
     unsigned decode_int_mode(fast_u8 y) {
@@ -1167,7 +1172,6 @@ public:
 
     void on_set_next_index_rp(index_regp irp) {
         decoder::on_set_next_index_rp(irp);
-        (*this)->on_disable_interrupt();
     }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
