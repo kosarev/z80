@@ -250,8 +250,8 @@ public:
             // cc not met:  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
             bool cc_met = (*this)->check_condition(cc);
-            fast_u16 nn = c ? (*this)->on_3t_4t_imm16_read() :
-                              (*this)->on_3t_3t_imm16_read();
+            fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
+                                   (*this)->on_3t_3t_imm16_read();
             return (*this)->on_call_cc_nn(cc_met, cc, nn); }
         case 0306: {
             // alu[y] n  f(4) r(3)
