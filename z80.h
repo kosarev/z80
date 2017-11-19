@@ -1358,6 +1358,7 @@ public:
     }
 
     void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
+        fast_u8 t = n;
         switch(k) {
         case rot::rlc:
             n = rol8(n);
@@ -1370,7 +1371,12 @@ public:
         case rot::sla: assert(0); break;  // TODO
         case rot::sra: assert(0); break;  // TODO
         case rot::sll: assert(0); break;  // TODO
-        case rot::srl: assert(0); break;  // TODO
+        case rot::srl:
+            n >>= 1;
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x1);
+            break;
         }
     }
 
