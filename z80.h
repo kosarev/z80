@@ -1743,7 +1743,7 @@ public:
         fast_u16 r = sub16(hl, t);
         fast_u8 f = (get_high8(r) & (sf_mask | yf_mask | xf_mask)) | zf_ari(r) |
                         hf_ari(r >> 8, hl >> 8, n >> 8) |
-                        (pf_ari(hl - t, hl >> 8, n >> 8) ^ (of ? pf_mask : 0)) |
+                        (pf_ari((hl - t) >> 8, hl >> 8, n >> 8) ^ (of ? pf_mask : 0)) |
                         cf_ari(r > hl || of) | nf_mask;
 
         (*this)->on_set_memptr(inc16(hl));
