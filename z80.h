@@ -1443,7 +1443,8 @@ public:
                 hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
 
         (*this)->on_set_memptr(inc16(i));
-        (*this)->on_set_index_rp(r); }
+        (*this)->on_set_index_rp(r);
+        (*this)->on_set_f(f); }
     void on_adc_hl_rp(regp rp) {
         fast_u16 hl = (*this)->on_get_hl();
         fast_u16 n = (*this)->on_get_rp(rp);

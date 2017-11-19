@@ -49,6 +49,7 @@ c616 add a, 0x16
 11 set_memptr 0000 -> 0001
 11 set_l 00 -> 00
 11 set_h 00 -> 00
+11 set_f 00 -> 00
 11 done
 
 # ADC HL, rp
