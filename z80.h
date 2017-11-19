@@ -1964,15 +1964,17 @@ public:
         state.iff1 = false;
         state.iff2 = false;
 
+        fast_u16 pc = (*this)->on_get_pc();
+
         if(state.halted) {
-            assert(0);  // TODO
-            // TODO: pc += 1
+            pc = inc16(pc);
+            (*this)->on_set_pc(pc);
             state.halted = false;
         }
 
         (*this)->on_inc_r_reg();
         (*this)->tick(7);
-        (*this)->on_push((*this)->on_get_pc());
+        (*this)->on_push(pc);
 
         fast_u16 isr_addr;
         switch(state.int_mode) {
