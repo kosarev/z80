@@ -353,6 +353,9 @@ public:
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
             return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
+        case 0x27:
+            // DAA  f(4)
+            return (*this)->on_daa();
         case 0x2a:
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
@@ -697,6 +700,8 @@ public:
         (*this)->on_format("ccf"); }
     void on_cpl() {
         (*this)->on_format("cpl"); }
+    void on_daa() {
+        (*this)->on_format("daa"); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -1584,6 +1589,34 @@ public:
         bool cf = f & cf_mask;
         f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
                 (cf ? hf_mask : 0) | cf_ari(!cf);
+        (*this)->on_set_f(f); }
+    void on_daa() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        bool cf = f & cf_mask;
+        bool hf = f & hf_mask;
+        bool nf = f & nf_mask;
+
+        fast_u8 d = 0x00;
+        if(cf || a >= 0x9a) {
+            d |= 0x60;
+            f |= cf_mask;
+        }
+        if(hf || (a & 0x0f) >= 0x0a) {
+            d |= 0x06;
+        }
+
+        if(!nf) {
+            f = (f & cf_mask) | ((a & 0x0f) >= 0x0a ? hf_mask : 0);
+            a = add8(a, d);
+        } else {
+            f = (f & cf_mask) | (hf && (a & 0x0f) <= 0x05 ? hf_mask : 0) |
+                    nf_mask;
+            a = sub8(a, d);
+        }
+        f |= (a & (sf_mask | xf_mask | yf_mask)) | pf_log(a) | zf_ari(a);
+
+        (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
     void on_cpl() {
         fast_u8 a = (*this)->on_get_a();
