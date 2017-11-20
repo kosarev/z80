@@ -531,6 +531,9 @@ public:
             // LD I, A  f(4) f(5)
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_ld_i_a(); }
+        case 0x6f:
+            // RLD  f(4) f(4) r(3) e(4) w(3)
+            return (*this)->on_rld();
         }
 
         std::fprintf(stderr, "Unknown ED-prefixed opcode 0x%02x at 0x%04x.\n",
@@ -808,6 +811,8 @@ public:
         (*this)->on_format("rla"); }
     void on_rlca() {
         (*this)->on_format("rlca"); }
+    void on_rld() {
+        (*this)->on_format("rld"); }
     void on_rot(rot k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
@@ -1802,6 +1807,22 @@ public:
                 (a & (yf_mask | xf_mask | cf_mask));
         (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
+    void on_rld() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        fast_u16 hl = (*this)->on_get_hl();
+        (*this)->on_set_memptr(inc16(hl));
+        fast_u16 t = make16(a, (*this)->on_3t_read_cycle(hl));
+        (*this)->on_4t_exec_cycle();
+
+        t = (t & 0xf000) | ((t & 0xff) << 4) | ((t & 0x0f00) >> 8);
+        a = get_high8(t);
+        f = (f & cf_mask) | (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) |
+                pf_log(a);
+
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f);
+        (*this)->on_3t_write_cycle(hl, get_low8(t)); }
     void on_rot(rot k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
