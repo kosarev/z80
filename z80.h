@@ -36,22 +36,26 @@ typedef uint_least16_t least_u16;
 
 typedef uint_fast32_t size_type;
 
-static const fast_u8 mask8 = 0xff;
-static const fast_u8 sign8_mask = 0x80;
-static const fast_u16 mask16 = 0xffff;
-
 static inline void unused(...) {}
 
-static inline bool get_sign8(fast_u8 n) {
-    return (n & sign8_mask) != 0;
+static inline constexpr fast_u8 mask8(fast_u8 n) {
+    return n & 0xff;
 }
 
-static inline fast_u8 add8(fast_u8 a, fast_u8 b) {
-    return (a + b) & mask8;
+static inline constexpr fast_u16 mask16(fast_u16 n) {
+    return n & 0xffff;
 }
 
-static inline fast_u8 sub8(fast_u8 a, fast_u8 b) {
-    return (a - b) & mask8;
+static inline constexpr bool get_sign8(fast_u8 n) {
+    return (n & 0x80) != 0;
+}
+
+static inline constexpr fast_u8 add8(fast_u8 a, fast_u8 b) {
+    return mask8(a + b);
+}
+
+static inline constexpr fast_u8 sub8(fast_u8 a, fast_u8 b) {
+    return mask8(a - b);
 }
 
 static inline fast_u8 inc8(fast_u8 n) {
@@ -62,52 +66,52 @@ static inline fast_u8 dec8(fast_u8 n) {
     return sub8(n, 1);
 }
 
-static inline fast_u8 rol8(fast_u8 n) {
-    return ((n << 1) | (n >> 7)) & mask8;
+static inline constexpr fast_u8 rol8(fast_u8 n) {
+    return mask8((n << 1) | (n >> 7));
 }
 
-static inline fast_u8 ror8(fast_u8 n) {
-    return ((n >> 1) | (n << 7)) & mask8;
+static inline constexpr fast_u8 ror8(fast_u8 n) {
+    return mask8((n >> 1) | (n << 7));
 }
 
-static inline fast_u8 neg8(fast_u8 n) {
-    return ((n ^ mask8) + 1) & mask8;
+static inline constexpr fast_u8 neg8(fast_u8 n) {
+    return mask8((n ^ 0xff) + 1);
 }
 
-static inline fast_u8 abs8(fast_u8 n) {
+static inline constexpr fast_u8 abs8(fast_u8 n) {
     return !get_sign8(n) ? n : neg8(n);
 }
 
-static inline int sign_extend8(fast_u8 n) {
-    auto a = static_cast<int>(abs8(n));
-    return !get_sign8(n) ? a : -a;
+static inline constexpr int sign_extend8(fast_u8 n) {
+    return !get_sign8(n) ? static_cast<int>(abs8(n)) :
+                           -static_cast<int>(abs8(n));
 }
 
-static inline fast_u8 get_low8(fast_u16 n) {
-    return n & mask8;
+static inline constexpr fast_u8 get_low8(fast_u16 n) {
+    return mask8(static_cast<fast_u8>(n));
 }
 
-static inline fast_u8 get_high8(fast_u16 n) {
-    return (n >> 8) & mask8;
+static inline constexpr fast_u8 get_high8(fast_u16 n) {
+    return mask8(static_cast<fast_u8>(n >> 8));
 }
 
 static inline fast_u16 make16(fast_u8 hi, fast_u8 lo) {
     return (static_cast<fast_u16>(hi) << 8) | lo;
 }
 
-static inline fast_u16 add16(fast_u16 a, fast_u16 b) {
-    return (a + b) & mask16;
+static inline constexpr fast_u16 add16(fast_u16 a, fast_u16 b) {
+    return mask16(a + b);
 }
 
-static inline fast_u16 sub16(fast_u16 a, fast_u16 b) {
-    return (a - b) & mask16;
+static inline constexpr fast_u16 sub16(fast_u16 a, fast_u16 b) {
+    return mask16(a - b);
 }
 
-static inline fast_u16 inc16(fast_u16 n) {
+static inline constexpr fast_u16 inc16(fast_u16 n) {
     return add16(n, 1);
 }
 
-static inline fast_u16 dec16(fast_u16 n) {
+static inline constexpr fast_u16 dec16(fast_u16 n) {
     return sub16(n, 1);
 }
 
@@ -1351,7 +1355,7 @@ public:
         case alu::adc: {
             f = (*this)->on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
-            fast_u8 t = (a + n + cfv) & mask8;
+            fast_u8 t = mask8(a + n + cfv);
             f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
                     hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
                     cf_ari(t < a || (cfv && n == 0xff));
@@ -1367,7 +1371,7 @@ public:
         case alu::sbc: {
             f = (*this)->on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
-            fast_u8 t = (a - n - cfv) & mask8;
+            fast_u8 t = mask8(a - n - cfv);
             f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
                     hf_ari(t, a, n) | pf_ari(a - n - cfv, a, n) |
                     cf_ari(t > a || (cfv && n == 0xff)) | nf_mask;
@@ -1409,14 +1413,14 @@ public:
             break;
         case rot::rrc: assert(0); break;  // TODO
         case rot::rl:
-            n = ((n << 1) | (cf ? 1 : 0)) & mask8;
+            n = mask8((n << 1) | (cf ? 1 : 0));
             // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x80);
             break;
         case rot::rr: assert(0); break;  // TODO
         case rot::sla:
-            n = (n << 1) & mask8;
+            n = mask8(n << 1);
             // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x80);
@@ -1794,7 +1798,7 @@ public:
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
         bool cf = f & cf_mask;
-        fast_u8 r = ((a << 1) | (cf ? 1 : 0)) & mask8;
+        fast_u8 r = mask8((a << 1) | (cf ? 1 : 0));
         f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
                 cf_ari(r & 0x80);
         (*this)->on_set_a(r);
