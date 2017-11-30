@@ -129,6 +129,17 @@ enum class block_ld { ldi, ldd, ldir, lddr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
 
+struct decoder_state {
+    decoder_state()
+        : index_rp(index_regp::hl), next_index_rp(index_regp::hl),
+          prefix(instruction_prefix::none)
+    {}
+
+    index_regp index_rp;
+    index_regp next_index_rp;
+    instruction_prefix prefix;
+};
+
 template<typename D>
 class instructions_decoder {
 public:
@@ -594,17 +605,6 @@ protected:
     static const fast_u8 q_mask = 0010;
 
 private:
-    struct decoder_state {
-        decoder_state()
-            : index_rp(index_regp::hl), next_index_rp(index_regp::hl),
-              prefix(instruction_prefix::none)
-        {}
-
-        index_regp index_rp;
-        index_regp next_index_rp;
-        instruction_prefix prefix;
-    };
-
     decoder_state state;
 };
 
@@ -848,6 +848,38 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
+struct processor_state {
+    processor_state()
+        : last_read_addr(0), interrupt_disabled(false),
+          bc(0), de(0), hl(0), af(0), ix(0), iy(0),
+          alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
+          pc(0), sp(0), ir(0), memptr(0),
+          iff1(false), iff2(false), halted(false), int_mode(0)
+    {}
+
+    void ex_af_alt_af() {
+        std::swap(af, alt_af);
+    }
+
+    void ex_de_hl() {
+        std::swap(de, hl);
+    }
+
+    void exx() {
+        std::swap(bc, alt_bc);
+        std::swap(de, alt_de);
+        std::swap(hl, alt_hl);
+    }
+
+    fast_u16 last_read_addr;
+    bool interrupt_disabled;
+    fast_u16 bc, de, hl, af, ix, iy;
+    fast_u16 alt_bc, alt_de, alt_hl, alt_af;
+    fast_u16 pc, sp, ir, memptr;
+    bool iff1, iff2, halted;
+    unsigned int_mode;
+};
+
 class processor_base {
 public:
     processor_base() {}
@@ -917,37 +949,7 @@ protected:
         return c ? cf_mask : 0;
     }
 
-    struct processor_state {
-        processor_state()
-            : last_read_addr(0), interrupt_disabled(false),
-              bc(0), de(0), hl(0), af(0), ix(0), iy(0),
-              alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
-              pc(0), sp(0), ir(0), memptr(0),
-              iff1(false), iff2(false), halted(false), int_mode(0)
-        {}
-
-        void ex_af_alt_af() {
-            std::swap(af, alt_af);
-        }
-
-        void ex_de_hl() {
-            std::swap(de, hl);
-        }
-
-        void exx() {
-            std::swap(bc, alt_bc);
-            std::swap(de, alt_de);
-            std::swap(hl, alt_hl);
-        }
-
-        fast_u16 last_read_addr;
-        bool interrupt_disabled;
-        fast_u16 bc, de, hl, af, ix, iy;
-        fast_u16 alt_bc, alt_de, alt_hl, alt_af;
-        fast_u16 pc, sp, ir, memptr;
-        bool iff1, iff2, halted;
-        unsigned int_mode;
-    } state;
+    processor_state state;
 };
 
 template<typename D>
