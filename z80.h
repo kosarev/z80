@@ -38,6 +38,11 @@ typedef uint_fast32_t size_type;
 
 static inline void unused(...) {}
 
+[[noreturn]] static inline void unreachable(const char *msg) {
+    std::fprintf(stderr, "%s\n", msg);
+    std::abort();
+}
+
 static inline constexpr fast_u8 mask8(fast_u8 n) {
     return n & 0xff;
 }
@@ -569,7 +574,7 @@ public:
         case instruction_prefix::ed:
             return decode_ed_prefixed();
         }
-        assert(0);
+        unreachable("Unknown instruction prefix.");
     }
 
     void decode() { (*this)->on_decode(); }
@@ -1244,7 +1249,7 @@ public:
         case reg::at_hl: return (*this)->on_read_access(get_hl());
         case reg::a: return get_a();
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     fast_u8 on_get_r(reg r, fast_u8 d = 0, bool long_read_cycle = false) {
@@ -1258,7 +1263,7 @@ public:
         case reg::at_hl: return read_at_disp(d, long_read_cycle);
         case reg::a: return (*this)->on_get_a();
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     void on_set_r(reg r, fast_u8 d, fast_u8 n) {
@@ -1272,7 +1277,7 @@ public:
         case reg::at_hl: return write_at_disp(d, n);
         case reg::a: return (*this)->on_set_a(n);
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     fast_u16 on_get_rp(regp rp) {
@@ -1282,7 +1287,7 @@ public:
         case regp::hl: return (*this)->on_get_index_rp();
         case regp::sp: return (*this)->on_get_sp();
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     void on_set_rp(regp rp, fast_u16 nn) {
@@ -1292,7 +1297,7 @@ public:
         case regp::hl: return (*this)->on_set_index_rp(nn);
         case regp::sp: return (*this)->on_set_sp(nn);
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     fast_u16 on_get_rp2(regp2 rp) {
@@ -1302,7 +1307,7 @@ public:
         case regp2::hl: return (*this)->on_get_index_rp();
         case regp2::af: return (*this)->on_get_af();
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     void on_set_rp2(regp2 rp, fast_u16 nn) {
@@ -1312,7 +1317,7 @@ public:
         case regp2::hl: return (*this)->on_set_index_rp(nn);
         case regp2::af: return (*this)->on_set_af(nn);
         }
-        assert(0);
+        unreachable("Unknown register.");
     }
 
     fast_u16 get_index_rp(index_regp irp) {
@@ -1321,7 +1326,7 @@ public:
         case index_regp::ix: return get_ix();
         case index_regp::iy: return get_iy();
         }
-        assert(0);
+        unreachable("Unknown index register.");
     }
 
     fast_u16 on_get_index_rp() {
@@ -1330,7 +1335,7 @@ public:
         case index_regp::ix: return (*this)->on_get_ix();
         case index_regp::iy: return (*this)->on_get_iy();
         }
-        assert(0);
+        unreachable("Unknown index register.");
     }
 
     void on_set_index_rp(fast_u16 nn) {
@@ -1339,7 +1344,7 @@ public:
         case index_regp::ix: return (*this)->on_set_ix(nn);
         case index_regp::iy: return (*this)->on_set_iy(nn);
         }
-        assert(0);
+        unreachable("Unknown index register.");
     }
 
     fast_u16 get_last_read_addr() const { return state.last_read_addr; }
@@ -1445,7 +1450,7 @@ public:
         case 2: return pf_mask;
         case 3: return sf_mask;
         }
-        assert(0);
+        unreachable("Unknown condition code.");
     }
 
     bool check_condition(condition cc) {
@@ -2058,7 +2063,7 @@ public:
             isr_addr = make16(lo, hi); }
             break;
         default:
-            assert(0);
+            unreachable("Unknown interrupts mode.");
         }
 
         (*this)->on_jump(isr_addr);
