@@ -1977,9 +1977,9 @@ public:
 
     fast_u8 on_input_cycle(fast_u16 addr) {
         // TODO: Shall we set the address bus here?
-        unused(addr);
+        fast_u8 n = (*this)->on_input(addr);
         (*this)->tick(4);
-        return 0xff;
+        return n;
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 n) {

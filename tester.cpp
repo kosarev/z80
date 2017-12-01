@@ -233,6 +233,11 @@ public:
         image[addr] = static_cast<least_u8>(n);
     }
 
+    fast_u8 on_input(fast_u16 addr) {
+        z80::unused(addr);
+        return 0xff;
+    }
+
     void set_instr_code(const least_u8 *code, unsigned size) {
         fast_u16 pc = get_pc();
         for(least_u8 &cell : image)
