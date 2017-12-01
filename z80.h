@@ -63,11 +63,11 @@ static inline constexpr fast_u8 sub8(fast_u8 a, fast_u8 b) {
     return mask8(a - b);
 }
 
-static inline fast_u8 inc8(fast_u8 n) {
+static inline constexpr fast_u8 inc8(fast_u8 n) {
     return add8(n, 1);
 }
 
-static inline fast_u8 dec8(fast_u8 n) {
+static inline constexpr fast_u8 dec8(fast_u8 n) {
     return sub8(n, 1);
 }
 
@@ -100,7 +100,7 @@ static inline constexpr fast_u8 get_high8(fast_u16 n) {
     return mask8(static_cast<fast_u8>(n >> 8));
 }
 
-static inline fast_u16 make16(fast_u8 hi, fast_u8 lo) {
+static inline constexpr fast_u16 make16(fast_u8 hi, fast_u8 lo) {
     return (static_cast<fast_u16>(hi) << 8) | lo;
 }
 
@@ -1351,7 +1351,7 @@ public:
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
-        fast_u8 f;
+        fast_u8 f = 0;
         switch(k) {
         case alu::add: {
             fast_u8 t = add8(a, n);
@@ -2049,6 +2049,7 @@ public:
         fast_u16 isr_addr;
         switch(state.int_mode) {
         case 0:
+            isr_addr = 0;
             assert(0);  // TODO
             break;
         case 1:
