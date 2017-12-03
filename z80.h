@@ -1185,7 +1185,7 @@ public:
     void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_ir() const { return state.ir; }
-    void set_ir(fast_u16 ir) const { state.ir = ir; }
+    void set_ir(fast_u16 ir) { state.ir = ir; }
 
     fast_u16 on_get_ir() const { return (*this)->get_ir(); }
 
