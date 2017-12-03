@@ -1062,7 +1062,7 @@ public:
     void set_af(fast_u16 af) { state.af = af; }
 
     fast_u16 get_alt_af() const { return state.alt_af; }
-    void set_alt_af(fast_u16 af) { state.alt_af = af; }
+    void set_alt_af(fast_u16 alt_af) { state.alt_af = alt_af; }
 
     fast_u16 on_get_af() {
         // Always get the low byte first.
@@ -1077,6 +1077,9 @@ public:
     fast_u16 get_hl() const { return state.hl; }
     void set_hl(fast_u16 hl) { state.hl = hl; }
 
+    fast_u16 get_alt_hl() const { return state.alt_hl; }
+    void set_alt_hl(fast_u16 alt_hl) { state.alt_hl = alt_hl; }
+
     fast_u16 on_get_hl() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_l();
@@ -1090,6 +1093,9 @@ public:
     fast_u16 get_bc() const { return state.bc; }
     void set_bc(fast_u16 bc) { state.bc = bc; }
 
+    fast_u16 get_alt_bc() const { return state.alt_bc; }
+    void set_alt_bc(fast_u16 alt_bc) { state.alt_bc = alt_bc; }
+
     fast_u16 on_get_bc() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_c();
@@ -1102,6 +1108,9 @@ public:
 
     fast_u16 get_de() const { return state.de; }
     void set_de(fast_u16 de) { state.de = de; }
+
+    fast_u16 get_alt_de() const { return state.alt_de; }
+    void set_alt_de(fast_u16 alt_de) { state.alt_de = alt_de; }
 
     fast_u16 on_get_de() {
         // Always get the low byte first.
@@ -1176,6 +1185,7 @@ public:
     void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_ir() const { return state.ir; }
+    void set_ir(fast_u16 ir) const { state.ir = ir; }
 
     fast_u16 on_get_ir() const { return (*this)->get_ir(); }
 
