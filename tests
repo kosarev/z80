@@ -1337,6 +1337,33 @@ c0 ret nz
 11 set_pc_on_return 0001 -> 00c0
 11 done
 
+# RETI
+ed4d reti
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 4d at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_sp 0000
+ 8 3t_read ed at 0000
+ 8   set_addr_bus 0000 -> 0000
+11 3t_read 4d at 0001
+11   set_addr_bus 0000 -> 0001
+14 set_sp 0000 -> 0002
+14 set_memptr 0000 -> 4ded
+14 set_pc_on_return 0002 -> 4ded
+14 prefix_reset
+14 done
+
 # SBC r
 9f sbc a, a
  0 get_pc_on_fetch 0000

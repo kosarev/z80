@@ -536,6 +536,12 @@ public:
             fast_u16 nn = (*this)->on_3t_3t_imm16_read();
             return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
                                  (*this)->on_ld_at_nn_rp(nn, rp); }
+        case 0105:
+            // RETI  f(4) f(4) r(3) r(3)
+            // RETN  f(4) f(4) r(3) r(3)
+            if(y == 1)
+                return (*this)->on_reti();
+            return (*this)->on_retn();
         case 0106: {
             // IM im[y]  f(4) f(4)
             return (*this)->on_im(decode_int_mode(y)); }
@@ -816,6 +822,10 @@ public:
         (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
+    void on_reti() {
+        (*this)->on_format("reti"); }
+    void on_retn() {
+        (*this)->on_format("retn"); }
     void on_rla() {
         (*this)->on_format("rla"); }
     void on_rlca() {
@@ -1205,6 +1215,7 @@ public:
 
     void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
     void set_iff1_on_ei(bool iff1) { (*this)->on_set_iff1(iff1); }
+    void set_iff1_on_retn(bool iff1) { (*this)->on_set_iff1(iff1); }
 
     bool get_iff2() const { return state.iff2; }
     void set_iff2(bool iff2) { state.iff2 = iff2; }
@@ -1214,6 +1225,8 @@ public:
 
     void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
     void set_iff2_on_ei(bool iff2) { (*this)->on_set_iff2(iff2); }
+
+    bool get_iff2_on_retn() const { return (*this)->on_get_iff2(); }
 
     unsigned get_int_mode() const { return state.int_mode; }
     void set_int_mode(unsigned mode) { state.int_mode = mode; }
@@ -1811,6 +1824,11 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_reti() {
+        (*this)->on_return(); }
+    void on_retn() {
+        (*this)->set_iff1_on_retn((*this)->get_iff2_on_retn());
+        (*this)->on_return(); }
     void on_rla() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
