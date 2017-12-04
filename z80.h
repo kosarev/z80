@@ -523,6 +523,11 @@ public:
             // IN (C)        f(4) f(4) i(4)
             auto r = static_cast<reg>(y);
             return (*this)->on_in_r_c(r); }
+        case 0101: {
+            // OUT (C), r[y]  f(4) f(4) o(4)
+            // OUT (C), 0     f(4) f(4) o(4)
+            auto r = static_cast<reg>(y);
+            return (*this)->on_out_c_r(r); }
         case 0102: {
             // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
             // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
@@ -803,6 +808,11 @@ public:
         (*this)->on_format("ld sp, P", regp::hl, irp); }
     void on_nop() {
         (*this)->on_format("nop"); }
+    void on_out_c_r(reg r) {
+        if(r == reg::at_hl)
+            (*this)->on_format("out (c), 0");
+        else
+            (*this)->on_format("out (c), R", r, index_regp::hl, 0); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
     void on_pop_rp(regp2 rp) {
@@ -1803,6 +1813,11 @@ public:
     void on_ld_sp_irp() {
         (*this)->on_set_sp((*this)->on_get_index_rp()); }
     void on_nop() {}
+    void on_out_c_r(reg r) {
+        fast_u16 bc = (*this)->on_get_bc();
+        (*this)->on_set_memptr(inc16(bc));
+        fast_u8 n = (r == reg::at_hl) ? 0 : (*this)->on_get_r(r, /* d= */ 0);
+        (*this)->on_output_cycle(bc, n); }
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
