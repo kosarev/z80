@@ -1262,6 +1262,37 @@ ed6f rld
  4 set_f 00 -> 00
  4 done
 
+# RRD
+ed67 rrd
+ 0 get_pc_on_fetch 0000
+ 0 fetch ed at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 67 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0000
+ 6   set_addr_bus 0001 -> 0000
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_a 00
+ 8 get_f 00
+ 8 get_l 00
+ 8 get_h 00
+ 8 set_memptr 0000 -> 0001
+ 8 3t_read ed at 0000
+ 8   set_addr_bus 0000 -> 0000
+11 4t_exec
+15 set_a 00 -> 0d
+15 set_f 00 -> 08
+15 3t_write ed -> 0e at 0000
+15   set_addr_bus 0000 -> 0000
+18 prefix_reset
+18 done
+
 # RST nn
 d7 rst 0x0010
  0 get_pc_on_fetch 0000
