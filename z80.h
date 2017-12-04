@@ -541,6 +541,9 @@ public:
             fast_u16 nn = (*this)->on_3t_3t_imm16_read();
             return op & q_mask ? (*this)->on_ld_rp_at_nn(rp, nn) :
                                  (*this)->on_ld_at_nn_rp(nn, rp); }
+        case 0104:
+            // NEG  f(4) f(4)
+            return (*this)->on_neg();
         case 0105:
             // RETI  f(4) f(4) r(3) r(3)
             // RETN  f(4) f(4) r(3) r(3)
@@ -809,6 +812,8 @@ public:
     void on_ld_sp_irp() {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("ld sp, P", regp::hl, irp); }
+    void on_neg() {
+        (*this)->on_format("neg"); }
     void on_nop() {
         (*this)->on_format("nop"); }
     void on_out_c_r(reg r) {
@@ -1387,6 +1392,13 @@ public:
 
     fast_u16 get_last_read_addr() const { return state.last_read_addr; }
 
+    void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
+        fast_u8 t = sub8(a, n);
+        f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
+        a = t;
+    }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = 0;
@@ -1407,11 +1419,7 @@ public:
             a = t;
             break; }
         case alu::sub: {
-            fast_u8 t = sub8(a, n);
-            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) |
-                    nf_mask;
-            a = t;
+            do_sub(a, f, n);
             break; }
         case alu::sbc: {
             f = (*this)->on_get_f();
@@ -1817,6 +1825,14 @@ public:
         (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_sp_irp() {
         (*this)->on_set_sp((*this)->on_get_index_rp()); }
+    void on_neg() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 n = a;
+        a = 0;
+        do_sub(a, f, n);
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(a); }
     void on_nop() {}
     void on_out_c_r(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
