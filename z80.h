@@ -1992,6 +1992,7 @@ public:
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(2);
         (*this)->on_set_addr_bus((*this)->get_ir_on_refresh());
+        (*this)->on_inc_r_reg();
         (*this)->tick(2);
         state.last_read_addr = addr;
         return b;
