@@ -642,10 +642,10 @@ public:
         base::on_prefix_reset();
     }
 
-    void on_disable_interrupt() {
+    void on_disable_int() {
         input.read_and_match("disable_int",
                              static_cast<unsigned>(get_ticks()));
-        base::on_disable_interrupt();
+        base::on_disable_int();
     }
 
     void on_set_next_index_rp(z80::index_regp irp) {

@@ -169,7 +169,7 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    void on_disable_interrupt() {}
+    void on_disable_int() {}
 
     instruction_prefix get_prefix() const { return state.prefix; }
     void set_prefix(instruction_prefix p) { state.prefix = p; }
@@ -177,13 +177,13 @@ public:
     void on_ed_prefix() {
         // TODO: Should we reset the index register pair here?
         set_prefix(instruction_prefix::ed);
-        (*this)->on_disable_interrupt();
+        (*this)->on_disable_int();
     }
 
     void on_cb_prefix() {
         set_prefix(instruction_prefix::cb);
         state.next_index_rp = state.index_rp;
-        (*this)->on_disable_interrupt();
+        (*this)->on_disable_int();
     }
 
     void on_prefix_reset() {
@@ -193,7 +193,7 @@ public:
     void on_set_next_index_rp(index_regp irp) {
         // TODO: Should we reset the prefix here?
         state.next_index_rp = irp;
-        (*this)->on_disable_interrupt();
+        (*this)->on_disable_int();
     }
 
     unsigned decode_int_mode(fast_u8 y) {
@@ -885,7 +885,7 @@ protected:
 
 struct processor_state {
     processor_state()
-        : last_read_addr(0), interrupt_disabled(false),
+        : last_read_addr(0),
           bc(0), de(0), hl(0), af(0), ix(0), iy(0),
           alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
           pc(0), sp(0), ir(0), memptr(0),
@@ -907,7 +907,7 @@ struct processor_state {
     }
 
     fast_u16 last_read_addr;
-    bool interrupt_disabled;
+    bool int_disabled = false;
     fast_u16 bc, de, hl, af, ix, iy;
     fast_u16 alt_bc, alt_de, alt_hl, alt_af;
     fast_u16 pc, sp, ir, memptr;
@@ -1254,8 +1254,8 @@ public:
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
-    void disable_interrupt() { state.interrupt_disabled = true; }
-    void on_disable_interrupt() { disable_interrupt(); }
+    void disable_int() { state.int_disabled = true; }
+    void on_disable_int() { disable_int(); }
 
     void on_set_next_index_rp(index_regp irp) {
         decoder::on_set_next_index_rp(irp);
@@ -1710,7 +1710,7 @@ public:
     void on_ei() {
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
-        (*this)->on_disable_interrupt(); }
+        (*this)->on_disable_int(); }
     void on_ex_af_alt_af() {
         state.ex_af_alt_af(); }
     void on_ex_de_hl() {
@@ -2108,7 +2108,7 @@ public:
     }
 
     void handle_active_int() {
-        if(state.interrupt_disabled || !state.iff1)
+        if(state.int_disabled || !state.iff1)
             return;
 
         state.iff1 = false;
@@ -2151,7 +2151,7 @@ public:
     }
 
     void on_step() {
-        state.interrupt_disabled = false;
+        state.int_disabled = false;
         (*this)->decode();
     }
 
