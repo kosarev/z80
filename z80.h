@@ -2107,10 +2107,7 @@ public:
         return op;
     }
 
-    void handle_active_int() {
-        if(state.int_disabled || !state.iff1)
-            return;
-
+    void initiate_int() {
         state.iff1 = false;
         state.iff2 = false;
 
@@ -2148,6 +2145,11 @@ public:
         }
 
         (*this)->on_jump(isr_addr);
+    }
+
+    void handle_active_int() {
+        if(!state.int_disabled && state.iff1)
+            initiate_int();
     }
 
     void on_step() {
