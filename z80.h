@@ -2148,9 +2148,12 @@ public:
         (*this)->on_jump(isr_addr);
     }
 
-    void handle_active_int() {
-        if(!state.int_disabled && state.iff1)
+    bool handle_active_int() {
+        if(!state.int_disabled && state.iff1) {
             initiate_int();
+            return true;
+        }
+        return false;
     }
 
     void on_step() {
