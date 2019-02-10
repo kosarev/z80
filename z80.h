@@ -2109,6 +2109,10 @@ public:
     }
 
     void initiate_int() {
+        // Interrupts can't happen in the middle of a prefixed
+        // instruction.
+        assert(decoder::get_prefix() == instruction_prefix::none);
+
         state.iff1 = false;
         state.iff2 = false;
 
