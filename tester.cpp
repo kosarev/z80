@@ -431,13 +431,20 @@ public:
         addr_bus = addr;
     }
 
-    fast_u8 on_fetch_cycle(fast_u16 addr) {
-        input.read_and_match("fetch %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read_access(addr)),
-                             static_cast<unsigned>(addr));
+    fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
+        if(m1) {
+            input.read_and_match("m1_fetch %02x at %04x",
+                                 static_cast<unsigned>(get_ticks()),
+                                 static_cast<unsigned>(on_read_access(addr)),
+                                 static_cast<unsigned>(addr));
+        } else {
+            input.read_and_match("fetch %02x at %04x",
+                                 static_cast<unsigned>(get_ticks()),
+                                 static_cast<unsigned>(on_read_access(addr)),
+                                 static_cast<unsigned>(addr));
+        }
         input_level_guard guard(input);
-        return base::on_fetch_cycle(addr);
+        return base::on_fetch_cycle(addr, m1);
     }
 
     void on_5t_fetch_cycle() {

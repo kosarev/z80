@@ -465,9 +465,15 @@ public:
         if(irp != index_regp::hl)
             d = (*this)->on_disp_read();
 
-        fast_u8 op = (*this)->on_fetch();
-        if(irp != index_regp::hl)
+        fast_u8 op;
+        if(irp == index_regp::hl) {
+            op = (*this)->on_fetch(/* m1= */ true);
+        } else {
+            // In ddcb- and fdcb-prefixed instructions the
+            // reading of the 3rd opcode is not an M1 cycle.
+            op = (*this)->on_fetch(/* m1= */ false);
             (*this)->on_5t_fetch_cycle();
+        }
 
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
@@ -673,7 +679,9 @@ public:
 
     disassembler() {}
 
-    fast_u8 on_fetch() { return (*this)->on_read_next_byte(); }
+    fast_u8 on_fetch(bool m1 = true) {
+        unused(m1);
+        return (*this)->on_read_next_byte(); }
     void on_5t_fetch_cycle() {}
     void on_6t_fetch_cycle() {}
 
@@ -1999,9 +2007,9 @@ public:
         (*this)->on_set_hl(r);
         (*this)->on_set_f(f); }
 
-    fast_u8 on_fetch() {
+    fast_u8 on_fetch(bool m1 = true) {
         fast_u16 pc = (*this)->get_pc_on_fetch();
-        fast_u8 op = (*this)->on_fetch_cycle(pc);
+        fast_u8 op = (*this)->on_fetch_cycle(pc, m1);
         (*this)->set_pc_on_fetch(inc16(pc));
         return op;
     }
@@ -2010,12 +2018,13 @@ public:
         unused(addr);
     }
 
-    fast_u8 on_fetch_cycle(fast_u16 addr) {
+    fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(2);
         (*this)->on_set_addr_bus((*this)->get_ir_on_refresh());
-        (*this)->on_inc_r_reg();
+        if(m1)
+            (*this)->on_inc_r_reg();
         (*this)->tick(2);
         state.last_read_addr = addr;
         return b;
