@@ -565,6 +565,10 @@ public:
             // LD I, A  f(4) f(5)
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_ld_i_a(); }
+        case 0x5f: {
+            // LD A, R  f(4) f(5)
+            (*this)->on_5t_fetch_cycle();
+            return (*this)->on_ld_a_r(); }
         case 0x67:
             // RRD  f(4) f(4) r(3) e(4) w(3)
             return (*this)->on_rrd();
@@ -780,6 +784,8 @@ public:
         (*this)->on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         (*this)->on_format("jr C, D", cc, sign_extend8(d) + 2); }
+    void on_ld_a_r() {
+        (*this)->on_format("ld a, r"); }
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
@@ -1779,6 +1785,14 @@ public:
     void on_jr_cc(condition cc, fast_u8 d) {
         if(check_condition(cc))
             (*this)->on_relative_jump(d); }
+    void on_ld_a_r() {
+        fast_u8 n = (*this)->on_get_r_reg();
+        fast_u8 f = (*this)->on_get_f();
+        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
+                ((state.iff2 ? 1u : 0u) << pf_bit);
+        (*this)->on_set_a(n);
+        (*this)->on_set_f(f);
+    }
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
