@@ -1199,6 +1199,51 @@ cb3c srl h
  8 prefix_reset
  8 done
 
+ddcb463e srl (ix + 70)
+ 0 get_pc_on_fetch 0000
+ 0 fetch dd at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> ix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch cb at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 disable_int
+ 8 disp_read 46 at 0002
+ 8   get_pc_on_disp_read 0002
+ 8   3t_read 46 at 0002
+ 8     set_addr_bus 0001 -> 0002
+11   set_pc_on_disp_read 0002 -> 0003
+11 get_pc_on_fetch 0003
+11 fetch 3e at 0003
+11   set_addr_bus 0002 -> 0003
+13   get_ir_on_refresh 0002
+13   set_addr_bus 0003 -> 0002
+15 set_pc_on_fetch 0003 -> 0004
+15 5t_fetch
+16 get_ixl 00
+16 get_ixh 00
+16 4t_read 00 at 0046
+16   set_addr_bus 0002 -> 0046
+20 set_memptr 0000 -> 0046
+20 get_f 00
+20 get_ixl 00
+20 get_ixh 00
+20 3t_write 00 -> 00 at 0046
+20   set_addr_bus 0046 -> 0046
+23 set_memptr 0046 -> 0046
+23 set_f 00 -> 44
+23 prefix_reset
+23 done
+
+ddcb1246 abc
+
 # RL r
 cb11 rl c
  0 get_pc_on_fetch 0000
