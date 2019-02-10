@@ -1294,6 +1294,28 @@ ed6f rld
  4 set_f 00 -> 00
  4 done
 
+# RRC
+cb08 rrc b
+ 0 get_pc_on_fetch 0000
+ 0 fetch cb at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 fetch 08 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_b 00
+ 8 get_f 00
+ 8 set_b 00 -> 00
+ 8 set_f 00 -> 44
+ 8 prefix_reset
+ 8 done
+
 # RRCA
 0f rrca
  0 get_pc_on_fetch 0000

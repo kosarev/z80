@@ -1470,7 +1470,11 @@ public:
             f = (n & (sf_mask | yf_mask | xf_mask | cf_mask)) | zf_ari(n) |
                     pf_log(n);
             break;
-        case rot::rrc: assert(0); break;  // TODO
+        case rot::rrc:
+            n = mask8((n >> 1) | (n << 7));
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                cf_ari(t & 0x01);
+            break;
         case rot::rl:
             n = mask8((n << 1) | (cf ? 1 : 0));
             // TODO: We don't need to read F here.
