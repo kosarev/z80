@@ -1372,7 +1372,7 @@ public:
         a = t;
     }
 
-    void do_cp(fast_u8 a, fast_u8 n, fast_u8 &f) {
+    void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
         f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
             hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
@@ -1423,7 +1423,7 @@ public:
             f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
             break;
         case alu::cp:
-            do_cp(a, n, f);
+            do_cp(a, f, n);
             break;
         }
         if(k != alu::cp)
@@ -1587,7 +1587,7 @@ public:
 
         fast_u8 t = (*this)->on_3t_read_cycle(hl);
         fast_u8 tf = f;
-        do_cp(a, t, tf);
+        do_cp(a, tf, t);
 
         (*this)->on_5t_exec_cycle();
         bc = dec16(bc);
