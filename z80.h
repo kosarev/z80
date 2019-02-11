@@ -1948,7 +1948,7 @@ public:
         bool cf = f & cf_mask;
         fast_u8 r = mask8((a << 1) | (cf ? 1 : 0));
         f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
-                cf_ari(r & 0x80);
+                cf_ari(a & 0x80);
         (*this)->on_set_a(r);
         (*this)->on_set_f(f); }
     void on_rlca() {
