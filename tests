@@ -659,6 +659,25 @@ ed5f ld a, r
  4 set_b 00 -> 00
  4 done
 
+dd6b ld ixl, e
+ 0 get_pc_on_fetch 0000
+ 0 m1_fetch dd at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> ix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 m1_fetch 6b at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_e 00
+ 8 set_ixl 00 -> 00
+ 8 done
+
 # LD r, n
 3eaf ld a, 0xaf
  0 get_pc_on_fetch 0000

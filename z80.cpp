@@ -11,18 +11,36 @@
 
 namespace z80 {
 
-const char *get_reg_name(reg r) {
+const char *get_reg_name(reg r, index_regp irp) {
     switch(r) {
     case reg::b: return "b";
     case reg::c: return "c";
     case reg::d: return "d";
     case reg::e: return "e";
-    case reg::h: return "h";
-    case reg::l: return "l";
-    case reg::at_hl: return "(hl)";
     case reg::a: return "a";
+    case reg::h:
+        switch(irp) {
+        case index_regp::hl: return "h";
+        case index_regp::ix: return "ixh";
+        case index_regp::iy: return "iyh";
+        }
+        break;
+    case reg::l:
+        switch(irp) {
+        case index_regp::hl: return "l";
+        case index_regp::ix: return "ixl";
+        case index_regp::iy: return "iyl";
+        }
+        break;
+    case reg::at_hl:
+        switch(irp) {
+        case index_regp::hl: return "(hl)";
+        case index_regp::ix: return "(ix)";
+        case index_regp::iy: return "(iy)";
+        }
+        break;
     }
-    assert(0);
+    unreachable("Unknown register.");
 }
 
 const char *get_reg_name(regp rp, index_regp irp) {
@@ -215,7 +233,7 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             auto irp = get_arg<index_regp>(args);
             auto d = get_arg<fast_u8>(args);
             if(r != reg::at_hl || irp == index_regp::hl) {
-                out.append(get_reg_name(r));
+                out.append(get_reg_name(r, irp));
             } else {
                 out.append('(');
                 out.append(get_index_reg_name(irp));

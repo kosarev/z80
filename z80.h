@@ -599,7 +599,7 @@ private:
     decoder_state state;
 };
 
-const char *get_reg_name(reg r);
+const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(index_regp irp);
@@ -1274,10 +1274,22 @@ public:
         case reg::c: return (*this)->on_get_c();
         case reg::d: return (*this)->on_get_d();
         case reg::e: return (*this)->on_get_e();
-        case reg::h: return (*this)->on_get_h();
-        case reg::l: return (*this)->on_get_l();
         case reg::at_hl: return read_at_disp(d, long_read_cycle);
         case reg::a: return (*this)->on_get_a();
+        case reg::h:
+            switch((*this)->get_index_rp_kind()) {
+            case index_regp::hl: return (*this)->on_get_h();
+            case index_regp::ix: return (*this)->on_get_ixh();
+            case index_regp::iy: return (*this)->on_get_iyh();
+            }
+            break;
+        case reg::l:
+            switch((*this)->get_index_rp_kind()) {
+            case index_regp::hl: return (*this)->on_get_l();
+            case index_regp::ix: return (*this)->on_get_ixl();
+            case index_regp::iy: return (*this)->on_get_iyl();
+            }
+            break;
         }
         unreachable("Unknown register.");
     }
@@ -1288,10 +1300,22 @@ public:
         case reg::c: return (*this)->on_set_c(n);
         case reg::d: return (*this)->on_set_d(n);
         case reg::e: return (*this)->on_set_e(n);
-        case reg::h: return (*this)->on_set_h(n);
-        case reg::l: return (*this)->on_set_l(n);
         case reg::at_hl: return write_at_disp(d, n);
         case reg::a: return (*this)->on_set_a(n);
+        case reg::h:
+            switch((*this)->get_index_rp_kind()) {
+            case index_regp::hl: return (*this)->on_set_h(n);
+            case index_regp::ix: return (*this)->on_set_ixh(n);
+            case index_regp::iy: return (*this)->on_set_iyh(n);
+            }
+            break;
+        case reg::l:
+            switch((*this)->get_index_rp_kind()) {
+            case index_regp::hl: return (*this)->on_set_l(n);
+            case index_regp::ix: return (*this)->on_set_ixl(n);
+            case index_regp::iy: return (*this)->on_set_iyl(n);
+            }
+            break;
         }
         unreachable("Unknown register.");
     }
