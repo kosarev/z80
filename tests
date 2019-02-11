@@ -678,6 +678,36 @@ dd6b ld ixl, e
  8 set_ixl 00 -> 00
  8 done
 
+# 0x6e LD L,(REGISTER+dd)
+fd6e12 ld l, (iy + 18)
+ 0 get_pc_on_fetch 0000
+ 0 m1_fetch fd at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_next_index_rp hl -> iy
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 m1_fetch 6e at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 disp_read 12 at 0002
+ 8   get_pc_on_disp_read 0002
+ 8   3t_read 12 at 0002
+ 8     set_addr_bus 0001 -> 0002
+11   set_pc_on_disp_read 0002 -> 0003
+11 5t_exec
+16 get_iyl 00
+16 get_iyh 00
+16 3t_read 00 at 0012
+16   set_addr_bus 0002 -> 0012
+19 set_memptr 0000 -> 0012
+19 set_l 00 -> 00
+19 done
+
 # LD r, n
 3eaf ld a, 0xaf
  0 get_pc_on_fetch 0000
