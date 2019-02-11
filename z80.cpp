@@ -92,6 +92,17 @@ const char *get_mnemonic(block_ld k) {
     assert(0);
 }
 
+const char *get_mnemonic(block_cp k) {
+    switch(k) {
+    case block_cp::cpi: return "cpi";
+    case block_cp::cpd: return "cpd";
+    case block_cp::cpir: return "cpir";
+    case block_cp::cpdr: return "cpdr";
+    }
+    assert(0);
+}
+
+
 bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
 }
@@ -246,6 +257,10 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'L': {  // A block transfer instruction.
             auto k = get_arg<block_ld>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'M': {  // A block comparison instruction.
+            auto k = get_arg<block_cp>(args);
             out.append(get_mnemonic(k));
             break; }
         default:

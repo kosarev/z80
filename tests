@@ -227,6 +227,44 @@ bc cp h
  4 set_f 00 -> 42
  4 done
 
+# CPIR
+edb1 cpir
+ 0 get_pc_on_fetch 0000
+ 0 m1_fetch ed at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 ed_prefix
+ 4 disable_int
+ 4 get_pc_on_fetch 0001
+ 4 m1_fetch b1 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 get_c 00
+ 8 get_b 00
+ 8 get_l 00
+ 8 get_h 00
+ 8 get_a 00
+ 8 get_f 00
+ 8 3t_read ed at 0000
+ 8   set_addr_bus 0001 -> 0000
+11 5t_exec
+16 set_c 00 -> ff
+16 set_b 00 -> ff
+16 set_memptr 0000 -> 0001
+16 set_l 00 -> 01
+16 set_h 00 -> 00
+16 set_f 00 -> 36
+16 5t_exec
+21 get_pc_on_block_instr 0002
+21 set_memptr 0001 -> 0001
+21 set_pc_on_block_instr 0002 -> 0000
+21 prefix_reset
+21 done
+
 # CPL
 2f cpl
  0 get_pc_on_fetch 0000

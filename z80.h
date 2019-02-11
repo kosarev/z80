@@ -131,6 +131,7 @@ enum class instruction_prefix { none, cb, ed };
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 enum class rot { rlc, rrc, rl, rr, sla, sra, sll, srl };
 enum class block_ld { ldi, ldd, ldir, lddr };
+enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
 
@@ -565,6 +566,12 @@ public:
                 return (*this)->on_noni_ed(op);
             auto k = static_cast<block_ld>(y - 4);
             return (*this)->on_block_ld(k); }
+        case 0201: {
+            // CPI, CPD, CPIR, CPDR  f(4) f(4) r(3) e(5) + e(5)
+            if(y < 4)
+                return (*this)->on_noni_ed(op);
+            auto k = static_cast<block_cp>(y - 4);
+            return (*this)->on_block_cp(k); }
         }
         switch(op) {
         case 0x47: {
@@ -647,6 +654,7 @@ const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
 const char *get_mnemonic(rot k);
 const char *get_mnemonic(block_ld k);
+const char *get_mnemonic(block_cp k);
 bool is_two_operand_alu_instr(alu k);
 const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
@@ -727,6 +735,8 @@ public:
     void on_alu_r(alu k, reg r, fast_u8 d) {
         index_regp irp = (*this)->get_index_rp_kind();
         (*this)->on_format("A R", k, r, irp, d); }
+    void on_block_cp(block_cp k) {
+        (*this)->on_format("M", k); }
     void on_block_ld(block_ld k) {
         (*this)->on_format("L", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
@@ -953,7 +963,7 @@ protected:
     static const fast_u8 cf_mask = 1 << cf_bit;
 
     template<typename T>
-    fast_u8 zf_ari(T n) {
+    static fast_u8 zf_ari(T n) {
         return (n == 0 ? 1u : 0u) << zf_bit;
     }
 
@@ -1413,6 +1423,12 @@ public:
         a = t;
     }
 
+    void do_cp(fast_u8 a, fast_u8 n, fast_u8 &f) {
+        fast_u8 t = sub8(a, n);
+        f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
+            hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
+    }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = 0;
@@ -1457,12 +1473,9 @@ public:
             a |= n;
             f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
             break;
-        case alu::cp: {
-            fast_u8 t = sub8(a, n);
-            f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
-                    hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) |
-                    nf_mask;
-            break; }
+        case alu::cp:
+            do_cp(a, n, f);
+            break;
         }
         if(k != alu::cp)
             (*this)->on_set_a(a);
@@ -1613,6 +1626,50 @@ public:
         do_alu(k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         do_alu(k, (*this)->on_get_r(r, d)); }
+    void on_block_cp(block_cp k) {
+        fast_u16 bc = (*this)->on_get_bc();
+        fast_u16 memptr = (*this)->on_get_memptr();
+        fast_u16 hl = (*this)->on_get_hl();
+        // TODO: Block comparisons implicitly depend on the
+        // register 'a'. We probably want to request its value
+        // here with a special handler.
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+
+        fast_u8 t = (*this)->on_3t_read_cycle(hl);
+        fast_u8 tf = f;
+        do_cp(a, t, tf);
+
+        (*this)->on_5t_exec_cycle();
+        bc = dec16(bc);
+
+        t = a - t - ((tf & hf_mask) ? 1 : 0);
+        f = (tf & (sf_mask | zf_mask | hf_mask)) |
+                ((t << 4) & yf_mask) | (t & xf_mask) |
+                (bc != 0 ? pf_mask : 0) | nf_mask | (f & cf_mask);
+
+        if(static_cast<unsigned>(k) & 1) {
+            // CPI, CPIR
+            hl = dec16(hl);
+            memptr = dec16(memptr);
+        } else {
+            // CPD, CPDR
+            hl = inc16(hl);
+            memptr = inc16(memptr);
+        }
+
+        (*this)->on_set_bc(bc);
+        (*this)->on_set_memptr(memptr);
+        (*this)->on_set_hl(hl);
+        (*this)->on_set_f(f);
+
+        // CPIR, CPDR
+        if((static_cast<unsigned>(k) & 2) && bc && !(f & zf_mask)) {
+            (*this)->on_5t_exec_cycle();
+            fast_u16 pc = (*this)->get_pc_on_block_instr();
+            (*this)->on_set_memptr(dec16(pc));
+            (*this)->set_pc_on_block_instr(sub16(pc, 2));
+        } }
     void on_block_ld(block_ld k) {
         fast_u16 bc = (*this)->on_get_bc();
         fast_u16 de = (*this)->on_get_de();
@@ -1623,9 +1680,10 @@ public:
         fast_u8 f = (*this)->on_get_f();
 
         fast_u8 t = (*this)->on_3t_read_cycle(hl);
-        (*this)->on_5t_write_cycle(de, t);
 
+        (*this)->on_5t_write_cycle(de, t);
         bc = dec16(bc);
+
         t += a;
         f = (f & (sf_mask | zf_mask | cf_mask)) |
                 ((t << 4) & yf_mask) | (t & xf_mask) | (bc != 0 ? pf_mask : 0);
