@@ -1035,7 +1035,7 @@ ed44 neg
  8 get_a 00
  8 get_f 00
  8 set_a 00 -> 00
- 8 set_f 00 -> 00
+ 8 set_f 00 -> 42
  8 done
 
 # NOP

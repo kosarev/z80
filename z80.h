@@ -1870,7 +1870,7 @@ public:
         a = 0;
         do_sub(a, f, n);
         (*this)->on_set_a(a);
-        (*this)->on_set_f(a); }
+        (*this)->on_set_f(f); }
     void on_nop() {}
     void on_out_c_r(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
