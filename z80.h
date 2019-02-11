@@ -2000,10 +2000,10 @@ public:
     void on_rra() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
-        a = (a >> 1) | ((f & cf_mask) ? 0x80 : 0);
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+        fast_u8 r = (a >> 1) | ((f & cf_mask) ? 0x80 : 0);
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
                 cf_ari(a & 0x1);
-        (*this)->on_set_a(a);
+        (*this)->on_set_a(r);
         (*this)->on_set_f(f); }
     void on_rrca() {
         fast_u8 a = (*this)->on_get_a();
