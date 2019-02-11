@@ -196,8 +196,7 @@ public:
     void disassemble() {
         // Skip prefixes.
         base::disassemble();
-        while(get_prefix() != z80::instruction_prefix::none ||
-              get_next_index_rp_kind() != z80::index_regp::hl)
+        while(get_next_index_rp_kind() != z80::index_regp::hl)
             base::disassemble();
     }
 
@@ -637,18 +636,6 @@ public:
         base::on_set_int_mode(mode);
     }
 
-    void on_ed_prefix() {
-        input.read_and_match("ed_prefix",
-                             static_cast<unsigned>(get_ticks()));
-        base::on_ed_prefix();
-    }
-
-    void on_prefix_reset() {
-        input.read_and_match("prefix_reset",
-                             static_cast<unsigned>(get_ticks()));
-        base::on_prefix_reset();
-    }
-
     void on_disable_int() {
         input.read_and_match("disable_int",
                              static_cast<unsigned>(get_ticks()));
@@ -666,8 +653,7 @@ public:
     void step() {
         // Skip prefixes.
         base::step();
-        while(get_prefix() != z80::instruction_prefix::none ||
-              get_next_index_rp_kind() != z80::index_regp::hl)
+        while(get_next_index_rp_kind() != z80::index_regp::hl)
             base::step();
 
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));

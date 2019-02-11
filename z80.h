@@ -126,8 +126,6 @@ enum class regp { bc, de, hl, sp };
 enum class regp2 { bc, de, hl, af };
 enum class index_regp { hl, ix, iy };
 
-enum class instruction_prefix { none, cb, ed };
-
 enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 enum class rot { rlc, rrc, rl, rr, sla, sra, sll, srl };
 enum class block_ld { ldi, ldd, ldir, lddr };
@@ -137,13 +135,11 @@ enum condition { nz, z, nc, c, po, pe, p, m };
 
 struct decoder_state {
     decoder_state()
-        : index_rp(index_regp::hl), next_index_rp(index_regp::hl),
-          prefix(instruction_prefix::none)
+        : index_rp(index_regp::hl), next_index_rp(index_regp::hl)
     {}
 
     index_regp index_rp;
     index_regp next_index_rp;
-    instruction_prefix prefix;
 };
 
 template<typename D>
@@ -171,25 +167,6 @@ public:
     }
 
     void on_disable_int() {}
-
-    instruction_prefix get_prefix() const { return state.prefix; }
-    void set_prefix(instruction_prefix p) { state.prefix = p; }
-
-    void on_ed_prefix() {
-        // TODO: Should we reset the index register pair here?
-        set_prefix(instruction_prefix::ed);
-        (*this)->on_disable_int();
-    }
-
-    void on_cb_prefix() {
-        set_prefix(instruction_prefix::cb);
-        state.next_index_rp = state.index_rp;
-        (*this)->on_disable_int();
-    }
-
-    void on_prefix_reset() {
-        set_prefix(instruction_prefix::none);
-    }
 
     void on_set_next_index_rp(index_regp irp) {
         // TODO: Should we reset the prefix here?
@@ -404,7 +381,7 @@ public:
             return (*this)->on_ret();
         case 0xcb:
             // CB prefix.
-            return (*this)->on_cb_prefix();
+            return decode_cb_prefixed();
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
@@ -434,7 +411,7 @@ public:
             return (*this)->on_ex_de_hl();
         case 0xed:
             // ED prefix.
-            return (*this)->on_ed_prefix();
+            return decode_ed_prefixed();
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
@@ -459,8 +436,6 @@ public:
     }
 
     void decode_cb_prefixed() {
-        prefix_reset_guard guard(this);
-
         fast_u8 d = 0;
         index_regp irp = get_index_rp_kind();
         if(irp != index_regp::hl)
@@ -519,7 +494,6 @@ public:
     }
 
     void decode_ed_prefixed() {
-        prefix_reset_guard guard(this);
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 p = get_p_part(op);
@@ -600,34 +574,12 @@ public:
         state.index_rp = state.next_index_rp;
         state.next_index_rp = index_regp::hl;
 
-        switch(get_prefix()) {
-        case instruction_prefix::none:
-            return decode_unprefixed();
-        case instruction_prefix::cb:
-            return decode_cb_prefixed();
-        case instruction_prefix::ed:
-            return decode_ed_prefixed();
-        }
-        unreachable("Unknown instruction prefix.");
+        return decode_unprefixed();
     }
 
     void decode() { (*this)->on_decode(); }
 
 protected:
-    class prefix_reset_guard {
-    public:
-        prefix_reset_guard(instructions_decoder *decoder)
-            : decoder(decoder)
-        {}
-
-        ~prefix_reset_guard() {
-            (*decoder)->on_prefix_reset();
-        }
-
-    private:
-        instructions_decoder *decoder;
-    };
-
     D *operator -> () { return static_cast<D*>(this); }
 
     static const fast_u8 x_mask = 0300;
@@ -718,9 +670,6 @@ public:
     void on_3t_exec_cycle() {}
     void on_4t_exec_cycle() {}
     void on_5t_exec_cycle() {}
-
-    void on_ed_prefix() { decoder::on_ed_prefix();
-                          (*this)->on_format("noni 0xed"); }
 
     void on_noni_ed(fast_u8 op) {
         (*this)->on_format("noni N, N", 0xed, op); }
@@ -2199,10 +2148,6 @@ public:
     }
 
     void initiate_int() {
-        // Interrupts can't happen in the middle of a prefixed
-        // instruction.
-        assert(decoder::get_prefix() == instruction_prefix::none);
-
         state.iff1 = false;
         state.iff2 = false;
 
