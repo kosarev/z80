@@ -43,6 +43,7 @@ void error(const char *format, ...) {
 
 using z80::fast_u8;
 using z80::fast_u16;
+using z80::fast_u32;
 using z80::least_u8;
 using z80::reg;
 
@@ -212,7 +213,7 @@ private:
 class machine : public z80::processor<machine> {
 public:
     typedef processor<machine> base;
-    typedef uint_fast32_t ticks_type;
+    typedef fast_u32 ticks_type;
 
     machine(test_input &input)
         : ticks(0), addr_bus(0), input(input)
