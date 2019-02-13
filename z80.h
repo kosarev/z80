@@ -2200,6 +2200,10 @@ public:
 
         fast_u16 pc = (*this)->on_get_pc();
 
+        // Get past the HALT instruction, if halted. Note that
+        // HALT instructions need to be executed at least once to
+        // be skipped on an interrupt, so checking if the PC is
+        // at a HALT instruction is not enough here.
         if(state.halted) {
             pc = inc16(pc);
             (*this)->on_set_pc(pc);
