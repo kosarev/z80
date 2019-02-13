@@ -116,7 +116,7 @@ fdcb014e bit 1, (iy + 1)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> iy
+ 4 set_index_rp hl -> iy
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch cb at 0001
@@ -666,7 +666,7 @@ dd6b ld ixl, e
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> ix
+ 4 set_index_rp hl -> ix
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch 6b at 0001
@@ -686,7 +686,7 @@ fd6e12 ld l, (iy + 18)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> iy
+ 4 set_index_rp hl -> iy
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch 6e at 0001
@@ -787,7 +787,7 @@ fd213a5c ld iy, 0x5c3a
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> iy
+ 4 set_index_rp hl -> iy
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch 21 at 0001
@@ -813,7 +813,7 @@ dd21d103 ld ix, 0x03d1
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> ix
+ 4 set_index_rp hl -> ix
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch 21 at 0001
@@ -1252,7 +1252,7 @@ ddcb463e srl (ix + 70)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> ix
+ 4 set_index_rp hl -> ix
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch cb at 0001
@@ -1465,7 +1465,7 @@ fdcb308e res 1, (iy + 48)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> iy
+ 4 set_index_rp hl -> iy
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch cb at 0001
@@ -1642,7 +1642,7 @@ fdcb01ce set 1, (iy + 1)
  2   get_ir_on_refresh 0000
  2   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 set_next_index_rp hl -> iy
+ 4 set_index_rp hl -> iy
  4 disable_int
  4 get_pc_on_fetch 0001
  4 m1_fetch cb at 0001

@@ -136,21 +136,14 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 enum condition { nz, z, nc, c, po, pe, p, m };
 
 struct decoder_state {
-    decoder_state()
-        : index_rp(index_regp::hl), next_index_rp(index_regp::hl)
-    {}
-
-    index_regp index_rp;
-    index_regp next_index_rp;
+    decoder_state() {}
+    index_regp index_rp = index_regp::hl;
 };
 
 template<typename D>
 class instructions_decoder {
 public:
     instructions_decoder() {}
-
-    index_regp get_index_rp_kind() const { return state.index_rp; }
-    index_regp get_next_index_rp_kind() const { return state.next_index_rp; }
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
         if(get_index_rp_kind() == index_regp::hl || !may_need_disp)
@@ -170,9 +163,10 @@ public:
 
     void on_disable_int() {}
 
-    void on_set_next_index_rp(index_regp irp) {
-        // TODO: Should we reset the prefix here?
-        state.next_index_rp = irp;
+    index_regp get_index_rp_kind() const { return state.index_rp; }
+
+    void on_set_index_rp_kind(index_regp irp) {
+        state.index_rp = irp;
         (*this)->on_disable_int();
     }
 
@@ -181,7 +175,7 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
-    void decode_unprefixed() {
+    void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
@@ -398,7 +392,8 @@ public:
             return (*this)->on_in_a_n((*this)->on_3t_imm8_read());
         case 0xdd:
             // DD prefix (IX-indexed instructions).
-            return (*this)->on_set_next_index_rp(index_regp::ix);
+            reset_index_rp = false;
+            return (*this)->on_set_index_rp_kind(index_regp::ix);
         case 0xe3:
             // EX (SP), irp
             // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
@@ -427,7 +422,8 @@ public:
             return (*this)->on_ei();
         case 0xfd:
             // FD prefix (IY-indexed instructions).
-            return (*this)->on_set_next_index_rp(index_regp::iy);
+            reset_index_rp = false;
+            return (*this)->on_set_index_rp_kind(index_regp::iy);
         }
 
         // TODO
@@ -573,10 +569,10 @@ public:
     }
 
     void on_decode() {
-        state.index_rp = state.next_index_rp;
-        state.next_index_rp = index_regp::hl;
-
-        return decode_unprefixed();
+        bool reset_index_rp = true;
+        decode_unprefixed(reset_index_rp);
+        if(reset_index_rp)
+            state.index_rp = index_regp::hl;
     }
 
     void decode() { (*this)->on_decode(); }
@@ -1233,10 +1229,6 @@ public:
 
     void disable_int() { state.int_disabled = true; }
     void on_disable_int() { disable_int(); }
-
-    void on_set_next_index_rp(index_regp irp) {
-        decoder::on_set_next_index_rp(irp);
-    }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));

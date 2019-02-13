@@ -197,7 +197,7 @@ public:
     void disassemble() {
         // Skip prefixes.
         base::disassemble();
-        while(get_next_index_rp_kind() != z80::index_regp::hl)
+        while(get_index_rp_kind() != z80::index_regp::hl)
             base::disassemble();
     }
 
@@ -643,18 +643,18 @@ public:
         base::on_disable_int();
     }
 
-    void on_set_next_index_rp(z80::index_regp irp) {
-        input.read_and_match("set_next_index_rp %s -> %s",
+    void on_set_index_rp_kind(z80::index_regp irp) {
+        input.read_and_match("set_index_rp %s -> %s",
                              static_cast<unsigned>(get_ticks()),
                              get_reg_name(get_index_rp_kind()),
                              get_reg_name(irp));
-        base::on_set_next_index_rp(irp);
+        base::on_set_index_rp_kind(irp);
     }
 
     void step() {
         // Skip prefixes.
         base::step();
-        while(get_next_index_rp_kind() != z80::index_regp::hl)
+        while(get_index_rp_kind() != z80::index_regp::hl)
             base::step();
 
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
