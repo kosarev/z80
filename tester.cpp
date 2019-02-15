@@ -96,9 +96,19 @@ public:
         --level;
     }
 
+    void reset_skipping_mode() {
+        in_skipping_mode = false;
+    }
+
     LIKE_PRINTF(2, 4)
     void read_and_match(const char *format, unsigned ticks, ...) {
-        read_line();
+        // Handle the skip directive.
+        if(!in_skipping_mode) {
+            read_line();
+            in_skipping_mode = (std::strcmp(line, "...") == 0);
+            if(in_skipping_mode)
+                read_line();
+        }
 
         char buff[max_line_size];
         va_list args;
@@ -112,8 +122,15 @@ public:
                       static_cast<unsigned>(ticks),
                       static_cast<int>(level * 2), "", buff);
 
-        if(std::strcmp(buff2, line) != 0)
-            error("mismatch: expected '%s'", buff2);
+        if(std::strcmp(buff2, line) == 0) {
+            reset_skipping_mode();
+            return;
+        }
+
+        if(in_skipping_mode)
+            return;
+
+        error("mismatch: expected '%s'", buff2);
     }
 
     void quote_line() const {
@@ -138,6 +155,7 @@ private:
     bool eof;
     unsigned long line_no;
     unsigned level;
+    bool in_skipping_mode = false;
 
     static const std::size_t max_line_size = 1024;
     char line[max_line_size];
@@ -771,6 +789,8 @@ void handle_test_entry(test_input &input) {
 
     mach.set_instr_code(instr_code, instr_size);
     mach.step();
+
+    input.reset_skipping_mode();
 }
 
 }  // anonymous namespace
