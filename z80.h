@@ -164,9 +164,10 @@ public:
     void on_disable_int() {}
 
     index_regp get_index_rp_kind() const { return state.index_rp; }
+    void set_index_rp_kind(index_regp irp) { state.index_rp = irp; }
 
     void on_set_index_rp_kind(index_regp irp) {
-        state.index_rp = irp;
+        set_index_rp_kind(irp);
         (*this)->on_disable_int();
     }
 
@@ -572,7 +573,7 @@ public:
         bool reset_index_rp = true;
         decode_unprefixed(reset_index_rp);
         if(reset_index_rp)
-            state.index_rp = index_regp::hl;
+            set_index_rp_kind(index_regp::hl);
     }
 
     void decode() { (*this)->on_decode(); }
