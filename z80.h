@@ -1487,12 +1487,12 @@ public:
         case rot::sra:
             n = (n >> 1) | (n & 0x80);
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(n & 0x01);
+                    cf_ari(t & 0x01);
             break;
         case rot::sll:
             n = mask8(n << 1) | 1;
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(n & 0x80);
+                    cf_ari(t & 0x80);
             break;
         case rot::srl:
             n >>= 1;

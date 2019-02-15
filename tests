@@ -1694,6 +1694,14 @@ cb30 sll b
  8 set_f 00 -> 00
  8 done
 
+# Test that CF is computed from the original value of the operand.
+.b=80
+cb30 sll b
+...
+ 8 set_b 80 -> 01
+ 8 set_f 00 -> 01
+ 8 done
+
 # SRA r
 cb28 sra b
  0 get_pc_on_fetch 0000
@@ -1714,11 +1722,12 @@ cb28 sra b
  8 set_f 00 -> 44
  8 done
 
-.b=12
-.c=34
+# Test that CF is computed from the original value of the operand.
+.b=01
 cb28 sra b
 ...
- 8 set_f 00 -> 0d
+ 8 set_b 01 -> 00
+ 8 set_f 00 -> 45
  8 done
 
 # SUB r
