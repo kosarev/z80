@@ -123,7 +123,7 @@ public:
     }
 
     [[noreturn]] LIKE_PRINTF(2, 3)
-    void error(const char *format, ...) {
+    void error(const char *format, ...) const {
         quote_line();
 
         va_list args;
@@ -703,11 +703,45 @@ void skip_whitespace(const char *&p) {
         ++p;
 }
 
+bool parse(const char *&p, const char *str) {
+    const char *t = p;
+    while(*str) {
+        if(*t != *str)
+            return false;
+
+        ++t;
+        ++str;
+    }
+
+    p = t;
+    return true;
+}
+
+void handle_directive(const test_input &input, machine &mach) {
+    const char *p = input.get_line();
+    if(parse(p, ".b=")) {
+        fast_u8 n;
+        if(!parse_u8(p, n) || *p != '\0')
+            input.error("malformed directive");
+        mach.set_b(n);
+        return;
+    }
+
+    input.error("unknown directive");
+}
+
 void handle_test_entry(test_input &input) {
+    // Handle directives.
+    machine mach(input);
+    const char *p = input.get_line();
+    while(*p == '.') {
+        handle_directive(input, mach);
+        p = input.read_line();
+    }
+
     // Parse instruction bytes.
     least_u8 instr_code[max_instr_size];
     unsigned instr_size = 0;
-    const char *p = input.get_line();
     fast_u8 instr_byte;
     while(parse_u8(p, instr_byte)) {
         if(instr_size == max_instr_size)
@@ -727,7 +761,6 @@ void handle_test_entry(test_input &input) {
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     instr, p);
 
-    machine mach(input);
     mach.set_instr_code(instr_code, instr_size);
     mach.step();
 }
