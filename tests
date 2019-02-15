@@ -1715,6 +1715,7 @@ cb28 sra b
  8 done
 
 .b=12
+.c=34
 cb28 sra b
  0 get_pc_on_fetch 0000
  0 m1_fetch cb at 0000

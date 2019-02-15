@@ -717,15 +717,23 @@ bool parse(const char *&p, const char *str) {
     return true;
 }
 
-void handle_directive(const test_input &input, machine &mach) {
+bool parse_set_r_directive(const char *r, fast_u8 &n,
+                           const test_input &input) {
     const char *p = input.get_line();
-    if(parse(p, ".b=")) {
-        fast_u8 n;
-        if(!parse_u8(p, n) || *p != '\0')
-            input.error("malformed directive");
-        mach.set_b(n);
-        return;
-    }
+    if(*p++ != '.' || !parse(p, r) || !parse(p, "="))
+        return false;
+
+    if(!parse_u8(p, n) || *p != '\0')
+        input.error("malformed operand");
+    return true;
+}
+
+void handle_directive(const test_input &input, machine &mach) {
+    fast_u8 n;
+    if(parse_set_r_directive("b", n, input))
+        return mach.set_b(n);
+    if(parse_set_r_directive("c", n, input))
+        return mach.set_c(n);
 
     input.error("unknown directive");
 }
