@@ -133,6 +133,13 @@ public:
         error("mismatch: expected '%s'", buff2);
     }
 
+    void handle_end_of_test_entry() {
+        if(in_skipping_mode && *line != '\0')
+            error("this line is expected, but not found");
+
+        reset_skipping_mode();
+    }
+
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
@@ -790,7 +797,7 @@ void handle_test_entry(test_input &input) {
     mach.set_instr_code(instr_code, instr_size);
     mach.step();
 
-    input.reset_skipping_mode();
+    input.handle_end_of_test_entry();
 }
 
 }  // anonymous namespace
