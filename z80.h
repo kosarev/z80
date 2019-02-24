@@ -2230,7 +2230,7 @@ public:
             fast_u16 vector_addr = make16((*this)->on_get_i(), 0xff);
             fast_u8 lo = (*this)->on_3t_read_cycle(vector_addr);
             fast_u8 hi = (*this)->on_3t_read_cycle(inc16(vector_addr));
-            isr_addr = make16(lo, hi); }
+            isr_addr = make16(hi, lo); }
             break;
         default:
             unreachable("Unknown interrupts mode.");
