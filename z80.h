@@ -1228,6 +1228,8 @@ public:
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
+    bool is_int_disabled() const { return state.int_disabled; }
+
     void disable_int() { state.int_disabled = true; }
     void on_disable_int() { disable_int(); }
 
