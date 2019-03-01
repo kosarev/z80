@@ -162,13 +162,14 @@ public:
     }
 
     void on_disable_int() {}
+    void disable_int_on_index_prefix() { (*this)->on_disable_int(); }
 
     index_regp get_index_rp_kind() const { return state.index_rp; }
     void set_index_rp_kind(index_regp irp) { state.index_rp = irp; }
 
     void on_set_index_rp_kind(index_regp irp) {
         set_index_rp_kind(irp);
-        (*this)->on_disable_int();
+        (*this)->disable_int_on_index_prefix();
     }
 
     unsigned decode_int_mode(fast_u8 y) {
@@ -1232,6 +1233,7 @@ public:
 
     void disable_int() { state.int_disabled = true; }
     void on_disable_int() { disable_int(); }
+    void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -1777,7 +1779,7 @@ public:
     void on_ei() {
         (*this)->set_iff1_on_ei(true);
         (*this)->set_iff2_on_ei(true);
-        (*this)->on_disable_int(); }
+        (*this)->disable_int_on_ei(); }
     void on_ex_af_alt_af() {
         state.ex_af_alt_af(); }
     void on_ex_de_hl() {
