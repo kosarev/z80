@@ -2148,9 +2148,11 @@ public:
     }
 
     fast_u8 on_input_cycle(fast_u16 addr) {
+        // Z80 samples the value at t4 of the input cycle, see
+        // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
+        (*this)->tick(4);
         // TODO: Shall we set the address bus here?
         fast_u8 n = (*this)->on_input(addr);
-        (*this)->tick(4);
         return n;
     }
 
