@@ -364,6 +364,13 @@ public:
     void on_set_i(fast_u8 i) { match_set_r("i", get_i(), i);
                                return base::on_set_a(i); }
 
+#if 0  // TODO
+    fast_u8 on_get_r_reg() { match_get_r("r", get_r_reg());
+                             return base::on_get_r_reg(); }
+#endif
+    void on_set_r_reg(fast_u8 r) { match_set_r("r", get_r_reg(), r);
+                                   return base::on_set_r_reg(r); }
+
     fast_u16 on_get_sp() { match_get_rp("sp", get_sp());
                            return base::on_get_sp(); }
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", get_sp(), sp);
