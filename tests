@@ -1,4 +1,13 @@
 
+#   Z80 CPU Simulator.
+#   https://github.com/kosarev/z80
+#
+#   Copyright (C) 2017-2019 Ivan Kosarev.
+#   ivan@kosarev.info
+#
+#   Published under the MIT license.
+
+
 # ADD r
 87 add a, a
  0 get_pc_on_fetch 0000
