@@ -1095,8 +1095,8 @@ protected:
     }
 };
 
-template<typename D>
-class processor : public instructions_decoder<D, processor_state>,
+template<typename D, typename S = processor_state>
+class processor : public instructions_decoder<D, S>,
                   public processor_base {
 public:
     typedef instructions_decoder<D> decoder;
