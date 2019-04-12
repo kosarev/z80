@@ -873,13 +873,7 @@ protected:
 };
 
 struct processor_state {
-    processor_state()
-        : last_read_addr(0),
-          bc(0), de(0), hl(0), af(0), ix(0), iy(0),
-          alt_bc(0), alt_de(0), alt_hl(0), alt_af(0),
-          pc(0), sp(0), ir(0), memptr(0),
-          iff1(false), iff2(false), halted(false), int_mode(0)
-    {}
+    processor_state() {}
 
     void ex_af_alt_af() {
         std::swap(af, alt_af);
@@ -895,13 +889,13 @@ struct processor_state {
         std::swap(hl, alt_hl);
     }
 
-    fast_u16 last_read_addr;
+    fast_u16 last_read_addr = 0;
     bool int_disabled = false;
-    fast_u16 bc, de, hl, af, ix, iy;
-    fast_u16 alt_bc, alt_de, alt_hl, alt_af;
-    fast_u16 pc, sp, ir, memptr;
-    bool iff1, iff2, halted;
-    unsigned int_mode;
+    fast_u16 bc = 0, de = 0, hl = 0, af = 0, ix = 0, iy = 0;
+    fast_u16 alt_bc = 0, alt_de = 0, alt_hl = 0, alt_af = 0;
+    fast_u16 pc = 0, sp = 0, ir = 0, memptr = 0;
+    bool iff1 = false, iff2 = false, halted = false;
+    unsigned int_mode = 0;
 };
 
 class processor_base {
