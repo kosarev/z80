@@ -83,7 +83,7 @@ static inline constexpr fast_u8 ror8(fast_u8 n) {
 }
 
 static inline constexpr fast_u8 neg8(fast_u8 n) {
-    return mask8((n ^ 0xff) + 1);
+    return mask8(~n + 1);
 }
 
 static inline constexpr fast_u8 abs8(fast_u8 n) {
@@ -91,8 +91,8 @@ static inline constexpr fast_u8 abs8(fast_u8 n) {
 }
 
 static inline constexpr int sign_extend8(fast_u8 n) {
-    return !get_sign8(n) ? static_cast<int>(abs8(n)) :
-                           -static_cast<int>(abs8(n));
+    return !get_sign8(n) ? static_cast<int>(n) :
+                           -static_cast<int>(neg8(n));
 }
 
 static inline constexpr fast_u8 get_low8(fast_u16 n) {
