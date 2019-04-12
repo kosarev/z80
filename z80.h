@@ -136,9 +136,9 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
 
-class decoder_state {
+class z80_decoder_state {
 public:
-    decoder_state() {}
+    z80_decoder_state() {}
 
     index_regp get_index_rp_kind() const { return index_rp; }
     void set_index_rp_kind(index_regp irp) { index_rp = irp; }
@@ -151,7 +151,7 @@ private:
     index_regp index_rp = index_regp::hl;
 };
 
-template<typename D, typename S = decoder_state>
+template<typename D, typename S = z80_decoder_state>
 class instructions_decoder : public S {
 public:
     instructions_decoder() {}
@@ -869,7 +869,7 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-class processor_state : public decoder_state {
+class processor_state : public z80_decoder_state {
 public:
     processor_state() {}
 
