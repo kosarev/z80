@@ -136,6 +136,9 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
 
+class i8080_decoder_state
+{};
+
 class z80_decoder_state {
 public:
     z80_decoder_state() {}
