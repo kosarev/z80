@@ -606,9 +606,6 @@ protected:
     fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
 
     static const fast_u8 q_mask = 0010;
-
-private:
-    decoder_state state;
 };
 
 const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
