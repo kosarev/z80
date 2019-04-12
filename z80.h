@@ -869,8 +869,137 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-struct processor_state {
+class processor_state : public decoder_state {
+public:
     processor_state() {}
+
+    fast_u8 get_b() const { return get_high8(bc); }
+    void set_b(fast_u8 b) { bc = make16(b, get_c()); }
+
+    fast_u8 get_c() const { return get_low8(bc); }
+    void set_c(fast_u8 c) { bc = make16(get_b(), c); }
+
+    fast_u8 get_d() const { return get_high8(de); }
+    void set_d(fast_u8 d) { de = make16(d, get_e()); }
+
+    fast_u8 get_e() const { return get_low8(de); }
+    void set_e(fast_u8 e) { de = make16(get_d(), e); }
+
+    fast_u8 get_h() const { return get_high8(hl); }
+    void set_h(fast_u8 h) { hl = make16(h, get_l()); }
+
+    fast_u8 get_l() const { return get_low8(hl); }
+    void set_l(fast_u8 l) { hl = make16(get_h(), l); }
+
+    fast_u8 get_a() const { return get_high8(af); }
+    void set_a(fast_u8 a) { af = make16(a, get_f()); }
+
+    fast_u8 get_f() const { return get_low8(af); }
+    void set_f(fast_u8 f) { af = make16(get_a(), f); }
+
+    fast_u8 get_ixh() const { return get_high8(ix); }
+    void set_ixh(fast_u8 ixh) { ix = make16(ixh, get_ixl()); }
+
+    fast_u8 get_ixl() const { return get_low8(ix); }
+    void set_ixl(fast_u8 ixl) { ix = make16(get_ixh(), ixl); }
+
+    fast_u8 get_iyh() const { return get_high8(iy); }
+    void set_iyh(fast_u8 iyh) { iy = make16(iyh, get_iyl()); }
+
+    fast_u8 get_iyl() const { return get_low8(iy); }
+    void set_iyl(fast_u8 iyl) { iy = make16(get_iyh(), iyl); }
+
+    fast_u8 get_i() const { return get_high8(ir); }
+    void set_i(fast_u8 i) { ir = make16(i, get_r_reg()); }
+
+    fast_u8 get_r_reg() const { return get_low8(ir); }
+    void set_r_reg(fast_u8 r) { ir = make16(get_i(), r); }
+
+    fast_u16 get_af() const { return af; }
+    void set_af(fast_u16 n) { af = n; }
+
+    fast_u16 get_alt_af() const { return alt_af; }
+    void set_alt_af(fast_u16 n) { alt_af = n; }
+
+    fast_u16 get_hl() const { return hl; }
+    void set_hl(fast_u16 n) { hl = n; }
+
+    fast_u16 get_alt_hl() const { return alt_hl; }
+    void set_alt_hl(fast_u16 n) { alt_hl = n; }
+
+    fast_u16 get_bc() const { return bc; }
+    void set_bc(fast_u16 n) { bc = n; }
+
+    fast_u16 get_alt_bc() const { return alt_bc; }
+    void set_alt_bc(fast_u16 n) { alt_bc = n; }
+
+    fast_u16 get_de() const { return de; }
+    void set_de(fast_u16 n) { de = n; }
+
+    fast_u16 get_alt_de() const { return alt_de; }
+    void set_alt_de(fast_u16 n) { alt_de = n; }
+
+    fast_u16 get_ix() const { return ix; }
+    void set_ix(fast_u16 n) { ix = n; }
+
+    fast_u16 get_iy() const { return iy; }
+    void set_iy(fast_u16 n) { iy = n; }
+
+    fast_u16 get_sp() const { return sp; }
+    void set_sp(fast_u16 n) { sp = n; }
+
+    fast_u16 get_pc() const { return pc; }
+    void set_pc(fast_u16 n) { pc = n; }
+
+    fast_u16 get_ir() const { return ir; }
+    void set_ir(fast_u16 n) { ir = n; }
+
+    fast_u16 get_memptr() const { return memptr; }
+    void set_memptr(fast_u16 n) { memptr = n; }
+
+    bool get_iff1() const { return iff1; }
+    void set_iff1(bool iff) { iff1 = iff; }
+
+    bool get_iff2() const { return iff2; }
+    void set_iff2(bool iff) { iff2 = iff; }
+
+    unsigned get_int_mode() const { return int_mode; }
+    void set_int_mode(unsigned mode) { int_mode = mode; }
+
+    bool is_int_disabled() const { return int_disabled; }
+    void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
+    void enable_int() { set_is_int_disabled(false); }
+    void disable_int() { set_is_int_disabled(true); }
+
+    fast_u8 get_r(reg r) {
+        switch(r) {
+        case reg::b: return get_b();
+        case reg::c: return get_c();
+        case reg::d: return get_d();
+        case reg::e: return get_e();
+        case reg::h: return get_h();
+        case reg::l: return get_l();
+        case reg::at_hl: unreachable("Can't get (HL) value.");
+        case reg::a: return get_a();
+        }
+        unreachable("Unknown register.");
+    }
+
+    fast_u16 get_index_rp(index_regp irp) {
+        switch(irp) {
+        case index_regp::hl: return get_hl();
+        case index_regp::ix: return get_ix();
+        case index_regp::iy: return get_iy();
+        }
+        unreachable("Unknown index register.");
+    }
+
+    fast_u16 get_last_read_addr() const { return last_read_addr; }
+    void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
+
+    bool is_halted() const { return halted; }
+    void set_is_halted(bool is_halted) { halted = is_halted; }
+    void halt() { set_is_halted(true); }
 
     void ex_af_alt_af() {
         std::swap(af, alt_af);
@@ -886,6 +1015,7 @@ struct processor_state {
         std::swap(hl, alt_hl);
     }
 
+private:
     fast_u16 last_read_addr = 0;
     bool int_disabled = false;
     fast_u16 bc = 0, de = 0, hl = 0, af = 0, ix = 0, iy = 0;
@@ -963,103 +1093,59 @@ protected:
     fast_u8 cf_ari(bool c) {
         return c ? cf_mask : 0;
     }
-
-    processor_state state;
 };
 
 template<typename D>
-class processor : public instructions_decoder<D>,
+class processor : public instructions_decoder<D, processor_state>,
                   public processor_base {
 public:
     typedef instructions_decoder<D> decoder;
 
     processor() {}
 
-    fast_u8 get_b() const { return get_high8(state.bc); }
-    void set_b(fast_u8 b) { state.bc = make16(b, get_c()); }
+    fast_u8 on_get_b() const { return this->get_b(); }
+    void on_set_b(fast_u8 b) { this->set_b(b); }
 
-    fast_u8 on_get_b() const { return get_b(); }
-    void on_set_b(fast_u8 b) { set_b(b); }
+    fast_u8 on_get_c() const { return this->get_c(); }
+    void on_set_c(fast_u8 c) { this->set_c(c); }
 
-    fast_u8 get_c() const { return get_low8(state.bc); }
-    void set_c(fast_u8 c) { state.bc = make16(get_b(), c); }
+    fast_u8 on_get_d() const { return this->get_d(); }
+    void on_set_d(fast_u8 d) { this->set_d(d); }
 
-    fast_u8 on_get_c() const { return get_c(); }
-    void on_set_c(fast_u8 c) { set_c(c); }
+    fast_u8 on_get_e() const { return this->get_e(); }
+    void on_set_e(fast_u8 e) { this->set_e(e); }
 
-    fast_u8 get_d() const { return get_high8(state.de); }
-    void set_d(fast_u8 d) { state.de = make16(d, get_e()); }
+    fast_u8 on_get_h() const { return this->get_h(); }
+    void on_set_h(fast_u8 h) { this->set_h(h); }
 
-    fast_u8 on_get_d() const { return get_d(); }
-    void on_set_d(fast_u8 d) { set_d(d); }
+    fast_u8 on_get_l() const { return this->get_l(); }
+    void on_set_l(fast_u8 l) { this->set_l(l); }
 
-    fast_u8 get_e() const { return get_low8(state.de); }
-    void set_e(fast_u8 e) { state.de = make16(get_d(), e); }
+    fast_u8 on_get_a() const { return this->get_a(); }
+    void on_set_a(fast_u8 a) { this->set_a(a); }
 
-    fast_u8 on_get_e() const { return get_e(); }
-    void on_set_e(fast_u8 e) { set_e(e); }
+    fast_u8 on_get_f() const { return this->get_f(); }
+    void on_set_f(fast_u8 f) { this->set_f(f); }
 
-    fast_u8 get_h() const { return get_high8(state.hl); }
-    void set_h(fast_u8 h) { state.hl = make16(h, get_l()); }
+    fast_u8 on_get_ixh() const { return this->get_ixh(); }
+    void on_set_ixh(fast_u8 ixh) { this->set_ixh(ixh); }
 
-    fast_u8 on_get_h() const { return get_h(); }
-    void on_set_h(fast_u8 h) { set_h(h); }
+    fast_u8 on_get_ixl() const { return this->get_ixl(); }
+    void on_set_ixl(fast_u8 ixl) { this->set_ixl(ixl); }
 
-    fast_u8 get_l() const { return get_low8(state.hl); }
-    void set_l(fast_u8 l) { state.hl = make16(get_h(), l); }
+    fast_u8 on_get_iyh() const { return this->get_iyh(); }
+    void on_set_iyh(fast_u8 iyh) { this->set_iyh(iyh); }
 
-    fast_u8 on_get_l() const { return get_l(); }
-    void on_set_l(fast_u8 l) { set_l(l); }
+    fast_u8 on_get_iyl() const { return this->get_iyl(); }
+    void on_set_iyl(fast_u8 iyl) { this->set_iyl(iyl); }
 
-    fast_u8 get_a() const { return get_high8(state.af); }
-    void set_a(fast_u8 a) { state.af = make16(a, get_f()); }
-
-    fast_u8 on_get_a() const { return get_a(); }
-    void on_set_a(fast_u8 a) { set_a(a); }
-
-    fast_u8 get_f() const { return get_low8(state.af); }
-    void set_f(fast_u8 f) { state.af = make16(get_a(), f); }
-
-    fast_u8 on_get_f() const { return get_f(); }
-    void on_set_f(fast_u8 f) { set_f(f); }
-
-    fast_u8 get_ixh() const { return get_high8(state.ix); }
-    void set_ixh(fast_u8 ixh) { state.ix = make16(ixh, get_ixl()); }
-
-    fast_u8 on_get_ixh() const { return get_ixh(); }
-    void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
-
-    fast_u8 get_ixl() const { return get_low8(state.ix); }
-    void set_ixl(fast_u8 ixl) { state.ix = make16(get_ixh(), ixl); }
-
-    fast_u8 on_get_ixl() const { return get_ixl(); }
-    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
-
-    fast_u8 get_iyh() const { return get_high8(state.iy); }
-    void set_iyh(fast_u8 iyh) { state.iy = make16(iyh, get_iyl()); }
-
-    fast_u8 on_get_iyh() const { return get_iyh(); }
-    void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
-
-    fast_u8 get_iyl() const { return get_low8(state.iy); }
-    void set_iyl(fast_u8 iyl) { state.iy = make16(get_iyh(), iyl); }
-
-    fast_u8 on_get_iyl() const { return get_iyl(); }
-    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
-
-    fast_u8 get_i() const { return get_high8(state.ir); }
-    void set_i(fast_u8 i) { state.ir = make16(i, get_r_reg()); }
-
-    fast_u8 on_get_i() const { return get_i(); }
-    void on_set_i(fast_u8 i) { set_i(i); }
+    fast_u8 on_get_i() const { return this->get_i(); }
+    void on_set_i(fast_u8 i) { this->set_i(i); }
 
     void set_i_on_ld(fast_u8 i) { (*this)->on_set_i(i); }
 
-    fast_u8 get_r_reg() const { return get_low8(state.ir); }
-    void set_r_reg(fast_u8 r) { state.ir = make16(get_i(), r); }
-
-    fast_u8 on_get_r_reg() const { return get_r_reg(); }
-    void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
+    fast_u8 on_get_r_reg() const { return this->get_r_reg(); }
+    void on_set_r_reg(fast_u8 r) { this->set_r_reg(r); }
 
     void on_inc_r_reg() {
         // TODO: Consider splitting R into R[7] and R[6:0].
@@ -1067,12 +1153,6 @@ public:
         r = (r & 0x80) | (inc8(r) & 0x7f);
         (*this)->set_r_reg(r);
     }
-
-    fast_u16 get_af() const { return state.af; }
-    void set_af(fast_u16 af) { state.af = af; }
-
-    fast_u16 get_alt_af() const { return state.alt_af; }
-    void set_alt_af(fast_u16 alt_af) { state.alt_af = alt_af; }
 
     fast_u16 on_get_af() {
         // Always get the low byte first.
@@ -1084,12 +1164,6 @@ public:
         (*this)->on_set_f(get_low8(af));
         (*this)->on_set_a(get_high8(af)); }
 
-    fast_u16 get_hl() const { return state.hl; }
-    void set_hl(fast_u16 hl) { state.hl = hl; }
-
-    fast_u16 get_alt_hl() const { return state.alt_hl; }
-    void set_alt_hl(fast_u16 alt_hl) { state.alt_hl = alt_hl; }
-
     fast_u16 on_get_hl() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_l();
@@ -1099,12 +1173,6 @@ public:
         // Always set the low byte first.
         (*this)->on_set_l(get_low8(hl));
         (*this)->on_set_h(get_high8(hl)); }
-
-    fast_u16 get_bc() const { return state.bc; }
-    void set_bc(fast_u16 bc) { state.bc = bc; }
-
-    fast_u16 get_alt_bc() const { return state.alt_bc; }
-    void set_alt_bc(fast_u16 alt_bc) { state.alt_bc = alt_bc; }
 
     fast_u16 on_get_bc() {
         // Always get the low byte first.
@@ -1116,12 +1184,6 @@ public:
         (*this)->on_set_c(get_low8(bc));
         (*this)->on_set_b(get_high8(bc)); }
 
-    fast_u16 get_de() const { return state.de; }
-    void set_de(fast_u16 de) { state.de = de; }
-
-    fast_u16 get_alt_de() const { return state.alt_de; }
-    void set_alt_de(fast_u16 alt_de) { state.alt_de = alt_de; }
-
     fast_u16 on_get_de() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_e();
@@ -1131,9 +1193,6 @@ public:
         // Always set the low byte first.
         (*this)->on_set_e(get_low8(de));
         (*this)->on_set_d(get_high8(de)); }
-
-    fast_u16 get_ix() const { return state.ix; }
-    void set_ix(fast_u16 ix) { state.ix = ix; }
 
     fast_u16 on_get_ix() {
         // Always get the low byte first.
@@ -1145,9 +1204,6 @@ public:
         (*this)->on_set_ixl(get_low8(ix));
         (*this)->on_set_ixh(get_high8(ix)); }
 
-    fast_u16 get_iy() const { return state.iy; }
-    void set_iy(fast_u16 iy) { state.iy = iy; }
-
     fast_u16 on_get_iy() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_iyl();
@@ -1158,17 +1214,11 @@ public:
         (*this)->on_set_iyl(get_low8(iy));
         (*this)->on_set_iyh(get_high8(iy)); }
 
-    fast_u16 get_sp() const { return state.sp; }
-    void set_sp(fast_u16 sp) { state.sp = sp; }
+    fast_u16 on_get_sp() { return this->get_sp(); }
+    void on_set_sp(fast_u16 sp) { this->set_sp(sp); }
 
-    fast_u16 on_get_sp() { return get_sp(); }
-    void on_set_sp(fast_u16 sp) { set_sp(sp); }
-
-    fast_u16 get_pc() const { return state.pc; }
-    void set_pc(fast_u16 pc) { state.pc = pc; }
-
-    fast_u16 on_get_pc() const { return get_pc(); }
-    void on_set_pc(fast_u16 pc) { set_pc(pc); }
+    fast_u16 on_get_pc() const { return this->get_pc(); }
+    void on_set_pc(fast_u16 pc) { this->set_pc(pc); }
 
     fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
@@ -1194,50 +1244,32 @@ public:
     fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
     void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
-    fast_u16 get_ir() const { return state.ir; }
-    void set_ir(fast_u16 ir) { state.ir = ir; }
-
     fast_u16 on_get_ir() const { return (*this)->get_ir(); }
 
     fast_u16 get_ir_on_refresh() const { return (*this)->on_get_ir(); }
 
-    fast_u16 get_memptr() const { return state.memptr; }
-    void set_memptr(fast_u16 memptr) { state.memptr = memptr; }
+    fast_u16 on_get_memptr() const { return this->get_memptr(); }
+    void on_set_memptr(fast_u16 memptr) { this->set_memptr(memptr); }
 
-    fast_u16 on_get_memptr() const { return get_memptr(); }
-    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
-
-    bool get_iff1() const { return state.iff1; }
-    void set_iff1(bool iff1) { state.iff1 = iff1; }
-
-    bool on_get_iff1() const { return get_iff1(); }
-    void on_set_iff1(bool iff1) { set_iff1(iff1); }
+    bool on_get_iff1() const { return this->get_iff1(); }
+    void on_set_iff1(bool iff1) { this->set_iff1(iff1); }
 
     void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
     void set_iff1_on_ei(bool iff1) { (*this)->on_set_iff1(iff1); }
     void set_iff1_on_retn(bool iff1) { (*this)->on_set_iff1(iff1); }
 
-    bool get_iff2() const { return state.iff2; }
-    void set_iff2(bool iff2) { state.iff2 = iff2; }
-
-    bool on_get_iff2() const { return get_iff2(); }
-    void on_set_iff2(bool iff2) { set_iff2(iff2); }
+    bool on_get_iff2() const { return this->get_iff2(); }
+    void on_set_iff2(bool iff2) { this->set_iff2(iff2); }
 
     void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
     void set_iff2_on_ei(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     bool get_iff2_on_retn() const { return (*this)->on_get_iff2(); }
 
-    unsigned get_int_mode() const { return state.int_mode; }
-    void set_int_mode(unsigned mode) { state.int_mode = mode; }
+    bool on_get_int_mode() const { return this->get_int_mode(); }
+    void on_set_int_mode(unsigned mode) { this->set_int_mode(mode); }
 
-    bool on_get_int_mode() const { return get_int_mode(); }
-    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
-
-    bool is_int_disabled() const { return state.int_disabled; }
-
-    void disable_int() { state.int_disabled = true; }
-    void on_disable_int() { disable_int(); }
+    void on_disable_int() { this->disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
@@ -1258,20 +1290,6 @@ public:
         (*this)->on_3t_write_cycle(addr, n);
         if(!this->is_index_rp_hl())
             (*this)->on_set_memptr(addr);
-    }
-
-    fast_u8 get_r(reg r) {
-        switch(r) {
-        case reg::b: return get_b();
-        case reg::c: return get_c();
-        case reg::d: return get_d();
-        case reg::e: return get_e();
-        case reg::h: return get_h();
-        case reg::l: return get_l();
-        case reg::at_hl: return (*this)->on_read_access(get_hl());
-        case reg::a: return get_a();
-        }
-        unreachable("Unknown register.");
     }
 
     fast_u8 on_get_r(reg r, index_regp irp, fast_u8 d = 0,
@@ -1367,15 +1385,6 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 get_index_rp(index_regp irp) {
-        switch(irp) {
-        case index_regp::hl: return get_hl();
-        case index_regp::ix: return get_ix();
-        case index_regp::iy: return get_iy();
-        }
-        unreachable("Unknown index register.");
-    }
-
     fast_u16 on_get_index_rp() {
         switch(this->get_index_rp_kind()) {
         case index_regp::hl: return (*this)->on_get_hl();
@@ -1393,8 +1402,6 @@ public:
         }
         unreachable("Unknown index register.");
     }
-
-    fast_u16 get_last_read_addr() const { return state.last_read_addr; }
 
     void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
@@ -1786,9 +1793,9 @@ public:
         (*this)->set_iff2_on_ei(true);
         (*this)->disable_int_on_ei(); }
     void on_ex_af_alt_af() {
-        state.ex_af_alt_af(); }
+        this->ex_af_alt_af(); }
     void on_ex_de_hl() {
-        state.ex_de_hl(); }
+        this->ex_de_hl(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = (*this)->on_get_sp();
         fast_u8 lo = (*this)->on_3t_read_cycle(sp);
@@ -1803,9 +1810,9 @@ public:
         (*this)->on_set_memptr(irp);
         (*this)->on_set_index_rp(irp); }
     void on_exx() {
-        state.exx(); }
+        this->exx(); }
     void on_halt() {
-        state.halted = true;
+        this->halt();
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
@@ -1854,7 +1861,7 @@ public:
         fast_u8 n = (*this)->on_get_r_reg();
         fast_u8 f = (*this)->on_get_f();
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
-                ((state.iff2 ? 1u : 0u) << pf_bit);
+                ((this->get_iff2() ? 1u : 0u) << pf_bit);
         (*this)->on_set_a(n);
         (*this)->on_set_f(f); }
     void on_ld_r_a() {
@@ -2091,7 +2098,7 @@ public:
         if(m1)
             (*this)->on_inc_r_reg();
         (*this)->tick(2);
-        state.last_read_addr = addr;
+        this->set_last_read_addr(addr);
         return b;
     }
 
@@ -2107,7 +2114,7 @@ public:
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(ticks);
-        state.last_read_addr = addr;
+        this->set_last_read_addr(addr);
         return b;
     }
 
@@ -2208,8 +2215,8 @@ public:
     }
 
     void initiate_int() {
-        state.iff1 = false;
-        state.iff2 = false;
+        this->set_iff1(false);
+        this->set_iff2(false);
 
         fast_u16 pc = (*this)->on_get_pc();
 
@@ -2217,10 +2224,10 @@ public:
         // HALT instructions need to be executed at least once to
         // be skipped on an interrupt, so checking if the PC is
         // at a HALT instruction is not enough here.
-        if(state.halted) {
+        if(this->is_halted()) {
             pc = inc16(pc);
             (*this)->on_set_pc(pc);
-            state.halted = false;
+            this->set_is_halted(false);
         }
 
         (*this)->on_inc_r_reg();
@@ -2228,7 +2235,7 @@ public:
         (*this)->on_push(pc);
 
         fast_u16 isr_addr;
-        switch(state.int_mode) {
+        switch(this->get_int_mode()) {
         case 0:
             isr_addr = 0;
             assert(0);  // TODO
@@ -2252,7 +2259,7 @@ public:
     }
 
     bool handle_active_int() {
-        if(!state.int_disabled && state.iff1) {
+        if(!this->is_int_disabled() && this->get_iff1()) {
             initiate_int();
             return true;
         }
@@ -2260,7 +2267,7 @@ public:
     }
 
     void on_step() {
-        state.int_disabled = false;
+        this->enable_int();
         (*this)->decode();
     }
 
