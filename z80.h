@@ -155,9 +155,9 @@ private:
 };
 
 template<typename D, typename S = z80_decoder_state>
-class instructions_decoder : public S {
+class z80_decoder : public S {
 public:
-    instructions_decoder() {}
+    z80_decoder() {}
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
         if(this->is_index_rp_hl() || !may_need_disp)
@@ -644,10 +644,10 @@ public:
 };
 
 template<typename D>
-class disassembler : public instructions_decoder<D>,
+class disassembler : public z80_decoder<D>,
                      public disassembler_base {
 public:
-    typedef instructions_decoder<D> decoder;
+    typedef z80_decoder<D> decoder;
 
     disassembler() {}
 
@@ -1099,10 +1099,10 @@ protected:
 };
 
 template<typename D, typename S = processor_state>
-class processor : public instructions_decoder<D, S>,
+class processor : public z80_decoder<D, S>,
                   public processor_base {
 public:
-    typedef instructions_decoder<D> decoder;
+    typedef z80_decoder<D> decoder;
 
     processor() {}
 
