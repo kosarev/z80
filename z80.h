@@ -205,6 +205,10 @@ protected:
     static const fast_u8 q_mask = 0010;
 };
 
+template<typename D, typename S = i8080_decoder_state>
+class i8080_decoder : public decoder_base<D, S>
+{};
+
 template<typename D, typename S = z80_decoder_state>
 class z80_decoder : public decoder_base<D, S> {
 public:
