@@ -939,9 +939,9 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-class processor_state : public z80_decoder_state {
+class z80_state : public z80_decoder_state {
 public:
-    processor_state() {}
+    z80_state() {}
 
     fast_u8 get_b() const { return get_high8(bc); }
     void set_b(fast_u8 b) { bc = make16(b, get_c()); }
@@ -1165,7 +1165,7 @@ protected:
     }
 };
 
-template<typename D, typename S = processor_state>
+template<typename D, typename S = z80_state>
 class processor : public z80_decoder<D, S>,
                   public processor_base {
 public:
