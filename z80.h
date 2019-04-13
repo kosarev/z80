@@ -1187,6 +1187,10 @@ protected:
 };
 
 template<typename D>
+class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>>
+{};
+
+template<typename D>
 class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
 public:
     typedef z80_state state;
