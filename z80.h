@@ -989,6 +989,9 @@ private:
     fast_u16 bc = 0, de = 0, hl = 0, af = 0;
 };
 
+class i8080_state : public processor_state_base<i8080_decoder_state>
+{};
+
 class z80_state : public processor_state_base<z80_decoder_state> {
 public:
     z80_state() {}
