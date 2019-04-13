@@ -154,13 +154,54 @@ private:
     index_regp index_rp = index_regp::hl;
 };
 
-template<typename D, typename S = z80_decoder_state>
-class z80_decoder : public S {
+template<typename D, typename S>
+class decoder_base : public S {
 public:
+    decoder_base() {}
+
+    void decode_in_base(bool &handled, fast_u8 op) {
+        handled = true;
+
+        fast_u8 y = get_y_part(op);
+        fast_u8 z = get_z_part(op);
+        fast_u8 p = get_p_part(op);
+
+        unused(y, z, p);
+
+        handled = false;
+    }
+
+protected:
+    static const fast_u8 x_mask = 0300;
+
+    static const fast_u8 y_mask = 0070;
+    fast_u8 get_y_part(fast_u8 op) { return (op & y_mask) >> 3; }
+
+    static const fast_u8 z_mask = 0007;
+    fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
+
+    static const fast_u8 p_mask = 0060;
+    fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
+
+    static const fast_u8 q_mask = 0010;
+};
+
+template<typename D, typename S = z80_decoder_state>
+class z80_decoder : public decoder_base<D, S> {
+public:
+    typedef S state;
+    typedef decoder_base<D, S> base;
+
     z80_decoder() {}
 
+    using state::get_index_rp_kind;
+    using state::set_index_rp_kind;
+    using state::is_index_rp_hl;
+
+    using base::decode_in_base;
+
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(this->is_index_rp_hl() || !may_need_disp)
+        if(is_index_rp_hl() || !may_need_disp)
             return 0;
         fast_u8 d = (*this)->on_disp_read();
         (*this)->on_5t_exec_cycle();
@@ -179,7 +220,7 @@ public:
     void disable_int_on_index_prefix() { (*this)->on_disable_int(); }
 
     void on_set_index_rp_kind(index_regp irp) {
-        this->set_index_rp_kind(irp);
+        set_index_rp_kind(irp);
         (*this)->disable_int_on_index_prefix();
     }
 
@@ -193,6 +234,14 @@ public:
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
+
+        // TODO
+        {
+            bool handled = false;
+            decode_in_base(handled, op);
+            if(handled)
+                return;
+        }
 
         switch(op & x_mask) {
         case 0100: {
@@ -239,7 +288,7 @@ public:
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
             auto r = static_cast<reg>(y);
             fast_u8 d, n;
-            if(r != reg::at_hl || this->is_index_rp_hl()) {
+            if(r != reg::at_hl || is_index_rp_hl()) {
                 d = 0;
                 n = (*this)->on_3t_imm8_read();
             } else {
@@ -448,7 +497,7 @@ public:
 
     void decode_cb_prefixed() {
         fast_u8 d = 0;
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         if(irp != index_regp::hl)
             d = (*this)->on_disp_read();
 
@@ -589,7 +638,7 @@ public:
         bool reset_index_rp = true;
         decode_unprefixed(reset_index_rp);
         if(reset_index_rp)
-            this->set_index_rp_kind(index_regp::hl);
+            set_index_rp_kind(index_regp::hl);
     }
 
     void decode() { (*this)->on_decode(); }
@@ -597,18 +646,15 @@ public:
 protected:
     D *operator -> () { return static_cast<D*>(this); }
 
-    static const fast_u8 x_mask = 0300;
+    using base::x_mask;
+    using base::y_mask;
+    using base::z_mask;
+    using base::p_mask;
+    using base::q_mask;
 
-    static const fast_u8 y_mask = 0070;
-    fast_u8 get_y_part(fast_u8 op) { return (op & y_mask) >> 3; }
-
-    static const fast_u8 z_mask = 0007;
-    fast_u8 get_z_part(fast_u8 op) { return op & z_mask; }
-
-    static const fast_u8 p_mask = 0060;
-    fast_u8 get_p_part(fast_u8 op) { return (op & p_mask) >> 4; }
-
-    static const fast_u8 q_mask = 0010;
+    using base::get_y_part;
+    using base::get_z_part;
+    using base::get_p_part;
 };
 
 const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
@@ -648,8 +694,11 @@ class disassembler : public z80_decoder<D>,
                      public disassembler_base {
 public:
     typedef z80_decoder<D> decoder;
+    typedef typename decoder::state state;
 
     disassembler() {}
+
+    using state::get_index_rp_kind;
 
     fast_u8 on_fetch(bool m1 = true) {
         unused(m1);
@@ -687,21 +736,21 @@ public:
         (*this)->on_format("noni N, N", 0xed, op); }
 
     void on_add_irp_rp(regp rp) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("add P, P", regp::hl, irp, rp, irp); }
     void on_adc_hl_rp(regp rp) {
         (*this)->on_format("adc hl, P", rp, index_regp::hl); }
     void on_alu_n(alu k, fast_u8 n) {
         (*this)->on_format("A N", k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("A R", k, r, irp, d); }
     void on_block_cp(block_cp k) {
         (*this)->on_format("M", k); }
     void on_block_ld(block_ld k) {
         (*this)->on_format("L", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("bit U, R", b, r, irp, d); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_format("call W", nn); }
@@ -715,10 +764,10 @@ public:
     void on_daa() {
         (*this)->on_format("daa"); }
     void on_dec_r(reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
     void on_dec_rp(regp rp) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("dec P", rp, irp); }
     void on_di() {
         (*this)->on_format("di"); }
@@ -731,7 +780,7 @@ public:
     void on_ex_de_hl() {
         (*this)->on_format("ex de, hl"); }
     void on_ex_at_sp_irp() {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ex (sp), P", regp::hl, irp); }
     void on_exx() {
         (*this)->on_format("exx"); }
@@ -747,15 +796,15 @@ public:
         else
             (*this)->on_format("in R, (c)", r, index_regp::hl, 0); }
     void on_inc_r(reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("inc R", r, irp, d); }
     void on_inc_rp(regp rp) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("inc P", rp, irp); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("jp C, W", cc, nn); }
     void on_jp_irp() {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jp W", nn); }
@@ -770,21 +819,21 @@ public:
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
         (*this)->on_format("ld R, R", rd, irpd, d, rs, irps, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ld R, N", r, irp, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ld P, W", rp, irp, nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ld P, (W)", regp::hl, irp, nn); }
     void on_ld_at_nn_irp(fast_u16 nn) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ld (W), P", nn, regp::hl, irp); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         (*this)->on_format("ld P, (W)", rp, index_regp::hl, nn); }
@@ -799,7 +848,7 @@ public:
     void on_ld_at_rp_a(regp rp) {
         (*this)->on_format("ld (P), a", rp, index_regp::hl); }
     void on_ld_sp_irp() {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("ld sp, P", regp::hl, irp); }
     void on_neg() {
         (*this)->on_format("neg"); }
@@ -813,13 +862,13 @@ public:
     void on_out_n_a(fast_u8 n) {
         (*this)->on_format("out (N), a", n); }
     void on_pop_rp(regp2 rp) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("pop G", rp, irp); }
     void on_push_rp(regp2 rp) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_format("push G", rp, irp); }
     void on_res(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             (*this)->on_format("res U, R", b, r, irp, d);
         else
@@ -840,7 +889,7 @@ public:
     void on_rld() {
         (*this)->on_format("rld"); }
     void on_rot(rot k, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             (*this)->on_format("O R", k, r, irp, d);
         else
@@ -857,7 +906,7 @@ public:
     void on_scf() {
         (*this)->on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             (*this)->on_format("set U, R", b, r, irp, d);
         else
@@ -1102,53 +1151,108 @@ template<typename D, typename S = processor_state>
 class processor : public z80_decoder<D, S>,
                   public processor_base {
 public:
+    typedef S state;
     typedef z80_decoder<D> decoder;
 
     processor() {}
 
-    fast_u8 on_get_b() const { return this->get_b(); }
-    void on_set_b(fast_u8 b) { this->set_b(b); }
+    using state::get_index_rp_kind;
+    using state::set_index_rp_kind;
+    using state::is_index_rp_hl;
+    using state::get_b;
+    using state::set_b;
+    using state::get_c;
+    using state::set_c;
+    using state::get_d;
+    using state::set_d;
+    using state::get_e;
+    using state::set_e;
+    using state::get_h;
+    using state::set_h;
+    using state::get_l;
+    using state::set_l;
+    using state::get_a;
+    using state::set_a;
+    using state::get_f;
+    using state::set_f;
+    using state::get_ixh;
+    using state::set_ixh;
+    using state::get_ixl;
+    using state::set_ixl;
+    using state::get_iyh;
+    using state::set_iyh;
+    using state::get_iyl;
+    using state::set_iyl;
+    using state::get_i;
+    using state::set_i;
+    using state::get_r_reg;
+    using state::set_r_reg;
+    using state::get_sp;
+    using state::set_sp;
+    using state::get_pc;
+    using state::set_pc;
+    using state::get_memptr;
+    using state::set_memptr;
+    using state::get_iff1;
+    using state::set_iff1;
+    using state::get_iff2;
+    using state::set_iff2;
+    using state::get_int_mode;
+    using state::set_int_mode;
+    using state::is_int_disabled;
+    using state::enable_int;
+    using state::disable_int;
+    using state::is_halted;
+    using state::set_is_halted;
+    using state::halt;
+    using state::set_last_read_addr;
+    using state::ex_af_alt_af;
+    using state::ex_de_hl;
+    using state::exx;
 
-    fast_u8 on_get_c() const { return this->get_c(); }
-    void on_set_c(fast_u8 c) { this->set_c(c); }
+    fast_u8 on_get_b() const { return get_b(); }
+    void on_set_b(fast_u8 b) { set_b(b); }
 
-    fast_u8 on_get_d() const { return this->get_d(); }
-    void on_set_d(fast_u8 d) { this->set_d(d); }
+    fast_u8 on_get_c() const { return get_c(); }
+    void on_set_c(fast_u8 c) { set_c(c); }
 
-    fast_u8 on_get_e() const { return this->get_e(); }
-    void on_set_e(fast_u8 e) { this->set_e(e); }
+    fast_u8 on_get_d() const { return get_d(); }
+    void on_set_d(fast_u8 d) { set_d(d); }
 
-    fast_u8 on_get_h() const { return this->get_h(); }
-    void on_set_h(fast_u8 h) { this->set_h(h); }
+    fast_u8 on_get_e() const { return get_e(); }
+    void on_set_e(fast_u8 e) { set_e(e); }
 
-    fast_u8 on_get_l() const { return this->get_l(); }
-    void on_set_l(fast_u8 l) { this->set_l(l); }
+    fast_u8 on_get_h() const { return get_h(); }
+    void on_set_h(fast_u8 h) { set_h(h); }
 
-    fast_u8 on_get_a() const { return this->get_a(); }
-    void on_set_a(fast_u8 a) { this->set_a(a); }
+    fast_u8 on_get_l() const { return get_l(); }
+    void on_set_l(fast_u8 l) { set_l(l); }
 
-    fast_u8 on_get_f() const { return this->get_f(); }
-    void on_set_f(fast_u8 f) { this->set_f(f); }
+    fast_u8 on_get_a() const { return get_a(); }
+    void on_set_a(fast_u8 a) { set_a(a); }
 
-    fast_u8 on_get_ixh() const { return this->get_ixh(); }
-    void on_set_ixh(fast_u8 ixh) { this->set_ixh(ixh); }
+    fast_u8 on_get_f() const { return get_f(); }
+    void on_set_f(fast_u8 f) { set_f(f); }
 
-    fast_u8 on_get_ixl() const { return this->get_ixl(); }
-    void on_set_ixl(fast_u8 ixl) { this->set_ixl(ixl); }
+    fast_u8 on_get_ixh() const { return get_ixh(); }
+    void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
 
-    fast_u8 on_get_iyh() const { return this->get_iyh(); }
-    void on_set_iyh(fast_u8 iyh) { this->set_iyh(iyh); }
+    fast_u8 on_get_ixl() const { return get_ixl(); }
+    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
 
-    fast_u8 on_get_iyl() const { return this->get_iyl(); }
-    void on_set_iyl(fast_u8 iyl) { this->set_iyl(iyl); }
+    fast_u8 on_get_iyh() const { return get_iyh(); }
+    void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
 
-    fast_u8 on_get_i() const { return this->get_i(); }
-    void on_set_i(fast_u8 i) { this->set_i(i); }
+    fast_u8 on_get_iyl() const { return get_iyl(); }
+    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
+
+    fast_u8 on_get_i() const { return get_i(); }
+    void on_set_i(fast_u8 i) { set_i(i); }
 
     void set_i_on_ld(fast_u8 i) { (*this)->on_set_i(i); }
 
-    fast_u8 on_get_r_reg() const { return this->get_r_reg(); }
-    void on_set_r_reg(fast_u8 r) { this->set_r_reg(r); }
+    fast_u8 on_get_r_reg() const { return get_r_reg(); }
+    void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
 
     void on_inc_r_reg() {
         // TODO: Consider splitting R into R[7] and R[6:0].
@@ -1217,11 +1321,11 @@ public:
         (*this)->on_set_iyl(get_low8(iy));
         (*this)->on_set_iyh(get_high8(iy)); }
 
-    fast_u16 on_get_sp() { return this->get_sp(); }
-    void on_set_sp(fast_u16 sp) { this->set_sp(sp); }
+    fast_u16 on_get_sp() { return get_sp(); }
+    void on_set_sp(fast_u16 sp) { set_sp(sp); }
 
-    fast_u16 on_get_pc() const { return this->get_pc(); }
-    void on_set_pc(fast_u16 pc) { this->set_pc(pc); }
+    fast_u16 on_get_pc() const { return get_pc(); }
+    void on_set_pc(fast_u16 pc) { set_pc(pc); }
 
     fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
@@ -1251,28 +1355,28 @@ public:
 
     fast_u16 get_ir_on_refresh() const { return (*this)->on_get_ir(); }
 
-    fast_u16 on_get_memptr() const { return this->get_memptr(); }
-    void on_set_memptr(fast_u16 memptr) { this->set_memptr(memptr); }
+    fast_u16 on_get_memptr() const { return get_memptr(); }
+    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
 
-    bool on_get_iff1() const { return this->get_iff1(); }
-    void on_set_iff1(bool iff1) { this->set_iff1(iff1); }
+    bool on_get_iff1() const { return get_iff1(); }
+    void on_set_iff1(bool iff1) { set_iff1(iff1); }
 
     void set_iff1_on_di(bool iff1) { (*this)->on_set_iff1(iff1); }
     void set_iff1_on_ei(bool iff1) { (*this)->on_set_iff1(iff1); }
     void set_iff1_on_retn(bool iff1) { (*this)->on_set_iff1(iff1); }
 
-    bool on_get_iff2() const { return this->get_iff2(); }
-    void on_set_iff2(bool iff2) { this->set_iff2(iff2); }
+    bool on_get_iff2() const { return get_iff2(); }
+    void on_set_iff2(bool iff2) { set_iff2(iff2); }
 
     void set_iff2_on_di(bool iff2) { (*this)->on_set_iff2(iff2); }
     void set_iff2_on_ei(bool iff2) { (*this)->on_set_iff2(iff2); }
 
     bool get_iff2_on_retn() const { return (*this)->on_get_iff2(); }
 
-    bool on_get_int_mode() const { return this->get_int_mode(); }
-    void on_set_int_mode(unsigned mode) { this->set_int_mode(mode); }
+    bool on_get_int_mode() const { return get_int_mode(); }
+    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
-    void on_disable_int() { this->disable_int(); }
+    void on_disable_int() { disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
@@ -1283,7 +1387,7 @@ public:
         fast_u16 addr = get_disp_target((*this)->on_get_index_rp(), d);
         fast_u8 res = long_read_cycle ? (*this)->on_4t_read_cycle(addr) :
                                         (*this)->on_3t_read_cycle(addr);
-        if(!this->is_index_rp_hl())
+        if(!is_index_rp_hl())
             (*this)->on_set_memptr(addr);
         return res;
     }
@@ -1291,7 +1395,7 @@ public:
     void write_at_disp(fast_u8 d, fast_u8 n) {
         fast_u16 addr = get_disp_target((*this)->on_get_index_rp(), d);
         (*this)->on_3t_write_cycle(addr, n);
-        if(!this->is_index_rp_hl())
+        if(!is_index_rp_hl())
             (*this)->on_set_memptr(addr);
     }
 
@@ -1389,7 +1493,7 @@ public:
     }
 
     fast_u16 on_get_index_rp() {
-        switch(this->get_index_rp_kind()) {
+        switch(get_index_rp_kind()) {
         case index_regp::hl: return (*this)->on_get_hl();
         case index_regp::ix: return (*this)->on_get_ix();
         case index_regp::iy: return (*this)->on_get_iy();
@@ -1398,7 +1502,7 @@ public:
     }
 
     void on_set_index_rp(fast_u16 nn) {
-        switch(this->get_index_rp_kind()) {
+        switch(get_index_rp_kind()) {
         case index_regp::hl: return (*this)->on_set_hl(nn);
         case index_regp::ix: return (*this)->on_set_ix(nn);
         case index_regp::iy: return (*this)->on_set_iy(nn);
@@ -1625,7 +1729,7 @@ public:
     void on_alu_n(alu k, fast_u8 n) {
         do_alu(k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         do_alu(k, (*this)->on_get_r(r, irp, d)); }
     void on_block_cp(block_cp k) {
         fast_u16 bc = (*this)->on_get_bc();
@@ -1711,12 +1815,12 @@ public:
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         fast_u8 v = (*this)->on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
         fast_u8 m = v & (1u << b);
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
-        if(!this->is_index_rp_hl() || r == reg::at_hl)
+        if(!is_index_rp_hl() || r == reg::at_hl)
             v = get_high8((*this)->on_get_memptr());
         f |= v & (xf_mask | yf_mask);
         (*this)->on_set_f(f); }
@@ -1772,7 +1876,7 @@ public:
         (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
     void on_dec_r(reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         fast_u8 v = (*this)->on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
         v = dec8(v);
@@ -1796,9 +1900,9 @@ public:
         (*this)->set_iff2_on_ei(true);
         (*this)->disable_int_on_ei(); }
     void on_ex_af_alt_af() {
-        this->ex_af_alt_af(); }
+        ex_af_alt_af(); }
     void on_ex_de_hl() {
-        this->ex_de_hl(); }
+        ex_de_hl(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = (*this)->on_get_sp();
         fast_u8 lo = (*this)->on_3t_read_cycle(sp);
@@ -1813,9 +1917,9 @@ public:
         (*this)->on_set_memptr(irp);
         (*this)->on_set_index_rp(irp); }
     void on_exx() {
-        this->exx(); }
+        exx(); }
     void on_halt() {
-        this->halt();
+        halt();
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
@@ -1829,14 +1933,14 @@ public:
         fast_u8 f = (*this)->on_get_f();
         (*this)->on_set_memptr(inc16(bc));
         fast_u8 n = (*this)->on_input_cycle(bc);
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         if(r != reg::at_hl)
             (*this)->on_set_r(r, irp, /* d= */ 0, n);
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
                 pf_log(n);
         (*this)->on_set_f(f); }
     void on_inc_r(reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         fast_u8 v = (*this)->on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = (*this)->on_get_f();
         v = inc8(v);
@@ -1864,7 +1968,7 @@ public:
         fast_u8 n = (*this)->on_get_r_reg();
         fast_u8 f = (*this)->on_get_f();
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
-                ((this->get_iff2() ? 1u : 0u) << pf_bit);
+                ((get_iff2() ? 1u : 0u) << pf_bit);
         (*this)->on_set_a(n);
         (*this)->on_set_f(f); }
     void on_ld_r_a() {
@@ -1872,12 +1976,12 @@ public:
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
         (*this)->on_set_r(rd, irpd, d, (*this)->on_get_r(rs, irps, d)); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         (*this)->on_set_r(r, irp, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
@@ -1936,7 +2040,7 @@ public:
     void on_out_c_r(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
         (*this)->on_set_memptr(inc16(bc));
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         fast_u8 n = (r == reg::at_hl) ?
             0 : (*this)->on_get_r(r, irp, /* d= */ 0);
         (*this)->on_output_cycle(bc, n); }
@@ -1949,7 +2053,7 @@ public:
     void on_push_rp(regp2 rp) {
         (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_res(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 v = (*this)->on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
@@ -2001,7 +2105,7 @@ public:
         (*this)->on_set_f(f);
         (*this)->on_3t_write_cycle(hl, get_low8(t)); }
     void on_rot(rot k, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 n = (*this)->on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
@@ -2052,7 +2156,7 @@ public:
                 cf_mask;
         (*this)->on_set_f(f); }
     void on_set(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = this->get_index_rp_kind();
+        index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 v = (*this)->on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
@@ -2101,7 +2205,7 @@ public:
         if(m1)
             (*this)->on_inc_r_reg();
         (*this)->tick(2);
-        this->set_last_read_addr(addr);
+        set_last_read_addr(addr);
         return b;
     }
 
@@ -2117,7 +2221,7 @@ public:
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(ticks);
-        this->set_last_read_addr(addr);
+        set_last_read_addr(addr);
         return b;
     }
 
@@ -2218,8 +2322,8 @@ public:
     }
 
     void initiate_int() {
-        this->set_iff1(false);
-        this->set_iff2(false);
+        set_iff1(false);
+        set_iff2(false);
 
         fast_u16 pc = (*this)->on_get_pc();
 
@@ -2227,10 +2331,10 @@ public:
         // HALT instructions need to be executed at least once to
         // be skipped on an interrupt, so checking if the PC is
         // at a HALT instruction is not enough here.
-        if(this->is_halted()) {
+        if(is_halted()) {
             pc = inc16(pc);
             (*this)->on_set_pc(pc);
-            this->set_is_halted(false);
+            set_is_halted(false);
         }
 
         (*this)->on_inc_r_reg();
@@ -2238,7 +2342,7 @@ public:
         (*this)->on_push(pc);
 
         fast_u16 isr_addr;
-        switch(this->get_int_mode()) {
+        switch(get_int_mode()) {
         case 0:
             isr_addr = 0;
             assert(0);  // TODO
@@ -2262,7 +2366,7 @@ public:
     }
 
     bool handle_active_int() {
-        if(!this->is_int_disabled() && this->get_iff1()) {
+        if(!is_int_disabled() && get_iff1()) {
             initiate_int();
             return true;
         }
@@ -2270,7 +2374,7 @@ public:
     }
 
     void on_step() {
-        this->enable_int();
+        enable_int();
         (*this)->decode();
     }
 
