@@ -186,9 +186,9 @@ private:
 
 static const unsigned max_instr_size = 4;
 
-class disassembler : public z80::disassembler<disassembler> {
+class disassembler : public z80::z80_disassembler<disassembler> {
 public:
-    typedef z80::disassembler<disassembler> base;
+    typedef z80::z80_disassembler<disassembler> base;
 
     disassembler()
         : index(0), instr_size(0)

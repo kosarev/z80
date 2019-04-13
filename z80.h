@@ -703,13 +703,18 @@ public:
 };
 
 template<typename D>
-class disassembler : public z80_decoder<D>,
-                     public disassembler_base {
+class i8080_disassembler : public z80_decoder<D>,
+                           public disassembler_base
+{};
+
+template<typename D>
+class z80_disassembler : public z80_decoder<D>,
+                         public disassembler_base {
 public:
     typedef z80_decoder<D> decoder;
     typedef typename decoder::state state;
 
-    disassembler() {}
+    z80_disassembler() {}
 
     using state::get_index_rp_kind;
 
