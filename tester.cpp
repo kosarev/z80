@@ -236,9 +236,9 @@ private:
     char output_buff[max_output_buff_size];
 };
 
-class machine : public z80::processor<machine> {
+class machine : public z80::z80_processor<machine> {
 public:
-    typedef processor<machine> base;
+    typedef z80_processor<machine> base;
     typedef fast_u32 ticks_type;
 
     machine(test_input &input)

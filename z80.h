@@ -1166,13 +1166,13 @@ protected:
 };
 
 template<typename D, typename S = z80_state>
-class processor : public z80_decoder<D, S>,
-                  public processor_base {
+class z80_processor : public z80_decoder<D, S>,
+                      public processor_base {
 public:
     typedef S state;
     typedef z80_decoder<D> decoder;
 
-    processor() {}
+    z80_processor() {}
 
     using state::get_index_rp_kind;
     using state::set_index_rp_kind;
