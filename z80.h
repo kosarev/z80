@@ -1113,14 +1113,120 @@ private:
     unsigned int_mode = 0;
 };
 
-template<typename E>
+template<typename D, typename E>
 class processor_base : public E {
 public:
     typedef E decoder;
+    typedef typename decoder::state state;
 
     processor_base() {}
 
+    using state::get_b;
+    using state::set_b;
+    using state::get_c;
+    using state::set_c;
+    using state::get_d;
+    using state::set_d;
+    using state::get_e;
+    using state::set_e;
+    using state::get_h;
+    using state::set_h;
+    using state::get_l;
+    using state::set_l;
+    using state::get_a;
+    using state::set_a;
+    using state::get_f;
+    using state::set_f;
+    using state::get_sp;
+    using state::set_sp;
+    using state::get_pc;
+    using state::set_pc;
+    using state::get_memptr;
+    using state::set_memptr;
+
+    fast_u8 on_get_b() const { return get_b(); }
+    void on_set_b(fast_u8 b) { set_b(b); }
+
+    fast_u8 on_get_c() const { return get_c(); }
+    void on_set_c(fast_u8 c) { set_c(c); }
+
+    fast_u8 on_get_d() const { return get_d(); }
+    void on_set_d(fast_u8 d) { set_d(d); }
+
+    fast_u8 on_get_e() const { return get_e(); }
+    void on_set_e(fast_u8 e) { set_e(e); }
+
+    fast_u8 on_get_h() const { return get_h(); }
+    void on_set_h(fast_u8 h) { set_h(h); }
+
+    fast_u8 on_get_l() const { return get_l(); }
+    void on_set_l(fast_u8 l) { set_l(l); }
+
+    fast_u8 on_get_a() const { return get_a(); }
+    void on_set_a(fast_u8 a) { set_a(a); }
+
+    fast_u8 on_get_f() const { return get_f(); }
+    void on_set_f(fast_u8 f) { set_f(f); }
+
+    fast_u16 on_get_af() {
+        // Always get the low byte first.
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 a = (*this)->on_get_a();
+        return make16(a, f); }
+    void on_set_af(fast_u16 af) {
+        // Always set the low byte first.
+        (*this)->on_set_f(get_low8(af));
+        (*this)->on_set_a(get_high8(af)); }
+
+    fast_u16 on_get_hl() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_l();
+        fast_u8 h = (*this)->on_get_h();
+        return make16(h, l); }
+    void on_set_hl(fast_u16 hl) {
+        // Always set the low byte first.
+        (*this)->on_set_l(get_low8(hl));
+        (*this)->on_set_h(get_high8(hl)); }
+
+    fast_u16 on_get_bc() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_c();
+        fast_u8 h = (*this)->on_get_b();
+        return make16(h, l); }
+    void on_set_bc(fast_u16 bc) {
+        // Always set the low byte first.
+        (*this)->on_set_c(get_low8(bc));
+        (*this)->on_set_b(get_high8(bc)); }
+
+    fast_u16 on_get_de() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_e();
+        fast_u8 h = (*this)->on_get_d();
+        return make16(h, l); }
+    void on_set_de(fast_u16 de) {
+        // Always set the low byte first.
+        (*this)->on_set_e(get_low8(de));
+        (*this)->on_set_d(get_high8(de)); }
+
+    fast_u16 on_get_sp() { return get_sp(); }
+    void on_set_sp(fast_u16 sp) { set_sp(sp); }
+
+    fast_u16 on_get_pc() const { return get_pc(); }
+    void on_set_pc(fast_u16 pc) { set_pc(pc); }
+
+    fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
+    void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_pc_on_imm8_read() const { return (*this)->on_get_pc(); }
+    void set_pc_on_imm8_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 get_pc_on_imm16_read() const { return (*this)->on_get_pc(); }
+    void set_pc_on_imm16_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
 protected:
+    D *operator -> () { return static_cast<D*>(this); }
+    const D *operator -> () const { return static_cast<const D*>(this); }
+
     static const unsigned sf_bit = 7;
     static const unsigned zf_bit = 6;
     static const unsigned yf_bit = 5;
@@ -1187,15 +1293,15 @@ protected:
 };
 
 template<typename D>
-class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>>
+class i8080_processor : public processor_base<D, i8080_decoder<D, i8080_state>>
 {};
 
 template<typename D>
-class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
+class z80_processor : public processor_base<D, z80_decoder<D, z80_state>> {
 public:
     typedef z80_state state;
     typedef z80_decoder<D, z80_state> decoder;
-    typedef processor_base<decoder> base;
+    typedef processor_base<D, decoder> base;
 
     z80_processor() {}
 
@@ -1281,30 +1387,6 @@ public:
     using base::pf_inc;
     using base::cf_ari;
 
-    fast_u8 on_get_b() const { return get_b(); }
-    void on_set_b(fast_u8 b) { set_b(b); }
-
-    fast_u8 on_get_c() const { return get_c(); }
-    void on_set_c(fast_u8 c) { set_c(c); }
-
-    fast_u8 on_get_d() const { return get_d(); }
-    void on_set_d(fast_u8 d) { set_d(d); }
-
-    fast_u8 on_get_e() const { return get_e(); }
-    void on_set_e(fast_u8 e) { set_e(e); }
-
-    fast_u8 on_get_h() const { return get_h(); }
-    void on_set_h(fast_u8 h) { set_h(h); }
-
-    fast_u8 on_get_l() const { return get_l(); }
-    void on_set_l(fast_u8 l) { set_l(l); }
-
-    fast_u8 on_get_a() const { return get_a(); }
-    void on_set_a(fast_u8 a) { set_a(a); }
-
-    fast_u8 on_get_f() const { return get_f(); }
-    void on_set_f(fast_u8 f) { set_f(f); }
-
     fast_u8 on_get_ixh() const { return get_ixh(); }
     void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
 
@@ -1332,46 +1414,6 @@ public:
         (*this)->set_r_reg(r);
     }
 
-    fast_u16 on_get_af() {
-        // Always get the low byte first.
-        fast_u8 f = (*this)->on_get_f();
-        fast_u8 a = (*this)->on_get_a();
-        return make16(a, f); }
-    void on_set_af(fast_u16 af) {
-        // Always set the low byte first.
-        (*this)->on_set_f(get_low8(af));
-        (*this)->on_set_a(get_high8(af)); }
-
-    fast_u16 on_get_hl() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_l();
-        fast_u8 h = (*this)->on_get_h();
-        return make16(h, l); }
-    void on_set_hl(fast_u16 hl) {
-        // Always set the low byte first.
-        (*this)->on_set_l(get_low8(hl));
-        (*this)->on_set_h(get_high8(hl)); }
-
-    fast_u16 on_get_bc() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_c();
-        fast_u8 h = (*this)->on_get_b();
-        return make16(h, l); }
-    void on_set_bc(fast_u16 bc) {
-        // Always set the low byte first.
-        (*this)->on_set_c(get_low8(bc));
-        (*this)->on_set_b(get_high8(bc)); }
-
-    fast_u16 on_get_de() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_e();
-        fast_u8 h = (*this)->on_get_d();
-        return make16(h, l); }
-    void on_set_de(fast_u16 de) {
-        // Always set the low byte first.
-        (*this)->on_set_e(get_low8(de));
-        (*this)->on_set_d(get_high8(de)); }
-
     fast_u16 on_get_ix() {
         // Always get the low byte first.
         fast_u8 l = (*this)->on_get_ixl();
@@ -1391,21 +1433,6 @@ public:
         // Always set the low byte first.
         (*this)->on_set_iyl(get_low8(iy));
         (*this)->on_set_iyh(get_high8(iy)); }
-
-    fast_u16 on_get_sp() { return get_sp(); }
-    void on_set_sp(fast_u16 sp) { set_sp(sp); }
-
-    fast_u16 on_get_pc() const { return get_pc(); }
-    void on_set_pc(fast_u16 pc) { set_pc(pc); }
-
-    fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
-    void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 get_pc_on_imm8_read() const { return (*this)->on_get_pc(); }
-    void set_pc_on_imm8_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 get_pc_on_imm16_read() const { return (*this)->on_get_pc(); }
-    void set_pc_on_imm16_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_pc_on_disp_read() const { return (*this)->on_get_pc(); }
     void set_pc_on_disp_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
