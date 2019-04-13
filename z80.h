@@ -166,12 +166,31 @@ public:
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
 
-        unused(y, z, p);
+        unused(p);  // TODO
+
+        switch(op & x_mask) {
+        case 0100: {
+            // LD/MOV r[y], r[z] or
+            // HALT/HLT (in place of LD (HL), (HL)/MOV M, M)
+            // LD r, r              f(4)
+            // LD r, (HL)           f(4)           r(3)
+            // LD r, (i+d)     f(4) f(4) r(3) e(5) r(3)
+            // LD (HL), r           f(4)           w(3)
+            // LD (i+d), r     f(4) f(4) r(3) e(5) w(3)
+            // HALT                 f(4)
+            auto rd = static_cast<reg>(y);
+            auto rs = static_cast<reg>(z);
+            if(rd == reg::at_hl && rs == reg::at_hl)
+                return (*this)->on_halt();
+            return (*this)->on_ld_r_r(rd, rs); }
+        }
 
         handled = false;
     }
 
 protected:
+    D *operator -> () { return static_cast<D*>(this); }
+
     static const fast_u8 x_mask = 0300;
 
     static const fast_u8 y_mask = 0070;
@@ -229,6 +248,9 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
+    void on_ld_r_r(reg rd, reg rs) {
+        (*this)->on_ld_r_r_d(rd, rs, read_disp_or_null(rd, rs)); }
+
     void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
@@ -244,19 +266,6 @@ public:
         }
 
         switch(op & x_mask) {
-        case 0100: {
-            // LD r[y], r[z] or HALT (in place of LD (HL), (HL))
-            // LD r, r              f(4)
-            // LD r, (HL)           f(4)           r(3)
-            // LD r, (i+d)     f(4) f(4) r(3) e(5) r(3)
-            // LD (HL), r           f(4)           w(3)
-            // LD (i+d), r     f(4) f(4) r(3) e(5) w(3)
-            // HALT                 f(4)
-            auto rd = static_cast<reg>(y);
-            auto rs = static_cast<reg>(z);
-            if(rd == reg::at_hl && rs == reg::at_hl)
-                return (*this)->on_halt();
-            return (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
         case 0200: {
             // alu[y] r[z]
             // alu r            f(4)
@@ -818,7 +827,7 @@ public:
         (*this)->on_format("ld r, a"); }
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
-    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
+    void on_ld_r_r_d(reg rd, reg rs, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
@@ -1975,7 +1984,7 @@ public:
         (*this)->on_set_r_reg((*this)->on_get_a()); }
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
-    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
+    void on_ld_r_r_d(reg rd, reg rs, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
