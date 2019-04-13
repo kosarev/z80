@@ -182,7 +182,7 @@ public:
             auto rs = static_cast<reg>(z);
             if(rd == reg::at_hl && rs == reg::at_hl)
                 return (*this)->on_halt();
-            return (*this)->on_ld_r_r(rd, rs); }
+            return (*this)->decode_ld_r_r(rd, rs); }
         }
 
         handled = false;
@@ -252,8 +252,8 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
-    void on_ld_r_r(reg rd, reg rs) {
-        (*this)->on_ld_r_r_d(rd, rs, read_disp_or_null(rd, rs)); }
+    void decode_ld_r_r(reg rd, reg rs) {
+        (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
 
     void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
@@ -836,7 +836,7 @@ public:
         (*this)->on_format("ld r, a"); }
     void on_ld_i_a() {
         (*this)->on_format("ld i, a"); }
-    void on_ld_r_r_d(reg rd, reg rs, fast_u8 d) {
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
@@ -2006,7 +2006,7 @@ public:
         (*this)->on_set_r_reg((*this)->on_get_a()); }
     void on_ld_i_a() {
         (*this)->set_i_on_ld((*this)->on_get_a()); }
-    void on_ld_r_r_d(reg rd, reg rs, fast_u8 d) {
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
