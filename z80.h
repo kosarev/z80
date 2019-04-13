@@ -136,8 +136,7 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum condition { nz, z, nc, c, po, pe, p, m };
 
-class i8080_decoder_state
-{};
+class i8080_decoder_state {};
 
 class z80_decoder_state {
 public:
@@ -157,6 +156,8 @@ private:
 template<typename D, typename S>
 class decoder_base : public S {
 public:
+    typedef S state;
+
     decoder_base() {}
 
     void decode_in_base(bool &handled, fast_u8 op) {
@@ -206,8 +207,10 @@ protected:
 };
 
 template<typename D, typename S = i8080_decoder_state>
-class i8080_decoder : public decoder_base<D, S>
-{};
+class i8080_decoder : public decoder_base<D, S> {
+public:
+    typedef S state;
+};
 
 template<typename D, typename S = z80_decoder_state>
 class z80_decoder : public decoder_base<D, S> {
@@ -703,7 +706,7 @@ public:
 };
 
 template<typename D>
-class i8080_disassembler : public z80_decoder<D>,
+class i8080_disassembler : public i8080_decoder<D>,
                            public disassembler_base
 {};
 
@@ -939,9 +942,11 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-template<typename DS>
-class processor_state_base : public DS {
+template<typename S>
+class processor_state_base : public S {
 public:
+    typedef S decoder_state;
+
     fast_u8 get_b() const { return get_high8(bc); }
     void set_b(fast_u8 b) { bc = make16(b, get_c()); }
 
@@ -1108,8 +1113,11 @@ private:
     unsigned int_mode = 0;
 };
 
-class processor_base {
+template<typename E>
+class processor_base : public E {
 public:
+    typedef E decoder;
+
     processor_base() {}
 
 protected:
@@ -1178,12 +1186,12 @@ protected:
     }
 };
 
-template<typename D, typename S = z80_state>
-class z80_processor : public z80_decoder<D, S>,
-                      public processor_base {
+template<typename D>
+class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
 public:
-    typedef S state;
-    typedef z80_decoder<D> decoder;
+    typedef z80_state state;
+    typedef z80_decoder<D, z80_state> decoder;
+    typedef processor_base<decoder> base;
 
     z80_processor() {}
 
@@ -1240,6 +1248,34 @@ public:
     using state::ex_af_alt_af;
     using state::ex_de_hl;
     using state::exx;
+
+    using base::sf_bit;
+    using base::zf_bit;
+    using base::yf_bit;
+    using base::hf_bit;
+    using base::xf_bit;
+    using base::pf_bit;
+    using base::nf_bit;
+    using base::cf_bit;
+
+    using base::sf_mask;
+    using base::zf_mask;
+    using base::yf_mask;
+    using base::hf_mask;
+    using base::xf_mask;
+    using base::pf_mask;
+    using base::nf_mask;
+    using base::cf_mask;
+
+    using base::zf_ari;
+    using base::hf_ari;
+    using base::hf_dec;
+    using base::hf_inc;
+    using base::pf_ari;
+    using base::pf_log;
+    using base::pf_dec;
+    using base::pf_inc;
+    using base::cf_ari;
 
     fast_u8 on_get_b() const { return get_b(); }
     void on_set_b(fast_u8 b) { set_b(b); }
