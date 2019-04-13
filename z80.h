@@ -939,10 +939,9 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 };
 
-class z80_state : public z80_decoder_state {
+template<typename DS>
+class processor_state_base : public DS {
 public:
-    z80_state() {}
-
     fast_u8 get_b() const { return get_high8(bc); }
     void set_b(fast_u8 b) { bc = make16(b, get_c()); }
 
@@ -967,6 +966,33 @@ public:
     fast_u8 get_f() const { return get_low8(af); }
     void set_f(fast_u8 f) { af = make16(get_a(), f); }
 
+    fast_u16 get_af() const { return af; }
+    void set_af(fast_u16 n) { af = n; }
+
+    fast_u16 get_hl() const { return hl; }
+    void set_hl(fast_u16 n) { hl = n; }
+
+    fast_u16 get_bc() const { return bc; }
+    void set_bc(fast_u16 n) { bc = n; }
+
+    fast_u16 get_de() const { return de; }
+    void set_de(fast_u16 n) { de = n; }
+
+    void ex_de_hl() { std::swap(de, hl); }
+
+    void swap_bc(fast_u16 &alt_bc) { std::swap(bc, alt_bc); }
+    void swap_de(fast_u16 &alt_de) { std::swap(de, alt_de); }
+    void swap_hl(fast_u16 &alt_hl) { std::swap(hl, alt_hl); }
+    void swap_af(fast_u16 &alt_af) { std::swap(af, alt_af); }
+
+private:
+    fast_u16 bc = 0, de = 0, hl = 0, af = 0;
+};
+
+class z80_state : public processor_state_base<z80_decoder_state> {
+public:
+    z80_state() {}
+
     fast_u8 get_ixh() const { return get_high8(ix); }
     void set_ixh(fast_u8 ixh) { ix = make16(ixh, get_ixl()); }
 
@@ -985,26 +1011,14 @@ public:
     fast_u8 get_r_reg() const { return get_low8(ir); }
     void set_r_reg(fast_u8 r) { ir = make16(get_i(), r); }
 
-    fast_u16 get_af() const { return af; }
-    void set_af(fast_u16 n) { af = n; }
-
     fast_u16 get_alt_af() const { return alt_af; }
     void set_alt_af(fast_u16 n) { alt_af = n; }
-
-    fast_u16 get_hl() const { return hl; }
-    void set_hl(fast_u16 n) { hl = n; }
 
     fast_u16 get_alt_hl() const { return alt_hl; }
     void set_alt_hl(fast_u16 n) { alt_hl = n; }
 
-    fast_u16 get_bc() const { return bc; }
-    void set_bc(fast_u16 n) { bc = n; }
-
     fast_u16 get_alt_bc() const { return alt_bc; }
     void set_alt_bc(fast_u16 n) { alt_bc = n; }
-
-    fast_u16 get_de() const { return de; }
-    void set_de(fast_u16 n) { de = n; }
 
     fast_u16 get_alt_de() const { return alt_de; }
     void set_alt_de(fast_u16 n) { alt_de = n; }
@@ -1072,23 +1086,19 @@ public:
     void halt() { set_is_halted(true); }
 
     void ex_af_alt_af() {
-        std::swap(af, alt_af);
-    }
-
-    void ex_de_hl() {
-        std::swap(de, hl);
+        swap_af(alt_af);
     }
 
     void exx() {
-        std::swap(bc, alt_bc);
-        std::swap(de, alt_de);
-        std::swap(hl, alt_hl);
+        swap_bc(alt_bc);
+        swap_de(alt_de);
+        swap_hl(alt_hl);
     }
 
 private:
     fast_u16 last_read_addr = 0;
     bool int_disabled = false;
-    fast_u16 bc = 0, de = 0, hl = 0, af = 0, ix = 0, iy = 0;
+    fast_u16 ix = 0, iy = 0;
     fast_u16 alt_bc = 0, alt_de = 0, alt_hl = 0, alt_af = 0;
     fast_u16 pc = 0, sp = 0, ir = 0, memptr = 0;
     bool iff1 = false, iff2 = false, halted = false;
