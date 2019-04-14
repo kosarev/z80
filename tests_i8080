@@ -7,6 +7,16 @@
 #
 #   Published under the MIT license.
 
+# HLT
+76 hlt
+ 0 get_pc_on_fetch 0000
+ 0 fetch 76 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_pc_on_halt 0001
+ 4 set_pc_on_halt 0001 -> 0000
+ 4 done
+
 # LD r, r
 47 mov b, a
  0 get_pc_on_fetch 0000
