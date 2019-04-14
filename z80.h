@@ -199,6 +199,9 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0xfb:
+            // EI  f(4)
+            return (*this)->on_ei();
         }
 
         handled = false;
@@ -520,9 +523,6 @@ public:
             // LD SP, i    f(4) f(6)
             (*this)->on_6t_fetch_cycle();
             return (*this)->on_ld_sp_irp();
-        case 0xfb:
-            // EI  f(4)
-            return (*this)->on_ei();
         case 0xfd:
             // FD prefix (IY-indexed instructions).
             reset_index_rp = false;
@@ -751,6 +751,8 @@ public:
         (*this)->on_output(out.get_buff());
     }
 
+    void on_ei() {
+        (*this)->on_format("ei"); }
     void on_nop() {
         (*this)->on_format("nop"); }
 
@@ -1012,8 +1014,6 @@ public:
         (*this)->on_format("di"); }
     void on_djnz(fast_u8 d) {
         (*this)->on_format("djnz D", sign_extend8(d) + 2); }
-    void on_ei() {
-        (*this)->on_format("ei"); }
     void on_ex_af_alt_af() {
         (*this)->on_format("ex af, af'"); }
     void on_ex_de_hl() {
@@ -1218,6 +1218,9 @@ public:
     void enable_int() { set_is_int_disabled(false); }
     void disable_int() { set_is_int_disabled(true); }
 
+    bool get_iff() const { return iff; }
+    void set_iff(bool new_iff) { iff = new_iff; }
+
     bool is_halted() const { return halted; }
     void set_is_halted(bool is_halted) { halted = is_halted; }
     void halt() { set_is_halted(true); }
@@ -1236,6 +1239,7 @@ private:
     fast_u16 bc = 0, de = 0, hl = 0, af = 0;
     fast_u16 pc = 0, sp = 0, memptr = 0;
     bool int_disabled = false;
+    bool iff = false;
     bool halted = false;
     fast_u16 last_read_addr = 0;
 };
@@ -1450,6 +1454,9 @@ public:
     fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
     void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    void on_disable_int() { state::disable_int(); }
+    void disable_int_on_ei() { (*this)->on_disable_int(); }
+
     fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
@@ -1567,6 +1574,12 @@ class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>> {
 public:
     typedef i8080_state state;
 
+    bool on_get_iff() const { return state::get_iff(); }
+    void on_set_iff(bool iff) { state::set_iff(iff); }
+
+    void set_iff_on_di(bool iff) { (*this)->on_set_iff(iff); }
+    void set_iff_on_ei(bool iff) { (*this)->on_set_iff(iff); }
+
     fast_u8 on_get_m() {
         return (*this)->on_3t_read_cycle((*this)->on_get_hl()); }
     void on_set_m(fast_u8 n) {
@@ -1615,6 +1628,9 @@ public:
         return op;
     }
 
+    void on_ei() {
+        (*this)->set_iff_on_ei(true);
+        (*this)->disable_int_on_ei(); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_set_r(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1795,9 +1811,6 @@ public:
 
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
-
-    void on_disable_int() { disable_int(); }
-    void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));

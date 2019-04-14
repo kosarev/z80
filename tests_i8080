@@ -7,6 +7,16 @@
 #
 #   Published under the MIT license.
 
+# EI
+fb ei
+ 0 get_pc_on_fetch 0000
+ 0 fetch fb at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_iff_on_ei 0 -> 1
+ 4 disable_int
+ 4 done
+
 # HLT
 76 hlt
  0 get_pc_on_fetch 0000
