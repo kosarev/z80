@@ -210,13 +210,15 @@ template<typename D, typename S = i8080_decoder_state>
 class i8080_decoder : public decoder_base<D, S> {
 public:
     typedef S state;
+    typedef D derived;
 };
 
 template<typename D, typename S = z80_decoder_state>
 class z80_decoder : public decoder_base<D, S> {
 public:
     typedef S state;
-    typedef decoder_base<D, S> base;
+    typedef D derived;
+    typedef decoder_base<derived, state> base;
 
     z80_decoder() {}
 
@@ -1113,11 +1115,12 @@ private:
     unsigned int_mode = 0;
 };
 
-template<typename D, typename E>
+template<typename E>
 class processor_base : public E {
 public:
     typedef E decoder;
     typedef typename decoder::state state;
+    typedef typename decoder::derived derived;
 
     processor_base() {}
 
@@ -1224,8 +1227,10 @@ public:
     void set_pc_on_imm16_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
 protected:
-    D *operator -> () { return static_cast<D*>(this); }
-    const D *operator -> () const { return static_cast<const D*>(this); }
+    derived *operator -> () {
+        return static_cast<derived*>(this); }
+    const derived *operator -> () const {
+        return static_cast<const derived*>(this); }
 
     static const unsigned sf_bit = 7;
     static const unsigned zf_bit = 6;
@@ -1293,15 +1298,15 @@ protected:
 };
 
 template<typename D>
-class i8080_processor : public processor_base<D, i8080_decoder<D, i8080_state>>
+class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>>
 {};
 
 template<typename D>
-class z80_processor : public processor_base<D, z80_decoder<D, z80_state>> {
+class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
 public:
     typedef z80_state state;
     typedef z80_decoder<D, z80_state> decoder;
-    typedef processor_base<D, decoder> base;
+    typedef processor_base<decoder> base;
 
     z80_processor() {}
 
