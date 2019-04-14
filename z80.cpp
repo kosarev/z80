@@ -231,6 +231,11 @@ void disassembler_base::on_format_impl(const char *fmt, const void *args[]) {
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
+            if(is_i8080) {
+                out.append(get_reg_name(r));
+                break;
+            }
+
             auto irp = get_arg<index_regp>(args);
             auto d = get_arg<fast_u8>(args);
             if(r != reg::at_hl || irp == index_regp::hl) {

@@ -160,6 +160,7 @@ public:
 
     decoder_base() {}
 
+    // TODO: Rename to 'decode()'.
     void decode_in_base(bool &handled, fast_u8 op) {
         handled = true;
 
@@ -189,6 +190,8 @@ public:
         handled = false;
     }
 
+    void decode() { (*this)->on_decode(); }
+
 protected:
     D *operator -> () { return static_cast<D*>(this); }
 
@@ -211,6 +214,19 @@ class i8080_decoder : public decoder_base<D, S> {
 public:
     typedef S state;
     typedef D derived;
+    typedef decoder_base<derived, state> base;
+
+    void decode_ld_r_r(reg rd, reg rs) {
+        (*this)->on_ld_r_r(rd, rs); }
+
+    void on_decode() {
+        fast_u8 op = (*this)->on_fetch();
+
+        // TODO
+        bool handled = false;
+        base::decode_in_base(handled, op);
+        assert(handled);
+    }
 };
 
 template<typename D, typename S = z80_decoder_state>
@@ -225,8 +241,6 @@ public:
     using state::get_index_rp_kind;
     using state::set_index_rp_kind;
     using state::is_index_rp_hl;
-
-    using base::decode_in_base;
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
         if(is_index_rp_hl() || !may_need_disp)
@@ -269,7 +283,7 @@ public:
         // TODO
         {
             bool handled = false;
-            decode_in_base(handled, op);
+            base::decode_in_base(handled, op);
             if(handled)
                 return;
         }
@@ -659,8 +673,6 @@ public:
             set_index_rp_kind(index_regp::hl);
     }
 
-    void decode() { (*this)->on_decode(); }
-
 protected:
     D *operator -> () { return static_cast<D*>(this); }
 
@@ -689,7 +701,10 @@ const char *get_condition_name(condition cc);
 
 class disassembler_base {
 public:
-    disassembler_base() {}
+    disassembler_base(bool is_i8080)
+        : is_i8080(is_i8080)
+    {}
+
     virtual ~disassembler_base() {}
 
     virtual void on_output(const char *out) = 0;
@@ -705,12 +720,29 @@ public:
     }
 
     virtual void on_format_impl(const char *fmt, const void *args[]);
+
+private:
+    bool is_i8080;
 };
 
 template<typename D>
 class i8080_disassembler : public i8080_decoder<D>,
-                           public disassembler_base
-{};
+                           public disassembler_base {
+public:
+    i8080_disassembler()
+        : disassembler_base(/* is_i8080= */ true)
+    {}
+
+    fast_u8 on_fetch() {
+        return (*this)->on_read_next_byte(); }
+
+    void on_halt() {
+        (*this)->on_format("hlt"); }
+    void on_ld_r_r(reg rd, reg rs) {
+        (*this)->on_format("mov R, R", rd, rs); }
+
+    void disassemble() { (*this)->decode(); }
+};
 
 template<typename D>
 class z80_disassembler : public z80_decoder<D>,
@@ -719,7 +751,9 @@ public:
     typedef z80_decoder<D> decoder;
     typedef typename decoder::state state;
 
-    z80_disassembler() {}
+    z80_disassembler()
+        : disassembler_base(/* is_i8080= */ false)
+    {}
 
     using state::get_index_rp_kind;
 
@@ -985,6 +1019,27 @@ public:
     fast_u16 get_de() const { return de; }
     void set_de(fast_u16 n) { de = n; }
 
+    fast_u16 get_sp() const { return sp; }
+    void set_sp(fast_u16 n) { sp = n; }
+
+    fast_u16 get_pc() const { return pc; }
+    void set_pc(fast_u16 n) { pc = n; }
+
+    fast_u16 get_memptr() const { return memptr; }
+    void set_memptr(fast_u16 n) { memptr = n; }
+
+    bool is_int_disabled() const { return int_disabled; }
+    void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
+    void enable_int() { set_is_int_disabled(false); }
+    void disable_int() { set_is_int_disabled(true); }
+
+    bool is_halted() const { return halted; }
+    void set_is_halted(bool is_halted) { halted = is_halted; }
+    void halt() { set_is_halted(true); }
+
+    fast_u16 get_last_read_addr() const { return last_read_addr; }
+    void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
+
     void ex_de_hl() { std::swap(de, hl); }
 
     void swap_bc(fast_u16 &alt_bc) { std::swap(bc, alt_bc); }
@@ -994,6 +1049,10 @@ public:
 
 private:
     fast_u16 bc = 0, de = 0, hl = 0, af = 0;
+    fast_u16 pc = 0, sp = 0, memptr = 0;
+    bool int_disabled = false;
+    bool halted = false;
+    fast_u16 last_read_addr = 0;
 };
 
 class i8080_state : public processor_state_base<i8080_decoder_state>
@@ -1039,17 +1098,8 @@ public:
     fast_u16 get_iy() const { return iy; }
     void set_iy(fast_u16 n) { iy = n; }
 
-    fast_u16 get_sp() const { return sp; }
-    void set_sp(fast_u16 n) { sp = n; }
-
-    fast_u16 get_pc() const { return pc; }
-    void set_pc(fast_u16 n) { pc = n; }
-
     fast_u16 get_ir() const { return ir; }
     void set_ir(fast_u16 n) { ir = n; }
-
-    fast_u16 get_memptr() const { return memptr; }
-    void set_memptr(fast_u16 n) { memptr = n; }
 
     bool get_iff1() const { return iff1; }
     void set_iff1(bool iff) { iff1 = iff; }
@@ -1059,11 +1109,6 @@ public:
 
     unsigned get_int_mode() const { return int_mode; }
     void set_int_mode(unsigned mode) { int_mode = mode; }
-
-    bool is_int_disabled() const { return int_disabled; }
-    void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
-    void enable_int() { set_is_int_disabled(false); }
-    void disable_int() { set_is_int_disabled(true); }
 
     fast_u8 get_r(reg r) {
         switch(r) {
@@ -1088,13 +1133,6 @@ public:
         unreachable("Unknown index register.");
     }
 
-    fast_u16 get_last_read_addr() const { return last_read_addr; }
-    void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
-
-    bool is_halted() const { return halted; }
-    void set_is_halted(bool is_halted) { halted = is_halted; }
-    void halt() { set_is_halted(true); }
-
     void ex_af_alt_af() {
         swap_af(alt_af);
     }
@@ -1106,12 +1144,10 @@ public:
     }
 
 private:
-    fast_u16 last_read_addr = 0;
-    bool int_disabled = false;
     fast_u16 ix = 0, iy = 0;
     fast_u16 alt_bc = 0, alt_de = 0, alt_hl = 0, alt_af = 0;
-    fast_u16 pc = 0, sp = 0, ir = 0, memptr = 0;
-    bool iff1 = false, iff2 = false, halted = false;
+    fast_u16 ir = 0;
+    bool iff1 = false, iff2 = false;
     unsigned int_mode = 0;
 };
 
@@ -1226,6 +1262,42 @@ public:
     fast_u16 get_pc_on_imm16_read() const { return (*this)->on_get_pc(); }
     void set_pc_on_imm16_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
+    void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
+        (*this)->on_set_addr_bus(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
+        (*this)->tick(ticks);
+        state::set_last_read_addr(addr);
+        return b;
+    }
+
+    fast_u8 on_3t_read_cycle(fast_u16 addr) {
+        return (*this)->on_read_cycle(addr, /* ticks= */ 3);
+    }
+
+    void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
+        (*this)->on_set_addr_bus(addr);
+        (*this)->on_write_access(addr, n);
+        (*this)->tick(ticks);
+    }
+
+    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_write_cycle(addr, n, /* ticks= */ 3);
+    }
+
+    void on_halt() {
+        state::halt();
+        (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
+
+    void on_step() {
+        state::enable_int();
+        (*this)->decode();
+    }
+
+    void step() { return (*this)->on_step(); }
+
 protected:
     derived *operator -> () {
         return static_cast<derived*>(this); }
@@ -1298,8 +1370,61 @@ protected:
 };
 
 template<typename D>
-class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>>
-{};
+class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>> {
+public:
+    typedef i8080_state state;
+
+    fast_u8 on_get_m() {
+        return (*this)->on_3t_read_cycle((*this)->on_get_hl()); }
+    void on_set_m(fast_u8 n) {
+        (*this)->on_3t_write_cycle((*this)->on_get_hl(), n); }
+
+    fast_u8 on_get_r(reg r) {
+        switch(r) {
+        case reg::b: return (*this)->on_get_b();
+        case reg::c: return (*this)->on_get_c();
+        case reg::d: return (*this)->on_get_d();
+        case reg::e: return (*this)->on_get_e();
+        case reg::at_hl: return (*this)->on_get_m();
+        case reg::a: return (*this)->on_get_a();
+        case reg::h: return (*this)->on_get_h();
+        case reg::l: return (*this)->on_get_l();
+        }
+        unreachable("Unknown register.");
+    }
+
+    void on_set_r(reg r, fast_u8 n) {
+        switch(r) {
+        case reg::b: return (*this)->on_set_b(n);
+        case reg::c: return (*this)->on_set_c(n);
+        case reg::d: return (*this)->on_set_d(n);
+        case reg::e: return (*this)->on_set_e(n);
+        case reg::at_hl: return (*this)->on_set_m(n);
+        case reg::a: return (*this)->on_set_a(n);
+        case reg::h: return (*this)->on_set_h(n);
+        case reg::l: return (*this)->on_set_l(n);
+        }
+        unreachable("Unknown register.");
+    }
+
+    fast_u8 on_fetch_cycle(fast_u16 addr) {
+        (*this)->on_set_addr_bus(addr);
+        fast_u8 b = (*this)->on_read_access(addr);
+        (*this)->tick(4);
+        state::set_last_read_addr(addr);
+        return b;
+    }
+
+    fast_u8 on_fetch() {
+        fast_u16 pc = (*this)->get_pc_on_fetch();
+        fast_u8 op = (*this)->on_fetch_cycle(pc);
+        (*this)->set_pc_on_fetch(inc16(pc));
+        return op;
+    }
+
+    void on_ld_r_r(reg rd, reg rs) {
+        (*this)->on_set_r(rd, (*this)->on_get_r(rs)); }
+};
 
 template<typename D>
 class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
@@ -1450,9 +1575,6 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
-    void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 on_get_ir() const { return (*this)->get_ir(); }
 
@@ -2021,9 +2143,6 @@ public:
         (*this)->on_set_index_rp(irp); }
     void on_exx() {
         exx(); }
-    void on_halt() {
-        halt();
-        (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_im(unsigned mode) {
         (*this)->on_set_int_mode(mode); }
     void on_in_a_n(fast_u8 n) {
@@ -2320,18 +2439,6 @@ public:
         (*this)->tick(2);
     }
 
-    fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
-        (*this)->on_set_addr_bus(addr);
-        fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(ticks);
-        set_last_read_addr(addr);
-        return b;
-    }
-
-    fast_u8 on_3t_read_cycle(fast_u16 addr) {
-        return (*this)->on_read_cycle(addr, /* ticks= */ 3);
-    }
-
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
         return (*this)->on_read_cycle(addr, /* ticks= */ 4);
     }
@@ -2342,16 +2449,6 @@ public:
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return (*this)->on_3t_read_cycle(addr);
-    }
-
-    void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
-        (*this)->on_set_addr_bus(addr);
-        (*this)->on_write_access(addr, n);
-        (*this)->tick(ticks);
-    }
-
-    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
-        (*this)->on_write_cycle(addr, n, /* ticks= */ 3);
     }
 
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
@@ -2475,13 +2572,6 @@ public:
         }
         return false;
     }
-
-    void on_step() {
-        enable_int();
-        (*this)->decode();
-    }
-
-    void step() { return (*this)->on_step(); }
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }

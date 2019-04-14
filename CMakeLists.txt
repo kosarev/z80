@@ -60,4 +60,5 @@ add_library(z80 STATIC z80.cpp)
 add_executable(tester tester.cpp)
 target_link_libraries(tester z80)
 
-add_test(disassembling_and_executing tester "${CMAKE_SOURCE_DIR}/tests")
+add_test(i8080_tests tester i8080 "${CMAKE_SOURCE_DIR}/tests_i8080")
+add_test(z80_tests tester z80 "${CMAKE_SOURCE_DIR}/tests_z80")
