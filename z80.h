@@ -186,6 +186,11 @@ public:
                 return (*this)->on_halt();
             return (*this)->decode_ld_r_r(rd, rs); }
         }
+        switch(op) {
+        case 0x00:
+            // NOP  f(4)
+            return (*this)->on_nop();
+        }
 
         handled = false;
     }
@@ -412,9 +417,6 @@ public:
             return (*this)->on_ld_a_at_rp(rp); }
         }
         switch(op) {
-        case 0x00:
-            // NOP  f(4)
-            return (*this)->on_nop();
         case 0x07:
             // RLCA  f(4)
             return (*this)->on_rlca();
@@ -699,42 +701,121 @@ bool is_two_operand_alu_instr(alu k);
 const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
 
-class disassembler_base {
+template<typename E>
+class disassembler_base : public E {
 public:
-    disassembler_base(bool is_i8080)
-        : is_i8080(is_i8080)
-    {}
+    typedef E decoder;
+    typedef typename decoder::derived derived;
+    typedef typename decoder::state state;
 
-    virtual ~disassembler_base() {}
-
-    virtual void on_output(const char *out) = 0;
+    disassembler_base() {}
 
     void on_format(const char *fmt) {
-        on_format_impl(fmt, /* args= */ nullptr);
+        (*this)->on_format_impl(fmt, /* args= */ nullptr);
     }
 
     template<typename... types>
     void on_format(const char *fmt, const types &... args) {
         const void *ptrs[] = { static_cast<const void*>(&args)... };
-        on_format_impl(fmt, ptrs);
+        (*this)->on_format_impl(fmt, ptrs);
     }
 
-    virtual void on_format_impl(const char *fmt, const void *args[]);
+    void on_nop() {
+        (*this)->on_format("nop"); }
 
-private:
-    bool is_i8080;
+protected:
+    derived *operator -> () { return static_cast<derived*>(this); }
+
+    class output_buff {
+    public:
+        output_buff() {}
+
+        const char *get_buff() const {
+            return buff;
+        }
+
+        void append(char c) {
+            assert(size < max_size);
+            buff[size++] = c;
+        }
+
+        void append(const char *str) {
+            for(const char *p = str; *p != '\0'; ++p)
+                append(*p);
+        }
+
+        void append_u8(fast_u8 n) {
+            char pad[32];
+            std::snprintf(pad, sizeof(pad), "0x%02x",
+                          static_cast<unsigned>(n));
+            append(pad);
+        }
+
+        void append_u(unsigned n) {
+            char pad[32];
+            std::snprintf(pad, sizeof(pad), "%u",
+                          static_cast<unsigned>(n));
+            append(pad);
+        }
+
+        void append_u16(fast_u16 n) {
+            char pad[32];
+            std::snprintf(pad, sizeof(pad), "0x%04x",
+                          static_cast<unsigned>(n));
+            append(pad);
+        }
+
+        void append_disp(int d) {
+            char pad[32];
+            std::snprintf(pad, sizeof(pad), "%c %d",
+                          static_cast<int>(d < 0 ? '-' : '+'),
+                          static_cast<int>(std::abs(d)));
+            append(pad);
+        }
+
+    private:
+        static const unsigned max_size = 32;
+        unsigned size = 0;
+        char buff[max_size];
+    };
+
+    template<typename T>
+    T get_arg(const void **&args) {
+        const T &value = *static_cast<const T*>(*args);
+        ++args;
+        return value;
+    }
 };
 
 template<typename D>
-class i8080_disassembler : public i8080_decoder<D>,
-                           public disassembler_base {
+class i8080_disassembler : public disassembler_base<i8080_decoder<D>> {
 public:
-    i8080_disassembler()
-        : disassembler_base(/* is_i8080= */ true)
-    {}
+    typedef D derived;
+    typedef disassembler_base<i8080_decoder<derived>> base;
+    typedef typename base::state state;
+
+    i8080_disassembler() {}
 
     fast_u8 on_fetch() {
         return (*this)->on_read_next_byte(); }
+
+    void on_format_impl(const char *fmt, const void *args[]) {
+        typename base::output_buff out;
+
+        for(const char *p = fmt; *p != '\0'; ++p) {
+            switch(*p) {
+            case 'R': {  // A register.
+                auto r = get_arg<reg>(args);
+                out.append(get_reg_name(r));
+                break; }
+            default:
+                out.append(*p);
+            }
+        }
+        out.append('\0');
+
+        (*this)->on_output(out.get_buff());
+    }
 
     void on_halt() {
         (*this)->on_format("hlt"); }
@@ -742,20 +823,24 @@ public:
         (*this)->on_format("mov R, R", rd, rs); }
 
     void disassemble() { (*this)->decode(); }
+
+protected:
+    template<typename T>
+    T get_arg(const void **&args) {
+        return base::template get_arg<T>(args);
+    }
 };
 
 template<typename D>
-class z80_disassembler : public z80_decoder<D>,
-                         public disassembler_base {
+class z80_disassembler : public disassembler_base<z80_decoder<D>> {
 public:
-    typedef z80_decoder<D> decoder;
-    typedef typename decoder::state state;
-
-    z80_disassembler()
-        : disassembler_base(/* is_i8080= */ false)
-    {}
+    typedef D derived;
+    typedef disassembler_base<z80_decoder<derived>> base;
+    typedef typename base::state state;
 
     using state::get_index_rp_kind;
+
+    z80_disassembler() {}
 
     fast_u8 on_fetch(bool m1 = true) {
         unused(m1);
@@ -788,6 +873,83 @@ public:
     void on_3t_exec_cycle() {}
     void on_4t_exec_cycle() {}
     void on_5t_exec_cycle() {}
+
+    void on_format_impl(const char *fmt, const void *args[]) {
+        typename base::output_buff out;
+
+        for(const char *p = fmt; *p != '\0'; ++p) {
+            switch(*p) {
+            case 'A': {  // ALU mnemonic.
+                auto k = get_arg<alu>(args);
+                out.append(get_mnemonic(k));
+                if(is_two_operand_alu_instr(k))
+                    out.append(" a,");
+                break; }
+            case 'O': {  // Rotation mnemonic.
+                auto k = get_arg<rot>(args);
+                out.append(get_mnemonic(k));
+                break; }
+            case 'R': {  // A register.
+                auto r = get_arg<reg>(args);
+                auto irp = get_arg<index_regp>(args);
+                auto d = get_arg<fast_u8>(args);
+                if(r != reg::at_hl || irp == index_regp::hl) {
+                    out.append(get_reg_name(r, irp));
+                } else {
+                    out.append('(');
+                    out.append(get_index_reg_name(irp));
+                    out.append(' ');
+                    out.append_disp(sign_extend8(d));
+                    out.append(')');
+                }
+                break; }
+            case 'P': {  // A register pair.
+                auto rp = get_arg<regp>(args);
+                auto irp = get_arg<index_regp>(args);
+                out.append(get_reg_name(rp, irp));
+                break; }
+            case 'G': {  // An alternative register pair.
+                auto rp = get_arg<regp2>(args);
+                auto irp = get_arg<index_regp>(args);
+                out.append(get_reg_name(rp, irp));
+                break; }
+            case 'N': {  // An 8-bit immediate operand.
+                auto n = get_arg<fast_u8>(args);
+                out.append_u8(n);
+                break; }
+            case 'W': {  // A 16-bit immediate operand.
+                auto nn = get_arg<fast_u16>(args);
+                out.append_u16(nn);
+                break; }
+            case 'U': {  // A decimal number.
+                auto u = get_arg<unsigned>(args);
+                out.append_u(u);
+                break; }
+            case 'C': {  // A condition operand.
+                auto cc = get_arg<condition>(args);
+                out.append(get_condition_name(cc));
+                break; }
+            case 'D': {  // A relative address.
+                auto d = get_arg<int>(args);
+                out.append("$ ");
+                out.append_disp(d);
+                break; }
+            case 'L': {  // A block transfer instruction.
+                auto k = get_arg<block_ld>(args);
+                out.append(get_mnemonic(k));
+                break; }
+            case 'M': {  // A block comparison instruction.
+                auto k = get_arg<block_cp>(args);
+                out.append(get_mnemonic(k));
+                break; }
+            default:
+                out.append(*p);
+            }
+        }
+        out.append('\0');
+
+        (*this)->on_output(out.get_buff());
+    }
 
     void on_noni_ed(fast_u8 op) {
         (*this)->on_format("noni N, N", 0xed, op); }
@@ -909,8 +1071,6 @@ public:
         (*this)->on_format("ld sp, P", regp::hl, irp); }
     void on_neg() {
         (*this)->on_format("neg"); }
-    void on_nop() {
-        (*this)->on_format("nop"); }
     void on_out_c_r(reg r) {
         if(r == reg::at_hl)
             (*this)->on_format("out (c), 0");
@@ -976,6 +1136,11 @@ public:
 
 protected:
     D *operator -> () { return static_cast<D*>(this); }
+
+    template<typename T>
+    T get_arg(const void **&args) {
+        return base::template get_arg<T>(args);
+    }
 };
 
 template<typename S>
@@ -1290,6 +1455,7 @@ public:
     void on_halt() {
         state::halt();
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
+    void on_nop() {}
 
     void on_step() {
         state::enable_int();
@@ -2258,7 +2424,6 @@ public:
         do_sub(a, f, n);
         (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
-    void on_nop() {}
     void on_out_c_r(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
         (*this)->on_set_memptr(inc16(bc));

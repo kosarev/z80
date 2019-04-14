@@ -200,7 +200,7 @@ public:
         return output_buff;
     }
 
-    void on_output(const char *out) override {
+    void on_output(const char *out) {
         std::snprintf(output_buff, max_output_buff_size, "%s", out);
     }
 
