@@ -186,6 +186,15 @@ public:
                 return (*this)->on_halt();
             return (*this)->decode_ld_r_r(rd, rs); }
         }
+        switch(op & (x_mask | z_mask)) {
+        case 0006: {
+            // LD/MVI r[y], n
+            // LD r, n              f(4)      r(3)
+            // LD (HL), n           f(4)      r(3) w(3)
+            // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
+            auto r = static_cast<reg>(y);
+            return (*this)->decode_ld_r_n(r); }
+        }
         switch(op) {
         case 0x00:
             // NOP  f(4)
@@ -221,6 +230,9 @@ public:
     typedef D derived;
     typedef decoder_base<derived, state> base;
 
+    void decode_ld_r_n(reg r) {
+        fast_u8 n = (*this)->on_3t_imm8_read();
+        (*this)->on_ld_r_n(r, n); }
     void decode_ld_r_r(reg rd, reg rs) {
         (*this)->on_ld_r_r(rd, rs); }
 
@@ -276,6 +288,16 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
+    void decode_ld_r_n(reg r) {
+        fast_u8 d, n;
+        if(r != reg::at_hl || is_index_rp_hl()) {
+            d = 0;
+            n = (*this)->on_3t_imm8_read();
+        } else {
+            d = (*this)->on_disp_read();
+            n = (*this)->on_5t_imm8_read();
+        }
+        return (*this)->on_ld_r_n(r, d, n); }
     void decode_ld_r_r(reg rd, reg rs) {
         (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
 
@@ -318,21 +340,6 @@ public:
             // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
             return (*this)->on_dec_r(r, read_disp_or_null(r)); }
-        case 0006: {
-            // LD r[y], n
-            // LD r, n              f(4)      r(3)
-            // LD (HL), n           f(4)      r(3) w(3)
-            // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
-            auto r = static_cast<reg>(y);
-            fast_u8 d, n;
-            if(r != reg::at_hl || is_index_rp_hl()) {
-                d = 0;
-                n = (*this)->on_3t_imm8_read();
-            } else {
-                d = (*this)->on_disp_read();
-                n = (*this)->on_5t_imm8_read();
-            }
-            return (*this)->on_ld_r_n(r, d, n); }
         case 0300: {
             // RET cc[y]  f(5) + r(3) r(3)
             (*this)->on_5t_fetch_cycle();
@@ -703,12 +710,17 @@ const char *get_condition_name(condition cc);
 
 template<typename E>
 class disassembler_base : public E {
+protected:
+    class output_buff;
+
 public:
     typedef E decoder;
     typedef typename decoder::derived derived;
     typedef typename decoder::state state;
 
     disassembler_base() {}
+
+    fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
 
     void on_format(const char *fmt) {
         (*this)->on_format_impl(fmt, /* args= */ nullptr);
@@ -718,6 +730,25 @@ public:
     void on_format(const char *fmt, const types &... args) {
         const void *ptrs[] = { static_cast<const void*>(&args)... };
         (*this)->on_format_impl(fmt, ptrs);
+    }
+
+    void on_format_char(char c, const void **&args, output_buff &out) {
+        switch(c) {
+        case 'N': {  // An 8-bit immediate operand.
+            auto n = get_arg<fast_u8>(args);
+            out.append_u8(n);
+            break; }
+        default:
+            out.append(c);
+        }
+    }
+
+    void on_format_impl(const char *fmt, const void *args[]) {
+        output_buff out;
+        for(const char *p = fmt; *p != '\0'; ++p)
+            (*this)->on_format_char(*p, args, out);
+        out.append('\0');
+        (*this)->on_output(out.get_buff());
     }
 
     void on_nop() {
@@ -799,26 +830,22 @@ public:
     fast_u8 on_fetch() {
         return (*this)->on_read_next_byte(); }
 
-    void on_format_impl(const char *fmt, const void *args[]) {
-        typename base::output_buff out;
-
-        for(const char *p = fmt; *p != '\0'; ++p) {
-            switch(*p) {
-            case 'R': {  // A register.
-                auto r = get_arg<reg>(args);
-                out.append(get_reg_name(r));
-                break; }
-            default:
-                out.append(*p);
-            }
+    void on_format_char(char c, const void **&args,
+                        typename base::output_buff &out) {
+        switch(c) {
+        case 'R': {  // A register.
+            auto r = get_arg<reg>(args);
+            out.append(get_reg_name(r));
+            break; }
+        default:
+            base::on_format_char(c, args, out);
         }
-        out.append('\0');
-
-        (*this)->on_output(out.get_buff());
     }
 
     void on_halt() {
         (*this)->on_format("hlt"); }
+    void on_ld_r_n(reg r, fast_u8 n) {
+        (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_format("mov R, R", rd, rs); }
 
@@ -856,7 +883,6 @@ public:
         return false;
     }
 
-    fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
     fast_u8 on_5t_imm8_read() { return (*this)->on_read_next_byte(); }
 
     fast_u16 on_3t_3t_imm16_read() {
@@ -874,81 +900,75 @@ public:
     void on_4t_exec_cycle() {}
     void on_5t_exec_cycle() {}
 
-    void on_format_impl(const char *fmt, const void *args[]) {
-        typename base::output_buff out;
-
-        for(const char *p = fmt; *p != '\0'; ++p) {
-            switch(*p) {
-            case 'A': {  // ALU mnemonic.
-                auto k = get_arg<alu>(args);
-                out.append(get_mnemonic(k));
-                if(is_two_operand_alu_instr(k))
-                    out.append(" a,");
-                break; }
-            case 'O': {  // Rotation mnemonic.
-                auto k = get_arg<rot>(args);
-                out.append(get_mnemonic(k));
-                break; }
-            case 'R': {  // A register.
-                auto r = get_arg<reg>(args);
-                auto irp = get_arg<index_regp>(args);
-                auto d = get_arg<fast_u8>(args);
-                if(r != reg::at_hl || irp == index_regp::hl) {
-                    out.append(get_reg_name(r, irp));
-                } else {
-                    out.append('(');
-                    out.append(get_index_reg_name(irp));
-                    out.append(' ');
-                    out.append_disp(sign_extend8(d));
-                    out.append(')');
-                }
-                break; }
-            case 'P': {  // A register pair.
-                auto rp = get_arg<regp>(args);
-                auto irp = get_arg<index_regp>(args);
-                out.append(get_reg_name(rp, irp));
-                break; }
-            case 'G': {  // An alternative register pair.
-                auto rp = get_arg<regp2>(args);
-                auto irp = get_arg<index_regp>(args);
-                out.append(get_reg_name(rp, irp));
-                break; }
-            case 'N': {  // An 8-bit immediate operand.
-                auto n = get_arg<fast_u8>(args);
-                out.append_u8(n);
-                break; }
-            case 'W': {  // A 16-bit immediate operand.
-                auto nn = get_arg<fast_u16>(args);
-                out.append_u16(nn);
-                break; }
-            case 'U': {  // A decimal number.
-                auto u = get_arg<unsigned>(args);
-                out.append_u(u);
-                break; }
-            case 'C': {  // A condition operand.
-                auto cc = get_arg<condition>(args);
-                out.append(get_condition_name(cc));
-                break; }
-            case 'D': {  // A relative address.
-                auto d = get_arg<int>(args);
-                out.append("$ ");
-                out.append_disp(d);
-                break; }
-            case 'L': {  // A block transfer instruction.
-                auto k = get_arg<block_ld>(args);
-                out.append(get_mnemonic(k));
-                break; }
-            case 'M': {  // A block comparison instruction.
-                auto k = get_arg<block_cp>(args);
-                out.append(get_mnemonic(k));
-                break; }
-            default:
-                out.append(*p);
+    void on_format_char(char c, const void **&args,
+                        typename base::output_buff &out) {
+        switch(c) {
+        case 'A': {  // ALU mnemonic.
+            auto k = get_arg<alu>(args);
+            out.append(get_mnemonic(k));
+            if(is_two_operand_alu_instr(k))
+                out.append(" a,");
+            break; }
+        case 'O': {  // Rotation mnemonic.
+            auto k = get_arg<rot>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'R': {  // A register.
+            auto r = get_arg<reg>(args);
+            auto irp = get_arg<index_regp>(args);
+            auto d = get_arg<fast_u8>(args);
+            if(r != reg::at_hl || irp == index_regp::hl) {
+                out.append(get_reg_name(r, irp));
+            } else {
+                out.append('(');
+                out.append(get_index_reg_name(irp));
+                out.append(' ');
+                out.append_disp(sign_extend8(d));
+                out.append(')');
             }
+            break; }
+        case 'P': {  // A register pair.
+            auto rp = get_arg<regp>(args);
+            auto irp = get_arg<index_regp>(args);
+            out.append(get_reg_name(rp, irp));
+            break; }
+        case 'G': {  // An alternative register pair.
+            auto rp = get_arg<regp2>(args);
+            auto irp = get_arg<index_regp>(args);
+            out.append(get_reg_name(rp, irp));
+            break; }
+        case 'N': {  // An 8-bit immediate operand.
+            auto n = get_arg<fast_u8>(args);
+            out.append_u8(n);
+            break; }
+        case 'W': {  // A 16-bit immediate operand.
+            auto nn = get_arg<fast_u16>(args);
+            out.append_u16(nn);
+            break; }
+        case 'U': {  // A decimal number.
+            auto u = get_arg<unsigned>(args);
+            out.append_u(u);
+            break; }
+        case 'C': {  // A condition operand.
+            auto cc = get_arg<condition>(args);
+            out.append(get_condition_name(cc));
+            break; }
+        case 'D': {  // A relative address.
+            auto d = get_arg<int>(args);
+            out.append("$ ");
+            out.append_disp(d);
+            break; }
+        case 'L': {  // A block transfer instruction.
+            auto k = get_arg<block_ld>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'M': {  // A block comparison instruction.
+            auto k = get_arg<block_cp>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        default:
+            base::on_format_char(c, args, out);
         }
-        out.append('\0');
-
-        (*this)->on_output(out.get_buff());
     }
 
     void on_noni_ed(fast_u8 op) {
@@ -1442,6 +1462,13 @@ public:
         return (*this)->on_read_cycle(addr, /* ticks= */ 3);
     }
 
+    fast_u8 on_3t_imm8_read() {
+        fast_u16 pc = (*this)->get_pc_on_imm8_read();
+        fast_u8 op = (*this)->on_3t_read_cycle(pc);
+        (*this)->set_pc_on_imm8_read(inc16(pc));
+        return op;
+    }
+
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         (*this)->on_write_access(addr, n);
@@ -1588,6 +1615,8 @@ public:
         return op;
     }
 
+    void on_ld_r_n(reg r, fast_u8 n) {
+        (*this)->on_set_r(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_set_r(rd, (*this)->on_get_r(rs)); }
 };
@@ -2645,13 +2674,6 @@ public:
         // TODO: Shall we set the address bus here?
         unused(addr, n);
         (*this)->tick(4);
-    }
-
-    fast_u8 on_3t_imm8_read() {
-        fast_u16 pc = (*this)->get_pc_on_imm8_read();
-        fast_u8 op = (*this)->on_3t_read_cycle(pc);
-        (*this)->set_pc_on_imm8_read(inc16(pc));
-        return op;
     }
 
     fast_u8 on_5t_imm8_read() {

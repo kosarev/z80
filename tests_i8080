@@ -17,7 +17,21 @@
  4 set_pc_on_halt 0001 -> 0000
  4 done
 
-# LD r, r
+# MVI r, n
+3eaf mvi a, 0xaf
+ 0 get_pc_on_fetch 0000
+ 0 fetch 3e at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read af at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read af at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 set_a 00 -> af
+ 7 done
+
+# MOV r, r
 47 mov b, a
  0 get_pc_on_fetch 0000
  0 fetch 47 at 0000
