@@ -199,6 +199,9 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0xc9:
+            // RET  f(4) r(3) r(3)
+            return (*this)->on_ret();
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
@@ -481,9 +484,6 @@ public:
         case 0xc3:
             // JP nn  f(4) r(3) r(3)
             return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
-        case 0xc9:
-            // RET  f(4) r(3) r(3)
-            return (*this)->on_ret();
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -757,6 +757,8 @@ public:
         (*this)->on_format("ei"); }
     void on_nop() {
         (*this)->on_format("nop"); }
+    void on_ret() {
+        (*this)->on_format("ret"); }
 
 protected:
     derived *operator -> () { return static_cast<derived*>(this); }
@@ -873,6 +875,8 @@ public:
 
     z80_disassembler() {}
 
+    // TODO: What if to replace 'on_fetch(false)' with a special
+    // method like 'on_non_m1_fetch()'?
     fast_u8 on_fetch(bool m1 = true) {
         unused(m1);
         return (*this)->on_read_next_byte(); }
@@ -1111,8 +1115,6 @@ public:
         else
             (*this)->on_format("res U, R, R", b, reg::at_hl, irp, d,
                                r, index_regp::hl, /* d= */ 0); }
-    void on_ret() {
-        (*this)->on_format("ret"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("ret C", cc); }
     void on_reti() {
@@ -1454,6 +1456,12 @@ public:
     fast_u16 get_pc_on_halt() const { return (*this)->on_get_pc(); }
     void set_pc_on_halt(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
+    void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
+    fast_u16 on_get_memptr() const { return get_memptr(); }
+    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
+
     void on_disable_int() { state::disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
@@ -1486,10 +1494,37 @@ public:
         (*this)->on_write_cycle(addr, n, /* ticks= */ 3);
     }
 
+    void on_push(fast_u16 nn) {
+        fast_u16 sp = (*this)->on_get_sp();
+        sp = dec16(sp);
+        (*this)->on_3t_write_cycle(sp, get_high8(nn));
+        sp = dec16(sp);
+        (*this)->on_3t_write_cycle(sp, get_low8(nn));
+        (*this)->on_set_sp(sp);
+    }
+
+    fast_u16 on_pop() {
+        fast_u16 sp = (*this)->on_get_sp();
+        fast_u8 lo = (*this)->on_3t_read_cycle(sp);
+        sp = inc16(sp);
+        fast_u8 hi = (*this)->on_3t_read_cycle(sp);
+        sp = inc16(sp);
+        (*this)->on_set_sp(sp);
+        return make16(hi, lo);
+    }
+
+    void on_return() {
+        fast_u16 pc = (*this)->on_pop();
+        (*this)->on_set_memptr(pc);
+        (*this)->set_pc_on_return(pc);
+    }
+
     void on_halt() {
         state::halt();
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_nop() {}
+    void on_ret() {
+        (*this)->on_return(); }
 
     void on_step() {
         state::enable_int();
@@ -1786,15 +1821,9 @@ public:
     fast_u16 get_pc_on_block_instr() const { return (*this)->on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
-    void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
-    void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
     fast_u16 on_get_ir() const { return (*this)->get_ir(); }
 
     fast_u16 get_ir_on_refresh() const { return (*this)->on_get_ir(); }
-
-    fast_u16 on_get_memptr() const { return get_memptr(); }
-    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
 
     bool on_get_iff1() const { return get_iff1(); }
     void on_set_iff1(bool iff1) { set_iff1(iff1); }
@@ -2083,35 +2112,10 @@ public:
         unused(op);
     }
 
-    void on_push(fast_u16 nn) {
-        fast_u16 sp = (*this)->on_get_sp();
-        sp = dec16(sp);
-        (*this)->on_3t_write_cycle(sp, get_high8(nn));
-        sp = dec16(sp);
-        (*this)->on_3t_write_cycle(sp, get_low8(nn));
-        (*this)->on_set_sp(sp);
-    }
-
-    fast_u16 on_pop() {
-        fast_u16 sp = (*this)->on_get_sp();
-        fast_u8 lo = (*this)->on_3t_read_cycle(sp);
-        sp = inc16(sp);
-        fast_u8 hi = (*this)->on_3t_read_cycle(sp);
-        sp = inc16(sp);
-        (*this)->on_set_sp(sp);
-        return make16(hi, lo);
-    }
-
     void on_call(fast_u16 nn) {
         (*this)->on_push((*this)->on_get_pc());
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_call(nn);
-    }
-
-    void on_return() {
-        fast_u16 pc = (*this)->on_pop();
-        (*this)->on_set_memptr(pc);
-        (*this)->set_pc_on_return(pc);
     }
 
     void on_jump(fast_u16 nn) {
@@ -2492,8 +2496,6 @@ public:
         (*this)->on_set_r(access_r, irp, d, v);
         if(irp != index_regp::hl && r != reg::at_hl)
             (*this)->on_set_r(r, irp, /* d= */ 0, v); }
-    void on_ret() {
-        (*this)->on_return(); }
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
