@@ -621,6 +621,15 @@ public:
         return base::on_disp_read();
     }
 
+    void set_iff_on_di(bool iff) {
+        input.read_and_match("set_iff_on_di %u -> %u",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(base::get_iff()),
+                             static_cast<unsigned>(iff));
+        input_level_guard guard(input);
+        base::set_iff_on_di(iff);
+    }
+
     void set_iff1_on_di(bool iff1) {
         input.read_and_match("set_iff1_on_di %u -> %u",
                              static_cast<unsigned>(get_ticks()),

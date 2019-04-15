@@ -7,6 +7,15 @@
 #
 #   Published under the MIT license.
 
+# DI
+f3 di
+ 0 get_pc_on_fetch 0000
+ 0 fetch f3 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 set_iff_on_di 0 -> 0
+ 4 done
+
 # EI
 fb ei
  0 get_pc_on_fetch 0000

@@ -199,6 +199,9 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0xf3:
+            // DI  f(4)
+            return (*this)->on_di();
         case 0xfb:
             // EI  f(4)
             return (*this)->on_ei();
@@ -515,9 +518,6 @@ public:
         case 0xed:
             // ED prefix.
             return decode_ed_prefixed();
-        case 0xf3:
-            // DI  f(4)
-            return (*this)->on_di();
         case 0xf9:
             // LD SP, HL        f(6)
             // LD SP, i    f(4) f(6)
@@ -751,6 +751,8 @@ public:
         (*this)->on_output(out.get_buff());
     }
 
+    void on_di() {
+        (*this)->on_format("di"); }
     void on_ei() {
         (*this)->on_format("ei"); }
     void on_nop() {
@@ -1010,8 +1012,6 @@ public:
     void on_dec_rp(regp rp) {
         index_regp irp = get_index_rp_kind();
         (*this)->on_format("dec P", rp, irp); }
-    void on_di() {
-        (*this)->on_format("di"); }
     void on_djnz(fast_u8 d) {
         (*this)->on_format("djnz D", sign_extend8(d) + 2); }
     void on_ex_af_alt_af() {
@@ -1628,6 +1628,8 @@ public:
         return op;
     }
 
+    void on_di() {
+        (*this)->set_iff_on_di(false); }
     void on_ei() {
         (*this)->set_iff_on_ei(true);
         (*this)->disable_int_on_ei(); }
