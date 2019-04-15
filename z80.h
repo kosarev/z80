@@ -202,6 +202,9 @@ public:
         case 0xc9:
             // RET  f(4) r(3) r(3)
             return (*this)->on_ret();
+        case 0xcd:
+            // CALL nn  f(4) r(3) r(4) w(3) w(3)
+            return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
@@ -487,9 +490,6 @@ public:
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
-        case 0xcd:
-            // CALL nn  f(4) r(3) r(4) w(3) w(3)
-            return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
         case 0xd3:
             // OUT (n), A  f(4) r(3) o(4)
             return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
@@ -722,6 +722,11 @@ public:
 
     fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
 
+    fast_u16 on_3t_4t_imm16_read() {
+        fast_u8 lo = (*this)->on_read_next_byte();
+        fast_u8 hi = (*this)->on_read_next_byte();
+        return make16(hi, lo); }
+
     void on_format(const char *fmt) {
         (*this)->on_format_impl(fmt, /* args= */ nullptr);
     }
@@ -738,6 +743,10 @@ public:
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
             break; }
+        case 'W': {  // A 16-bit immediate operand.
+            auto nn = get_arg<fast_u16>(args);
+            out.append_u16(nn);
+            break; }
         default:
             out.append(c);
         }
@@ -751,6 +760,8 @@ public:
         (*this)->on_output(out.get_buff());
     }
 
+    void on_call_nn(fast_u16 nn) {
+        (*this)->on_format("call W", nn); }
     void on_di() {
         (*this)->on_format("di"); }
     void on_ei() {
@@ -897,10 +908,6 @@ public:
         fast_u8 lo = (*this)->on_read_next_byte();
         fast_u8 hi = (*this)->on_read_next_byte();
         return make16(hi, lo); }
-    fast_u16 on_3t_4t_imm16_read() {
-        fast_u8 lo = (*this)->on_read_next_byte();
-        fast_u8 hi = (*this)->on_read_next_byte();
-        return make16(hi, lo); }
 
     fast_u8 on_disp_read() { return (*this)->on_read_next_byte(); }
 
@@ -949,10 +956,6 @@ public:
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
             break; }
-        case 'W': {  // A 16-bit immediate operand.
-            auto nn = get_arg<fast_u16>(args);
-            out.append_u16(nn);
-            break; }
         case 'U': {  // A decimal number.
             auto u = get_arg<unsigned>(args);
             out.append_u(u);
@@ -999,8 +1002,6 @@ public:
     void on_bit(unsigned b, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         (*this)->on_format("bit U, R", b, r, irp, d); }
-    void on_call_nn(fast_u16 nn) {
-        (*this)->on_format("call W", nn); }
     void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
         unused(cc_met);
         (*this)->on_format("call C, W", cc, nn); }
@@ -1477,11 +1478,24 @@ public:
         return (*this)->on_read_cycle(addr, /* ticks= */ 3);
     }
 
+    fast_u8 on_4t_read_cycle(fast_u16 addr) {
+        return (*this)->on_read_cycle(addr, /* ticks= */ 4);
+    }
+
     fast_u8 on_3t_imm8_read() {
         fast_u16 pc = (*this)->get_pc_on_imm8_read();
         fast_u8 op = (*this)->on_3t_read_cycle(pc);
         (*this)->set_pc_on_imm8_read(inc16(pc));
         return op;
+    }
+
+    fast_u16 on_3t_4t_imm16_read() {
+        fast_u16 pc = (*this)->get_pc_on_imm16_read();
+        fast_u8 lo = (*this)->on_3t_read_cycle(pc);
+        pc = inc16(pc);
+        fast_u8 hi = (*this)->on_4t_read_cycle(pc);
+        (*this)->set_pc_on_imm16_read(inc16(pc));
+        return make16(hi, lo);
     }
 
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
@@ -1513,12 +1527,20 @@ public:
         return make16(hi, lo);
     }
 
+    void on_call(fast_u16 nn) {
+        (*this)->on_push((*this)->on_get_pc());
+        (*this)->on_set_memptr(nn);
+        (*this)->set_pc_on_call(nn);
+    }
+
     void on_return() {
         fast_u16 pc = (*this)->on_pop();
         (*this)->on_set_memptr(pc);
         (*this)->set_pc_on_return(pc);
     }
 
+    void on_call_nn(fast_u16 nn) {
+        (*this)->on_call(nn); }
     void on_halt() {
         state::halt();
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
@@ -2112,12 +2134,6 @@ public:
         unused(op);
     }
 
-    void on_call(fast_u16 nn) {
-        (*this)->on_push((*this)->on_get_pc());
-        (*this)->on_set_memptr(nn);
-        (*this)->set_pc_on_call(nn);
-    }
-
     void on_jump(fast_u16 nn) {
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn);
@@ -2263,8 +2279,6 @@ public:
             v = get_high8((*this)->on_get_memptr());
         f |= v & (xf_mask | yf_mask);
         (*this)->on_set_f(f); }
-    void on_call_nn(fast_u16 nn) {
-        (*this)->on_call(nn); }
     void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
         unused(cc);
         if(cc_met)
@@ -2650,10 +2664,6 @@ public:
         (*this)->tick(2);
     }
 
-    fast_u8 on_4t_read_cycle(fast_u16 addr) {
-        return (*this)->on_read_cycle(addr, /* ticks= */ 4);
-    }
-
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
         return (*this)->on_read_cycle(addr, /* ticks= */ 5);
     }
@@ -2705,15 +2715,6 @@ public:
         fast_u8 lo = (*this)->on_3t_read_cycle(pc);
         pc = inc16(pc);
         fast_u8 hi = (*this)->on_3t_read_cycle(pc);
-        (*this)->set_pc_on_imm16_read(inc16(pc));
-        return make16(hi, lo);
-    }
-
-    fast_u16 on_3t_4t_imm16_read() {
-        fast_u16 pc = (*this)->get_pc_on_imm16_read();
-        fast_u8 lo = (*this)->on_3t_read_cycle(pc);
-        pc = inc16(pc);
-        fast_u8 hi = (*this)->on_4t_read_cycle(pc);
         (*this)->set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo);
     }
