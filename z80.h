@@ -228,10 +228,14 @@ public:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
         case 0xe9:
-            // PCHL             f(5)
-            // JP HL            f(4)
-            // JP i        f(4) f(4)
+            // PCHL        f(5)
+            // JP HL       f(4)
+            // JP i   f(4) f(4)
             return (*this)->decode_jp_irp();
+        case 0xeb:
+            // XCHG       f(5)
+            // EX DE, HL  f(4)
+            return (*this)->decode_ex_de_hl();
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
@@ -272,6 +276,9 @@ public:
     void decode_call_cc_nn(condition cc) {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_call_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
+    void decode_ex_de_hl() {
+        (*this)->on_5t_fetch_cycle();
+        (*this)->on_ex_de_hl(); }
     void decode_halt() {
         (*this)->on_7t_fetch_cycle();
         (*this)->on_halt(); }
@@ -344,6 +351,8 @@ public:
         fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
                                (*this)->on_3t_3t_imm16_read();
         return (*this)->on_call_cc_nn(cc, nn); }
+    void decode_ex_de_hl() {
+        (*this)->on_ex_de_hl(); }
     void decode_halt() {
         (*this)->on_halt(); }
     void decode_jp_irp() {
@@ -538,9 +547,6 @@ public:
             // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
             // EX (SP), i      f(4) f(4) r(3) r(4) w(3) w(5)
             return (*this)->on_ex_at_sp_irp();
-        case 0xeb:
-            // EX DE, HL  f(4)
-            return (*this)->on_ex_de_hl();
         case 0xed:
             // ED prefix.
             return decode_ed_prefixed();
@@ -901,6 +907,8 @@ public:
 
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
+    void on_ex_de_hl() {
+        (*this)->on_format("xchg"); }
     void on_halt() {
         (*this)->on_format("hlt"); }
     void on_jp_irp() {
@@ -1610,6 +1618,8 @@ public:
             (*this)->on_call(nn);
         else
             (*this)->on_set_memptr(nn); }
+    void on_ex_de_hl() {
+        state::ex_de_hl(); }
     void on_halt() {
         state::halt();
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
@@ -1839,7 +1849,6 @@ public:
     using state::halt;
     using state::set_last_read_addr;
     using state::ex_af_alt_af;
-    using state::ex_de_hl;
     using state::exx;
 
     using base::sf_bit;
@@ -2412,8 +2421,6 @@ public:
         (*this)->disable_int_on_ei(); }
     void on_ex_af_alt_af() {
         ex_af_alt_af(); }
-    void on_ex_de_hl() {
-        ex_de_hl(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = (*this)->on_get_sp();
         fast_u8 lo = (*this)->on_3t_read_cycle(sp);
