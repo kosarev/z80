@@ -191,6 +191,7 @@ public:
         switch(op & (x_mask | z_mask)) {
         case 0006: {
             // LD/MVI r[y], n
+            // MVI r, n             f(4)      r(3)
             // LD r, n              f(4)      r(3)
             // LD (HL), n           f(4)      r(3) w(3)
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
@@ -211,6 +212,10 @@ public:
             // cc not met:  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
             return (*this)->decode_call_cc_nn(cc); }
+        case 0307:
+            // RST y*8  f(5) w(3) w(3)
+            (*this)->on_5t_fetch_cycle();
+            return (*this)->on_rst(y * 8);
         }
         switch(op) {
         case 0x00:
@@ -393,10 +398,6 @@ public:
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
             return (*this)->on_alu_n(k, (*this)->on_3t_imm8_read()); }
-        case 0307:
-            // RST y*8  f(5) w(3) w(3)
-            (*this)->on_5t_fetch_cycle();
-            return (*this)->on_rst(y * 8);
         }
         if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
             // JR cc[y-4], d  f(4) r(3) + e(5)
@@ -799,6 +800,8 @@ public:
         (*this)->on_format("nop"); }
     void on_ret() {
         (*this)->on_format("ret"); }
+    void on_rst(fast_u16 nn) {
+        (*this)->on_format("rst W", nn); }
 
 protected:
     derived *operator -> () { return static_cast<derived*>(this); }
@@ -1165,8 +1168,6 @@ public:
         (*this)->on_format("rrca"); }
     void on_rrd() {
         (*this)->on_format("rrd"); }
-    void on_rst(fast_u16 nn) {
-        (*this)->on_format("rst W", nn); }
     void on_scf() {
         (*this)->on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
@@ -1608,12 +1609,15 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             (*this)->on_return(); }
+    void on_rst(fast_u16 nn) {
+        (*this)->on_call(nn); }
 
     void on_step() {
         state::enable_int();
         (*this)->decode();
     }
 
+    // TODO: Remove. Use on_step() instead.
     void step() { return (*this)->on_step(); }
 
 protected:
@@ -2635,8 +2639,6 @@ public:
         (*this)->on_set_a(a);
         (*this)->on_set_f(f);
         (*this)->on_3t_write_cycle(hl, get_low8(t)); }
-    void on_rst(fast_u16 nn) {
-        (*this)->on_call(nn); }
     void on_scf() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
