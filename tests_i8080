@@ -358,6 +358,16 @@ d7 rst 0x0010
 11 set_pc_on_call 0001 -> 0010
 11 done
 
+# STC
+37 stc
+ 0 get_pc_on_fetch 0000
+ 0 fetch 37 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_f 00
+ 4 set_f 00 -> 01
+ 4 done
+
 # SHLD nn
 227b5c shld 0x5c7b
  0 get_pc_on_fetch 0000

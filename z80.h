@@ -286,6 +286,10 @@ public:
             // STA nn      f(4) r(3) r(3) w(3)
             // LD (nn), A  f(4) r(3) r(3) w(3)
             return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
+        case 0x37:
+            // STC  f(4)
+            // SCF  f(4)
+            return (*this)->on_scf();
         case 0x3a:
             // LDA nn      f(4) r(3) r(3) r(3)
             // LD A, (nn)  f(4) r(3) r(3) r(3)
@@ -558,9 +562,6 @@ public:
         case 0x2f:
             // CPL  f(4)
             return (*this)->on_cpl();
-        case 0x37:
-            // SCF  f(4)
-            return (*this)->on_scf();
         case 0x3f:
             // CCF  f(4)
             return (*this)->on_ccf();
@@ -983,6 +984,8 @@ public:
         (*this)->on_format("push G", rp); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
+    void on_scf() {
+        (*this)->on_format("stc"); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -1841,6 +1844,8 @@ template<typename D>
 class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>> {
 public:
     typedef i8080_state state;
+    typedef i8080_decoder<D, i8080_state> decoder;
+    typedef processor_base<decoder> base;
 
     bool on_get_iff() const { return state::get_iff(); }
     void on_set_iff(bool iff) { state::set_iff(iff); }
@@ -1976,6 +1981,8 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
+    void on_scf() {
+        (*this)->on_set_f((*this)->on_get_f() | base::cf_mask); }
 };
 
 template<typename D>
