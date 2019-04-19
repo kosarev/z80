@@ -30,6 +30,31 @@ cddf0e call 0x0edf
 17 set_pc_on_call 0003 -> 0edf
 17 done
 
+# Ccc, nn
+c4550c cnz 0x0c55
+ 0 get_pc_on_fetch 0000
+ 0 fetch c4 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 5t_fetch
+ 5 3t_3t_imm16_read 0c55 at 0001
+ 5   get_pc_on_imm16_read 0001
+ 5   3t_read 55 at 0001
+ 5     set_addr_bus 0000 -> 0001
+ 8   3t_read 0c at 0002
+ 8     set_addr_bus 0001 -> 0002
+11   set_pc_on_imm16_read 0001 -> 0003
+11 get_f 00
+11 get_sp 0000
+11 3t_write 00 -> 00 at ffff
+11   set_addr_bus 0002 -> ffff
+14 3t_write 00 -> 03 at fffe
+14   set_addr_bus ffff -> fffe
+17 set_sp 0000 -> fffe
+17 set_memptr 0000 -> 0c55
+17 set_pc_on_call 0003 -> 0c55
+17 done
+
 # DI
 f3 di
  0 get_pc_on_fetch 0000

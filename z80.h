@@ -201,6 +201,16 @@ public:
             (*this)->on_5t_fetch_cycle();
             auto cc = static_cast<condition>(y);
             return (*this)->on_ret_cc(cc); }
+        case 0304: {
+            // Ccc[y], nn
+            // cc met:      f(5) r(3) r(3) w(3) w(3)
+            // cc not met:  f(5) r(3) r(3)
+            //
+            // CALL cc[y], nn
+            // cc met:      f(4) r(3) r(4) w(3) w(3)
+            // cc not met:  f(4) r(3) r(3)
+            auto cc = static_cast<condition>(y);
+            return (*this)->decode_call_cc_nn(cc); }
         }
         switch(op) {
         case 0x00:
@@ -249,6 +259,9 @@ public:
     typedef D derived;
     typedef decoder_base<derived, state> base;
 
+    void decode_call_cc_nn(condition cc) {
+        (*this)->on_5t_fetch_cycle();
+        (*this)->on_call_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
     void decode_halt() {
         (*this)->on_7t_fetch_cycle();
         (*this)->on_halt(); }
@@ -310,6 +323,14 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
+    void decode_call_cc_nn(condition cc) {
+        // TODO: Read imm16 as r(3) r(3) and do extra tick on
+        // execution if the condition is met. Do not check the
+        // condition on decoding.
+        bool cc_met = (*this)->check_condition(cc);
+        fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
+                               (*this)->on_3t_3t_imm16_read();
+        return (*this)->on_call_cc_nn(cc, nn); }
     void decode_halt() {
         (*this)->on_halt(); }
     void decode_ld_r_n(reg r) {
@@ -368,15 +389,6 @@ public:
             // JP cc[y], nn  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
             return (*this)->on_jp_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
-        case 0304: {
-            // CALL cc[y], nn
-            // cc met:      f(4) r(3) r(4) w(3) w(3)
-            // cc not met:  f(4) r(3) r(3)
-            auto cc = static_cast<condition>(y);
-            bool cc_met = (*this)->check_condition(cc);
-            fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
-                                   (*this)->on_3t_3t_imm16_read();
-            return (*this)->on_call_cc_nn(cc_met, cc, nn); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -731,6 +743,10 @@ public:
 
     fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
 
+    fast_u16 on_3t_3t_imm16_read() {
+        fast_u8 lo = (*this)->on_read_next_byte();
+        fast_u8 hi = (*this)->on_read_next_byte();
+        return make16(hi, lo); }
     fast_u16 on_3t_4t_imm16_read() {
         fast_u8 lo = (*this)->on_read_next_byte();
         fast_u8 hi = (*this)->on_read_next_byte();
@@ -874,6 +890,8 @@ public:
         }
     }
 
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        (*this)->on_format("cC W", cc, nn); }
     void on_halt() {
         (*this)->on_format("hlt"); }
     void on_ld_r_n(reg r, fast_u8 n) {
@@ -919,11 +937,6 @@ public:
     }
 
     fast_u8 on_5t_imm8_read() { return (*this)->on_read_next_byte(); }
-
-    fast_u16 on_3t_3t_imm16_read() {
-        fast_u8 lo = (*this)->on_read_next_byte();
-        fast_u8 hi = (*this)->on_read_next_byte();
-        return make16(hi, lo); }
 
     fast_u8 on_disp_read() { return (*this)->on_read_next_byte(); }
 
@@ -1014,8 +1027,7 @@ public:
     void on_bit(unsigned b, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         (*this)->on_format("bit U, R", b, r, irp, d); }
-    void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
-        unused(cc_met);
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("call C, W", cc, nn); }
     void on_ccf() {
         (*this)->on_format("ccf"); }
@@ -1225,6 +1237,8 @@ public:
     fast_u16 get_pc() const { return pc; }
     void set_pc(fast_u16 n) { pc = n; }
 
+    // TODO: Rename to WZ.
+    // TODO: Do we really need it for i8080?
     fast_u16 get_memptr() const { return memptr; }
     void set_memptr(fast_u16 n) { memptr = n; }
 
@@ -1521,14 +1535,20 @@ public:
         return op;
     }
 
+    fast_u16 on_3t_3t_imm16_read() {
+        fast_u16 pc = (*this)->get_pc_on_imm16_read();
+        fast_u8 lo = (*this)->on_3t_read_cycle(pc);
+        pc = inc16(pc);
+        fast_u8 hi = (*this)->on_3t_read_cycle(pc);
+        (*this)->set_pc_on_imm16_read(inc16(pc));
+        return make16(hi, lo); }
     fast_u16 on_3t_4t_imm16_read() {
         fast_u16 pc = (*this)->get_pc_on_imm16_read();
         fast_u8 lo = (*this)->on_3t_read_cycle(pc);
         pc = inc16(pc);
         fast_u8 hi = (*this)->on_4t_read_cycle(pc);
         (*this)->set_pc_on_imm16_read(inc16(pc));
-        return make16(hi, lo);
-    }
+        return make16(hi, lo); }
 
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
@@ -1573,6 +1593,11 @@ public:
 
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            (*this)->on_call(nn);
+        else
+            (*this)->on_set_memptr(nn); }
     void on_halt() {
         state::halt();
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
@@ -2304,12 +2329,6 @@ public:
             v = get_high8((*this)->on_get_memptr());
         f |= v & (xf_mask | yf_mask);
         (*this)->on_set_f(f); }
-    void on_call_cc_nn(bool cc_met, condition cc, fast_u16 nn) {
-        unused(cc);
-        if(cc_met)
-            (*this)->on_call(nn);
-        else
-            (*this)->on_set_memptr(nn); }
     void on_ccf() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
@@ -2726,15 +2745,6 @@ public:
         fast_u8 op = (*this)->on_5t_read_cycle(pc);
         (*this)->set_pc_on_imm8_read(inc16(pc));
         return op;
-    }
-
-    fast_u16 on_3t_3t_imm16_read() {
-        fast_u16 pc = (*this)->get_pc_on_imm16_read();
-        fast_u8 lo = (*this)->on_3t_read_cycle(pc);
-        pc = inc16(pc);
-        fast_u8 hi = (*this)->on_3t_read_cycle(pc);
-        (*this)->set_pc_on_imm16_read(inc16(pc));
-        return make16(hi, lo);
     }
 
     fast_u8 on_disp_read() {
