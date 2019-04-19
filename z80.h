@@ -246,6 +246,10 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x3a:
+            // LDA nn      f(4) r(3) r(3) r(3)
+            // LD A, (nn)  f(4) r(3) r(3) r(3)
+            return (*this)->on_ld_a_at_nn((*this)->on_3t_3t_imm16_read());
         case 0xc3:
             // JMP nn  f(4) r(3) r(3)
             // JP nn   f(4) r(3) r(3)
@@ -540,9 +544,6 @@ public:
         case 0x37:
             // SCF  f(4)
             return (*this)->on_scf();
-        case 0x3a:
-            // LD A, (nn)  f(4) r(3) r(3) r(3)
-            return (*this)->on_ld_a_at_nn((*this)->on_3t_3t_imm16_read());
         case 0x3f:
             // CCF  f(4)
             return (*this)->on_ccf();
@@ -935,6 +936,8 @@ public:
         (*this)->on_format("jmp W", nn); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("jC W", cc, nn); }
+    void on_ld_a_at_nn(fast_u16 nn) {
+        (*this)->on_format("lda W", nn); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1689,6 +1692,9 @@ public:
             (*this)->on_jump(nn);
         else
             (*this)->on_set_memptr(nn); }
+    void on_ld_a_at_nn(fast_u16 nn) {
+        (*this)->on_set_memptr(inc16(nn));
+        (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
@@ -2624,9 +2630,6 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
-    void on_ld_a_at_nn(fast_u16 nn) {
-        (*this)->on_set_memptr(inc16(nn));
-        (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_at_nn_a(fast_u16 nn) {
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
