@@ -79,9 +79,10 @@ fb ei
  0 fetch 47 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 get_a 00
- 4 set_b 00 -> 00
- 4 done
+ 4 5t_fetch
+ 5 get_a 00
+ 5 set_b 00 -> 00
+ 5 done
 
 # NOP
 00 nop

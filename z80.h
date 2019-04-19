@@ -174,11 +174,13 @@ public:
         case 0100: {
             // LD/MOV r[y], r[z] or
             // HALT/HLT (in place of LD (HL), (HL)/MOV M, M)
+            // MOV r, r             f(5)
             // LD r, r              f(4)
             // LD r, (HL)           f(4)           r(3)
             // LD r, (i+d)     f(4) f(4) r(3) e(5) r(3)
             // LD (HL), r           f(4)           w(3)
             // LD (i+d), r     f(4) f(4) r(3) e(5) w(3)
+            // HLT                  f(7)
             // HALT                 f(4)
             auto rd = static_cast<reg>(y);
             auto rs = static_cast<reg>(z);
@@ -1466,6 +1468,10 @@ public:
     void on_disable_int() { state::disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
+    void on_5t_fetch_cycle() {
+        (*this)->tick(1);
+    }
+
     fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
@@ -1693,6 +1699,7 @@ public:
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_set_r(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
+        (*this)->on_5t_fetch_cycle();
         (*this)->on_set_r(rd, (*this)->on_get_r(rs)); }
 };
 
@@ -2654,10 +2661,6 @@ public:
         (*this)->tick(2);
         set_last_read_addr(addr);
         return b;
-    }
-
-    void on_5t_fetch_cycle() {
-        (*this)->tick(1);
     }
 
     void on_6t_fetch_cycle() {
