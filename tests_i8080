@@ -119,6 +119,19 @@ d2d90a jnc 0x0ad9
 10 set_pc_on_jump 0003 -> 0ad9
 10 done
 
+# INX rp
+23 inx h
+ 0 get_pc_on_fetch 0000
+ 0 fetch 23 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 5t_fetch
+ 5 get_l 00
+ 5 get_h 00
+ 5 set_l 00 -> 01
+ 5 set_h 00 -> 00
+ 5 done
+
 # LDA nn
 3a8d5c lda 0x5c8d
  0 get_pc_on_fetch 0000

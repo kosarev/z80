@@ -228,6 +228,13 @@ public:
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
+        case 0003: {
+            // INC/INX rp[p]
+            // INX rp           f(5)
+            // INC rp           f(6)
+            // INC i       f(4) f(6)
+            auto rp = static_cast<regp>(p);
+            return (*this)->decode_inc_rp(rp); }
         case 0301: {
             // POP rp2[p]
             // POP rr           f(4) r(3) r(3)
@@ -352,6 +359,9 @@ public:
     void decode_halt() {
         (*this)->on_7t_fetch_cycle();
         (*this)->on_halt(); }
+    void decode_inc_rp(regp rp) {
+        (*this)->on_5t_fetch_cycle();
+        return (*this)->on_inc_rp(rp); }
     void decode_jp_irp() {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_jp_irp(); }
@@ -430,6 +440,9 @@ public:
         (*this)->on_halt(); }
     void decode_jp_irp() {
         (*this)->on_jp_irp(); }
+    void decode_inc_rp(regp rp) {
+        (*this)->on_6t_fetch_cycle();
+        return (*this)->on_inc_rp(rp); }
     void decode_ld_r_n(reg r) {
         fast_u8 d, n;
         if(r != reg::at_hl || is_index_rp_hl()) {
@@ -496,13 +509,6 @@ public:
             return (*this)->on_jr_cc(cc, (*this)->on_disp_read());
         }
         switch(op & (x_mask | z_mask | q_mask)) {
-        case 0003: {
-            // INC rp[p]
-            // INC rr           f(6)
-            // INC i       f(4) f(6)
-            (*this)->on_6t_fetch_cycle();
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_inc_rp(rp); }
         case 0011: {
             // ADD HL, rp[p]
             // ADD HL, rr           f(4) e(4) e(3)
@@ -941,6 +947,8 @@ public:
         (*this)->on_format("jmp W", nn); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("jC W", cc, nn); }
+    void on_inc_rp(regp rp) {
+        (*this)->on_format("inx P", rp); }
     void on_ld_a_at_nn(fast_u16 nn) {
         (*this)->on_format("lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -1707,6 +1715,8 @@ public:
             (*this)->on_jump(nn);
         else
             (*this)->on_set_memptr(nn); }
+    void on_inc_rp(regp rp) {
+        (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_ld_a_at_nn(fast_u16 nn) {
         (*this)->on_set_memptr(inc16(nn));
         (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
@@ -2627,8 +2637,6 @@ public:
                 hf_inc(v) | pf_inc(v);
         (*this)->on_set_r(r, irp, d, v);
         (*this)->on_set_f(f); }
-    void on_inc_rp(regp rp) {
-        (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jr(fast_u8 d) {
