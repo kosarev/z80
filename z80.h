@@ -243,6 +243,11 @@ public:
             return (*this)->on_push_rp(rp); }
         }
         switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
+        case 0002: {
+            // STAX rp[p]     f(4) w(3)
+            // LD (rp[p]), A  f(4) w(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_ld_at_rp_a(rp); }
         case 0012: {
             // LDAX rp[p]     f(4) r(3)
             // LD A, (rp[p])  f(4) r(3)
@@ -511,12 +516,6 @@ public:
             (*this)->on_6t_fetch_cycle();
             auto rp = static_cast<regp>(p);
             return (*this)->on_dec_rp(rp); }
-        }
-        switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
-        case 0002: {
-            // LD (rp[p]), A  f(4) w(3)
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_ld_at_rp_a(rp); }
         }
         switch(op) {
         case 0x07:
@@ -948,6 +947,8 @@ public:
         (*this)->on_format("sta W", nn); }
     void on_ld_a_at_rp(regp rp) {
         (*this)->on_format("ldax P", rp); }
+    void on_ld_at_rp_a(regp rp) {
+        (*this)->on_format("stax P", rp); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1717,6 +1718,11 @@ public:
         fast_u16 nn = (*this)->on_get_rp(rp);
         (*this)->on_set_memptr(inc16(nn));
         (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
+    void on_ld_at_rp_a(regp rp) {
+        fast_u16 nn = (*this)->on_get_rp(rp);
+        fast_u8 a = (*this)->on_get_a();
+        (*this)->on_set_memptr(make16(a, get_low8(nn + 1)));
+        (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
@@ -2674,11 +2680,6 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
-    void on_ld_at_rp_a(regp rp) {
-        fast_u16 nn = (*this)->on_get_rp(rp);
-        fast_u8 a = (*this)->on_get_a();
-        (*this)->on_set_memptr(make16(a, get_low8(nn + 1)));
-        (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_sp_irp() {
         (*this)->on_set_sp((*this)->on_get_index_rp()); }
     void on_neg() {
