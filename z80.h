@@ -272,6 +272,10 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x07:
+            // RLC   f(4)
+            // RLCA  f(4)
+            return (*this)->on_rlca();
         case 0x17:
             // RAL  f(4)
             // RLA  f(4)
@@ -550,9 +554,6 @@ public:
             return (*this)->on_add_irp_rp(rp); }
         }
         switch(op) {
-        case 0x07:
-            // RLCA  f(4)
-            return (*this)->on_rlca();
         case 0x08:
             // EX AF, AF'  f(4)
             return (*this)->on_ex_af_alt_af();
@@ -994,6 +995,8 @@ public:
         (*this)->on_format("ral"); }
     void on_rra() {
         (*this)->on_format("rar"); }
+    void on_rlca() {
+        (*this)->on_format("rlc"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
     void on_scf() {
@@ -2008,8 +2011,15 @@ public:
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
         fast_u8 r = (a >> 1) | ((f & base::cf_mask) ? 0x80 : 0);
-        f = (f & (0xff & ~base::cf_mask)) | base::cf_ari(a & 0x1);
+        f = (f & ~base::cf_mask) | base::cf_ari(a & 0x1);
         (*this)->on_set_a(r);
+        (*this)->on_set_f(f); }
+    void on_rlca() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a = rol8(a);
+        f = (f & ~base::cf_mask) | base::cf_ari(a & 0x1);
+        (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
     void on_scf() {
         (*this)->on_set_f((*this)->on_get_f() | base::cf_mask); }
