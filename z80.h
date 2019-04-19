@@ -272,6 +272,10 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x1f:
+            // RAR  f(4)
+            // RRA  f(4)
+            return (*this)->on_rra();
         case 0x22:
             // SHLD nn              f(4) r(3) r(3) w(3) w(3)
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
@@ -561,9 +565,6 @@ public:
         case 0x18:
             // JR d  f(4) r(3) e(5)
             return (*this)->on_jr((*this)->on_disp_read());
-        case 0x1f:
-            // RRA  f(4)
-            return (*this)->on_rra();
         case 0x27:
             // DAA  f(4)
             return (*this)->on_daa();
@@ -988,6 +989,8 @@ public:
         (*this)->on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
         (*this)->on_format("push G", rp); }
+    void on_rra() {
+        (*this)->on_format("rar"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
     void on_scf() {
@@ -1991,6 +1994,13 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
+    void on_rra() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 r = (a >> 1) | ((f & base::cf_mask) ? 0x80 : 0);
+        f = (f & (0xff & ~base::cf_mask)) | base::cf_ari(a & 0x1);
+        (*this)->on_set_a(r);
+        (*this)->on_set_f(f); }
     void on_scf() {
         (*this)->on_set_f((*this)->on_get_f() | base::cf_mask); }
 };
