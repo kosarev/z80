@@ -246,6 +246,11 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x22:
+            // SHLD nn              f(4) r(3) r(3) w(3) w(3)
+            // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
+            // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
+            return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
         case 0x2a:
             // LHLD nn              f(4) r(3) r(3) r(3) r(3)
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
@@ -533,10 +538,6 @@ public:
         case 0x1f:
             // RRA  f(4)
             return (*this)->on_rra();
-        case 0x22:
-            // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
-            // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
-            return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
         case 0x27:
             // DAA  f(4)
             return (*this)->on_daa();
@@ -952,6 +953,8 @@ public:
         (*this)->on_format("sphl"); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         (*this)->on_format("lhld W", nn); }
+    void on_ld_at_nn_irp(fast_u16 nn) {
+        (*this)->on_format("shld W", nn); }
     void on_pop_rp(regp2 rp) {
         (*this)->on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
@@ -1922,6 +1925,12 @@ public:
         (*this)->on_set_memptr(nn);
         fast_u8 hi = (*this)->on_3t_read_cycle(nn);
         (*this)->on_set_hl(make16(hi, lo)); }
+    void on_ld_at_nn_irp(fast_u16 nn) {
+        fast_u16 irp = (*this)->on_get_hl();
+        (*this)->on_3t_write_cycle(nn, get_low8(irp));
+        nn = inc16(nn);
+        (*this)->on_set_memptr(nn);
+        (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
 };
 
 template<typename D>
