@@ -168,8 +168,6 @@ public:
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
 
-        unused(p);  // TODO
-
         switch(op & x_mask) {
         case 0100: {
             // LD/MOV r[y], r[z] or
@@ -223,6 +221,12 @@ public:
             return (*this)->on_rst(y * 8);
         }
         switch(op & (x_mask | z_mask | q_mask)) {
+        case 0301: {
+            // POP rp2[p]
+            // POP rr           f(4) r(3) r(3)
+            // POP i       f(4) f(4) r(3) r(3)
+            auto rp = static_cast<regp2>(p);
+            return (*this)->on_pop_rp(rp); }
         case 0305: {
             // PUSH rp2[p]
             // PUSH rr          f(5) w(3) w(3)
@@ -481,12 +485,6 @@ public:
             (*this)->on_6t_fetch_cycle();
             auto rp = static_cast<regp>(p);
             return (*this)->on_dec_rp(rp); }
-        case 0301: {
-            // POP rp2[p]
-            // POP rr           f(4) r(3) r(3)
-            // POP i       f(4) f(4) r(3) r(3)
-            auto rp = static_cast<regp2>(p);
-            return (*this)->on_pop_rp(rp); }
         }
         switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
         case 0002: {
@@ -939,6 +937,8 @@ public:
         (*this)->on_format("mov R, R", rd, rs); }
     void on_ld_sp_irp() {
         (*this)->on_format("sphl"); }
+    void on_pop_rp(regp2 rp) {
+        (*this)->on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
         (*this)->on_format("push G", rp); }
     void on_ret_cc(condition cc) {
@@ -1664,6 +1664,8 @@ public:
         else
             (*this)->on_set_memptr(nn); }
     void on_nop() {}
+    void on_pop_rp(regp2 rp) {
+        (*this)->on_set_rp2(rp, (*this)->on_pop()); }
     void on_push_rp(regp2 rp) {
         (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_ret() {
@@ -1803,6 +1805,16 @@ public:
         case regp2::de: return (*this)->on_get_de();
         case regp2::hl: return (*this)->on_get_hl();
         case regp2::af: return (*this)->on_get_af();
+        }
+        unreachable("Unknown register.");
+    }
+
+    void on_set_rp2(regp2 rp, fast_u16 nn) {
+        switch(rp) {
+        case regp2::bc: return (*this)->on_set_bc(nn);
+        case regp2::de: return (*this)->on_set_de(nn);
+        case regp2::hl: return (*this)->on_set_hl(nn);
+        case regp2::af: return (*this)->on_set_af(nn);
         }
         unreachable("Unknown register.");
     }
@@ -2613,8 +2625,6 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
         (*this)->on_set_memptr(make16(a, inc8(n))); }
-    void on_pop_rp(regp2 rp) {
-        (*this)->on_set_rp2(rp, (*this)->on_pop()); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;

@@ -176,6 +176,22 @@ e9 pchl
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# POP rp2
+c1 pop b
+ 0 get_pc_on_fetch 0000
+ 0 fetch c1 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_sp 0000
+ 4 3t_read c1 at 0000
+ 4   set_addr_bus 0000 -> 0000
+ 7 3t_read 00 at 0001
+ 7   set_addr_bus 0000 -> 0001
+10 set_sp 0000 -> 0002
+10 set_c 00 -> c1
+10 set_b 00 -> 00
+10 done
+
 # PUSH rp2
 c5 push b
  0 get_pc_on_fetch 0000
