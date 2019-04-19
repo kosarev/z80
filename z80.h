@@ -222,8 +222,9 @@ public:
         }
         switch(op & (x_mask | z_mask | q_mask)) {
         case 0001: {
-            // LD rp[p], nn
-            // LD rr, nn        f(4) r(3) r(3)
+            // LD/LXI rp[p], nn
+            // LXI rp, nn       f(4) r(3) r(3)
+            // LD rp, nn        f(4) r(3) r(3)
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
