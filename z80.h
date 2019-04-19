@@ -248,6 +248,11 @@ public:
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
+        case 0xf9:
+            // SPHL            f(5)
+            // LD SP, HL       f(6)
+            // LD SP, i   f(4) f(6)
+            return (*this)->decode_ld_sp_irp();
         case 0xfb:
             // EI  f(4)
             return (*this)->on_ei();
@@ -299,6 +304,9 @@ public:
         (*this)->on_ld_r_n(r, n); }
     void decode_ld_r_r(reg rd, reg rs) {
         (*this)->on_ld_r_r(rd, rs); }
+    void decode_ld_sp_irp() {
+        (*this)->on_5t_fetch_cycle();
+        return (*this)->on_ld_sp_irp(); }
 
     void on_decode() {
         fast_u8 op = (*this)->on_fetch();
@@ -378,6 +386,9 @@ public:
         return (*this)->on_ld_r_n(r, d, n); }
     void decode_ld_r_r(reg rd, reg rs) {
         (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
+    void decode_ld_sp_irp() {
+        (*this)->on_6t_fetch_cycle();
+        return (*this)->on_ld_sp_irp(); }
 
     void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
@@ -552,11 +563,6 @@ public:
         case 0xed:
             // ED prefix.
             return decode_ed_prefixed();
-        case 0xf9:
-            // LD SP, HL        f(6)
-            // LD SP, i    f(4) f(6)
-            (*this)->on_6t_fetch_cycle();
-            return (*this)->on_ld_sp_irp();
         case 0xfd:
             // FD prefix (IY-indexed instructions).
             reset_index_rp = false;
@@ -923,6 +929,8 @@ public:
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_format("mov R, R", rd, rs); }
+    void on_ld_sp_irp() {
+        (*this)->on_format("sphl"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
 
@@ -1760,12 +1768,9 @@ public:
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(4);
         state::set_last_read_addr(addr);
-        return b;
-    }
-
+        return b; }
     void on_7t_fetch_cycle() {
-        (*this)->tick(3);
-    }
+        (*this)->tick(3); }
 
     fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
@@ -1786,6 +1791,8 @@ public:
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_set_r(rd, (*this)->on_get_r(rs)); }
+    void on_ld_sp_irp() {
+        (*this)->on_set_sp((*this)->on_get_hl()); }
 };
 
 template<typename D>
