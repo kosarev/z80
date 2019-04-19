@@ -236,6 +236,12 @@ public:
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
+        case 0xe3:
+            // EX (SP), irp / XHTL
+            // XTHL                 f(4) r(3) r(3) w(3) w(5)
+            // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
+            // EX (SP), i      f(4) f(4) r(3) r(4) w(3) w(5)
+            return (*this)->on_ex_at_sp_irp();
         case 0xe9:
             // PCHL        f(5)
             // JP HL       f(4)
@@ -555,11 +561,6 @@ public:
             // DD prefix (IX-indexed instructions).
             reset_index_rp = false;
             return (*this)->on_set_index_rp_kind(index_regp::ix);
-        case 0xe3:
-            // EX (SP), irp
-            // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
-            // EX (SP), i      f(4) f(4) r(3) r(4) w(3) w(5)
-            return (*this)->on_ex_at_sp_irp();
         case 0xed:
             // ED prefix.
             return decode_ed_prefixed();
@@ -917,6 +918,8 @@ public:
         (*this)->on_format("cC W", cc, nn); }
     void on_ex_de_hl() {
         (*this)->on_format("xchg"); }
+    void on_ex_at_sp_irp() {
+        (*this)->on_format("xthl"); }
     void on_halt() {
         (*this)->on_format("hlt"); }
     void on_jp_irp() {
@@ -1583,6 +1586,8 @@ public:
         (*this)->tick(ticks); }
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_write_cycle(addr, n, /* ticks= */ 3); }
+    void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
+        (*this)->on_write_cycle(addr, n, /* ticks= */ 5); }
 
     void on_push(fast_u16 nn) {
         fast_u16 sp = (*this)->on_get_sp();
@@ -1784,6 +1789,19 @@ public:
     void on_ei() {
         (*this)->set_iff_on_ei(true);
         (*this)->disable_int_on_ei(); }
+    void on_ex_at_sp_irp() {
+        fast_u16 sp = (*this)->on_get_sp();
+        fast_u8 lo = (*this)->on_3t_read_cycle(sp);
+        sp = inc16(sp);
+        fast_u8 hi = (*this)->on_3t_read_cycle(sp);
+        fast_u16 nn = make16(hi, lo);
+        fast_u16 hl = (*this)->on_get_hl();
+        std::swap(nn, hl);
+        (*this)->on_3t_write_cycle(sp, get_high8(nn));
+        sp = dec16(sp);
+        (*this)->on_5t_write_cycle(sp, get_low8(nn));
+        (*this)->on_set_memptr(hl);
+        (*this)->on_set_hl(hl); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_hl()); }
     void on_ld_r_n(reg r, fast_u8 n) {
@@ -2720,10 +2738,6 @@ public:
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return (*this)->on_3t_read_cycle(addr);
-    }
-
-    void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
-        (*this)->on_write_cycle(addr, n, /* ticks= */ 5);
     }
 
     void on_3t_exec_cycle() {
