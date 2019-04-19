@@ -282,6 +282,10 @@ public:
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
             return (*this)->on_ld_irp_at_nn((*this)->on_3t_3t_imm16_read());
+        case 0x2f:
+            // CMA  f(4)
+            // CPL  f(4)
+            return (*this)->on_cpl();
         case 0x32:
             // STA nn      f(4) r(3) r(3) w(3)
             // LD (nn), A  f(4) r(3) r(3) w(3)
@@ -563,9 +567,6 @@ public:
         case 0x27:
             // DAA  f(4)
             return (*this)->on_daa();
-        case 0x2f:
-            // CPL  f(4)
-            return (*this)->on_cpl();
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -941,12 +942,14 @@ public:
         }
     }
 
-    void on_dec_rp(regp rp) {
-        (*this)->on_format("dcx P", rp); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
     void on_ccf() {
         (*this)->on_format("cmc"); }
+    void on_cpl() {
+        (*this)->on_format("cma"); }
+    void on_dec_rp(regp rp) {
+        (*this)->on_format("dcx P", rp); }
     void on_ex_de_hl() {
         (*this)->on_format("xchg"); }
     void on_ex_at_sp_irp() {
@@ -1947,6 +1950,8 @@ public:
 
     void on_ccf() {
         (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
+    void on_cpl() {
+        (*this)->on_set_a((*this)->on_get_a() ^ 0xff); }
     void on_di() {
         (*this)->set_iff_on_di(false); }
     void on_ei() {
