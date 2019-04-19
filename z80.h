@@ -228,6 +228,13 @@ public:
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
+        case 0013: {
+            // DEC/DCX rp[p]
+            // DCX rp           f(5)
+            // DEC rp           f(6)
+            // DEC i       f(4) f(6)
+            auto rp = static_cast<regp>(p);
+            return (*this)->decode_dec_rp(rp); }
         case 0003: {
             // INC/INX rp[p]
             // INX rp           f(5)
@@ -353,6 +360,9 @@ public:
     void decode_call_cc_nn(condition cc) {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_call_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
+    void decode_dec_rp(regp rp) {
+        (*this)->on_5t_fetch_cycle();
+        return (*this)->on_dec_rp(rp); }
     void decode_ex_de_hl() {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_ex_de_hl(); }
@@ -434,6 +444,9 @@ public:
         fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
                                (*this)->on_3t_3t_imm16_read();
         return (*this)->on_call_cc_nn(cc, nn); }
+    void decode_dec_rp(regp rp) {
+        (*this)->on_6t_fetch_cycle();
+        return (*this)->on_dec_rp(rp); }
     void decode_ex_de_hl() {
         (*this)->on_ex_de_hl(); }
     void decode_halt() {
@@ -515,13 +528,6 @@ public:
             // ADD i, rr       f(4) f(4) e(4) e(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_add_irp_rp(rp); }
-        case 0013: {
-            // DEC rp[p]
-            // DEC rr           f(6)
-            // DEC i       f(4) f(6)
-            (*this)->on_6t_fetch_cycle();
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_dec_rp(rp); }
         }
         switch(op) {
         case 0x07:
@@ -933,6 +939,8 @@ public:
         }
     }
 
+    void on_dec_rp(regp rp) {
+        (*this)->on_format("dcx P", rp); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
     void on_ex_de_hl() {
@@ -1695,6 +1703,8 @@ public:
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
 
+    void on_dec_rp(regp rp) {
+        (*this)->on_set_rp(rp, dec16((*this)->on_get_rp(rp))); }
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2578,8 +2588,6 @@ public:
                 hf_dec(v) | pf_dec(v) | nf_mask;
         (*this)->on_set_r(r, irp, d, v);
         (*this)->on_set_f(f); }
-    void on_dec_rp(regp rp) {
-        (*this)->on_set_rp(rp, dec16((*this)->on_get_rp(rp))); }
     void on_di() {
         (*this)->set_iff1_on_di(false);
         (*this)->set_iff2_on_di(false); }
