@@ -276,6 +276,10 @@ public:
             // RLC   f(4)
             // RLCA  f(4)
             return (*this)->on_rlca();
+        case 0x0f:
+            // RRC   f(4)
+            // RRCA  f(4)
+            return (*this)->on_rrca();
         case 0x17:
             // RAL  f(4)
             // RLA  f(4)
@@ -557,9 +561,6 @@ public:
         case 0x08:
             // EX AF, AF'  f(4)
             return (*this)->on_ex_af_alt_af();
-        case 0x0f:
-            // RRCA  f(4)
-            return (*this)->on_rrca();
         case 0x10:
             // DJNZ  f(5) r(3) + e(5)
             (*this)->on_5t_fetch_cycle();
@@ -997,6 +998,8 @@ public:
         (*this)->on_format("rar"); }
     void on_rlca() {
         (*this)->on_format("rlc"); }
+    void on_rrca() {
+        (*this)->on_format("rrc"); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
     void on_scf() {
@@ -2019,6 +2022,13 @@ public:
         fast_u8 f = (*this)->on_get_f();
         a = rol8(a);
         f = (f & ~base::cf_mask) | base::cf_ari(a & 0x1);
+        (*this)->on_set_a(a);
+        (*this)->on_set_f(f); }
+    void on_rrca() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        a = ror8(a);
+        f = (f & ~base::cf_mask) | base::cf_ari(a & 0x80);
         (*this)->on_set_a(a);
         (*this)->on_set_f(f); }
     void on_scf() {
