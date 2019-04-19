@@ -221,6 +221,10 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0xc3:
+            // JMP nn  f(4) r(3) r(3)
+            // JP nn   f(4) r(3) r(3)
+            return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
         case 0xc9:
             // RET  f(4) r(3) r(3)
             return (*this)->on_ret();
@@ -523,9 +527,6 @@ public:
         case 0x3f:
             // CCF  f(4)
             return (*this)->on_ccf();
-        case 0xc3:
-            // JP nn  f(4) r(3) r(3)
-            return (*this)->on_jp_nn((*this)->on_3t_3t_imm16_read());
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -913,6 +914,8 @@ public:
         (*this)->on_format("hlt"); }
     void on_jp_irp() {
         (*this)->on_format("pchl"); }
+    void on_jp_nn(fast_u16 nn) {
+        (*this)->on_format("jmp W", nn); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1537,24 +1540,17 @@ public:
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->tick(ticks);
         state::set_last_read_addr(addr);
-        return b;
-    }
-
+        return b; }
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
-        return (*this)->on_read_cycle(addr, /* ticks= */ 3);
-    }
-
+        return (*this)->on_read_cycle(addr, /* ticks= */ 3); }
     fast_u8 on_4t_read_cycle(fast_u16 addr) {
-        return (*this)->on_read_cycle(addr, /* ticks= */ 4);
-    }
+        return (*this)->on_read_cycle(addr, /* ticks= */ 4); }
 
     fast_u8 on_3t_imm8_read() {
         fast_u16 pc = (*this)->get_pc_on_imm8_read();
         fast_u8 op = (*this)->on_3t_read_cycle(pc);
         (*this)->set_pc_on_imm8_read(inc16(pc));
-        return op;
-    }
-
+        return op; }
     fast_u16 on_3t_3t_imm16_read() {
         fast_u16 pc = (*this)->get_pc_on_imm16_read();
         fast_u8 lo = (*this)->on_3t_read_cycle(pc);
@@ -1573,12 +1569,9 @@ public:
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         (*this)->on_write_access(addr, n);
-        (*this)->tick(ticks);
-    }
-
+        (*this)->tick(ticks); }
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
-        (*this)->on_write_cycle(addr, n, /* ticks= */ 3);
-    }
+        (*this)->on_write_cycle(addr, n, /* ticks= */ 3); }
 
     void on_push(fast_u16 nn) {
         fast_u16 sp = (*this)->on_get_sp();
@@ -1586,9 +1579,7 @@ public:
         (*this)->on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         (*this)->on_3t_write_cycle(sp, get_low8(nn));
-        (*this)->on_set_sp(sp);
-    }
-
+        (*this)->on_set_sp(sp); }
     fast_u16 on_pop() {
         fast_u16 sp = (*this)->on_get_sp();
         fast_u8 lo = (*this)->on_3t_read_cycle(sp);
@@ -1596,20 +1587,18 @@ public:
         fast_u8 hi = (*this)->on_3t_read_cycle(sp);
         sp = inc16(sp);
         (*this)->on_set_sp(sp);
-        return make16(hi, lo);
-    }
-
+        return make16(hi, lo); }
     void on_call(fast_u16 nn) {
         (*this)->on_push((*this)->on_get_pc());
         (*this)->on_set_memptr(nn);
-        (*this)->set_pc_on_call(nn);
-    }
-
+        (*this)->set_pc_on_call(nn); }
     void on_return() {
         fast_u16 pc = (*this)->on_pop();
         (*this)->on_set_memptr(pc);
-        (*this)->set_pc_on_return(pc);
-    }
+        (*this)->set_pc_on_return(pc); }
+    void on_jump(fast_u16 nn) {
+        (*this)->on_set_memptr(nn);
+        (*this)->set_pc_on_jump(nn); }
 
     void on_call_nn(fast_u16 nn) {
         (*this)->on_call(nn); }
@@ -1624,6 +1613,8 @@ public:
         state::halt();
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
+    void on_jp_nn(fast_u16 nn) {
+        (*this)->on_jump(nn); }
     void on_nop() {}
     void on_ret() {
         (*this)->on_return(); }
@@ -2207,11 +2198,6 @@ public:
         unused(op);
     }
 
-    void on_jump(fast_u16 nn) {
-        (*this)->on_set_memptr(nn);
-        (*this)->set_pc_on_jump(nn);
-    }
-
     void on_relative_jump(fast_u8 d) {
         (*this)->on_5t_exec_cycle();
         (*this)->on_jump(get_disp_target((*this)->get_pc_on_jump(), d));
@@ -2472,8 +2458,6 @@ public:
             (*this)->on_set_memptr(nn); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
-    void on_jp_nn(fast_u16 nn) {
-        (*this)->on_jump(nn); }
     void on_jr(fast_u8 d) {
         (*this)->on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
