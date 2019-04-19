@@ -196,6 +196,11 @@ public:
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
             auto r = static_cast<reg>(y);
             return (*this)->decode_ld_r_n(r); }
+        case 0300: {
+            // RET cc[y]/Rcc[y]  f(5) + r(3) r(3)
+            (*this)->on_5t_fetch_cycle();
+            auto cc = static_cast<condition>(y);
+            return (*this)->on_ret_cc(cc); }
         }
         switch(op) {
         case 0x00:
@@ -359,11 +364,6 @@ public:
             // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
             return (*this)->on_dec_r(r, read_disp_or_null(r)); }
-        case 0300: {
-            // RET cc[y]  f(5) + r(3) r(3)
-            (*this)->on_5t_fetch_cycle();
-            auto cc = static_cast<condition>(y);
-            return (*this)->on_ret_cc(cc); }
         case 0302: {
             // JP cc[y], nn  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
@@ -727,6 +727,8 @@ public:
 
     disassembler_base() {}
 
+    void on_5t_fetch_cycle() {}
+
     fast_u8 on_3t_imm8_read() { return (*this)->on_read_next_byte(); }
 
     fast_u16 on_3t_4t_imm16_read() {
@@ -746,6 +748,10 @@ public:
 
     void on_format_char(char c, const void **&args, output_buff &out) {
         switch(c) {
+        case 'C': {  // A condition operand.
+            auto cc = get_arg<condition>(args);
+            out.append(get_condition_name(cc));
+            break; }
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
@@ -874,6 +880,8 @@ public:
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_format("mov R, R", rd, rs); }
+    void on_ret_cc(condition cc) {
+        (*this)->on_format("rC", cc); }
 
     void disassemble() { (*this)->decode(); }
 
@@ -900,7 +908,6 @@ public:
     fast_u8 on_fetch(bool m1 = true) {
         unused(m1);
         return (*this)->on_read_next_byte(); }
-    void on_5t_fetch_cycle() {}
     void on_6t_fetch_cycle() {}
 
     // 'call cc, nn' instructions require this function to disambiguate between
@@ -968,10 +975,6 @@ public:
         case 'U': {  // A decimal number.
             auto u = get_arg<unsigned>(args);
             out.append_u(u);
-            break; }
-        case 'C': {  // A condition operand.
-            auto cc = get_arg<condition>(args);
-            out.append(get_condition_name(cc));
             break; }
         case 'D': {  // A relative address.
             auto d = get_arg<int>(args);
@@ -1475,6 +1478,22 @@ public:
     void on_disable_int() { state::disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
+    fast_u8 get_flag_mask(condition cc) {
+        switch(cc / 2) {
+        case 0: return zf_mask;
+        case 1: return cf_mask;
+        case 2: return pf_mask;
+        case 3: return sf_mask;
+        }
+        unreachable("Unknown condition code.");
+    }
+
+    bool check_condition(condition cc) {
+        bool actual = (*this)->on_get_f() & get_flag_mask(cc);
+        bool expected = cc & 1;
+        return actual == expected;
+    }
+
     void on_5t_fetch_cycle() {
         (*this)->tick(1);
     }
@@ -1561,6 +1580,9 @@ public:
     void on_nop() {}
     void on_ret() {
         (*this)->on_return(); }
+    void on_ret_cc(condition cc) {
+        if(check_condition(cc))
+            (*this)->on_return(); }
 
     void on_step() {
         state::enable_int();
@@ -2132,22 +2154,6 @@ public:
         }
     }
 
-    fast_u8 get_flag_mask(condition cc) {
-        switch(cc / 2) {
-        case 0: return zf_mask;
-        case 1: return cf_mask;
-        case 2: return pf_mask;
-        case 3: return sf_mask;
-        }
-        unreachable("Unknown condition code.");
-    }
-
-    bool check_condition(condition cc) {
-        bool actual = (*this)->on_get_f() & get_flag_mask(cc);
-        bool expected = cc & 1;
-        return actual == expected;
-    }
-
     void on_noni_ed(fast_u8 op) {
         // TODO: Forbid INT after this instruction.
         unused(op);
@@ -2420,7 +2426,7 @@ public:
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
+        if(base::check_condition(cc))
             (*this)->on_jump(nn);
         else
             (*this)->on_set_memptr(nn); }
@@ -2431,7 +2437,7 @@ public:
     void on_jr(fast_u8 d) {
         (*this)->on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
-        if(check_condition(cc))
+        if(base::check_condition(cc))
             (*this)->on_relative_jump(d); }
     void on_ld_a_r() {
         fast_u8 n = (*this)->on_get_r_reg();
@@ -2529,9 +2535,6 @@ public:
         (*this)->on_set_r(access_r, irp, d, v);
         if(irp != index_regp::hl && r != reg::at_hl)
             (*this)->on_set_r(r, irp, /* d= */ 0, v); }
-    void on_ret_cc(condition cc) {
-        if(check_condition(cc))
-            (*this)->on_return(); }
     void on_reti() {
         (*this)->on_return(); }
     void on_retn() {
