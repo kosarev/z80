@@ -68,6 +68,16 @@ c4550c cnz 0x0c55
  5 set_h 00 -> ff
  5 done
 
+# CMC
+3f cmc
+ 0 get_pc_on_fetch 0000
+ 0 fetch 3f at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_f 00
+ 4 set_f 00 -> 01
+ 4 done
+
 # DI
 f3 di
  0 get_pc_on_fetch 0000

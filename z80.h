@@ -290,6 +290,10 @@ public:
             // STC  f(4)
             // SCF  f(4)
             return (*this)->on_scf();
+        case 0x3f:
+            // CMC  f(4)
+            // CCF  f(4)
+            return (*this)->on_ccf();
         case 0x3a:
             // LDA nn      f(4) r(3) r(3) r(3)
             // LD A, (nn)  f(4) r(3) r(3) r(3)
@@ -562,9 +566,6 @@ public:
         case 0x2f:
             // CPL  f(4)
             return (*this)->on_cpl();
-        case 0x3f:
-            // CCF  f(4)
-            return (*this)->on_ccf();
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -944,6 +945,8 @@ public:
         (*this)->on_format("dcx P", rp); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
+    void on_ccf() {
+        (*this)->on_format("cmc"); }
     void on_ex_de_hl() {
         (*this)->on_format("xchg"); }
     void on_ex_at_sp_irp() {
@@ -1942,6 +1945,8 @@ public:
         return op;
     }
 
+    void on_ccf() {
+        (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
     void on_di() {
         (*this)->set_iff_on_di(false); }
     void on_ei() {
