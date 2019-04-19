@@ -227,6 +227,11 @@ public:
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
+        case 0xe9:
+            // PCHL             f(5)
+            // JP HL            f(4)
+            // JP i        f(4) f(4)
+            return (*this)->decode_jp_irp();
         case 0xf3:
             // DI  f(4)
             return (*this)->on_di();
@@ -270,6 +275,9 @@ public:
     void decode_halt() {
         (*this)->on_7t_fetch_cycle();
         (*this)->on_halt(); }
+    void decode_jp_irp() {
+        (*this)->on_5t_fetch_cycle();
+        (*this)->on_jp_irp(); }
     void decode_ld_r_n(reg r) {
         fast_u8 n = (*this)->on_3t_imm8_read();
         (*this)->on_ld_r_n(r, n); }
@@ -338,6 +346,8 @@ public:
         return (*this)->on_call_cc_nn(cc, nn); }
     void decode_halt() {
         (*this)->on_halt(); }
+    void decode_jp_irp() {
+        (*this)->on_jp_irp(); }
     void decode_ld_r_n(reg r) {
         fast_u8 d, n;
         if(r != reg::at_hl || is_index_rp_hl()) {
@@ -528,10 +538,6 @@ public:
             // EX (SP), HL          f(4) r(3) r(4) w(3) w(5)
             // EX (SP), i      f(4) f(4) r(3) r(4) w(3) w(5)
             return (*this)->on_ex_at_sp_irp();
-        case 0xe9:
-            // JP HL            f(4)
-            // JP i        f(4) f(4)
-            return (*this)->on_jp_irp();
         case 0xeb:
             // EX DE, HL  f(4)
             return (*this)->on_ex_de_hl();
@@ -897,6 +903,8 @@ public:
         (*this)->on_format("cC W", cc, nn); }
     void on_halt() {
         (*this)->on_format("hlt"); }
+    void on_jp_irp() {
+        (*this)->on_format("pchl"); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1475,6 +1483,9 @@ public:
     fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
+    fast_u16 get_pc_on_jump() const { return (*this)->on_get_pc(); }
+    void set_pc_on_jump(fast_u16 pc) { (*this)->on_set_pc(pc); }
+
     fast_u16 get_pc_on_imm8_read() const { return (*this)->on_get_pc(); }
     void set_pc_on_imm8_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
@@ -1759,6 +1770,8 @@ public:
     void on_ei() {
         (*this)->set_iff_on_ei(true);
         (*this)->disable_int_on_ei(); }
+    void on_jp_irp() {
+        (*this)->set_pc_on_jump((*this)->on_get_hl()); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_set_r(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1906,9 +1919,6 @@ public:
 
     fast_u16 get_pc_on_disp_read() const { return (*this)->on_get_pc(); }
     void set_pc_on_disp_read(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 get_pc_on_jump() const { return (*this)->on_get_pc(); }
-    void set_pc_on_jump(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
     fast_u16 get_pc_on_block_instr() const { return (*this)->on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { (*this)->on_set_pc(pc); }
