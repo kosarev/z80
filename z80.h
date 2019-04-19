@@ -228,6 +228,13 @@ public:
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
+        case 0011: {
+            // ADD HL, rp[p] / DAD rp
+            // DAD rp               f(4) e(3) e(3)
+            // ADD HL, rp           f(4) e(4) e(3)
+            // ADD i, rp       f(4) f(4) e(4) e(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_add_irp_rp(rp); }
         case 0013: {
             // DEC/DCX rp[p]
             // DCX rp           f(5)
@@ -504,7 +511,6 @@ public:
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
-        fast_u8 p = get_p_part(op);
 
         // TODO
         {
@@ -548,14 +554,6 @@ public:
             // JR cc[y-4], d  f(4) r(3) + e(5)
             auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
             return (*this)->on_jr_cc(cc, (*this)->on_disp_read());
-        }
-        switch(op & (x_mask | z_mask | q_mask)) {
-        case 0011: {
-            // ADD HL, rp[p]
-            // ADD HL, rr           f(4) e(4) e(3)
-            // ADD i, rr       f(4) f(4) e(4) e(3)
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_add_irp_rp(rp); }
         }
         switch(op) {
         case 0x08:
@@ -946,6 +944,8 @@ public:
         }
     }
 
+    void on_add_irp_rp(regp rp) {
+        (*this)->on_format("dad P", rp); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
     void on_ccf() {
@@ -1697,6 +1697,9 @@ public:
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_write_cycle(addr, n, /* ticks= */ 5); }
 
+    void on_3t_exec_cycle() {
+        (*this)->tick(3); }
+
     void on_push(fast_u16 nn) {
         fast_u16 sp = (*this)->on_get_sp();
         sp = dec16(sp);
@@ -1960,6 +1963,18 @@ public:
         return op;
     }
 
+    void on_add_irp_rp(regp rp) {
+        (*this)->on_3t_exec_cycle();
+        (*this)->on_3t_exec_cycle();
+
+        fast_u16 i = (*this)->on_get_hl();
+        fast_u16 n = (*this)->on_get_rp(rp);
+        fast_u8 f = (*this)->on_get_f();
+        fast_u16 r = add16(i, n);
+        f = (f & ~base::cf_mask) | base::cf_ari(r < i);
+        (*this)->on_set_memptr(inc16(i));
+        (*this)->on_set_hl(r);
+        (*this)->on_set_f(f); }
     void on_ccf() {
         (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
     void on_cpl() {
@@ -2934,10 +2949,6 @@ public:
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return (*this)->on_3t_read_cycle(addr);
-    }
-
-    void on_3t_exec_cycle() {
-        (*this)->tick(3);
     }
 
     void on_4t_exec_cycle() {

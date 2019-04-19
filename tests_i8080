@@ -75,6 +75,25 @@ c4550c cnz 0x0c55
  4 set_f 00 -> 01
  4 done
 
+# DAD rp
+19 dad d
+ 0 get_pc_on_fetch 0000
+ 0 fetch 19 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_exec
+ 7 3t_exec
+10 get_l 00
+10 get_h 00
+10 get_e 00
+10 get_d 00
+10 get_f 00
+10 set_memptr 0000 -> 0001
+10 set_l 00 -> 00
+10 set_h 00 -> 00
+10 set_f 00 -> 00
+10 done
+
 # DCX rp
 2b dcx h
  0 get_pc_on_fetch 0000
