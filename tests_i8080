@@ -119,6 +119,23 @@ d2d90a jnc 0x0ad9
 10 set_pc_on_jump 0003 -> 0ad9
 10 done
 
+# LXI rp, nn
+115634 lxi d, 0x3456
+ 0 get_pc_on_fetch 0000
+ 0 fetch 11 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_3t_imm16_read 3456 at 0001
+ 4   get_pc_on_imm16_read 0001
+ 4   3t_read 56 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   3t_read 34 at 0002
+ 7     set_addr_bus 0001 -> 0002
+10   set_pc_on_imm16_read 0001 -> 0003
+10 set_e 00 -> 56
+10 set_d 00 -> 34
+10 done
+
 # SPHL
 f9 sphl
  0 get_pc_on_fetch 0000

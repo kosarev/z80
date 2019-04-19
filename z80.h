@@ -221,6 +221,12 @@ public:
             return (*this)->on_rst(y * 8);
         }
         switch(op & (x_mask | z_mask | q_mask)) {
+        case 0001: {
+            // LD rp[p], nn
+            // LD rr, nn        f(4) r(3) r(3)
+            // LD i, nn    f(4) f(4) r(3) r(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
         case 0301: {
             // POP rp2[p]
             // POP rr           f(4) r(3) r(3)
@@ -459,12 +465,6 @@ public:
             return (*this)->on_jr_cc(cc, (*this)->on_disp_read());
         }
         switch(op & (x_mask | z_mask | q_mask)) {
-        case 0001: {
-            // LD rp[p], nn
-            // LD rr, nn        f(4) r(3) r(3)
-            // LD i, nn    f(4) f(4) r(3) r(3)
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_ld_rp_nn(rp, (*this)->on_3t_3t_imm16_read()); }
         case 0003: {
             // INC rp[p]
             // INC rr           f(6)
@@ -738,7 +738,6 @@ protected:
 };
 
 const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
-const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
 const char *get_mnemonic(rot k);
@@ -912,6 +911,10 @@ public:
             auto r = get_arg<reg>(args);
             out.append(z80::get_reg_name(r));
             break; }
+        case 'P': {  // A register pair.
+            auto rp = get_arg<regp>(args);
+            out.append(get_reg_name(rp));
+            break; }
         default:
             base::on_format_char(c, args, out);
         }
@@ -935,6 +938,8 @@ public:
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         (*this)->on_format("mov R, R", rd, rs); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        (*this)->on_format("lxi P, W", rp, nn); }
     void on_ld_sp_irp() {
         (*this)->on_format("sphl"); }
     void on_pop_rp(regp2 rp) {
@@ -950,6 +955,16 @@ protected:
     template<typename T>
     T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
+    }
+
+    const char *get_reg_name(regp rp) {
+        switch(rp) {
+        case regp::bc: return "b";
+        case regp::de: return "d";
+        case regp::hl: return "h";
+        case regp::sp: return "sp";
+        }
+        unreachable("Unknown register.");
     }
 
     const char *get_reg_name(regp2 rp) {
@@ -1027,7 +1042,7 @@ public:
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
             auto irp = get_arg<index_regp>(args);
-            out.append(z80::get_reg_name(rp, irp));
+            out.append(get_reg_name(rp, irp));
             break; }
         case 'G': {  // An alternative register pair.
             auto rp = get_arg<regp2>(args);
@@ -1238,6 +1253,16 @@ protected:
     template<typename T>
     T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
+    }
+
+    const char *get_reg_name(regp rp, index_regp irp = index_regp::hl) {
+        switch(rp) {
+        case regp::bc: return "bc";
+        case regp::de: return "de";
+        case regp::hl: return z80::get_reg_name(irp);
+        case regp::sp: return "sp";
+        }
+        unreachable("Unknown register.");
     }
 
     const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl) {
@@ -1663,6 +1688,8 @@ public:
             (*this)->on_jump(nn);
         else
             (*this)->on_set_memptr(nn); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
     void on_pop_rp(regp2 rp) {
         (*this)->on_set_rp2(rp, (*this)->on_pop()); }
@@ -1795,6 +1822,16 @@ public:
         case reg::a: return (*this)->on_set_a(n);
         case reg::h: return (*this)->on_set_h(n);
         case reg::l: return (*this)->on_set_l(n);
+        }
+        unreachable("Unknown register.");
+    }
+
+    void on_set_rp(regp rp, fast_u16 nn) {
+        switch(rp) {
+        case regp::bc: return (*this)->on_set_bc(nn);
+        case regp::de: return (*this)->on_set_de(nn);
+        case regp::hl: return (*this)->on_set_hl(nn);
+        case regp::sp: return (*this)->on_set_sp(nn);
         }
         unreachable("Unknown register.");
     }
@@ -2561,8 +2598,6 @@ public:
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
         index_regp irp = get_index_rp_kind();
         (*this)->on_set_r(r, irp, d, n); }
-    void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        (*this)->on_set_rp(rp, nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = (*this)->on_3t_read_cycle(nn);
         nn = inc16(nn);

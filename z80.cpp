@@ -44,16 +44,6 @@ const char *get_reg_name(reg r, index_regp irp) {
     unreachable("Unknown register.");
 }
 
-const char *get_reg_name(regp rp, index_regp irp) {
-    switch(rp) {
-    case regp::bc: return "bc";
-    case regp::de: return "de";
-    case regp::hl: return get_reg_name(irp);
-    case regp::sp: return "sp";
-    }
-    assert(0);
-}
-
 const char *get_reg_name(index_regp irp) {
     switch(irp) {
     case index_regp::hl: return "hl";
