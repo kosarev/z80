@@ -202,6 +202,11 @@ public:
             (*this)->on_5t_fetch_cycle();
             auto cc = static_cast<condition>(y);
             return (*this)->on_ret_cc(cc); }
+        case 0302: {
+            // Jcc[y] nn     f(4) r(3) r(3)
+            // JP cc[y], nn  f(4) r(3) r(3)
+            auto cc = static_cast<condition>(y);
+            return (*this)->on_jp_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
         case 0304: {
             // Ccc[y], nn
             // cc met:      f(5) r(3) r(3) w(3) w(3)
@@ -413,10 +418,6 @@ public:
             // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
             return (*this)->on_dec_r(r, read_disp_or_null(r)); }
-        case 0302: {
-            // JP cc[y], nn  f(4) r(3) r(3)
-            auto cc = static_cast<condition>(y);
-            return (*this)->on_jp_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -916,6 +917,8 @@ public:
         (*this)->on_format("pchl"); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_format("jmp W", nn); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        (*this)->on_format("jC W", cc, nn); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1615,6 +1618,11 @@ public:
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_jp_nn(fast_u16 nn) {
         (*this)->on_jump(nn); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            (*this)->on_jump(nn);
+        else
+            (*this)->on_set_memptr(nn); }
     void on_nop() {}
     void on_ret() {
         (*this)->on_return(); }
@@ -2451,11 +2459,6 @@ public:
         (*this)->on_set_f(f); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(base::check_condition(cc))
-            (*this)->on_jump(nn);
-        else
-            (*this)->on_set_memptr(nn); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_index_rp()); }
     void on_jr(fast_u8 d) {
