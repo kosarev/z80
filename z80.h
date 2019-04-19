@@ -246,6 +246,10 @@ public:
         case 0x00:
             // NOP  f(4)
             return (*this)->on_nop();
+        case 0x32:
+            // STA nn      f(4) r(3) r(3) w(3)
+            // LD (nn), A  f(4) r(3) r(3) w(3)
+            return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
         case 0x3a:
             // LDA nn      f(4) r(3) r(3) r(3)
             // LD A, (nn)  f(4) r(3) r(3) r(3)
@@ -538,9 +542,6 @@ public:
         case 0x2f:
             // CPL  f(4)
             return (*this)->on_cpl();
-        case 0x32:
-            // LD (nn), A  f(4) r(3) r(3) w(3)
-            return (*this)->on_ld_at_nn_a((*this)->on_3t_3t_imm16_read());
         case 0x37:
             // SCF  f(4)
             return (*this)->on_scf();
@@ -938,6 +939,8 @@ public:
         (*this)->on_format("jC W", cc, nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
         (*this)->on_format("lda W", nn); }
+    void on_ld_at_nn_a(fast_u16 nn) {
+        (*this)->on_format("sta W", nn); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1695,6 +1698,10 @@ public:
     void on_ld_a_at_nn(fast_u16 nn) {
         (*this)->on_set_memptr(inc16(nn));
         (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
+    void on_ld_at_nn_a(fast_u16 nn) {
+        fast_u8 a = (*this)->on_get_a();
+        (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
+        (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
@@ -2630,10 +2637,6 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
-    void on_ld_at_nn_a(fast_u16 nn) {
-        fast_u8 a = (*this)->on_get_a();
-        (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
-        (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_a_at_rp(regp rp) {
         fast_u16 nn = (*this)->on_get_rp(rp);
         (*this)->on_set_memptr(inc16(nn));
