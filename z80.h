@@ -242,6 +242,13 @@ public:
             auto rp = static_cast<regp2>(p);
             return (*this)->on_push_rp(rp); }
         }
+        switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
+        case 0012: {
+            // LDAX rp[p]     f(4) r(3)
+            // LD A, (rp[p])  f(4) r(3)
+            auto rp = static_cast<regp>(p);
+            return (*this)->on_ld_a_at_rp(rp); }
+        }
         switch(op) {
         case 0x00:
             // NOP  f(4)
@@ -510,10 +517,6 @@ public:
             // LD (rp[p]), A  f(4) w(3)
             auto rp = static_cast<regp>(p);
             return (*this)->on_ld_at_rp_a(rp); }
-        case 0012: {
-            // LD A, (rp[p])  f(4) r(3)
-            auto rp = static_cast<regp>(p);
-            return (*this)->on_ld_a_at_rp(rp); }
         }
         switch(op) {
         case 0x07:
@@ -943,6 +946,8 @@ public:
         (*this)->on_format("lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
         (*this)->on_format("sta W", nn); }
+    void on_ld_a_at_rp(regp rp) {
+        (*this)->on_format("ldax P", rp); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -1708,6 +1713,10 @@ public:
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
         (*this)->on_3t_write_cycle(nn, a); }
+    void on_ld_a_at_rp(regp rp) {
+        fast_u16 nn = (*this)->on_get_rp(rp);
+        (*this)->on_set_memptr(inc16(nn));
+        (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
     void on_nop() {}
@@ -1842,6 +1851,16 @@ public:
         case reg::a: return (*this)->on_set_a(n);
         case reg::h: return (*this)->on_set_h(n);
         case reg::l: return (*this)->on_set_l(n);
+        }
+        unreachable("Unknown register.");
+    }
+
+    fast_u16 on_get_rp(regp rp) {
+        switch(rp) {
+        case regp::bc: return (*this)->on_get_bc();
+        case regp::de: return (*this)->on_get_de();
+        case regp::hl: return (*this)->on_get_hl();
+        case regp::sp: return (*this)->on_get_sp();
         }
         unreachable("Unknown register.");
     }
@@ -2655,10 +2674,6 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
-    void on_ld_a_at_rp(regp rp) {
-        fast_u16 nn = (*this)->on_get_rp(rp);
-        (*this)->on_set_memptr(inc16(nn));
-        (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_at_rp_a(regp rp) {
         fast_u16 nn = (*this)->on_get_rp(rp);
         fast_u8 a = (*this)->on_get_a();
