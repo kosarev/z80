@@ -222,6 +222,15 @@ public:
             (*this)->on_5t_fetch_cycle();
             return (*this)->on_rst(y * 8);
         }
+        switch(op & (x_mask | z_mask | q_mask)) {
+        case 0305: {
+            // PUSH rp2[p]
+            // PUSH rr          f(5) w(3) w(3)
+            // PUSH i      f(4) f(5) w(3) w(3)
+            (*this)->on_5t_fetch_cycle();
+            auto rp = static_cast<regp2>(p);
+            return (*this)->on_push_rp(rp); }
+        }
         switch(op) {
         case 0x00:
             // NOP  f(4)
@@ -478,13 +487,6 @@ public:
             // POP i       f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp2>(p);
             return (*this)->on_pop_rp(rp); }
-        case 0305: {
-            // PUSH rp2[p]
-            // PUSH rr          f(5) w(3) w(3)
-            // PUSH i      f(4) f(5) w(3) w(3)
-            (*this)->on_5t_fetch_cycle();
-            auto rp = static_cast<regp2>(p);
-            return (*this)->on_push_rp(rp); }
         }
         switch(op & (x_mask | z_mask | q_mask | (p_mask - 1))) {
         case 0002: {
@@ -739,7 +741,6 @@ protected:
 
 const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
 const char *get_reg_name(regp rp, index_regp irp = index_regp::hl);
-const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl);
 const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
 const char *get_mnemonic(rot k);
@@ -905,9 +906,13 @@ public:
     void on_format_char(char c, const void **&args,
                         typename base::output_buff &out) {
         switch(c) {
+        case 'G': {  // An alternative register pair.
+            auto rp = get_arg<regp2>(args);
+            out.append(get_reg_name(rp));
+            break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
-            out.append(get_reg_name(r));
+            out.append(z80::get_reg_name(r));
             break; }
         default:
             base::on_format_char(c, args, out);
@@ -934,6 +939,8 @@ public:
         (*this)->on_format("mov R, R", rd, rs); }
     void on_ld_sp_irp() {
         (*this)->on_format("sphl"); }
+    void on_push_rp(regp2 rp) {
+        (*this)->on_format("push G", rp); }
     void on_ret_cc(condition cc) {
         (*this)->on_format("rC", cc); }
 
@@ -943,6 +950,16 @@ protected:
     template<typename T>
     T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
+    }
+
+    const char *get_reg_name(regp2 rp) {
+        switch(rp) {
+        case regp2::bc: return "b";
+        case regp2::de: return "d";
+        case regp2::hl: return "h";
+        case regp2::af: return "psw";
+        }
+        unreachable("Unknown register.");
     }
 };
 
@@ -998,7 +1015,7 @@ public:
             auto irp = get_arg<index_regp>(args);
             auto d = get_arg<fast_u8>(args);
             if(r != reg::at_hl || irp == index_regp::hl) {
-                out.append(get_reg_name(r, irp));
+                out.append(z80::get_reg_name(r, irp));
             } else {
                 out.append('(');
                 out.append(get_index_reg_name(irp));
@@ -1010,7 +1027,7 @@ public:
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
             auto irp = get_arg<index_regp>(args);
-            out.append(get_reg_name(rp, irp));
+            out.append(z80::get_reg_name(rp, irp));
             break; }
         case 'G': {  // An alternative register pair.
             auto rp = get_arg<regp2>(args);
@@ -1221,6 +1238,16 @@ protected:
     template<typename T>
     T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
+    }
+
+    const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl) {
+        switch(rp) {
+        case regp2::bc: return "bc";
+        case regp2::de: return "de";
+        case regp2::hl: return z80::get_reg_name(irp);
+        case regp2::af: return "af";
+        }
+        unreachable("Unknown register.");
     }
 };
 
@@ -1637,6 +1664,8 @@ public:
         else
             (*this)->on_set_memptr(nn); }
     void on_nop() {}
+    void on_push_rp(regp2 rp) {
+        (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_ret() {
         (*this)->on_return(); }
     void on_ret_cc(condition cc) {
@@ -1764,6 +1793,16 @@ public:
         case reg::a: return (*this)->on_set_a(n);
         case reg::h: return (*this)->on_set_h(n);
         case reg::l: return (*this)->on_set_l(n);
+        }
+        unreachable("Unknown register.");
+    }
+
+    fast_u16 on_get_rp2(regp2 rp) {
+        switch(rp) {
+        case regp2::bc: return (*this)->on_get_bc();
+        case regp2::de: return (*this)->on_get_de();
+        case regp2::hl: return (*this)->on_get_hl();
+        case regp2::af: return (*this)->on_get_af();
         }
         unreachable("Unknown register.");
     }
@@ -2576,8 +2615,6 @@ public:
         (*this)->on_set_memptr(make16(a, inc8(n))); }
     void on_pop_rp(regp2 rp) {
         (*this)->on_set_rp2(rp, (*this)->on_pop()); }
-    void on_push_rp(regp2 rp) {
-        (*this)->on_push((*this)->on_get_rp2(rp)); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;

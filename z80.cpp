@@ -54,16 +54,6 @@ const char *get_reg_name(regp rp, index_regp irp) {
     assert(0);
 }
 
-const char *get_reg_name(regp2 rp, index_regp irp) {
-    switch(rp) {
-    case regp2::bc: return "bc";
-    case regp2::de: return "de";
-    case regp2::hl: return get_reg_name(irp);
-    case regp2::af: return "af";
-    }
-    assert(0);
-}
-
 const char *get_reg_name(index_regp irp) {
     switch(irp) {
     case index_regp::hl: return "hl";

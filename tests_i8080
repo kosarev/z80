@@ -176,6 +176,23 @@ e9 pchl
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+# PUSH rp2
+c5 push b
+ 0 get_pc_on_fetch 0000
+ 0 fetch c5 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 5t_fetch
+ 5 get_c 00
+ 5 get_b 00
+ 5 get_sp 0000
+ 5 3t_write 00 -> 00 at ffff
+ 5   set_addr_bus 0000 -> ffff
+ 8 3t_write 00 -> 00 at fffe
+ 8   set_addr_bus ffff -> fffe
+11 set_sp 0000 -> fffe
+11 done
+
 # RET
 c9 ret
  0 get_pc_on_fetch 0000
