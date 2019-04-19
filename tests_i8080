@@ -55,9 +55,9 @@ fb ei
  0 fetch 76 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_halt 0001
- 4 set_pc_on_halt 0001 -> 0000
- 4 done
+ 7 get_pc_on_halt 0001
+ 7 set_pc_on_halt 0001 -> 0000
+ 7 done
 
 # MVI r, n
 3eaf mvi a, 0xaf

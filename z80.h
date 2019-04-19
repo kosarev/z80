@@ -185,7 +185,7 @@ public:
             auto rd = static_cast<reg>(y);
             auto rs = static_cast<reg>(z);
             if(rd == reg::at_hl && rs == reg::at_hl)
-                return (*this)->on_halt();
+                return (*this)->decode_halt();
             return (*this)->decode_ld_r_r(rd, rs); }
         }
         switch(op & (x_mask | z_mask)) {
@@ -244,6 +244,9 @@ public:
     typedef D derived;
     typedef decoder_base<derived, state> base;
 
+    void decode_halt() {
+        (*this)->on_7t_fetch_cycle();
+        (*this)->on_halt(); }
     void decode_ld_r_n(reg r) {
         fast_u8 n = (*this)->on_3t_imm8_read();
         (*this)->on_ld_r_n(r, n); }
@@ -302,6 +305,8 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
+    void decode_halt() {
+        (*this)->on_halt(); }
     void decode_ld_r_n(reg r) {
         fast_u8 d, n;
         if(r != reg::at_hl || is_index_rp_hl()) {
@@ -845,6 +850,8 @@ public:
     typedef typename base::state state;
 
     i8080_disassembler() {}
+
+    void on_7t_fetch_cycle() {}
 
     fast_u8 on_fetch() {
         return (*this)->on_read_next_byte(); }
@@ -1549,6 +1556,7 @@ public:
         (*this)->on_call(nn); }
     void on_halt() {
         state::halt();
+        // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_nop() {}
     void on_ret() {
@@ -1682,6 +1690,10 @@ public:
         (*this)->tick(4);
         state::set_last_read_addr(addr);
         return b;
+    }
+
+    void on_7t_fetch_cycle() {
+        (*this)->tick(3);
     }
 
     fast_u8 on_fetch() {
