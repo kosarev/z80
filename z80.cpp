@@ -21,20 +21,6 @@ const char *get_reg_name(index_regp irp) {
     assert(0);
 }
 
-const char *get_mnemonic(alu k) {
-    switch(k) {
-    case alu::add: return "add";
-    case alu::adc: return "adc";
-    case alu::sub: return "sub";
-    case alu::sbc: return "sbc";
-    case alu::and_a: return "and";
-    case alu::xor_a: return "xor";
-    case alu::or_a: return "or";
-    case alu::cp: return "cp";
-    }
-    assert(0);
-}
-
 const char *get_mnemonic(rot k) {
     switch(k) {
     case rot::rlc: return "rlc";

@@ -185,6 +185,15 @@ public:
             if(rd == reg::at_hl && rs == reg::at_hl)
                 return (*this)->decode_halt();
             return (*this)->decode_ld_r_r(rd, rs); }
+        case 0200: {
+            // alu[y] r[z]
+            // alu r            f(4)                 (both i8080 and z80)
+            // alu M            f(4)           r(3)
+            // alu (HL)         f(4)           r(3)
+            // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
+            auto k = static_cast<alu>(y);
+            auto r = static_cast<reg>(z);
+            return (*this)->decode_alu_r(k, r); }
         }
         switch(op & (x_mask | z_mask)) {
         case 0004: {
@@ -410,6 +419,8 @@ public:
     typedef D derived;
     typedef decoder_base<derived, state> base;
 
+    void decode_alu_r(alu k, reg r) {
+        (*this)->on_alu_r(k, r); }
     void decode_call_cc_nn(condition cc) {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_call_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
@@ -419,7 +430,7 @@ public:
         (*this)->on_dec_r(r); }
     void decode_dec_rp(regp rp) {
         (*this)->on_5t_fetch_cycle();
-        return (*this)->on_dec_rp(rp); }
+        (*this)->on_dec_rp(rp); }
     void decode_ex_de_hl() {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_ex_de_hl(); }
@@ -432,7 +443,7 @@ public:
         (*this)->on_inc_r(r); }
     void decode_inc_rp(regp rp) {
         (*this)->on_5t_fetch_cycle();
-        return (*this)->on_inc_rp(rp); }
+        (*this)->on_inc_rp(rp); }
     void decode_jp_irp() {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_jp_irp(); }
@@ -443,7 +454,7 @@ public:
         (*this)->on_ld_r_r(rd, rs); }
     void decode_ld_sp_irp() {
         (*this)->on_5t_fetch_cycle();
-        return (*this)->on_ld_sp_irp(); }
+        (*this)->on_ld_sp_irp(); }
 
     void on_decode() {
         fast_u8 op = (*this)->on_fetch();
@@ -497,6 +508,8 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
+    void decode_alu_r(alu k, reg r) {
+        (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
     void decode_call_cc_nn(condition cc) {
         // TODO: Read imm16 as r(3) r(3) and do extra tick on
         // execution if the condition is met. Do not check the
@@ -504,12 +517,12 @@ public:
         bool cc_met = (*this)->check_condition(cc);
         fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
                                (*this)->on_3t_3t_imm16_read();
-        return (*this)->on_call_cc_nn(cc, nn); }
+        (*this)->on_call_cc_nn(cc, nn); }
     void decode_dec_r(reg r) {
         (*this)->on_dec_r(r, read_disp_or_null(r)); }
     void decode_dec_rp(regp rp) {
         (*this)->on_6t_fetch_cycle();
-        return (*this)->on_dec_rp(rp); }
+        (*this)->on_dec_rp(rp); }
     void decode_ex_de_hl() {
         (*this)->on_ex_de_hl(); }
     void decode_halt() {
@@ -520,7 +533,7 @@ public:
         (*this)->on_inc_r(r, read_disp_or_null(r)); }
     void decode_inc_rp(regp rp) {
         (*this)->on_6t_fetch_cycle();
-        return (*this)->on_inc_rp(rp); }
+        (*this)->on_inc_rp(rp); }
     void decode_ld_r_n(reg r) {
         fast_u8 d, n;
         if(r != reg::at_hl || is_index_rp_hl()) {
@@ -530,17 +543,16 @@ public:
             d = (*this)->on_disp_read();
             n = (*this)->on_5t_imm8_read();
         }
-        return (*this)->on_ld_r_n(r, d, n); }
+        (*this)->on_ld_r_n(r, d, n); }
     void decode_ld_r_r(reg rd, reg rs) {
         (*this)->on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
     void decode_ld_sp_irp() {
         (*this)->on_6t_fetch_cycle();
-        return (*this)->on_ld_sp_irp(); }
+        (*this)->on_ld_sp_irp(); }
 
     void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
         fast_u8 y = get_y_part(op);
-        fast_u8 z = get_z_part(op);
 
         // TODO
         {
@@ -550,16 +562,6 @@ public:
                 return;
         }
 
-        switch(op & x_mask) {
-        case 0200: {
-            // alu[y] r[z]
-            // alu r            f(4)
-            // alu (HL)         f(4)           r(3)
-            // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
-            auto k = static_cast<alu>(y);
-            auto r = static_cast<reg>(z);
-            return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
-        }
         switch(op & (x_mask | z_mask)) {
         case 0306: {
             // alu[y] n  f(4) r(3)
@@ -778,7 +780,6 @@ protected:
 };
 
 const char *get_reg_name(index_regp irp);
-const char *get_mnemonic(alu k);
 const char *get_mnemonic(rot k);
 const char *get_mnemonic(block_ld k);
 const char *get_mnemonic(block_cp k);
@@ -942,6 +943,10 @@ public:
     void on_format_char(char c, const void **&args,
                         typename base::output_buff &out) {
         switch(c) {
+        case 'A': {  // ALU mnemonic.
+            auto k = get_arg<alu>(args);
+            out.append(get_mnemonic_r(k));
+            break; }
         case 'G': {  // An alternative register pair.
             auto rp = get_arg<regp2>(args);
             out.append(get_reg_name(rp));
@@ -961,6 +966,8 @@ public:
 
     void on_add_irp_rp(regp rp) {
         (*this)->on_format("dad P", rp); }
+    void on_alu_r(alu k, reg r) {
+        (*this)->on_format("A R", k, r); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("cC W", cc, nn); }
     void on_ccf() {
@@ -1065,6 +1072,20 @@ protected:
         }
         unreachable("Unknown register.");
     }
+
+    static const char *get_mnemonic_r(alu k) {
+        switch(k) {
+        case alu::add: return "add";
+        case alu::adc: return "adc";
+        case alu::sub: return "sub";
+        case alu::sbc: return "sbb";
+        case alu::and_a: return "ana";
+        case alu::xor_a: return "xra";
+        case alu::or_a: return "ora";
+        case alu::cp: return "cmp";
+        }
+        unreachable("Unknown ALU operation.");
+    }
 };
 
 template<typename D>
@@ -1112,7 +1133,7 @@ public:
             break; }
         case 'O': {  // Rotation mnemonic.
             auto k = get_arg<rot>(args);
-            out.append(get_mnemonic(k));
+            out.append(z80::get_mnemonic(k));
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
@@ -1153,11 +1174,11 @@ public:
             break; }
         case 'L': {  // A block transfer instruction.
             auto k = get_arg<block_ld>(args);
-            out.append(get_mnemonic(k));
+            out.append(z80::get_mnemonic(k));
             break; }
         case 'M': {  // A block comparison instruction.
             auto k = get_arg<block_cp>(args);
-            out.append(get_mnemonic(k));
+            out.append(z80::get_mnemonic(k));
             break; }
         default:
             base::on_format_char(c, args, out);
@@ -1395,6 +1416,20 @@ protected:
         case regp2::af: return "af";
         }
         unreachable("Unknown register.");
+    }
+
+    static const char *get_mnemonic(alu k) {
+        switch(k) {
+        case alu::add: return "add";
+        case alu::adc: return "adc";
+        case alu::sub: return "sub";
+        case alu::sbc: return "sbc";
+        case alu::and_a: return "and";
+        case alu::xor_a: return "xor";
+        case alu::or_a: return "or";
+        case alu::cp: return "cp";
+        }
+        unreachable("Unknown ALU operation.");
     }
 };
 
@@ -1940,8 +1975,11 @@ public:
     using base::xf_mask;
     using base::yf_mask;
 
+    using base::cf_ari;
+    using base::hf_ari;
     using base::hf_dec;
     using base::hf_inc;
+    using base::pf_ari;
     using base::pf_log;
     using base::zf_ari;
 
@@ -2040,6 +2078,80 @@ public:
         return op;
     }
 
+    void do_alu(alu k, fast_u8 n) {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = 0;
+        switch(k) {
+        case alu::add: {
+            fast_u8 t = add8(a, n);
+            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
+            a = t;
+            break; }
+        case alu::adc: {
+            assert(0);  // TODO
+#if 0
+            f = (*this)->on_get_f();
+            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
+            fast_u8 t = mask8(a + n + cfv);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
+                    cf_ari(t < a || (cfv && n == 0xff));
+            a = t;
+#endif
+            break; }
+        case alu::sub: {
+            assert(0);  // TODO
+#if 0
+            do_sub(a, f, n);
+#endif
+            break; }
+        case alu::sbc: {
+            assert(0);  // TODO
+#if 0
+            f = (*this)->on_get_f();
+            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
+            fast_u8 t = mask8(a - n - cfv);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a - n - cfv, a, n) |
+                    cf_ari(t > a || (cfv && n == 0xff)) | nf_mask;
+            a = t;
+#endif
+            break; }
+        case alu::and_a:
+            assert(0);  // TODO
+#if 0
+            a &= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a) |
+                    hf_mask;
+#endif
+            break;
+        case alu::xor_a:
+            assert(0);  // TODO
+#if 0
+            a ^= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+#endif
+            break;
+        case alu::or_a:
+            assert(0);  // TODO
+#if 0
+            a |= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+#endif
+            break;
+        case alu::cp:
+            assert(0);  // TODO
+#if 0
+            do_cp(a, f, n);
+#endif
+            break;
+        }
+        if(k != alu::cp)
+            (*this)->on_set_a(a);
+        (*this)->on_set_f(f);
+    }
+
     void on_add_irp_rp(regp rp) {
         (*this)->on_3t_exec_cycle();
         (*this)->on_3t_exec_cycle();
@@ -2052,6 +2164,8 @@ public:
         (*this)->on_set_memptr(inc16(i));
         (*this)->on_set_hl(r);
         (*this)->on_set_f(f); }
+    void on_alu_r(alu k, reg r) {
+        do_alu(k, (*this)->on_get_r(r)); }
     void on_ccf() {
         (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
     void on_cpl() {
