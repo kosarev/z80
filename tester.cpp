@@ -566,6 +566,14 @@ public:
         return base::on_input_cycle(addr);
     }
 
+    void on_output_cycle(fast_u8 n, fast_u8 b) {
+        input.read_and_match("output %02x at %02x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(b),
+                             static_cast<unsigned>(n));
+        base::on_output_cycle(n, b);
+    }
+
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
         input.read_and_match("output %02x at %04x",
                              static_cast<unsigned>(get_ticks()),

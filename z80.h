@@ -369,6 +369,10 @@ public:
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
+        case 0xd3:
+            // OUT n       f(4) r(3) o(3)
+            // OUT (n), A  f(4) r(3) o(4)
+            return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
         case 0xdb:
             // IN n       f(4) r(3) i(3)
             // IN A, (n)  f(4) r(3) i(4)
@@ -591,9 +595,6 @@ public:
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
-        case 0xd3:
-            // OUT (n), A  f(4) r(3) o(4)
-            return (*this)->on_out_n_a((*this)->on_3t_imm8_read());
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
@@ -1022,6 +1023,8 @@ public:
         (*this)->on_format("lhld W", nn); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         (*this)->on_format("shld W", nn); }
+    void on_out_n_a(fast_u8 n) {
+        (*this)->on_format("out N", n); }
     void on_pop_rp(regp2 rp) {
         (*this)->on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
@@ -2102,8 +2105,10 @@ public:
 
     fast_u8 on_input_cycle(fast_u8 n) {
         (*this)->tick(3);
-        return (*this)->on_input(n);
-    }
+        return (*this)->on_input(n); }
+    void on_output_cycle(fast_u8 n, fast_u8 v) {
+        unused(n, v);
+        (*this)->tick(3); }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
@@ -2258,6 +2263,8 @@ public:
         nn = inc16(nn);
         (*this)->on_set_memptr(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
+    void on_out_n_a(fast_u8 n) {
+        (*this)->on_output_cycle(n, (*this)->on_get_a()); }
     void on_rla() {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
