@@ -1979,7 +1979,6 @@ public:
     using base::hf_ari;
     using base::hf_dec;
     using base::hf_inc;
-    using base::pf_ari;
     using base::pf_log;
     using base::zf_ari;
 
@@ -2085,20 +2084,17 @@ public:
         case alu::add: {
             fast_u8 t = add8(a, n);
             f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
+                    hf_ari(t, a, n) | pf_log(t) | cf_ari(t < a);
             a = t;
             break; }
         case alu::adc: {
-            assert(0);  // TODO
-#if 0
             f = (*this)->on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a + n + cfv);
-            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
+            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_log(t) |
                     cf_ari(t < a || (cfv && n == 0xff));
             a = t;
-#endif
             break; }
         case alu::sub: {
             assert(0);  // TODO
