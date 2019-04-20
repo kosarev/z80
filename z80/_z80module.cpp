@@ -55,7 +55,7 @@ struct __attribute__((packed)) processor_state {
     least_u16 pc;
     least_u16 sp;
     least_u16 ir;
-    least_u16 memptr;
+    least_u16 wz;
 
     least_u8 iff1;
     least_u8 iff2;
@@ -184,7 +184,7 @@ protected:
         state.pc = get_pc();
         state.sp = get_sp();
         state.ir = get_ir();
-        state.memptr = get_memptr();
+        state.wz = get_wz();
 
         state.iff1 = get_iff1() ? 1 : 0;
         state.iff2 = get_iff2() ? 1 : 0;
@@ -210,7 +210,7 @@ protected:
         set_pc(state.pc);
         set_sp(state.sp);
         set_ir(state.ir);
-        set_memptr(state.memptr);
+        set_wz(state.wz);
 
         set_iff1(state.iff1);
         set_iff2(state.iff2);

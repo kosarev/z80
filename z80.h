@@ -1503,10 +1503,9 @@ public:
     fast_u16 get_pc() const { return pc; }
     void set_pc(fast_u16 n) { pc = n; }
 
-    // TODO: Rename to WZ.
     // TODO: Do we really need it for i8080?
-    fast_u16 get_memptr() const { return memptr; }
-    void set_memptr(fast_u16 n) { memptr = n; }
+    fast_u16 get_wz() const { return wz; }
+    void set_wz(fast_u16 n) { wz = n; }
 
     bool is_int_disabled() const { return int_disabled; }
     void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
@@ -1532,7 +1531,7 @@ public:
 
 private:
     fast_u16 bc = 0, de = 0, hl = 0, af = 0;
-    fast_u16 pc = 0, sp = 0, memptr = 0;
+    fast_u16 pc = 0, sp = 0, wz = 0;
     bool int_disabled = false;
     bool iff = false;
     bool halted = false;
@@ -1664,8 +1663,8 @@ public:
     using state::set_sp;
     using state::get_pc;
     using state::set_pc;
-    using state::get_memptr;
-    using state::set_memptr;
+    using state::get_wz;
+    using state::set_wz;
 
     fast_u8 on_get_b() const { return get_b(); }
     void on_set_b(fast_u8 b) { set_b(b); }
@@ -1755,8 +1754,8 @@ public:
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
 
-    fast_u16 on_get_memptr() const { return get_memptr(); }
-    void on_set_memptr(fast_u16 memptr) { set_memptr(memptr); }
+    fast_u16 on_get_wz() const { return get_wz(); }
+    void on_set_wz(fast_u16 wz) { set_wz(wz); }
 
     void on_disable_int() { state::disable_int(); }
     void disable_int_on_ei() { (*this)->on_disable_int(); }
@@ -1841,14 +1840,14 @@ public:
         return make16(hi, lo); }
     void on_call(fast_u16 nn) {
         (*this)->on_push((*this)->on_get_pc());
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         (*this)->set_pc_on_call(nn); }
     void on_return() {
         fast_u16 pc = (*this)->on_pop();
-        (*this)->on_set_memptr(pc);
+        (*this)->on_set_wz(pc);
         (*this)->set_pc_on_return(pc); }
     void on_jump(fast_u16 nn) {
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         (*this)->set_pc_on_jump(nn); }
 
     void on_alu_n(alu k, fast_u8 n) {
@@ -1861,7 +1860,7 @@ public:
         if(check_condition(cc))
             (*this)->on_call(nn);
         else
-            (*this)->on_set_memptr(nn); }
+            (*this)->on_set_wz(nn); }
     void on_ex_de_hl() {
         state::ex_de_hl(); }
     void on_halt() {
@@ -1874,24 +1873,24 @@ public:
         if(check_condition(cc))
             (*this)->on_jump(nn);
         else
-            (*this)->on_set_memptr(nn); }
+            (*this)->on_set_wz(nn); }
     void on_inc_rp(regp rp) {
         (*this)->on_set_rp(rp, inc16((*this)->on_get_rp(rp))); }
     void on_ld_a_at_nn(fast_u16 nn) {
-        (*this)->on_set_memptr(inc16(nn));
+        (*this)->on_set_wz(inc16(nn));
         (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_at_nn_a(fast_u16 nn) {
         fast_u8 a = (*this)->on_get_a();
-        (*this)->on_set_memptr(make16(a, inc8(get_low8(nn))));
+        (*this)->on_set_wz(make16(a, inc8(get_low8(nn))));
         (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_a_at_rp(regp rp) {
         fast_u16 nn = (*this)->on_get_rp(rp);
-        (*this)->on_set_memptr(inc16(nn));
+        (*this)->on_set_wz(inc16(nn));
         (*this)->on_set_a((*this)->on_3t_read_cycle(nn)); }
     void on_ld_at_rp_a(regp rp) {
         fast_u16 nn = (*this)->on_get_rp(rp);
         fast_u8 a = (*this)->on_get_a();
-        (*this)->on_set_memptr(make16(a, get_low8(nn + 1)));
+        (*this)->on_set_wz(make16(a, get_low8(nn + 1)));
         (*this)->on_3t_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         (*this)->on_set_rp(rp, nn); }
@@ -2175,7 +2174,7 @@ public:
         fast_u8 f = (*this)->on_get_f();
         fast_u16 r = add16(i, n);
         f = (f & ~base::cf_mask) | base::cf_ari(r < i);
-        (*this)->on_set_memptr(inc16(i));
+        (*this)->on_set_wz(inc16(i));
         (*this)->on_set_hl(r);
         (*this)->on_set_f(f); }
     void on_alu_r(alu k, reg r) {
@@ -2230,7 +2229,7 @@ public:
         (*this)->on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         (*this)->on_5t_write_cycle(sp, get_low8(nn));
-        (*this)->on_set_memptr(hl);
+        (*this)->on_set_wz(hl);
         (*this)->on_set_hl(hl); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_hl()); }
@@ -2254,14 +2253,14 @@ public:
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = (*this)->on_3t_read_cycle(nn);
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         fast_u8 hi = (*this)->on_3t_read_cycle(nn);
         (*this)->on_set_hl(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = (*this)->on_get_hl();
         (*this)->on_3t_write_cycle(nn, get_low8(irp));
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
     void on_out_n_a(fast_u8 n) {
         (*this)->on_output_cycle(n, (*this)->on_get_a()); }
@@ -2341,8 +2340,8 @@ public:
     using state::set_sp;
     using state::get_pc;
     using state::set_pc;
-    using state::get_memptr;
-    using state::set_memptr;
+    using state::get_wz;
+    using state::set_wz;
     using state::get_iff1;
     using state::set_iff1;
     using state::get_iff2;
@@ -2471,7 +2470,7 @@ public:
         fast_u8 res = long_read_cycle ? (*this)->on_4t_read_cycle(addr) :
                                         (*this)->on_3t_read_cycle(addr);
         if(!is_index_rp_hl())
-            (*this)->on_set_memptr(addr);
+            (*this)->on_set_wz(addr);
         return res;
     }
 
@@ -2479,7 +2478,7 @@ public:
         fast_u16 addr = get_disp_target((*this)->on_get_index_rp(), d);
         (*this)->on_3t_write_cycle(addr, n);
         if(!is_index_rp_hl())
-            (*this)->on_set_memptr(addr);
+            (*this)->on_set_wz(addr);
     }
 
     fast_u8 on_get_r(reg r, index_regp irp, fast_u8 d = 0,
@@ -2733,7 +2732,7 @@ public:
                 (get_high8(r) & (yf_mask | xf_mask)) |
                 hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
 
-        (*this)->on_set_memptr(inc16(i));
+        (*this)->on_set_wz(inc16(i));
         (*this)->on_set_index_rp(r);
         (*this)->on_set_f(f); }
     void on_adc_hl_rp(regp rp) {
@@ -2754,7 +2753,7 @@ public:
                              (of ? pf_mask : 0)) |
                         cf_ari(r16 < hl || of);
 
-        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_wz(inc16(hl));
         (*this)->on_set_hl(r16);
         (*this)->on_set_f(f); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
@@ -2762,7 +2761,7 @@ public:
         do_alu(k, (*this)->on_get_r(r, irp, d)); }
     void on_block_cp(block_cp k) {
         fast_u16 bc = (*this)->on_get_bc();
-        fast_u16 memptr = (*this)->on_get_memptr();
+        fast_u16 wz = (*this)->on_get_wz();
         fast_u16 hl = (*this)->on_get_hl();
         // TODO: Block comparisons implicitly depend on the
         // register 'a'. We probably want to request its value
@@ -2785,15 +2784,15 @@ public:
         if(static_cast<unsigned>(k) & 1) {
             // CPI, CPIR
             hl = dec16(hl);
-            memptr = dec16(memptr);
+            wz = dec16(wz);
         } else {
             // CPD, CPDR
             hl = inc16(hl);
-            memptr = inc16(memptr);
+            wz = inc16(wz);
         }
 
         (*this)->on_set_bc(bc);
-        (*this)->on_set_memptr(memptr);
+        (*this)->on_set_wz(wz);
         (*this)->on_set_hl(hl);
         (*this)->on_set_f(f);
 
@@ -2801,7 +2800,7 @@ public:
         if((static_cast<unsigned>(k) & 2) && bc && !(f & zf_mask)) {
             (*this)->on_5t_exec_cycle();
             fast_u16 pc = (*this)->get_pc_on_block_instr();
-            (*this)->on_set_memptr(dec16(pc));
+            (*this)->on_set_wz(dec16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_block_ld(block_ld k) {
@@ -2840,7 +2839,7 @@ public:
         if((static_cast<unsigned>(k) & 2) && bc) {
             (*this)->on_5t_exec_cycle();
             fast_u16 pc = (*this)->get_pc_on_block_instr();
-            (*this)->on_set_memptr(dec16(pc));
+            (*this)->on_set_wz(dec16(pc));
             (*this)->set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {
@@ -2850,7 +2849,7 @@ public:
         fast_u8 m = v & (1u << b);
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
         if(!is_index_rp_hl() || r == reg::at_hl)
-            v = get_high8((*this)->on_get_memptr());
+            v = get_high8((*this)->on_get_wz());
         f |= v & (xf_mask | yf_mask);
         (*this)->on_set_f(f); }
     void on_ccf() {
@@ -2931,7 +2930,7 @@ public:
         (*this)->on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         (*this)->on_5t_write_cycle(sp, get_low8(nn));
-        (*this)->on_set_memptr(irp);
+        (*this)->on_set_wz(irp);
         (*this)->on_set_index_rp(irp); }
     void on_exx() {
         exx(); }
@@ -2940,12 +2939,12 @@ public:
     void on_in_a_n(fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u16 addr = make16(a, n);
-        (*this)->on_set_memptr(inc16(addr));
+        (*this)->on_set_wz(inc16(addr));
         (*this)->on_set_a((*this)->on_input_cycle(addr)); }
     void on_in_r_c(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
         fast_u8 f = (*this)->on_get_f();
-        (*this)->on_set_memptr(inc16(bc));
+        (*this)->on_set_wz(inc16(bc));
         fast_u8 n = (*this)->on_input_cycle(bc);
         index_regp irp = get_index_rp_kind();
         if(r != reg::at_hl)
@@ -2991,27 +2990,27 @@ public:
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = (*this)->on_3t_read_cycle(nn);
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         fast_u8 hi = (*this)->on_3t_read_cycle(nn);
         (*this)->on_set_index_rp(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = (*this)->on_get_index_rp();
         (*this)->on_3t_write_cycle(nn, get_low8(irp));
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(irp)); }
 
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         fast_u8 lo = (*this)->on_3t_read_cycle(nn);
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         fast_u8 hi = (*this)->on_3t_read_cycle(nn);
         (*this)->on_set_rp(rp, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         fast_u16 rpv = (*this)->on_get_rp(rp);
         (*this)->on_3t_write_cycle(nn, get_low8(rpv));
         nn = inc16(nn);
-        (*this)->on_set_memptr(nn);
+        (*this)->on_set_wz(nn);
         (*this)->on_3t_write_cycle(nn, get_high8(rpv)); }
     void on_ld_sp_irp() {
         (*this)->on_set_sp((*this)->on_get_index_rp()); }
@@ -3025,7 +3024,7 @@ public:
         (*this)->on_set_f(f); }
     void on_out_c_r(reg r) {
         fast_u16 bc = (*this)->on_get_bc();
-        (*this)->on_set_memptr(inc16(bc));
+        (*this)->on_set_wz(inc16(bc));
         index_regp irp = get_index_rp_kind();
         fast_u8 n = (r == reg::at_hl) ?
             0 : (*this)->on_get_r(r, irp, /* d= */ 0);
@@ -3033,7 +3032,7 @@ public:
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         (*this)->on_output_cycle(make16(a, n), a);
-        (*this)->on_set_memptr(make16(a, inc8(n))); }
+        (*this)->on_set_wz(make16(a, inc8(n))); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
@@ -3069,7 +3068,7 @@ public:
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
         fast_u16 hl = (*this)->on_get_hl();
-        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_wz(inc16(hl));
         fast_u16 t = make16(a, (*this)->on_3t_read_cycle(hl));
         (*this)->on_4t_exec_cycle();
 
@@ -3112,7 +3111,7 @@ public:
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = (*this)->on_get_f();
         fast_u16 hl = (*this)->on_get_hl();
-        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_wz(inc16(hl));
         fast_u16 t = make16(a, (*this)->on_3t_read_cycle(hl));
         (*this)->on_4t_exec_cycle();
 
@@ -3157,7 +3156,7 @@ public:
                              (of ? pf_mask : 0)) |
                         cf_ari(r16 > hl || of) | nf_mask;
 
-        (*this)->on_set_memptr(inc16(hl));
+        (*this)->on_set_wz(inc16(hl));
         (*this)->on_set_hl(r16);
         (*this)->on_set_f(f); }
 

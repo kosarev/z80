@@ -388,8 +388,8 @@ public:
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", base::get_sp(), sp);
                                   return base::on_set_sp(sp); }
 
-    void on_set_memptr(fast_u16 mp) { match_set_rp("memptr", base::get_memptr(), mp);
-                                      return base::on_set_memptr(mp); }
+    void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);
+                                  return base::on_set_wz(wz); }
 
     void match_get_pc(const char *name) const {
         input.read_and_match("get_pc_on_%s %04x",
