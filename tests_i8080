@@ -7,6 +7,23 @@
 #
 #   Published under the MIT license.
 
+# ACI n
+ce16 aci 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch ce at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 get_f 00
+ 7 set_a 00 -> 16
+ 7 set_f 00 -> 02
+ 7 done
+
 # ADD r
 87 add a
  0 get_pc_on_fetch 0000
@@ -59,6 +76,22 @@ a7 ana a
  4 set_a 00 -> 00
  4 set_f 00 -> 54
  4 done
+
+# ANI n
+e616 ani 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch e6 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_a 00 -> 00
+ 7 set_f 00 -> 54
+ 7 done
 
 # CALL nn
 cddf0e call 0x0edf
@@ -138,6 +171,21 @@ bc cmp h
  4 get_a 00
  4 set_f 00 -> 44
  4 done
+
+# CPI n
+fe16 cpi 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch fe at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_f 00 -> bb
+ 7 done
 
 # DAD rp
 19 dad d
@@ -381,6 +429,22 @@ b3 ora e
  4 set_f 00 -> 44
  4 done
 
+# ORI n
+f616 ori 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch f6 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_a 00 -> 16
+ 7 set_f 00 -> 02
+ 7 done
+
 # PCHL
 e9 pchl
  0 get_pc_on_fetch 0000
@@ -454,6 +518,23 @@ e9 pchl
  4 set_f 00 -> 44
  4 done
 
+# SBI n
+de16 sbi 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch de at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 get_f 00
+ 7 set_a 00 -> ea
+ 7 set_f 00 -> bb
+ 7 done
+
 # SPHL
 f9 sphl
  0 get_pc_on_fetch 0000
@@ -477,6 +558,22 @@ f9 sphl
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
+
+# SUI n
+d616 sui 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch d6 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_a 00 -> ea
+ 7 set_f 00 -> bb
+ 7 done
 
 # MVI r, n
 3eaf mvi a, 0xaf
@@ -680,6 +777,22 @@ af xra a
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
+
+# XRI n
+ee16 xri 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch ee at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_a 00 -> 16
+ 7 set_f 00 -> 02
+ 7 done
 
 # XTHL
 e3 xthl
