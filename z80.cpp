@@ -12,38 +12,6 @@
 
 namespace z80 {
 
-const char *get_reg_name(reg r, index_regp irp) {
-    switch(r) {
-    case reg::b: return "b";
-    case reg::c: return "c";
-    case reg::d: return "d";
-    case reg::e: return "e";
-    case reg::a: return "a";
-    case reg::h:
-        switch(irp) {
-        case index_regp::hl: return "h";
-        case index_regp::ix: return "ixh";
-        case index_regp::iy: return "iyh";
-        }
-        break;
-    case reg::l:
-        switch(irp) {
-        case index_regp::hl: return "l";
-        case index_regp::ix: return "ixl";
-        case index_regp::iy: return "iyl";
-        }
-        break;
-    case reg::at_hl:
-        switch(irp) {
-        case index_regp::hl: return "(hl)";
-        case index_regp::ix: return "(ix)";
-        case index_regp::iy: return "(iy)";
-        }
-        break;
-    }
-    unreachable("Unknown register.");
-}
-
 const char *get_reg_name(index_regp irp) {
     switch(irp) {
     case index_regp::hl: return "hl";

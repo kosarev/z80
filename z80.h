@@ -187,6 +187,15 @@ public:
             return (*this)->decode_ld_r_r(rd, rs); }
         }
         switch(op & (x_mask | z_mask)) {
+        case 0004: {
+            // INR/INC r[y]
+            // INR r            f(5)
+            // INR M            f(4)           r(3) r(3)
+            // INC r            f(4)
+            // INC (HL)         f(4)           r(4) w(3)
+            // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
+            auto r = static_cast<reg>(y);
+            return (*this)->decode_inc_r(r); }
         case 0006: {
             // LD/MVI r[y], n
             // MVI r, n             f(4)      r(3)
@@ -404,6 +413,10 @@ public:
     void decode_halt() {
         (*this)->on_7t_fetch_cycle();
         (*this)->on_halt(); }
+    void decode_inc_r(reg r) {
+        if(r != reg::at_hl)
+            (*this)->on_5t_fetch_cycle();
+        (*this)->on_inc_r(r); }
     void decode_inc_rp(regp rp) {
         (*this)->on_5t_fetch_cycle();
         return (*this)->on_inc_rp(rp); }
@@ -488,6 +501,8 @@ public:
         (*this)->on_halt(); }
     void decode_jp_irp() {
         (*this)->on_jp_irp(); }
+    void decode_inc_r(reg r) {
+        (*this)->on_inc_r(r, read_disp_or_null(r)); }
     void decode_inc_rp(regp rp) {
         (*this)->on_6t_fetch_cycle();
         return (*this)->on_inc_rp(rp); }
@@ -531,13 +546,6 @@ public:
             return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask)) {
-        case 0004: {
-            // INC r[y]
-            // INC r            f(4)
-            // INC (HL)         f(4)           r(4) w(3)
-            // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
-            auto r = static_cast<reg>(y);
-            return (*this)->on_inc_r(r, read_disp_or_null(r)); }
         case 0005: {
             // DEC r[y]
             // DEC r            f(4)
@@ -761,7 +769,6 @@ protected:
     using base::get_p_part;
 };
 
-const char *get_reg_name(reg r, index_regp irp = index_regp::hl);
 const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(alu k);
 const char *get_mnemonic(rot k);
@@ -903,7 +910,7 @@ protected:
     };
 
     template<typename T>
-    T get_arg(const void **&args) {
+    static T get_arg(const void **&args) {
         const T &value = *static_cast<const T*>(*args);
         ++args;
         return value;
@@ -933,7 +940,7 @@ public:
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
-            out.append(z80::get_reg_name(r));
+            out.append(get_reg_name(r));
             break; }
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
@@ -966,6 +973,8 @@ public:
         (*this)->on_format("jmp W", nn); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("jC W", cc, nn); }
+    void on_inc_r(reg r) {
+        (*this)->on_format("inr R", r); }
     void on_inc_rp(regp rp) {
         (*this)->on_format("inx P", rp); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -1009,11 +1018,25 @@ public:
 
 protected:
     template<typename T>
-    T get_arg(const void **&args) {
+    static T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
     }
 
-    const char *get_reg_name(regp rp) {
+    static const char *get_reg_name(reg r) {
+        switch(r) {
+        case reg::b: return "b";
+        case reg::c: return "c";
+        case reg::d: return "d";
+        case reg::e: return "e";
+        case reg::a: return "a";
+        case reg::h: return "h";
+        case reg::l: return "l";
+        case reg::at_hl: return "m";
+        }
+        unreachable("Unknown register.");
+    }
+
+    static const char *get_reg_name(regp rp) {
         switch(rp) {
         case regp::bc: return "b";
         case regp::de: return "d";
@@ -1023,7 +1046,7 @@ protected:
         unreachable("Unknown register.");
     }
 
-    const char *get_reg_name(regp2 rp) {
+    static const char *get_reg_name(regp2 rp) {
         switch(rp) {
         case regp2::bc: return "b";
         case regp2::de: return "d";
@@ -1086,7 +1109,7 @@ public:
             auto irp = get_arg<index_regp>(args);
             auto d = get_arg<fast_u8>(args);
             if(r != reg::at_hl || irp == index_regp::hl) {
-                out.append(z80::get_reg_name(r, irp));
+                out.append(get_reg_name(r, irp));
             } else {
                 out.append('(');
                 out.append(get_index_reg_name(irp));
@@ -1307,11 +1330,43 @@ protected:
     D *operator -> () { return static_cast<D*>(this); }
 
     template<typename T>
-    T get_arg(const void **&args) {
+    static T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
     }
 
-    const char *get_reg_name(regp rp, index_regp irp = index_regp::hl) {
+    static const char *get_reg_name(reg r, index_regp irp = index_regp::hl) {
+        switch(r) {
+        case reg::b: return "b";
+        case reg::c: return "c";
+        case reg::d: return "d";
+        case reg::e: return "e";
+        case reg::a: return "a";
+        case reg::h:
+            switch(irp) {
+            case index_regp::hl: return "h";
+            case index_regp::ix: return "ixh";
+            case index_regp::iy: return "iyh";
+            }
+            break;
+        case reg::l:
+            switch(irp) {
+            case index_regp::hl: return "l";
+            case index_regp::ix: return "ixl";
+            case index_regp::iy: return "iyl";
+            }
+            break;
+        case reg::at_hl:
+            switch(irp) {
+            case index_regp::hl: return "(hl)";
+            case index_regp::ix: return "(ix)";
+            case index_regp::iy: return "(iy)";
+            }
+            break;
+        }
+        unreachable("Unknown register.");
+    }
+
+    static const char *get_reg_name(regp rp, index_regp irp = index_regp::hl) {
         switch(rp) {
         case regp::bc: return "bc";
         case regp::de: return "de";
@@ -1321,7 +1376,8 @@ protected:
         unreachable("Unknown register.");
     }
 
-    const char *get_reg_name(regp2 rp, index_regp irp = index_regp::hl) {
+    static const char *get_reg_name(regp2 rp,
+                                    index_regp irp = index_regp::hl) {
         switch(rp) {
         case regp2::bc: return "bc";
         case regp2::de: return "de";
@@ -1868,6 +1924,16 @@ public:
     typedef i8080_decoder<D, i8080_state> decoder;
     typedef processor_base<decoder> base;
 
+    using base::cf_mask;
+    using base::nf_mask;
+    using base::sf_mask;
+    using base::xf_mask;
+    using base::yf_mask;
+
+    using base::hf_inc;
+    using base::pf_log;
+    using base::zf_ari;
+
     bool on_get_iff() const { return state::get_iff(); }
     void on_set_iff(bool iff) { state::set_iff(iff); }
 
@@ -1999,6 +2065,14 @@ public:
         (*this)->on_set_hl(hl); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_hl()); }
+    void on_inc_r(reg r) {
+        fast_u8 n = (*this)->on_get_r(r);
+        fast_u8 f = (*this)->on_get_f();
+        n = inc8(n);
+        f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
+                (n & sf_mask) | zf_ari(n) | hf_inc(n) | pf_log(n);
+        (*this)->on_set_r(r, n);
+        (*this)->on_set_f(f); }
     void on_ld_r_n(reg r, fast_u8 n) {
         (*this)->on_set_r(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
