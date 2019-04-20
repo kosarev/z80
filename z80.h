@@ -2118,15 +2118,13 @@ public:
             break; }
         case alu::and_a:
             a &= n;
-            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(a) |
-                    pf_log(a) | hf_mask;
+            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(a) | pf_log(a) | hf_mask;
             break;
         case alu::xor_a:
-            assert(0);  // TODO
-#if 0
             a ^= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
-#endif
+            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(a) | pf_log(a);
             break;
         case alu::or_a:
             a |= n;
