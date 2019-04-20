@@ -32,6 +32,22 @@
  4 set_f 00 -> 44
  4 done
 
+# ADI n
+c616 adi 0x16
+ 0 get_pc_on_fetch 0000
+ 0 fetch c6 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read 16 at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read 16 at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 get_a 00
+ 7 set_a 00 -> 16
+ 7 set_f 00 -> 02
+ 7 done
+
 # ANA r
 a7 ana a
  0 get_pc_on_fetch 0000

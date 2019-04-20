@@ -242,6 +242,10 @@ public:
             // cc not met:  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
             return (*this)->decode_call_cc_nn(cc); }
+        case 0306: {
+            // alu[y] n  f(4) r(3)  (both i8080 and z80)
+            auto k = static_cast<alu>(y);
+            return (*this)->on_alu_n(k, (*this)->on_3t_imm8_read()); }
         case 0307:
             // RST y*8  f(5) w(3) w(3)
             (*this)->on_5t_fetch_cycle();
@@ -552,7 +556,6 @@ public:
 
     void decode_unprefixed(bool &reset_index_rp) {
         fast_u8 op = (*this)->on_fetch();
-        fast_u8 y = get_y_part(op);
 
         // TODO
         {
@@ -562,12 +565,6 @@ public:
                 return;
         }
 
-        switch(op & (x_mask | z_mask)) {
-        case 0306: {
-            // alu[y] n  f(4) r(3)
-            auto k = static_cast<alu>(y);
-            return (*this)->on_alu_n(k, (*this)->on_3t_imm8_read()); }
-        }
         if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
             // JR cc[y-4], d  f(4) r(3) + e(5)
             auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
@@ -943,13 +940,17 @@ public:
     void on_format_char(char c, const void **&args,
                         typename base::output_buff &out) {
         switch(c) {
-        case 'A': {  // ALU mnemonic.
+        case 'A': {  // Register-operand ALU mnemonic.
             auto k = get_arg<alu>(args);
             out.append(get_mnemonic_r(k));
             break; }
         case 'G': {  // An alternative register pair.
             auto rp = get_arg<regp2>(args);
             out.append(get_reg_name(rp));
+            break; }
+        case 'I': {  // Immediate-operand ALU mnemonic.
+            auto k = get_arg<alu>(args);
+            out.append(get_mnemonic_imm(k));
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
@@ -966,6 +967,8 @@ public:
 
     void on_add_irp_rp(regp rp) {
         (*this)->on_format("dad P", rp); }
+    void on_alu_n(alu k, fast_u8 n) {
+        (*this)->on_format("I N", k, n); }
     void on_alu_r(alu k, reg r) {
         (*this)->on_format("A R", k, r); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -1083,6 +1086,20 @@ protected:
         case alu::xor_a: return "xra";
         case alu::or_a: return "ora";
         case alu::cp: return "cmp";
+        }
+        unreachable("Unknown ALU operation.");
+    }
+
+    static const char *get_mnemonic_imm(alu k) {
+        switch(k) {
+        case alu::add: return "adi";
+        case alu::adc: return "aci";
+        case alu::sub: return "sui";
+        case alu::sbc: return "sbi";
+        case alu::and_a: return "ani";
+        case alu::xor_a: return "xri";
+        case alu::or_a: return "ori";
+        case alu::cp: return "cpi";
         }
         unreachable("Unknown ALU operation.");
     }
@@ -1828,6 +1845,8 @@ public:
         (*this)->on_set_memptr(nn);
         (*this)->set_pc_on_jump(nn); }
 
+    void on_alu_n(alu k, fast_u8 n) {
+        (*this)->do_alu(k, n); }
     void on_dec_rp(regp rp) {
         (*this)->on_set_rp(rp, dec16((*this)->on_get_rp(rp))); }
     void on_call_nn(fast_u16 nn) {
@@ -2699,8 +2718,6 @@ public:
         (*this)->on_set_memptr(inc16(hl));
         (*this)->on_set_hl(r16);
         (*this)->on_set_f(f); }
-    void on_alu_n(alu k, fast_u8 n) {
-        do_alu(k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         do_alu(k, (*this)->on_get_r(r, irp, d)); }
