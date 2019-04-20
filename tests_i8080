@@ -32,6 +32,18 @@
  4 set_f 00 -> 44
  4 done
 
+# ANA r
+a7 ana a
+ 0 get_pc_on_fetch 0000
+ 0 fetch a7 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_a 00
+ 4 get_a 00
+ 4 set_a 00 -> 00
+ 4 set_f 00 -> 54
+ 4 done
+
 # CALL nn
 cddf0e call 0x0edf
  0 get_pc_on_fetch 0000

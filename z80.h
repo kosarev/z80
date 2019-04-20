@@ -1970,6 +1970,7 @@ public:
     typedef processor_base<decoder> base;
 
     using base::cf_mask;
+    using base::hf_mask;
     using base::nf_mask;
     using base::sf_mask;
     using base::xf_mask;
@@ -2116,12 +2117,9 @@ public:
             a = t;
             break; }
         case alu::and_a:
-            assert(0);  // TODO
-#if 0
             a &= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a) |
-                    hf_mask;
-#endif
+            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(a) |
+                    pf_log(a) | hf_mask;
             break;
         case alu::xor_a:
             assert(0);  // TODO
