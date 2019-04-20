@@ -187,6 +187,18 @@ fe16 cpi 0x16
  7 set_f 00 -> bb
  7 done
 
+# DAA
+27 daa
+ 0 get_pc_on_fetch 0000
+ 0 fetch 27 at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_a 00
+ 4 get_f 00
+ 4 set_a 00 -> 00
+ 4 set_f 00 -> 44
+ 4 done
+
 # DAD rp
 19 dad d
  0 get_pc_on_fetch 0000

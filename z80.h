@@ -331,6 +331,9 @@ public:
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
             return (*this)->on_ld_at_nn_irp((*this)->on_3t_3t_imm16_read());
+        case 0x27:
+            // DAA  f(4)  (both i8080 and z80)
+            return (*this)->on_daa();
         case 0x2a:
             // LHLD nn              f(4) r(3) r(3) r(3) r(3)
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
@@ -581,9 +584,6 @@ public:
         case 0x18:
             // JR d  f(4) r(3) e(5)
             return (*this)->on_jr((*this)->on_disp_read());
-        case 0x27:
-            // DAA  f(4)
-            return (*this)->on_daa();
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -848,6 +848,8 @@ public:
 
     void on_call_nn(fast_u16 nn) {
         (*this)->on_format("call W", nn); }
+    void on_daa() {
+        (*this)->on_format("daa"); }
     void on_di() {
         (*this)->on_format("di"); }
     void on_ei() {
@@ -1228,8 +1230,6 @@ public:
         (*this)->on_format("ccf"); }
     void on_cpl() {
         (*this)->on_format("cpl"); }
-    void on_daa() {
-        (*this)->on_format("daa"); }
     void on_dec_r(reg r, fast_u8 d) {
         index_regp irp = get_index_rp_kind();
         (*this)->on_format("dec R", r, irp, d); }
@@ -2171,6 +2171,28 @@ public:
         (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
     void on_cpl() {
         (*this)->on_set_a((*this)->on_get_a() ^ 0xff); }
+    void on_daa() {
+        fast_u8 a = (*this)->on_get_a();
+        fast_u8 f = (*this)->on_get_f();
+        bool cf = f & cf_mask;
+        bool hf = f & hf_mask;
+
+        fast_u8 d = 0x00;
+        if(cf || a > 0x99) {
+            d |= 0x60;
+            f |= cf_mask;
+        }
+        if(hf || (a & 0x0f) > 0x09) {
+            d |= 0x06;
+        }
+
+        fast_u8 n = add8(a, d);
+        f = (f & ~(cf_mask | xf_mask | yf_mask | nf_mask)) |
+                ((a & 0x0f) > 0x09 ? hf_mask : 0) | (n & sf_mask) |
+                pf_log(n) | zf_ari(n);
+
+        (*this)->on_set_a(n);
+        (*this)->on_set_f(f); }
     void on_dec_r(reg r) {
         fast_u8 n = (*this)->on_get_r(r);
         fast_u8 f = (*this)->on_get_f();
