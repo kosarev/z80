@@ -196,6 +196,15 @@ public:
             // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
             return (*this)->decode_inc_r(r); }
+        case 0005: {
+            // DCR/DEC r[y]
+            // DCR r            f(5)
+            // DCR M            f(4)           r(3) w(3)
+            // DEC r            f(4)
+            // DEC (HL)         f(4)           r(4) w(3)
+            // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
+            auto r = static_cast<reg>(y);
+            return (*this)->decode_dec_r(r); }
         case 0006: {
             // LD/MVI r[y], n
             // MVI r, n             f(4)      r(3)
@@ -404,6 +413,10 @@ public:
     void decode_call_cc_nn(condition cc) {
         (*this)->on_5t_fetch_cycle();
         (*this)->on_call_cc_nn(cc, (*this)->on_3t_3t_imm16_read()); }
+    void decode_dec_r(reg r) {
+        if(r != reg::at_hl)
+            (*this)->on_5t_fetch_cycle();
+        (*this)->on_dec_r(r); }
     void decode_dec_rp(regp rp) {
         (*this)->on_5t_fetch_cycle();
         return (*this)->on_dec_rp(rp); }
@@ -492,6 +505,8 @@ public:
         fast_u16 nn = cc_met ? (*this)->on_3t_4t_imm16_read() :
                                (*this)->on_3t_3t_imm16_read();
         return (*this)->on_call_cc_nn(cc, nn); }
+    void decode_dec_r(reg r) {
+        (*this)->on_dec_r(r, read_disp_or_null(r)); }
     void decode_dec_rp(regp rp) {
         (*this)->on_6t_fetch_cycle();
         return (*this)->on_dec_rp(rp); }
@@ -546,13 +561,6 @@ public:
             return (*this)->on_alu_r(k, r, read_disp_or_null(r)); }
         }
         switch(op & (x_mask | z_mask)) {
-        case 0005: {
-            // DEC r[y]
-            // DEC r            f(4)
-            // DEC (HL)         f(4)           r(4) w(3)
-            // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
-            auto r = static_cast<reg>(y);
-            return (*this)->on_dec_r(r, read_disp_or_null(r)); }
         case 0306: {
             // alu[y] n  f(4) r(3)
             auto k = static_cast<alu>(y);
@@ -959,6 +967,8 @@ public:
         (*this)->on_format("cmc"); }
     void on_cpl() {
         (*this)->on_format("cma"); }
+    void on_dec_r(reg r) {
+        (*this)->on_format("dcr R", r); }
     void on_dec_rp(regp rp) {
         (*this)->on_format("dcx P", rp); }
     void on_ex_de_hl() {
@@ -1930,6 +1940,7 @@ public:
     using base::xf_mask;
     using base::yf_mask;
 
+    using base::hf_dec;
     using base::hf_inc;
     using base::pf_log;
     using base::zf_ari;
@@ -2045,6 +2056,14 @@ public:
         (*this)->on_set_f((*this)->on_get_f() ^ base::cf_mask); }
     void on_cpl() {
         (*this)->on_set_a((*this)->on_get_a() ^ 0xff); }
+    void on_dec_r(reg r) {
+        fast_u8 n = (*this)->on_get_r(r);
+        fast_u8 f = (*this)->on_get_f();
+        n = dec8(n);
+        f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
+                (n & sf_mask) | zf_ari(n) | hf_dec(n) | pf_log(n);
+        (*this)->on_set_r(r, n);
+        (*this)->on_set_f(f); }
     void on_di() {
         (*this)->set_iff_on_di(false); }
     void on_ei() {
