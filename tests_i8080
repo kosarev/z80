@@ -313,6 +313,21 @@ d2d90a jnc 0x0ad9
 10 set_pc_on_jump 0003 -> 0ad9
 10 done
 
+# IN n
+dbfe in 0xfe
+ 0 get_pc_on_fetch 0000
+ 0 fetch db at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 3t_imm8_read fe at 0001
+ 4   get_pc_on_imm8_read 0001
+ 4   3t_read fe at 0001
+ 4     set_addr_bus 0000 -> 0001
+ 7   set_pc_on_imm8_read 0001 -> 0002
+ 7 input at fe
+10 set_a 00 -> ff
+10 done
+
 # INR r
 04 inr b
  0 get_pc_on_fetch 0000

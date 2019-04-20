@@ -369,6 +369,10 @@ public:
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return (*this)->on_call_nn((*this)->on_3t_4t_imm16_read());
+        case 0xdb:
+            // IN n       f(4) r(3) i(3)
+            // IN A, (n)  f(4) r(3) i(4)
+            return (*this)->on_in_a_n((*this)->on_3t_imm8_read());
         case 0xe3:
             // EX (SP), irp / XHTL
             // XTHL                 f(4) r(3) r(3) w(3) w(5)
@@ -593,9 +597,6 @@ public:
         case 0xd9:
             // EXX  f(4)
             return (*this)->on_exx();
-        case 0xdb:
-            // IN A, (n)  f(4) r(3) i(4)
-            return (*this)->on_in_a_n((*this)->on_3t_imm8_read());
         case 0xdd:
             // DD prefix (IX-indexed instructions).
             reset_index_rp = false;
@@ -995,6 +996,8 @@ public:
         (*this)->on_format("jmp W", nn); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         (*this)->on_format("jC W", cc, nn); }
+    void on_in_a_n(fast_u8 n) {
+        (*this)->on_format("in N", n); }
     void on_inc_r(reg r) {
         (*this)->on_format("inr R", r); }
     void on_inc_rp(regp rp) {
@@ -2097,6 +2100,11 @@ public:
         return op;
     }
 
+    fast_u8 on_input_cycle(fast_u8 n) {
+        (*this)->tick(3);
+        return (*this)->on_input(n);
+    }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = 0;
@@ -2221,6 +2229,8 @@ public:
         (*this)->on_set_hl(hl); }
     void on_jp_irp() {
         (*this)->set_pc_on_jump((*this)->on_get_hl()); }
+    void on_in_a_n(fast_u8 n) {
+        (*this)->on_set_a((*this)->on_input_cycle(n)); }
     void on_inc_r(reg r) {
         fast_u8 n = (*this)->on_get_r(r);
         fast_u8 f = (*this)->on_get_f();

@@ -552,6 +552,13 @@ public:
         base::on_5t_exec_cycle();
     }
 
+    fast_u8 on_input_cycle(fast_u8 n) {
+        input.read_and_match("input at %02x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(n));
+        return base::on_input_cycle(n);
+    }
+
     fast_u8 on_input_cycle(fast_u16 addr) {
         input.read_and_match("input at %04x",
                              static_cast<unsigned>(get_ticks()),
