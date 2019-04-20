@@ -2078,13 +2078,6 @@ public:
         return op;
     }
 
-    void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
-        fast_u8 t = sub8(a, n);
-        f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                hf_ari(t, a, n) | pf_log(t) | cf_ari(t > a);
-        a = t;
-    }
-
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
         fast_u8 f = 0;
@@ -2104,8 +2097,12 @@ public:
                     cf_ari(t < a || (cfv && n == 0xff));
             a = t;
             break; }
-        case alu::sub: {
-            do_sub(a, f, n);
+        case alu::sub:
+        case alu::cp: {
+            fast_u8 t = sub8(a, n);
+            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_log(t) | cf_ari(t > a);
+            a = t;
             break; }
         case alu::sbc: {
             f = (*this)->on_get_f();
@@ -2130,12 +2127,6 @@ public:
             a |= n;
             f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a);
-            break;
-        case alu::cp:
-            assert(0);  // TODO
-#if 0
-            do_cp(a, f, n);
-#endif
             break;
         }
         if(k != alu::cp)
