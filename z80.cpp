@@ -12,41 +12,6 @@
 
 namespace z80 {
 
-const char *get_mnemonic(rot k) {
-    switch(k) {
-    case rot::rlc: return "rlc";
-    case rot::rrc: return "rrc";
-    case rot::rl: return "rl";
-    case rot::rr: return "rr";
-    case rot::sla: return "sla";
-    case rot::sra: return "sra";
-    case rot::sll: return "sll";
-    case rot::srl: return "srl";
-    }
-    assert(0);
-}
-
-const char *get_mnemonic(block_ld k) {
-    switch(k) {
-    case block_ld::ldi: return "ldi";
-    case block_ld::ldd: return "ldd";
-    case block_ld::ldir: return "ldir";
-    case block_ld::lddr: return "lddr";
-    }
-    assert(0);
-}
-
-const char *get_mnemonic(block_cp k) {
-    switch(k) {
-    case block_cp::cpi: return "cpi";
-    case block_cp::cpd: return "cpd";
-    case block_cp::cpir: return "cpir";
-    case block_cp::cpdr: return "cpdr";
-    }
-    assert(0);
-}
-
-
 bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
 }

@@ -778,9 +778,6 @@ protected:
     using base::get_p_part;
 };
 
-const char *get_mnemonic(rot k);
-const char *get_mnemonic(block_ld k);
-const char *get_mnemonic(block_cp k);
 bool is_two_operand_alu_instr(alu k);
 const char *get_condition_name(condition cc);
 
@@ -1156,7 +1153,7 @@ public:
             break; }
         case 'O': {  // Rotation mnemonic.
             auto k = get_arg<rot>(args);
-            out.append(z80::get_mnemonic(k));
+            out.append(get_mnemonic(k));
             break; }
         case 'R': {  // A register.
             auto r = get_arg<reg>(args);
@@ -1197,11 +1194,11 @@ public:
             break; }
         case 'L': {  // A block transfer instruction.
             auto k = get_arg<block_ld>(args);
-            out.append(z80::get_mnemonic(k));
+            out.append(get_mnemonic(k));
             break; }
         case 'M': {  // A block comparison instruction.
             auto k = get_arg<block_cp>(args);
-            out.append(z80::get_mnemonic(k));
+            out.append(get_mnemonic(k));
             break; }
         default:
             base::on_format_char(c, args, out);
@@ -1452,6 +1449,40 @@ public:
         case alu::cp: return "cp";
         }
         unreachable("Unknown ALU operation.");
+    }
+
+    static const char *get_mnemonic(rot k) {
+        switch(k) {
+        case rot::rlc: return "rlc";
+        case rot::rrc: return "rrc";
+        case rot::rl: return "rl";
+        case rot::rr: return "rr";
+        case rot::sla: return "sla";
+        case rot::sra: return "sra";
+        case rot::sll: return "sll";
+        case rot::srl: return "srl";
+        }
+        unreachable("Unknown rotation operation.");
+    }
+
+    static const char *get_mnemonic(block_ld k) {
+        switch(k) {
+        case block_ld::ldi: return "ldi";
+        case block_ld::ldd: return "ldd";
+        case block_ld::ldir: return "ldir";
+        case block_ld::lddr: return "lddr";
+        }
+        unreachable("Unknown block load operation.");
+    }
+
+    static const char *get_mnemonic(block_cp k) {
+        switch(k) {
+        case block_cp::cpi: return "cpi";
+        case block_cp::cpd: return "cpd";
+        case block_cp::cpir: return "cpir";
+        case block_cp::cpdr: return "cpdr";
+        }
+        unreachable("Unknown block compare operation.");
     }
 
 protected:
