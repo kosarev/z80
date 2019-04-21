@@ -1457,7 +1457,7 @@ protected:
 };
 
 template<typename S>
-class processor_state_base : public S {
+class cpu_state_base : public S {
 public:
     typedef S decoder_state;
 
@@ -1538,10 +1538,10 @@ private:
     fast_u16 last_read_addr = 0;
 };
 
-class i8080_state : public processor_state_base<i8080_decoder_state>
+class i8080_state : public cpu_state_base<i8080_decoder_state>
 {};
 
-class z80_state : public processor_state_base<z80_decoder_state> {
+class z80_state : public cpu_state_base<z80_decoder_state> {
 public:
     z80_state() {}
 
@@ -1635,13 +1635,13 @@ private:
 };
 
 template<typename E>
-class processor_base : public E {
+class cpu_base : public E {
 public:
     typedef E decoder;
     typedef typename decoder::state state;
     typedef typename decoder::derived derived;
 
-    processor_base() {}
+    cpu_base() {}
 
     using state::get_b;
     using state::set_b;
@@ -1987,11 +1987,11 @@ protected:
 };
 
 template<typename D>
-class i8080_processor : public processor_base<i8080_decoder<D, i8080_state>> {
+class i8080_cpu : public cpu_base<i8080_decoder<D, i8080_state>> {
 public:
     typedef i8080_state state;
     typedef i8080_decoder<D, i8080_state> decoder;
-    typedef processor_base<decoder> base;
+    typedef cpu_base<decoder> base;
 
     using base::cf_mask;
     using base::hf_mask;
@@ -2297,13 +2297,13 @@ public:
 };
 
 template<typename D>
-class z80_processor : public processor_base<z80_decoder<D, z80_state>> {
+class z80_cpu : public cpu_base<z80_decoder<D, z80_state>> {
 public:
     typedef z80_state state;
     typedef z80_decoder<D, z80_state> decoder;
-    typedef processor_base<decoder> base;
+    typedef cpu_base<decoder> base;
 
-    z80_processor() {}
+    z80_cpu() {}
 
     using state::get_index_rp_kind;
     using state::set_index_rp_kind;

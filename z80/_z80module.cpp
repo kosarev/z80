@@ -39,7 +39,7 @@ private:
 };
 
 // TODO: Should be part of z80.h?
-struct __attribute__((packed)) processor_state {
+struct __attribute__((packed)) cpu_state {
     least_u16 bc;
     least_u16 de;
     least_u16 hl;
@@ -77,13 +77,13 @@ struct __attribute__((packed)) memory_image {
 };
 
 struct __attribute__((packed)) machine_state {
-    struct processor_state proc;
+    cpu_state proc;
     memory_image memory;
 };
 
-class z80_machine : public z80::processor<z80_machine> {
+class z80_machine : public z80::cpu<z80_machine> {
 public:
-    typedef z80::processor<z80_machine> base;
+    typedef z80::cpu<z80_machine> base;
 
     z80_machine() {
         retrieve_state();
@@ -94,11 +94,11 @@ public:
     }
 
     void retrieve_state() {
-        state.proc = get_processor_state();
+        state.proc = get_cpu_state();
     }
 
     void install_state() {
-        set_processor_state(state.proc);
+        set_cpu_state(state.proc);
     }
 
     memory_image &get_memory() { return state.memory; }
@@ -166,8 +166,8 @@ public:
     }
 
 protected:
-    processor_state get_processor_state() {
-        processor_state state;
+    cpu_state get_cpu_state() {
+        cpu_state state;
 
         state.bc = get_bc();
         state.de = get_de();
@@ -194,7 +194,7 @@ protected:
         return state;
     }
 
-    void set_processor_state(const processor_state &state) {
+    void set_cpu_state(const cpu_state &state) {
         set_bc(state.bc);
         set_de(state.de);
         set_hl(state.hl);

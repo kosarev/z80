@@ -723,10 +723,10 @@ private:
     least_u8 image[image_size];
 };
 
-class i8080_machine : public machine_base<z80::i8080_processor<i8080_machine>> {
+class i8080_machine : public machine_base<z80::i8080_cpu<i8080_machine>> {
 public:
     i8080_machine(test_input &input)
-        : machine_base<z80::i8080_processor<i8080_machine>>(input)
+        : machine_base<z80::i8080_cpu<i8080_machine>>(input)
     {}
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
@@ -744,10 +744,10 @@ public:
     }
 };
 
-class z80_machine : public machine_base<z80::z80_processor<z80_machine>> {
+class z80_machine : public machine_base<z80::z80_cpu<z80_machine>> {
 public:
     z80_machine(test_input &input)
-        : machine_base<z80::z80_processor<z80_machine>>(input)
+        : machine_base<z80::z80_cpu<z80_machine>>(input)
     {}
 
     fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
