@@ -787,7 +787,7 @@ const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
 
 template<typename E>
-class disassembler_base : public E {
+class disasm_base : public E {
 protected:
     class output_buff;
 
@@ -796,7 +796,7 @@ public:
     typedef typename decoder::derived derived;
     typedef typename decoder::state state;
 
-    disassembler_base() {}
+    disasm_base() {}
 
     void on_5t_fetch_cycle() {}
 
@@ -928,13 +928,13 @@ protected:
 };
 
 template<typename D>
-class i8080_disassembler : public disassembler_base<i8080_decoder<D>> {
+class i8080_disasm : public disasm_base<i8080_decoder<D>> {
 public:
     typedef D derived;
-    typedef disassembler_base<i8080_decoder<derived>> base;
+    typedef disasm_base<i8080_decoder<derived>> base;
     typedef typename base::state state;
 
-    i8080_disassembler() {}
+    i8080_disasm() {}
 
     void on_7t_fetch_cycle() {}
 
@@ -1114,15 +1114,15 @@ protected:
 };
 
 template<typename D>
-class z80_disassembler : public disassembler_base<z80_decoder<D>> {
+class z80_disasm : public disasm_base<z80_decoder<D>> {
 public:
     typedef D derived;
-    typedef disassembler_base<z80_decoder<derived>> base;
+    typedef disasm_base<z80_decoder<derived>> base;
     typedef typename base::state state;
 
     using state::get_index_rp_kind;
 
-    z80_disassembler() {}
+    z80_disasm() {}
 
     // TODO: What if to replace 'on_fetch(false)' with a special
     // method like 'on_non_m1_fetch()'?

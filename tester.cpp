@@ -188,11 +188,11 @@ private:
 static const unsigned max_instr_size = 4;
 
 template<typename B>
-class disassembler_base : public B {
+class disasm_base : public B {
 public:
     typedef B base;
 
-    disassembler_base()
+    disasm_base()
         : index(0), instr_size(0)
     {}
 
@@ -231,12 +231,10 @@ private:
     char output_buff[max_output_buff_size];
 };
 
-class i8080_disassembler
-    : public disassembler_base<z80::i8080_disassembler<i8080_disassembler>>
+class i8080_disasm : public disasm_base<z80::i8080_disasm<i8080_disasm>>
 {};
 
-class z80_disassembler
-    : public disassembler_base<z80::z80_disassembler<z80_disassembler>> {
+class z80_disasm : public disasm_base<z80::z80_disasm<z80_disasm>> {
 public:
     void disassemble() {
         // Skip prefixes.
@@ -848,7 +846,7 @@ void handle_directive(const test_input &input, M &mach) {
 template<typename M, typename D>
 void handle_test_entry(test_input &input) {
     typedef M machine;
-    typedef D disassembler;
+    typedef D disasm;
 
     // Handle directives.
     machine mach(input);
@@ -872,10 +870,10 @@ void handle_test_entry(test_input &input) {
     skip_whitespace(p);
 
     // Test instruction disassembly.
-    disassembler disasm;
-    disasm.set_instr_code(instr_code, instr_size);
-    disasm.disassemble();
-    const char *instr = disasm.get_output();
+    disasm dis;
+    dis.set_instr_code(instr_code, instr_size);
+    dis.disassemble();
+    const char *instr = dis.get_output();
     if(std::strcmp(instr, p) != 0)
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     instr, p);
@@ -927,10 +925,10 @@ int main(int argc, char *argv[]) {
 
         switch(cpu) {
         case cpu_kind::i8080:
-            handle_test_entry<i8080_machine, i8080_disassembler>(input);
+            handle_test_entry<i8080_machine, i8080_disasm>(input);
             break;
         case cpu_kind::z80:
-            handle_test_entry<z80_machine, z80_disassembler>(input);
+            handle_test_entry<z80_machine, z80_disasm>(input);
             break;
         case cpu_kind::unknown:
             unreachable("Unknown CPU.");
