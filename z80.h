@@ -1486,6 +1486,19 @@ public:
     void set_high(fast_u8 n) { v = make16(n, get_low()); }
 };
 
+// The interface to a state's flip-flop.
+class flipflop {
+public:
+    flipflop() {}
+    flipflop(const flipflop &other) = delete;
+
+    bool get() const { return v; }
+    void set(bool n) { v = n; }
+
+private:
+    bool v = false;
+};
+
 template<typename S>
 class cpu_state_base : public S {
 public:
@@ -1537,16 +1550,13 @@ public:
     fast_u16 get_wz() const { return wz.get(); }
     void set_wz(fast_u16 n) { wz.set(n); }
 
-    bool is_int_disabled() const { return int_disabled; }
-    void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
+    bool is_int_disabled() const { return int_disabled.get(); }
+    void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
     void enable_int() { set_is_int_disabled(false); }
     void disable_int() { set_is_int_disabled(true); }
 
-    bool get_iff() const { return iff; }
-    void set_iff(bool new_iff) { iff = new_iff; }
-
     bool is_halted() const { return halted; }
-    void set_is_halted(bool is_halted) { halted = is_halted; }
+    void set_is_halted(bool is_halted) { halted.set(is_halted); }
     void halt() { set_is_halted(true); }
 
     fast_u16 get_last_read_addr() const { return last_read_addr; }
@@ -1557,14 +1567,18 @@ public:
 protected:
     regp_value bc, de, hl, af;
     reg16_value pc, sp, wz;
-    bool int_disabled = false;
-    bool iff = false;
-    bool halted = false;
-    fast_u16 last_read_addr = 0;
+    flipflop int_disabled, halted;
+    fast_u16 last_read_addr = 0;  // TODO: Remove.
 };
 
-class i8080_state : public cpu_state_base<i8080_decoder_state>
-{};
+class i8080_state : public cpu_state_base<i8080_decoder_state> {
+public:
+    bool get_iff() const { return iff.get(); }
+    void set_iff(bool new_iff) { iff.set(new_iff); }
+
+protected:
+    flipflop iff;
+};
 
 class z80_state : public cpu_state_base<z80_decoder_state> {
 public:
@@ -1609,11 +1623,11 @@ public:
     fast_u16 get_ir() const { return ir.get(); }
     void set_ir(fast_u16 n) { ir.set(n); }
 
-    bool get_iff1() const { return iff1; }
-    void set_iff1(bool iff) { iff1 = iff; }
+    bool get_iff1() const { return iff1.get(); }
+    void set_iff1(bool iff) { iff1.set(iff); }
 
-    bool get_iff2() const { return iff2; }
-    void set_iff2(bool iff) { iff2 = iff; }
+    bool get_iff2() const { return iff2.get(); }
+    void set_iff2(bool iff) { iff2.set(iff); }
 
     unsigned get_int_mode() const { return int_mode; }
     void set_int_mode(unsigned mode) { int_mode = mode; }
@@ -1654,7 +1668,7 @@ public:
 protected:
     regp_value ix, iy, ir;
     reg16_value alt_bc, alt_de, alt_hl, alt_af;
-    bool iff1 = false, iff2 = false;
+    flipflop iff1, iff2;
     unsigned int_mode = 0;
 };
 
