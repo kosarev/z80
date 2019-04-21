@@ -281,9 +281,9 @@ PyObject *handle_active_int(PyObject *self, PyObject *args) {
 PyMethodDef methods[] = {
     {"get_state_image", get_state_image, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
-     "simulated machine."},
+     "emulated machine."},
     {"get_memory", get_memory, METH_NOARGS,
-     "Return a MemoryView object that exposes the memory of the simulated "
+     "Return a MemoryView object that exposes the memory of the emulated "
      "machine."},
     {"set_on_input_callback", set_on_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
