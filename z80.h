@@ -3398,6 +3398,24 @@ protected:
     const D *operator -> () const { return static_cast<const D*>(this); }
 };
 
+class memory_image {
+public:
+    static const unsigned size = 0x10000;  // 64K bytes.
+
+    fast_u8 read(fast_u16 addr) const {
+        assert(addr < size);
+        return bytes[addr];
+    }
+
+    void write(fast_u16 addr, fast_u8 n) {
+        assert(addr < size);
+        bytes[addr] = static_cast<least_u8>(n);
+    }
+
+private:
+    least_u8 bytes[size];
+};
+
 }  // namespace z80
 
 #endif  // Z80_H
