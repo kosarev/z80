@@ -1456,56 +1456,86 @@ protected:
     }
 };
 
+// Provides access to the value of a 16-bit register. Supposed to
+// be as efficient as possible.
+class reg16_value {
+public:
+    reg16_value() {}
+    reg16_value(const reg16_value &other) = delete;
+
+    fast_u16 get() const { return v; }
+    void set(fast_u16 n) { v = n; }
+
+    void swap(fast_u16 &n) { std::swap(v, n); }
+    void swap(reg16_value &other) { swap(other.v); }
+
+protected:
+    fast_u16 v = 0;
+};
+
+// Provides interface to a register pair.
+class regp_value : public reg16_value {
+public:
+    regp_value() {}
+    regp_value(const regp_value &other) = delete;
+
+    fast_u8 get_low() const { return get_low8(v); }
+    void set_low(fast_u8 n) { v = make16(get_high(), n); }
+
+    fast_u8 get_high() const { return get_high8(v); }
+    void set_high(fast_u8 n) { v = make16(n, get_low()); }
+};
+
 template<typename S>
 class cpu_state_base : public S {
 public:
     typedef S decoder_state;
 
-    fast_u8 get_b() const { return get_high8(bc); }
-    void set_b(fast_u8 b) { bc = make16(b, get_c()); }
+    fast_u8 get_b() const { return bc.get_high(); }
+    void set_b(fast_u8 n) { bc.set_high(n); }
 
-    fast_u8 get_c() const { return get_low8(bc); }
-    void set_c(fast_u8 c) { bc = make16(get_b(), c); }
+    fast_u8 get_c() const { return bc.get_low(); }
+    void set_c(fast_u8 n) { bc.set_low(n); }
 
-    fast_u8 get_d() const { return get_high8(de); }
-    void set_d(fast_u8 d) { de = make16(d, get_e()); }
+    fast_u8 get_d() const { return de.get_high(); }
+    void set_d(fast_u8 n) { de.set_high(n); }
 
-    fast_u8 get_e() const { return get_low8(de); }
-    void set_e(fast_u8 e) { de = make16(get_d(), e); }
+    fast_u8 get_e() const { return de.get_low(); }
+    void set_e(fast_u8 n) { de.set_low(n); }
 
-    fast_u8 get_h() const { return get_high8(hl); }
-    void set_h(fast_u8 h) { hl = make16(h, get_l()); }
+    fast_u8 get_h() const { return hl.get_high(); }
+    void set_h(fast_u8 n) { hl.set_high(n); }
 
-    fast_u8 get_l() const { return get_low8(hl); }
-    void set_l(fast_u8 l) { hl = make16(get_h(), l); }
+    fast_u8 get_l() const { return hl.get_low(); }
+    void set_l(fast_u8 n) { hl.set_low(n); }
 
-    fast_u8 get_a() const { return get_high8(af); }
-    void set_a(fast_u8 a) { af = make16(a, get_f()); }
+    fast_u8 get_a() const { return af.get_high(); }
+    void set_a(fast_u8 n) { af.set_high(n); }
 
-    fast_u8 get_f() const { return get_low8(af); }
-    void set_f(fast_u8 f) { af = make16(get_a(), f); }
+    fast_u8 get_f() const { return af.get_low(); }
+    void set_f(fast_u8 n) { af.set_low(n); }
 
-    fast_u16 get_af() const { return af; }
-    void set_af(fast_u16 n) { af = n; }
+    fast_u16 get_bc() const { return bc.get(); }
+    void set_bc(fast_u16 n) { bc.set(n); }
 
-    fast_u16 get_hl() const { return hl; }
-    void set_hl(fast_u16 n) { hl = n; }
+    fast_u16 get_de() const { return de.get(); }
+    void set_de(fast_u16 n) { de.set(n); }
 
-    fast_u16 get_bc() const { return bc; }
-    void set_bc(fast_u16 n) { bc = n; }
+    fast_u16 get_hl() const { return hl.get(); }
+    void set_hl(fast_u16 n) { hl.set(n); }
 
-    fast_u16 get_de() const { return de; }
-    void set_de(fast_u16 n) { de = n; }
+    fast_u16 get_af() const { return af.get(); }
+    void set_af(fast_u16 n) { af.set(n); }
 
-    fast_u16 get_sp() const { return sp; }
-    void set_sp(fast_u16 n) { sp = n; }
+    fast_u16 get_pc() const { return pc.get(); }
+    void set_pc(fast_u16 n) { pc.set(n); }
 
-    fast_u16 get_pc() const { return pc; }
-    void set_pc(fast_u16 n) { pc = n; }
+    fast_u16 get_sp() const { return sp.get(); }
+    void set_sp(fast_u16 n) { sp.set(n); }
 
     // TODO: Do we really need it for i8080?
-    fast_u16 get_wz() const { return wz; }
-    void set_wz(fast_u16 n) { wz = n; }
+    fast_u16 get_wz() const { return wz.get(); }
+    void set_wz(fast_u16 n) { wz.set(n); }
 
     bool is_int_disabled() const { return int_disabled; }
     void set_is_int_disabled(bool disabled) { int_disabled = disabled; }
@@ -1522,16 +1552,11 @@ public:
     fast_u16 get_last_read_addr() const { return last_read_addr; }
     void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
 
-    void ex_de_hl() { std::swap(de, hl); }
+    void ex_de_hl() { de.swap(hl); }
 
-    void swap_bc(fast_u16 &alt_bc) { std::swap(bc, alt_bc); }
-    void swap_de(fast_u16 &alt_de) { std::swap(de, alt_de); }
-    void swap_hl(fast_u16 &alt_hl) { std::swap(hl, alt_hl); }
-    void swap_af(fast_u16 &alt_af) { std::swap(af, alt_af); }
-
-private:
-    fast_u16 bc = 0, de = 0, hl = 0, af = 0;
-    fast_u16 pc = 0, sp = 0, wz = 0;
+protected:
+    regp_value bc, de, hl, af;
+    reg16_value pc, sp, wz;
     bool int_disabled = false;
     bool iff = false;
     bool halted = false;
@@ -1545,44 +1570,44 @@ class z80_state : public cpu_state_base<z80_decoder_state> {
 public:
     z80_state() {}
 
-    fast_u8 get_ixh() const { return get_high8(ix); }
-    void set_ixh(fast_u8 ixh) { ix = make16(ixh, get_ixl()); }
+    fast_u8 get_ixh() const { return ix.get_high(); }
+    void set_ixh(fast_u8 n) { ix.set_high(n); }
 
-    fast_u8 get_ixl() const { return get_low8(ix); }
-    void set_ixl(fast_u8 ixl) { ix = make16(get_ixh(), ixl); }
+    fast_u8 get_ixl() const { return ix.get_low(); }
+    void set_ixl(fast_u8 n) { ix.set_low(n); }
 
-    fast_u8 get_iyh() const { return get_high8(iy); }
-    void set_iyh(fast_u8 iyh) { iy = make16(iyh, get_iyl()); }
+    fast_u8 get_iyh() const { return iy.get_high(); }
+    void set_iyh(fast_u8 n) { iy.set_high(n); }
 
-    fast_u8 get_iyl() const { return get_low8(iy); }
-    void set_iyl(fast_u8 iyl) { iy = make16(get_iyh(), iyl); }
+    fast_u8 get_iyl() const { return iy.get_low(); }
+    void set_iyl(fast_u8 n) { iy.set_low(n); }
 
-    fast_u8 get_i() const { return get_high8(ir); }
-    void set_i(fast_u8 i) { ir = make16(i, get_r_reg()); }
+    fast_u8 get_i() const { return ir.get_high(); }
+    void set_i(fast_u8 n) { ir.set_high(n); }
 
-    fast_u8 get_r_reg() const { return get_low8(ir); }
-    void set_r_reg(fast_u8 r) { ir = make16(get_i(), r); }
+    fast_u8 get_r_reg() const { return ir.get_low(); }
+    void set_r_reg(fast_u8 n) { ir.set_low(n); }
 
-    fast_u16 get_alt_af() const { return alt_af; }
-    void set_alt_af(fast_u16 n) { alt_af = n; }
+    fast_u16 get_alt_af() const { return alt_af.get(); }
+    void set_alt_af(fast_u16 n) { alt_af.set(n); }
 
-    fast_u16 get_alt_hl() const { return alt_hl; }
-    void set_alt_hl(fast_u16 n) { alt_hl = n; }
+    fast_u16 get_alt_hl() const { return alt_hl.get(); }
+    void set_alt_hl(fast_u16 n) { alt_hl.set(n); }
 
-    fast_u16 get_alt_bc() const { return alt_bc; }
-    void set_alt_bc(fast_u16 n) { alt_bc = n; }
+    fast_u16 get_alt_bc() const { return alt_bc.get(); }
+    void set_alt_bc(fast_u16 n) { alt_bc.set(n); }
 
-    fast_u16 get_alt_de() const { return alt_de; }
-    void set_alt_de(fast_u16 n) { alt_de = n; }
+    fast_u16 get_alt_de() const { return alt_de.get(); }
+    void set_alt_de(fast_u16 n) { alt_de.set(n); }
 
-    fast_u16 get_ix() const { return ix; }
-    void set_ix(fast_u16 n) { ix = n; }
+    fast_u16 get_ix() const { return ix.get(); }
+    void set_ix(fast_u16 n) { ix.set(n); }
 
-    fast_u16 get_iy() const { return iy; }
-    void set_iy(fast_u16 n) { iy = n; }
+    fast_u16 get_iy() const { return iy.get(); }
+    void set_iy(fast_u16 n) { iy.set(n); }
 
-    fast_u16 get_ir() const { return ir; }
-    void set_ir(fast_u16 n) { ir = n; }
+    fast_u16 get_ir() const { return ir.get(); }
+    void set_ir(fast_u16 n) { ir.set(n); }
 
     bool get_iff1() const { return iff1; }
     void set_iff1(bool iff) { iff1 = iff; }
@@ -1617,19 +1642,18 @@ public:
     }
 
     void ex_af_alt_af() {
-        swap_af(alt_af);
+        af.swap(alt_af);
     }
 
     void exx() {
-        swap_bc(alt_bc);
-        swap_de(alt_de);
-        swap_hl(alt_hl);
+        bc.swap(alt_bc);
+        de.swap(alt_de);
+        hl.swap(alt_hl);
     }
 
-private:
-    fast_u16 ix = 0, iy = 0;
-    fast_u16 alt_bc = 0, alt_de = 0, alt_hl = 0, alt_af = 0;
-    fast_u16 ir = 0;
+protected:
+    regp_value ix, iy, ir;
+    reg16_value alt_bc, alt_de, alt_hl, alt_af;
     bool iff1 = false, iff2 = false;
     unsigned int_mode = 0;
 };
