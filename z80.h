@@ -3398,22 +3398,31 @@ protected:
     const D *operator -> () const { return static_cast<const D*>(this); }
 };
 
-class memory_image {
+template<typename S>
+class memory_state : public S {
 public:
-    static const unsigned size = 0x10000;  // 64K bytes.
+    memory_state() { reset(); }
+
+    // TODO: Initialize with random data.
+    void reset() {}
 
     fast_u8 read(fast_u16 addr) const {
-        assert(addr < size);
-        return bytes[addr];
+        assert(addr < memory_size);
+        return memory[addr];
     }
 
     void write(fast_u16 addr, fast_u8 n) {
-        assert(addr < size);
-        bytes[addr] = static_cast<least_u8>(n);
+        assert(addr < memory_size);
+        memory[addr] = static_cast<least_u8>(n);
     }
 
 private:
-    least_u8 bytes[size];
+    static const unsigned memory_size = 0x10000;  // 64K bytes.
+    least_u8 memory[memory_size] = {};
+};
+
+template<typename S>
+class machine_state_base : public S {
 };
 
 }  // namespace z80
