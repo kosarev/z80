@@ -1580,6 +1580,22 @@ protected:
     flipflop iff;
 };
 
+class int_mode {
+public:
+    int_mode() {}
+    int_mode(const int_mode &other) = delete;
+
+    unsigned get() const { return v; }
+
+    void set(unsigned n) {
+        assert(n <= 2);
+        v = n;
+    }
+
+private:
+    unsigned v = 0;
+};
+
 class z80_state : public cpu_state_base<z80_decoder_state> {
 public:
     z80_state() {}
@@ -1629,8 +1645,8 @@ public:
     bool get_iff2() const { return iff2.get(); }
     void set_iff2(bool iff) { iff2.set(iff); }
 
-    unsigned get_int_mode() const { return int_mode; }
-    void set_int_mode(unsigned mode) { int_mode = mode; }
+    unsigned get_int_mode() const { return im.get(); }
+    void set_int_mode(unsigned mode) { im.set(mode); }
 
     fast_u8 get_r(reg r) {
         switch(r) {
@@ -1669,7 +1685,7 @@ protected:
     regp_value ix, iy, ir;
     reg16_value alt_bc, alt_de, alt_hl, alt_af;
     flipflop iff1, iff2;
-    unsigned int_mode = 0;
+    int_mode im;
 };
 
 template<typename E>
