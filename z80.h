@@ -778,8 +778,6 @@ protected:
     using base::get_p_part;
 };
 
-const char *get_condition_name(condition cc);
-
 template<typename E>
 class disasm_base : public E {
 protected:
@@ -856,6 +854,20 @@ public:
         (*this)->on_format("ret"); }
     void on_rst(fast_u16 nn) {
         (*this)->on_format("rst W", nn); }
+
+    static const char *get_condition_name(condition cc) {
+        switch(cc) {
+        case condition::nz: return "nz";
+        case condition::z: return "z";
+        case condition::nc: return "nc";
+        case condition::c: return "c";
+        case condition::po: return "po";
+        case condition::pe: return "pe";
+        case condition::p: return "p";
+        case condition::m: return "m";
+        }
+        unreachable("Unknown condition code.");
+    }
 
 protected:
     derived *operator -> () { return static_cast<derived*>(this); }

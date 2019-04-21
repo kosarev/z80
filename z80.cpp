@@ -12,18 +12,4 @@
 
 namespace z80 {
 
-const char *get_condition_name(condition cc) {
-    switch(cc) {
-    case condition::nz: return "nz";
-    case condition::z: return "z";
-    case condition::nc: return "nc";
-    case condition::c: return "c";
-    case condition::po: return "po";
-    case condition::pe: return "pe";
-    case condition::p: return "p";
-    case condition::m: return "m";
-    }
-    assert(0);
-}
-
 }  // namespace z80
