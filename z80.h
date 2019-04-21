@@ -778,7 +778,6 @@ protected:
     using base::get_p_part;
 };
 
-bool is_two_operand_alu_instr(alu k);
 const char *get_condition_name(condition cc);
 
 template<typename E>
@@ -1435,6 +1434,10 @@ public:
         case index_regp::iy: return "iy";
         }
         unreachable("Unknown register.");
+    }
+
+    static bool is_two_operand_alu_instr(alu k) {
+        return k == alu::add || k == alu::adc || k == alu::sbc;
     }
 
     static const char *get_mnemonic(alu k) {

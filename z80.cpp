@@ -12,10 +12,6 @@
 
 namespace z80 {
 
-bool is_two_operand_alu_instr(alu k) {
-    return k == alu::add || k == alu::adc || k == alu::sbc;
-}
-
 const char *get_condition_name(condition cc) {
     switch(cc) {
     case condition::nz: return "nz";
