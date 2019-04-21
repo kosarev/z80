@@ -12,15 +12,6 @@
 
 namespace z80 {
 
-const char *get_reg_name(index_regp irp) {
-    switch(irp) {
-    case index_regp::hl: return "hl";
-    case index_regp::ix: return "ix";
-    case index_regp::iy: return "iy";
-    }
-    assert(0);
-}
-
 const char *get_mnemonic(rot k) {
     switch(k) {
     case rot::rlc: return "rlc";

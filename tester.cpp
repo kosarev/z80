@@ -248,6 +248,8 @@ template<typename B>
 class machine_base : public B {
 public:
     typedef B base;
+    typedef typename B::derived derived;
+    typedef z80::z80_disasm<derived> disasm;
     typedef fast_u32 ticks_type;
 
     machine_base(test_input &input)
@@ -705,8 +707,8 @@ public:
     void on_set_index_rp_kind(z80::index_regp irp) {
         input.read_and_match("set_index_rp %s -> %s",
                              static_cast<unsigned>(get_ticks()),
-                             get_reg_name(base::get_index_rp_kind()),
-                             get_reg_name(irp));
+                             disasm::get_reg_name(base::get_index_rp_kind()),
+                             disasm::get_reg_name(irp));
         base::on_set_index_rp_kind(irp);
     }
 

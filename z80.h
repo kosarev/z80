@@ -778,7 +778,6 @@ protected:
     using base::get_p_part;
 };
 
-const char *get_reg_name(index_regp irp);
 const char *get_mnemonic(rot k);
 const char *get_mnemonic(block_ld k);
 const char *get_mnemonic(block_cp k);
@@ -1044,12 +1043,6 @@ public:
 
     void disassemble() { (*this)->decode(); }
 
-protected:
-    template<typename T>
-    static T get_arg(const void **&args) {
-        return base::template get_arg<T>(args);
-    }
-
     static const char *get_reg_name(reg r) {
         switch(r) {
         case reg::b: return "b";
@@ -1110,6 +1103,12 @@ protected:
         case alu::cp: return "cpi";
         }
         unreachable("Unknown ALU operation.");
+    }
+
+protected:
+    template<typename T>
+    static T get_arg(const void **&args) {
+        return base::template get_arg<T>(args);
     }
 };
 
@@ -1380,14 +1379,6 @@ public:
 
     void disassemble() { (*this)->decode(); }
 
-protected:
-    D *operator -> () { return static_cast<D*>(this); }
-
-    template<typename T>
-    static T get_arg(const void **&args) {
-        return base::template get_arg<T>(args);
-    }
-
     static const char *get_reg_name(reg r, index_regp irp = index_regp::hl) {
         switch(r) {
         case reg::b: return "b";
@@ -1424,7 +1415,7 @@ protected:
         switch(rp) {
         case regp::bc: return "bc";
         case regp::de: return "de";
-        case regp::hl: return z80::get_reg_name(irp);
+        case regp::hl: return get_reg_name(irp);
         case regp::sp: return "sp";
         }
         unreachable("Unknown register.");
@@ -1435,8 +1426,17 @@ protected:
         switch(rp) {
         case regp2::bc: return "bc";
         case regp2::de: return "de";
-        case regp2::hl: return z80::get_reg_name(irp);
+        case regp2::hl: return get_reg_name(irp);
         case regp2::af: return "af";
+        }
+        unreachable("Unknown register.");
+    }
+
+    static const char *get_reg_name(index_regp irp) {
+        switch(irp) {
+        case index_regp::hl: return "hl";
+        case index_regp::ix: return "ix";
+        case index_regp::iy: return "iy";
         }
         unreachable("Unknown register.");
     }
@@ -1453,6 +1453,14 @@ protected:
         case alu::cp: return "cp";
         }
         unreachable("Unknown ALU operation.");
+    }
+
+protected:
+    D *operator -> () { return static_cast<D*>(this); }
+
+    template<typename T>
+    static T get_arg(const void **&args) {
+        return base::template get_arg<T>(args);
     }
 };
 
