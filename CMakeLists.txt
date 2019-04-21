@@ -55,10 +55,7 @@ append_if(WERROR_FLAG "-Werror" CMAKE_CXX_FLAGS)
 append_if(ERROR_LIMIT_FLAG "-ferror-limit=1" CMAKE_CXX_FLAGS)
 append_if(G_FLAG "-g" CMAKE_CXX_FLAGS)
 
-add_library(z80 STATIC z80.cpp)
-
 add_executable(tester tester.cpp)
-target_link_libraries(tester z80)
 
 add_test(i8080_tests tester i8080 "${CMAKE_SOURCE_DIR}/tests_i8080")
 add_test(z80_tests tester z80 "${CMAKE_SOURCE_DIR}/tests_z80")
