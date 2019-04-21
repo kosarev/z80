@@ -256,7 +256,7 @@ public:
         : input(input)
     {}
 
-    void tick(unsigned t) { ticks += t; }
+    void on_tick(unsigned t) { ticks += t; }
 
     ticks_type get_ticks() const { return ticks; }
 

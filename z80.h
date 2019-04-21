@@ -1886,13 +1886,13 @@ public:
     }
 
     void on_5t_fetch_cycle() {
-        (*this)->tick(1);
+        (*this)->on_tick(1);
     }
 
     fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(ticks);
+        (*this)->on_tick(ticks);
         state::set_last_read_addr(addr);
         return b; }
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
@@ -1923,14 +1923,14 @@ public:
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         (*this)->on_set_addr_bus(addr);
         (*this)->on_write_access(addr, n);
-        (*this)->tick(ticks); }
+        (*this)->on_tick(ticks); }
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_write_cycle(addr, n, /* ticks= */ 3); }
     void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
         (*this)->on_write_cycle(addr, n, /* ticks= */ 5); }
 
     void on_3t_exec_cycle() {
-        (*this)->tick(3); }
+        (*this)->on_tick(3); }
 
     void on_push(fast_u16 nn) {
         fast_u16 sp = (*this)->on_get_sp();
@@ -2198,11 +2198,11 @@ public:
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(4);
+        (*this)->on_tick(4);
         state::set_last_read_addr(addr);
         return b; }
     void on_7t_fetch_cycle() {
-        (*this)->tick(3); }
+        (*this)->on_tick(3); }
 
     fast_u8 on_fetch() {
         fast_u16 pc = (*this)->get_pc_on_fetch();
@@ -2212,11 +2212,11 @@ public:
     }
 
     fast_u8 on_input_cycle(fast_u8 n) {
-        (*this)->tick(3);
+        (*this)->on_tick(3);
         return (*this)->on_input(n); }
     void on_output_cycle(fast_u8 n, fast_u8 v) {
         unused(n, v);
-        (*this)->tick(3); }
+        (*this)->on_tick(3); }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = (*this)->on_get_a();
@@ -3283,17 +3283,17 @@ public:
     fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
-        (*this)->tick(2);
+        (*this)->on_tick(2);
         (*this)->on_set_addr_bus((*this)->get_ir_on_refresh());
         if(m1)
             (*this)->on_inc_r_reg();
-        (*this)->tick(2);
+        (*this)->on_tick(2);
         set_last_read_addr(addr);
         return b;
     }
 
     void on_6t_fetch_cycle() {
-        (*this)->tick(2);
+        (*this)->on_tick(2);
     }
 
     fast_u8 on_5t_read_cycle(fast_u16 addr) {
@@ -3305,17 +3305,17 @@ public:
     }
 
     void on_4t_exec_cycle() {
-        (*this)->tick(4);
+        (*this)->on_tick(4);
     }
 
     void on_5t_exec_cycle() {
-        (*this)->tick(5);
+        (*this)->on_tick(5);
     }
 
     fast_u8 on_input_cycle(fast_u16 addr) {
         // Z80 samples the value at t4 of the input cycle, see
         // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
-        (*this)->tick(4);
+        (*this)->on_tick(4);
         // TODO: Shall we set the address bus here?
         fast_u8 n = (*this)->on_input(addr);
         return n;
@@ -3324,7 +3324,7 @@ public:
     void on_output_cycle(fast_u16 addr, fast_u8 n) {
         // TODO: Shall we set the address bus here?
         unused(addr, n);
-        (*this)->tick(4);
+        (*this)->on_tick(4);
     }
 
     fast_u8 on_5t_imm8_read() {
@@ -3358,7 +3358,7 @@ public:
         }
 
         (*this)->on_inc_r_reg();
-        (*this)->tick(7);
+        (*this)->on_tick(7);
         (*this)->on_push(pc);
 
         fast_u16 isr_addr;

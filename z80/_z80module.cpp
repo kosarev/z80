@@ -103,7 +103,7 @@ public:
 
     memory_image &get_memory() { return state.memory; }
 
-    void tick(unsigned t) {
+    void on_tick(unsigned t) {
         unused(t);
     }
 
