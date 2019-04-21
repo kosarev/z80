@@ -1470,6 +1470,8 @@ public:
     void swap(reg16_value &other) { swap(other.v); }
 
 protected:
+    // TODO: Would representing it as a pair of fast_u8 halves be
+    // generally more efficient?
     fast_u16 v = 0;
 };
 
