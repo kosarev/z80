@@ -134,7 +134,7 @@ enum class rot { rlc, rrc, rl, rr, sla, sra, sll, srl };
 enum class block_ld { ldi, ldd, ldir, lddr };
 enum class block_cp { cpi, cpd, cpir, cpdr };
 
-enum condition { nz, z, nc, c, po, pe, p, m };
+enum class condition { nz, z, nc, c, po, pe, p, m };
 
 class i8080_decoder_state {};
 
@@ -1817,7 +1817,7 @@ public:
     void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u8 get_flag_mask(condition cc) {
-        switch(cc / 2) {
+        switch(static_cast<unsigned>(cc) / 2) {
         case 0: return zf_mask;
         case 1: return cf_mask;
         case 2: return pf_mask;
@@ -1828,7 +1828,7 @@ public:
 
     bool check_condition(condition cc) {
         bool actual = (*this)->on_get_f() & get_flag_mask(cc);
-        bool expected = cc & 1;
+        bool expected = static_cast<unsigned>(cc) & 1;
         return actual == expected;
     }
 
