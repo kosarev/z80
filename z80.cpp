@@ -51,15 +51,6 @@ bool is_two_operand_alu_instr(alu k) {
     return k == alu::add || k == alu::adc || k == alu::sbc;
 }
 
-const char *get_index_reg_name(index_regp irp) {
-    switch(irp) {
-    case index_regp::hl: return "hl";
-    case index_regp::ix: return "ix";
-    case index_regp::iy: return "iy";
-    }
-    assert(0);
-}
-
 const char *get_condition_name(condition cc) {
     switch(cc) {
     case condition::nz: return "nz";

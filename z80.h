@@ -782,7 +782,6 @@ const char *get_mnemonic(rot k);
 const char *get_mnemonic(block_ld k);
 const char *get_mnemonic(block_cp k);
 bool is_two_operand_alu_instr(alu k);
-const char *get_index_reg_name(index_regp irp);
 const char *get_condition_name(condition cc);
 
 template<typename E>
@@ -1167,7 +1166,7 @@ public:
                 out.append(get_reg_name(r, irp));
             } else {
                 out.append('(');
-                out.append(get_index_reg_name(irp));
+                out.append(get_reg_name(irp));
                 out.append(' ');
                 out.append_disp(sign_extend8(d));
                 out.append(')');
