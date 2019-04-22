@@ -705,10 +705,13 @@ public:
     }
 
     void on_set_index_rp_kind(z80::index_regp irp) {
-        input.read_and_match("set_index_rp %s -> %s",
-                             static_cast<unsigned>(get_ticks()),
-                             disasm::get_reg_name(base::get_index_rp_kind()),
-                             disasm::get_reg_name(irp));
+        if(irp != base::get_index_rp_kind()) {
+            input.read_and_match(
+                "set_index_rp %s -> %s",
+                static_cast<unsigned>(get_ticks()),
+                disasm::get_reg_name(base::get_index_rp_kind()),
+                disasm::get_reg_name(irp));
+        }
         base::on_set_index_rp_kind(irp);
     }
 

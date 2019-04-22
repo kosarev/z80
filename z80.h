@@ -159,6 +159,7 @@ public:
     void set_index_rp_kind(index_regp irp) { index_rp = irp; }
 
     index_regp on_get_index_rp_kind() const { return get_index_rp_kind(); }
+    void on_set_index_rp_kind(index_regp irp) { set_index_rp_kind(irp); }
 
     bool is_index_rp_hl() const {
         return get_index_rp_kind() == index_regp::hl;
@@ -504,7 +505,6 @@ public:
 
     using base::self;
 
-    using base::set_index_rp_kind;
     using base::is_index_rp_hl;
 
     z80_decoder() {}
@@ -528,8 +528,8 @@ public:
     void on_disable_int() {}
     void disable_int_on_index_prefix() { self().on_disable_int(); }
 
-    void on_set_index_rp_kind(index_regp irp) {
-        set_index_rp_kind(irp);
+    void on_instr_prefix(index_regp irp) {
+        self().on_set_index_rp_kind(irp);
         self().disable_int_on_index_prefix();
     }
 
@@ -616,14 +616,14 @@ public:
         case 0xdd:
             // DD prefix (IX-indexed instructions).
             reset_index_rp = false;
-            return self().on_set_index_rp_kind(index_regp::ix);
+            return self().on_instr_prefix(index_regp::ix);
         case 0xed:
             // ED prefix.
             return decode_ed_prefixed();
         case 0xfd:
             // FD prefix (IY-indexed instructions).
             reset_index_rp = false;
-            return self().on_set_index_rp_kind(index_regp::iy);
+            return self().on_instr_prefix(index_regp::iy);
         }
 
         // TODO
@@ -776,7 +776,7 @@ public:
         bool reset_index_rp = true;
         decode_unprefixed(reset_index_rp);
         if(reset_index_rp)
-            set_index_rp_kind(index_regp::hl);
+            self().on_set_index_rp_kind(index_regp::hl);
     }
 
 protected:
@@ -2427,7 +2427,6 @@ public:
 
     z80_cpu() {}
 
-    using base::set_index_rp_kind;
     using base::is_index_rp_hl;
     using base::get_b;
     using base::set_b;

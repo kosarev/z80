@@ -152,6 +152,7 @@ fdcb014e bit 1, (iy + 1)
 20 set_wz 0000 -> 0001
 20 get_f 00
 20 set_f 00 -> 10
+20 set_index_rp iy -> hl
 20 done
 
 # CALL nn
@@ -706,6 +707,7 @@ dd6b ld ixl, e
  8 set_pc_on_fetch 0001 -> 0002
  8 get_e 00
  8 set_ixl 00 -> 00
+ 8 set_index_rp ix -> hl
  8 done
 
 # 0x6e LD L,(REGISTER+dd)
@@ -736,6 +738,7 @@ fd6e12 ld l, (iy + 18)
 16   set_addr_bus 0002 -> 0012
 19 set_wz 0000 -> 0012
 19 set_l 00 -> 00
+19 set_index_rp iy -> hl
 19 done
 
 # LD r, n
@@ -834,6 +837,7 @@ fd213a5c ld iy, 0x5c3a
 14   set_pc_on_imm16_read 0002 -> 0004
 14 set_iyl 00 -> 3a
 14 set_iyh 00 -> 5c
+14 set_index_rp iy -> hl
 14 done
 
 dd21d103 ld ix, 0x03d1
@@ -860,6 +864,7 @@ dd21d103 ld ix, 0x03d1
 14   set_pc_on_imm16_read 0002 -> 0004
 14 set_ixl 00 -> d1
 14 set_ixh 00 -> 03
+14 set_index_rp ix -> hl
 14 done
 
 # LD rp, (nn)
@@ -1314,6 +1319,7 @@ ddcb463e srl (ix + 70)
 20   set_addr_bus 0046 -> 0046
 23 set_wz 0046 -> 0046
 23 set_f 00 -> 44
+23 set_index_rp ix -> hl
 23 done
 
 # RL r
@@ -1525,6 +1531,7 @@ fdcb308e res 1, (iy + 48)
 20 3t_write 00 -> 00 at 0030
 20   set_addr_bus 0030 -> 0030
 23 set_wz 0030 -> 0030
+23 set_index_rp iy -> hl
 23 done
 
 # RET
@@ -1702,6 +1709,7 @@ fdcb01ce set 1, (iy + 1)
 20 3t_write cb -> cb at 0001
 20   set_addr_bus 0001 -> 0001
 23 set_wz 0001 -> 0001
+23 set_index_rp iy -> hl
 23 done
 
 # SLL r
