@@ -3388,8 +3388,22 @@ private:
     least_u8 memory[memory_size] = {};
 };
 
-template<typename S>
-class machine_state_base : public S {
+template<typename B>
+class machine_state : public B {
+public:
+    typedef B base;
+    typedef unsigned ticks_type;
+
+    using base::self;
+
+    machine_state() {}
+
+    void on_tick(unsigned t) {
+        ticks += t;
+    }
+
+private:
+    ticks_type ticks = 0;
 };
 
 }  // namespace z80
