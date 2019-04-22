@@ -523,8 +523,8 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    void on_disable_int() {}
-    void disable_int_on_index_prefix() { self().on_disable_int(); }
+    void on_set_is_int_disabled(bool f) { unused(f); }
+    void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
 
     void on_instr_prefix(index_regp irp) {
         self().on_set_index_rp_kind(irp);
@@ -1641,8 +1641,6 @@ public:
 
     bool is_int_disabled() const { return int_disabled.get(); }
     void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
-    void enable_int() { set_is_int_disabled(false); }
-    void disable_int() { set_is_int_disabled(true); }
 
     bool is_halted() const { return halted; }
     void set_is_halted(bool is_halted) { halted.set(is_halted); }
@@ -1726,8 +1724,8 @@ public:
     fast_u16 on_get_wz() const { return get_wz(); }
     void on_set_wz(fast_u16 n) { set_wz(n); }
 
-    void on_disable_int() { disable_int(); }
-    void disable_int_on_ei() { self().on_disable_int(); }
+    bool on_is_int_disabled() const { return is_int_disabled(); }
+    void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
 
 protected:
     regp_value bc, de, hl, af;
@@ -1864,6 +1862,9 @@ public:
     bool on_get_iff2() const { return get_iff2(); }
     void on_set_iff2(bool f) { set_iff2(f); }
 
+    bool on_get_int_mode() const { return get_int_mode(); }
+    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
+
 protected:
     regp_value ix, iy, ir;
     reg16_value alt_bc, alt_de, alt_hl, alt_af;
@@ -1899,6 +1900,8 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { self().on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { self().on_set_pc(pc); }
+
+    void disable_int_on_ei() { self().on_set_is_int_disabled(true); }
 
     fast_u8 get_flag_mask(condition cc) {
         switch(static_cast<unsigned>(cc) / 2) {
@@ -2048,7 +2051,7 @@ public:
         self().on_call(nn); }
 
     void on_step() {
-        base::enable_int();
+        self().on_set_is_int_disabled(false);
         self().decode();
     }
 
@@ -2443,11 +2446,6 @@ public:
 
     z80_cpu() {}
 
-    using base::get_int_mode;
-    using base::set_int_mode;
-    using base::is_int_disabled;
-    using base::enable_int;
-    using base::disable_int;
     using base::is_halted;
     using base::set_is_halted;
     using base::halt;
@@ -2530,9 +2528,6 @@ public:
     void set_iff2_on_ei(bool iff2) { self().on_set_iff2(iff2); }
 
     bool get_iff2_on_retn() const { return self().on_get_iff2(); }
-
-    bool on_get_int_mode() const { return get_int_mode(); }
-    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -3326,7 +3321,7 @@ public:
         self().on_push(pc);
 
         fast_u16 isr_addr;
-        switch(get_int_mode()) {
+        switch(self().on_get_int_mode()) {
         case 0:
             isr_addr = 0;
             assert(0);  // TODO
@@ -3350,7 +3345,7 @@ public:
     }
 
     bool handle_active_int() {
-        if(!is_int_disabled() && self().on_get_iff1()) {
+        if(!self().on_is_int_disabled() && self().on_get_iff1()) {
             initiate_int();
             return true;
         }

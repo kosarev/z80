@@ -698,10 +698,12 @@ public:
         base::on_set_int_mode(mode);
     }
 
-    void on_disable_int() {
-        input.read_and_match("disable_int",
-                             static_cast<unsigned>(get_ticks()));
-        base::on_disable_int();
+    void on_set_is_int_disabled(bool f) {
+        if(f) {
+            input.read_and_match("disable_int",
+                                 static_cast<unsigned>(get_ticks()));
+        }
+        base::on_set_is_int_disabled(f);
     }
 
     void on_set_index_rp_kind(z80::index_regp irp) {
