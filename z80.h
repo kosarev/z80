@@ -136,10 +136,20 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum class condition { nz, z, nc, c, po, pe, p, m };
 
-class i8080_decoder_state {};
-
-class z80_decoder_state {
+// TODO: Rename to 'base' when all references to base members are
+// eliminated.
+template<typename D>
+class root {
 public:
+    typedef D derived;
+};
+
+template<typename B>
+class z80_decoder_state : public B {
+public:
+    typedef B base;
+    typedef typename base::derived derived;
+
     z80_decoder_state() {}
 
     index_regp get_index_rp_kind() const { return index_rp; }
@@ -153,10 +163,12 @@ private:
     index_regp index_rp = index_regp::hl;
 };
 
-template<typename D, typename S>
-class decoder_base : public S {
+// TODO: Part of 'internal' namespace?
+template<typename B>
+class decoder_base : public B {
 public:
-    typedef S state;
+    typedef B base;
+    typedef typename base::derived derived;
 
     decoder_base() {}
 
@@ -411,7 +423,8 @@ public:
     void decode() { (*this)->on_decode(); }
 
 protected:
-    D *operator -> () { return static_cast<D*>(this); }
+    // TODO: Move to z80::base<>.
+    derived *operator -> () { return static_cast<derived*>(this); }
 
     static const fast_u8 x_mask = 0300;
 
@@ -427,12 +440,11 @@ protected:
     static const fast_u8 q_mask = 0010;
 };
 
-template<typename D, typename S = i8080_decoder_state>
-class i8080_decoder : public decoder_base<D, S> {
+template<typename B>
+class i8080_decoder : public decoder_base<B> {
 public:
-    typedef S state;
-    typedef D derived;
-    typedef decoder_base<derived, state> base;
+    typedef decoder_base<B> base;
+    typedef typename base::derived derived;
 
     void decode_alu_r(alu k, reg r) {
         (*this)->on_alu_r(k, r); }
@@ -481,18 +493,17 @@ public:
     }
 };
 
-template<typename D, typename S = z80_decoder_state>
-class z80_decoder : public decoder_base<D, S> {
+template<typename B>
+class z80_decoder : public decoder_base<B> {
 public:
-    typedef S state;
-    typedef D derived;
-    typedef decoder_base<derived, state> base;
+    typedef decoder_base<B> base;
+    typedef typename base::derived derived;
 
     z80_decoder() {}
 
-    using state::get_index_rp_kind;
-    using state::set_index_rp_kind;
-    using state::is_index_rp_hl;
+    using base::get_index_rp_kind;
+    using base::set_index_rp_kind;
+    using base::is_index_rp_hl;
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
         if(is_index_rp_hl() || !may_need_disp)
@@ -765,7 +776,7 @@ public:
     }
 
 protected:
-    D *operator -> () { return static_cast<D*>(this); }
+    derived *operator -> () { return static_cast<derived*>(this); }
 
     using base::x_mask;
     using base::y_mask;
@@ -778,15 +789,15 @@ protected:
     using base::get_p_part;
 };
 
-template<typename E>
-class disasm_base : public E {
+// TODO: internal?
+template<typename B>
+class disasm_base : public B {
 protected:
     class output_buff;
 
 public:
-    typedef E decoder;
-    typedef typename decoder::derived derived;
-    typedef typename decoder::state state;
+    typedef B base;
+    typedef typename base::derived derived;
 
     disasm_base() {}
 
@@ -933,12 +944,12 @@ protected:
     }
 };
 
+// TODO: Split to a instructions verbalizer and a disassembler.
 template<typename D>
-class i8080_disasm : public disasm_base<i8080_decoder<D>> {
+class i8080_disasm : public disasm_base<i8080_decoder<root<D>>> {
 public:
+    typedef disasm_base<i8080_decoder<root<D>>> base;
     typedef D derived;
-    typedef disasm_base<i8080_decoder<derived>> base;
-    typedef typename base::state state;
 
     i8080_disasm() {}
 
@@ -1120,13 +1131,12 @@ protected:
 };
 
 template<typename D>
-class z80_disasm : public disasm_base<z80_decoder<D>> {
+class z80_disasm : public disasm_base<z80_decoder<z80_decoder_state<root<D>>>> {
 public:
     typedef D derived;
-    typedef disasm_base<z80_decoder<derived>> base;
-    typedef typename base::state state;
+    typedef disasm_base<z80_decoder<z80_decoder_state<root<D>>>> base;
 
-    using state::get_index_rp_kind;
+    using base::get_index_rp_kind;
 
     z80_disasm() {}
 
@@ -1554,10 +1564,11 @@ private:
     bool v = false;
 };
 
-template<typename S>
-class cpu_state_base : public S {
+template<typename B>
+class cpu_state_base : public B {
 public:
-    typedef S decoder_state;
+    typedef B base;
+    typedef typename base::derived derived;
 
     fast_u8 get_b() const { return bc.get_high(); }
     void set_b(fast_u8 n) { bc.set_high(n); }
@@ -1582,6 +1593,20 @@ public:
 
     fast_u8 get_f() const { return af.get_low(); }
     void set_f(fast_u8 n) { af.set_low(n); }
+
+    fast_u8 get_r(reg r) {
+        switch(r) {
+        case reg::b: return get_b();
+        case reg::c: return get_c();
+        case reg::d: return get_d();
+        case reg::e: return get_e();
+        case reg::h: return get_h();
+        case reg::l: return get_l();
+        case reg::at_hl: unreachable("Can't get (HL) value.");
+        case reg::a: return get_a();
+        }
+        unreachable("Unknown register.");
+    }
 
     fast_u16 get_bc() const { return bc.get(); }
     void set_bc(fast_u16 n) { bc.set(n); }
@@ -1619,15 +1644,98 @@ public:
 
     void ex_de_hl() { de.swap(hl); }
 
+    fast_u8 on_get_b() const { return get_b(); }
+    void on_set_b(fast_u8 b) { set_b(b); }
+
+    fast_u8 on_get_c() const { return get_c(); }
+    void on_set_c(fast_u8 c) { set_c(c); }
+
+    fast_u8 on_get_d() const { return get_d(); }
+    void on_set_d(fast_u8 d) { set_d(d); }
+
+    fast_u8 on_get_e() const { return get_e(); }
+    void on_set_e(fast_u8 e) { set_e(e); }
+
+    fast_u8 on_get_h() const { return get_h(); }
+    void on_set_h(fast_u8 h) { set_h(h); }
+
+    fast_u8 on_get_l() const { return get_l(); }
+    void on_set_l(fast_u8 l) { set_l(l); }
+
+    fast_u8 on_get_a() const { return get_a(); }
+    void on_set_a(fast_u8 a) { set_a(a); }
+
+    fast_u8 on_get_f() const { return get_f(); }
+    void on_set_f(fast_u8 f) { set_f(f); }
+
+    fast_u16 on_get_bc() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_c();
+        fast_u8 h = (*this)->on_get_b();
+        return make16(h, l); }
+    void on_set_bc(fast_u16 n) {
+        // Always set the low byte first.
+        (*this)->on_set_c(get_low8(n));
+        (*this)->on_set_b(get_high8(n)); }
+
+    fast_u16 on_get_de() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_e();
+        fast_u8 h = (*this)->on_get_d();
+        return make16(h, l); }
+    void on_set_de(fast_u16 n) {
+        // Always set the low byte first.
+        (*this)->on_set_e(get_low8(n));
+        (*this)->on_set_d(get_high8(n)); }
+
+    fast_u16 on_get_hl() {
+        // Always get the low byte first.
+        fast_u8 l = (*this)->on_get_l();
+        fast_u8 h = (*this)->on_get_h();
+        return make16(h, l); }
+    void on_set_hl(fast_u16 n) {
+        // Always set the low byte first.
+        (*this)->on_set_l(get_low8(n));
+        (*this)->on_set_h(get_high8(n)); }
+
+    fast_u16 on_get_af() {
+        // Always get the low byte first.
+        fast_u8 f = (*this)->on_get_f();
+        fast_u8 a = (*this)->on_get_a();
+        return make16(a, f); }
+    void on_set_af(fast_u16 n) {
+        // Always set the low byte first.
+        (*this)->on_set_f(get_low8(n));
+        (*this)->on_set_a(get_high8(n)); }
+
+    fast_u16 on_get_pc() const { return get_pc(); }
+    void on_set_pc(fast_u16 n) { set_pc(n); }
+
+    fast_u16 on_get_sp() { return get_sp(); }
+    void on_set_sp(fast_u16 n) { set_sp(n); }
+
+    fast_u16 on_get_wz() const { return get_wz(); }
+    void on_set_wz(fast_u16 n) { set_wz(n); }
+
+    void on_disable_int() { disable_int(); }
+    void disable_int_on_ei() { (*this)->on_disable_int(); }
+
 protected:
     regp_value bc, de, hl, af;
     reg16_value pc, sp, wz;
     flipflop int_disabled, halted;
     fast_u16 last_read_addr = 0;  // TODO: Remove.
+
+    derived *operator -> () {
+        return static_cast<derived*>(this); }
 };
 
-class i8080_state : public cpu_state_base<i8080_decoder_state> {
+template<typename B>
+class i8080_state : public cpu_state_base<B> {
 public:
+    typedef cpu_state_base<B> base;
+    typedef typename base::derived derived;
+
     bool get_iff() const { return iff.get(); }
     void set_iff(bool new_iff) { iff.set(new_iff); }
 
@@ -1651,8 +1759,12 @@ private:
     unsigned v = 0;
 };
 
-class z80_state : public cpu_state_base<z80_decoder_state> {
+template<typename B>
+class z80_state : public cpu_state_base<z80_decoder_state<B>> {
 public:
+    typedef cpu_state_base<z80_decoder_state<B>> base;
+    typedef typename base::derived derived;
+
     z80_state() {}
 
     fast_u8 get_ixh() const { return ix.get_high(); }
@@ -1703,23 +1815,9 @@ public:
     unsigned get_int_mode() const { return im.get(); }
     void set_int_mode(unsigned mode) { im.set(mode); }
 
-    fast_u8 get_r(reg r) {
-        switch(r) {
-        case reg::b: return get_b();
-        case reg::c: return get_c();
-        case reg::d: return get_d();
-        case reg::e: return get_e();
-        case reg::h: return get_h();
-        case reg::l: return get_l();
-        case reg::at_hl: unreachable("Can't get (HL) value.");
-        case reg::a: return get_a();
-        }
-        unreachable("Unknown register.");
-    }
-
     fast_u16 get_index_rp(index_regp irp) {
         switch(irp) {
-        case index_regp::hl: return get_hl();
+        case index_regp::hl: return base::get_hl();
         case index_regp::ix: return get_ix();
         case index_regp::iy: return get_iy();
         }
@@ -1727,13 +1825,13 @@ public:
     }
 
     void ex_af_alt_af() {
-        af.swap(alt_af);
+        base::af.swap(alt_af);
     }
 
     void exx() {
-        bc.swap(alt_bc);
-        de.swap(alt_de);
-        hl.swap(alt_hl);
+        base::bc.swap(alt_bc);
+        base::de.swap(alt_de);
+        base::hl.swap(alt_hl);
     }
 
 protected:
@@ -1743,107 +1841,37 @@ protected:
     int_mode im;
 };
 
-template<typename E>
-class cpu_base : public E {
+// TODO: internal?
+template<typename B>
+class cpu_base : public B {
 public:
-    typedef E decoder;
-    typedef typename decoder::state state;
-    typedef typename decoder::derived derived;
+    typedef B base;
+    typedef typename base::derived derived;
 
     cpu_base() {}
 
-    using state::get_b;
-    using state::set_b;
-    using state::get_c;
-    using state::set_c;
-    using state::get_d;
-    using state::set_d;
-    using state::get_e;
-    using state::set_e;
-    using state::get_h;
-    using state::set_h;
-    using state::get_l;
-    using state::set_l;
-    using state::get_a;
-    using state::set_a;
-    using state::get_f;
-    using state::set_f;
-    using state::get_sp;
-    using state::set_sp;
-    using state::get_pc;
-    using state::set_pc;
-    using state::get_wz;
-    using state::set_wz;
-
-    fast_u8 on_get_b() const { return get_b(); }
-    void on_set_b(fast_u8 b) { set_b(b); }
-
-    fast_u8 on_get_c() const { return get_c(); }
-    void on_set_c(fast_u8 c) { set_c(c); }
-
-    fast_u8 on_get_d() const { return get_d(); }
-    void on_set_d(fast_u8 d) { set_d(d); }
-
-    fast_u8 on_get_e() const { return get_e(); }
-    void on_set_e(fast_u8 e) { set_e(e); }
-
-    fast_u8 on_get_h() const { return get_h(); }
-    void on_set_h(fast_u8 h) { set_h(h); }
-
-    fast_u8 on_get_l() const { return get_l(); }
-    void on_set_l(fast_u8 l) { set_l(l); }
-
-    fast_u8 on_get_a() const { return get_a(); }
-    void on_set_a(fast_u8 a) { set_a(a); }
-
-    fast_u8 on_get_f() const { return get_f(); }
-    void on_set_f(fast_u8 f) { set_f(f); }
-
-    fast_u16 on_get_af() {
-        // Always get the low byte first.
-        fast_u8 f = (*this)->on_get_f();
-        fast_u8 a = (*this)->on_get_a();
-        return make16(a, f); }
-    void on_set_af(fast_u16 af) {
-        // Always set the low byte first.
-        (*this)->on_set_f(get_low8(af));
-        (*this)->on_set_a(get_high8(af)); }
-
-    fast_u16 on_get_hl() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_l();
-        fast_u8 h = (*this)->on_get_h();
-        return make16(h, l); }
-    void on_set_hl(fast_u16 hl) {
-        // Always set the low byte first.
-        (*this)->on_set_l(get_low8(hl));
-        (*this)->on_set_h(get_high8(hl)); }
-
-    fast_u16 on_get_bc() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_c();
-        fast_u8 h = (*this)->on_get_b();
-        return make16(h, l); }
-    void on_set_bc(fast_u16 bc) {
-        // Always set the low byte first.
-        (*this)->on_set_c(get_low8(bc));
-        (*this)->on_set_b(get_high8(bc)); }
-
-    fast_u16 on_get_de() {
-        // Always get the low byte first.
-        fast_u8 l = (*this)->on_get_e();
-        fast_u8 h = (*this)->on_get_d();
-        return make16(h, l); }
-    void on_set_de(fast_u16 de) {
-        // Always set the low byte first.
-        (*this)->on_set_e(get_low8(de));
-        (*this)->on_set_d(get_high8(de)); }
-
-    fast_u16 on_get_sp() { return get_sp(); }
-    void on_set_sp(fast_u16 sp) { set_sp(sp); }
-
-    fast_u16 on_get_pc() const { return get_pc(); }
-    void on_set_pc(fast_u16 pc) { set_pc(pc); }
+    using base::get_b;
+    using base::set_b;
+    using base::get_c;
+    using base::set_c;
+    using base::get_d;
+    using base::set_d;
+    using base::get_e;
+    using base::set_e;
+    using base::get_h;
+    using base::set_h;
+    using base::get_l;
+    using base::set_l;
+    using base::get_a;
+    using base::set_a;
+    using base::get_f;
+    using base::set_f;
+    using base::get_sp;
+    using base::set_sp;
+    using base::get_pc;
+    using base::set_pc;
+    using base::get_wz;
+    using base::set_wz;
 
     fast_u16 get_pc_on_fetch() const { return (*this)->on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { (*this)->on_set_pc(pc); }
@@ -1862,12 +1890,6 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { (*this)->on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { (*this)->on_set_pc(pc); }
-
-    fast_u16 on_get_wz() const { return get_wz(); }
-    void on_set_wz(fast_u16 wz) { set_wz(wz); }
-
-    void on_disable_int() { state::disable_int(); }
-    void disable_int_on_ei() { (*this)->on_disable_int(); }
 
     fast_u8 get_flag_mask(condition cc) {
         switch(static_cast<unsigned>(cc) / 2) {
@@ -1893,7 +1915,7 @@ public:
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->on_tick(ticks);
-        state::set_last_read_addr(addr);
+        base::set_last_read_addr(addr);
         return b; }
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         return (*this)->on_read_cycle(addr, /* ticks= */ 3); }
@@ -1971,9 +1993,9 @@ public:
         else
             (*this)->on_set_wz(nn); }
     void on_ex_de_hl() {
-        state::ex_de_hl(); }
+        base::ex_de_hl(); }
     void on_halt() {
-        state::halt();
+        base::halt();
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
         (*this)->set_pc_on_halt(dec16((*this)->get_pc_on_halt())); }
     void on_jp_nn(fast_u16 nn) {
@@ -2017,7 +2039,7 @@ public:
         (*this)->on_call(nn); }
 
     void on_step() {
-        state::enable_int();
+        base::enable_int();
         (*this)->decode();
     }
 
@@ -2096,11 +2118,10 @@ protected:
 };
 
 template<typename D>
-class i8080_cpu : public cpu_base<i8080_decoder<D, i8080_state>> {
+class i8080_cpu : public cpu_base<i8080_decoder<i8080_state<root<D>>>> {
 public:
-    typedef i8080_state state;
-    typedef i8080_decoder<D, i8080_state> decoder;
-    typedef cpu_base<decoder> base;
+    typedef cpu_base<i8080_decoder<i8080_state<root<D>>>> base;
+    typedef typename base::derived derived;
 
     using base::cf_mask;
     using base::hf_mask;
@@ -2116,8 +2137,8 @@ public:
     using base::pf_log;
     using base::zf_ari;
 
-    bool on_get_iff() const { return state::get_iff(); }
-    void on_set_iff(bool iff) { state::set_iff(iff); }
+    bool on_get_iff() const { return base::get_iff(); }
+    void on_set_iff(bool iff) { base::set_iff(iff); }
 
     void set_iff_on_di(bool iff) { (*this)->on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { (*this)->on_set_iff(iff); }
@@ -2199,7 +2220,7 @@ public:
         (*this)->on_set_addr_bus(addr);
         fast_u8 b = (*this)->on_read_access(addr);
         (*this)->on_tick(4);
-        state::set_last_read_addr(addr);
+        base::set_last_read_addr(addr);
         return b; }
     void on_7t_fetch_cycle() {
         (*this)->on_tick(3); }
@@ -2406,66 +2427,65 @@ public:
 };
 
 template<typename D>
-class z80_cpu : public cpu_base<z80_decoder<D, z80_state>> {
+class z80_cpu : public cpu_base<z80_decoder<z80_state<root<D>>>> {
 public:
-    typedef z80_state state;
-    typedef z80_decoder<D, z80_state> decoder;
-    typedef cpu_base<decoder> base;
+    typedef cpu_base<z80_decoder<z80_state<root<D>>>> base;
+    typedef typename base::derived derived;
 
     z80_cpu() {}
 
-    using state::get_index_rp_kind;
-    using state::set_index_rp_kind;
-    using state::is_index_rp_hl;
-    using state::get_b;
-    using state::set_b;
-    using state::get_c;
-    using state::set_c;
-    using state::get_d;
-    using state::set_d;
-    using state::get_e;
-    using state::set_e;
-    using state::get_h;
-    using state::set_h;
-    using state::get_l;
-    using state::set_l;
-    using state::get_a;
-    using state::set_a;
-    using state::get_f;
-    using state::set_f;
-    using state::get_ixh;
-    using state::set_ixh;
-    using state::get_ixl;
-    using state::set_ixl;
-    using state::get_iyh;
-    using state::set_iyh;
-    using state::get_iyl;
-    using state::set_iyl;
-    using state::get_i;
-    using state::set_i;
-    using state::get_r_reg;
-    using state::set_r_reg;
-    using state::get_sp;
-    using state::set_sp;
-    using state::get_pc;
-    using state::set_pc;
-    using state::get_wz;
-    using state::set_wz;
-    using state::get_iff1;
-    using state::set_iff1;
-    using state::get_iff2;
-    using state::set_iff2;
-    using state::get_int_mode;
-    using state::set_int_mode;
-    using state::is_int_disabled;
-    using state::enable_int;
-    using state::disable_int;
-    using state::is_halted;
-    using state::set_is_halted;
-    using state::halt;
-    using state::set_last_read_addr;
-    using state::ex_af_alt_af;
-    using state::exx;
+    using base::get_index_rp_kind;
+    using base::set_index_rp_kind;
+    using base::is_index_rp_hl;
+    using base::get_b;
+    using base::set_b;
+    using base::get_c;
+    using base::set_c;
+    using base::get_d;
+    using base::set_d;
+    using base::get_e;
+    using base::set_e;
+    using base::get_h;
+    using base::set_h;
+    using base::get_l;
+    using base::set_l;
+    using base::get_a;
+    using base::set_a;
+    using base::get_f;
+    using base::set_f;
+    using base::get_ixh;
+    using base::set_ixh;
+    using base::get_ixl;
+    using base::set_ixl;
+    using base::get_iyh;
+    using base::set_iyh;
+    using base::get_iyl;
+    using base::set_iyl;
+    using base::get_i;
+    using base::set_i;
+    using base::get_r_reg;
+    using base::set_r_reg;
+    using base::get_sp;
+    using base::set_sp;
+    using base::get_pc;
+    using base::set_pc;
+    using base::get_wz;
+    using base::set_wz;
+    using base::get_iff1;
+    using base::set_iff1;
+    using base::get_iff2;
+    using base::set_iff2;
+    using base::get_int_mode;
+    using base::set_int_mode;
+    using base::is_int_disabled;
+    using base::enable_int;
+    using base::disable_int;
+    using base::is_halted;
+    using base::set_is_halted;
+    using base::halt;
+    using base::set_last_read_addr;
+    using base::ex_af_alt_af;
+    using base::exx;
 
     using base::sf_bit;
     using base::zf_bit;
