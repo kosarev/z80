@@ -158,6 +158,8 @@ public:
     index_regp get_index_rp_kind() const { return index_rp; }
     void set_index_rp_kind(index_regp irp) { index_rp = irp; }
 
+    index_regp on_get_index_rp_kind() const { return get_index_rp_kind(); }
+
     bool is_index_rp_hl() const {
         return get_index_rp_kind() == index_regp::hl;
     }
@@ -502,7 +504,6 @@ public:
 
     using base::self;
 
-    using base::get_index_rp_kind;
     using base::set_index_rp_kind;
     using base::is_index_rp_hl;
 
@@ -634,7 +635,7 @@ public:
 
     void decode_cb_prefixed() {
         fast_u8 d = 0;
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         if(irp != index_regp::hl)
             d = self().on_disp_read();
 
@@ -1138,8 +1139,6 @@ public:
 
     using base::self;
 
-    using base::get_index_rp_kind;
-
     z80_disasm() {}
 
     // TODO: What if to replace 'on_fetch(false)' with a special
@@ -1232,21 +1231,21 @@ public:
         self().on_format("noni N, N", 0xed, op); }
 
     void on_add_irp_rp(regp rp) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("add P, P", regp::hl, irp, rp, irp); }
     void on_adc_hl_rp(regp rp) {
         self().on_format("adc hl, P", rp, index_regp::hl); }
     void on_alu_n(alu k, fast_u8 n) {
         self().on_format("A N", k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("A R", k, r, irp, d); }
     void on_block_cp(block_cp k) {
         self().on_format("M", k); }
     void on_block_ld(block_ld k) {
         self().on_format("L", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("bit U, R", b, r, irp, d); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
@@ -1255,10 +1254,10 @@ public:
     void on_cpl() {
         self().on_format("cpl"); }
     void on_dec_r(reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("dec R", r, irp, d); }
     void on_dec_rp(regp rp) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("dec P", rp, irp); }
     void on_djnz(fast_u8 d) {
         self().on_format("djnz D", sign_extend8(d) + 2); }
@@ -1267,7 +1266,7 @@ public:
     void on_ex_de_hl() {
         self().on_format("ex de, hl"); }
     void on_ex_at_sp_irp() {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ex (sp), P", regp::hl, irp); }
     void on_exx() {
         self().on_format("exx"); }
@@ -1283,15 +1282,15 @@ public:
         else
             self().on_format("in R, (c)", r, index_regp::hl, 0); }
     void on_inc_r(reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("inc R", r, irp, d); }
     void on_inc_rp(regp rp) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("inc P", rp, irp); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("jp C, W", cc, nn); }
     void on_jp_irp() {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
@@ -1306,21 +1305,21 @@ public:
     void on_ld_i_a() {
         self().on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
         self().on_format("ld R, R", rd, irpd, d, rs, irps, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ld R, N", r, irp, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ld P, W", rp, irp, nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ld P, (W)", regp::hl, irp, nn); }
     void on_ld_at_nn_irp(fast_u16 nn) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ld (W), P", nn, regp::hl, irp); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         self().on_format("ld P, (W)", rp, index_regp::hl, nn); }
@@ -1335,7 +1334,7 @@ public:
     void on_ld_at_rp_a(regp rp) {
         self().on_format("ld (P), a", rp, index_regp::hl); }
     void on_ld_sp_irp() {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("ld sp, P", regp::hl, irp); }
     void on_neg() {
         self().on_format("neg"); }
@@ -1347,13 +1346,13 @@ public:
     void on_out_n_a(fast_u8 n) {
         self().on_format("out (N), a", n); }
     void on_pop_rp(regp2 rp) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("pop G", rp, irp); }
     void on_push_rp(regp2 rp) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_format("push G", rp, irp); }
     void on_res(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             self().on_format("res U, R", b, r, irp, d);
         else
@@ -1372,7 +1371,7 @@ public:
     void on_rld() {
         self().on_format("rld"); }
     void on_rot(rot k, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             self().on_format("O R", k, r, irp, d);
         else
@@ -1387,7 +1386,7 @@ public:
     void on_scf() {
         self().on_format("scf"); }
     void on_set(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         if(irp == index_regp::hl || r == reg::at_hl)
             self().on_format("set U, R", b, r, irp, d);
         else
@@ -2428,7 +2427,6 @@ public:
 
     z80_cpu() {}
 
-    using base::get_index_rp_kind;
     using base::set_index_rp_kind;
     using base::is_index_rp_hl;
     using base::get_b;
@@ -2698,7 +2696,7 @@ public:
     }
 
     fast_u16 on_get_index_rp() {
-        switch(get_index_rp_kind()) {
+        switch(self().on_get_index_rp_kind()) {
         case index_regp::hl: return self().on_get_hl();
         case index_regp::ix: return self().on_get_ix();
         case index_regp::iy: return self().on_get_iy();
@@ -2707,7 +2705,7 @@ public:
     }
 
     void on_set_index_rp(fast_u16 nn) {
-        switch(get_index_rp_kind()) {
+        switch(self().on_get_index_rp_kind()) {
         case index_regp::hl: return self().on_set_hl(nn);
         case index_regp::ix: return self().on_set_ix(nn);
         case index_regp::iy: return self().on_set_iy(nn);
@@ -2880,7 +2878,7 @@ public:
         self().on_set_hl(r16);
         self().on_set_f(f); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         do_alu(k, self().on_get_r(r, irp, d)); }
     void on_block_cp(block_cp k) {
         fast_u16 bc = self().on_get_bc();
@@ -2966,7 +2964,7 @@ public:
             self().set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         fast_u8 v = self().on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = self().on_get_f();
         fast_u8 m = v & (1u << b);
@@ -3019,7 +3017,7 @@ public:
         self().on_set_a(a);
         self().on_set_f(f); }
     void on_dec_r(reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         fast_u8 v = self().on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = self().on_get_f();
         v = dec8(v);
@@ -3069,14 +3067,14 @@ public:
         fast_u8 f = self().on_get_f();
         self().on_set_wz(inc16(bc));
         fast_u8 n = self().on_input_cycle(bc);
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         if(r != reg::at_hl)
             self().on_set_r(r, irp, /* d= */ 0, n);
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
                 pf_log(n);
         self().on_set_f(f); }
     void on_inc_r(reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         fast_u8 v = self().on_get_r(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = self().on_get_f();
         v = inc8(v);
@@ -3103,12 +3101,12 @@ public:
     void on_ld_i_a() {
         self().set_i_on_ld(self().on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         index_regp irpd = rs == reg::at_hl ? index_regp::hl : irp;
         index_regp irps = rd == reg::at_hl ? index_regp::hl : irp;
         self().on_set_r(rd, irpd, d, self().on_get_r(rs, irps, d)); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         self().on_set_r(r, irp, d, n); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = self().on_3t_read_cycle(nn);
@@ -3148,7 +3146,7 @@ public:
     void on_out_c_r(reg r) {
         fast_u16 bc = self().on_get_bc();
         self().on_set_wz(inc16(bc));
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         fast_u8 n = (r == reg::at_hl) ?
             0 : self().on_get_r(r, irp, /* d= */ 0);
         self().on_output_cycle(bc, n); }
@@ -3157,7 +3155,7 @@ public:
         self().on_output_cycle(make16(a, n), a);
         self().on_set_wz(make16(a, inc8(n))); }
     void on_res(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 v = self().on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
@@ -3204,7 +3202,7 @@ public:
         self().on_set_f(f);
         self().on_3t_write_cycle(hl, get_low8(t)); }
     void on_rot(rot k, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 n = self().on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
@@ -3253,7 +3251,7 @@ public:
                 cf_mask;
         self().on_set_f(f); }
     void on_set(unsigned b, reg r, fast_u8 d) {
-        index_regp irp = get_index_rp_kind();
+        index_regp irp = self().on_get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;
         fast_u8 v = self().on_get_r(access_r, irp, d,
                                       /* long_read_cycle= */ true);
