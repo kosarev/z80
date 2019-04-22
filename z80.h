@@ -1840,6 +1840,30 @@ public:
         base::hl.swap(alt_hl);
     }
 
+    fast_u8 on_get_ixh() const { return get_ixh(); }
+    void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
+
+    fast_u8 on_get_ixl() const { return get_ixl(); }
+    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
+
+    fast_u8 on_get_iyh() const { return get_iyh(); }
+    void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
+
+    fast_u8 on_get_iyl() const { return get_iyl(); }
+    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
+
+    fast_u8 on_get_i() const { return get_i(); }
+    void on_set_i(fast_u8 i) { set_i(i); }
+
+    fast_u8 on_get_r_reg() const { return get_r_reg(); }
+    void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
+
+    bool on_get_iff1() const { return get_iff1(); }
+    void on_set_iff1(bool f) { set_iff1(f); }
+
+    bool on_get_iff2() const { return get_iff2(); }
+    void on_set_iff2(bool f) { set_iff2(f); }
+
 protected:
     regp_value ix, iy, ir;
     reg16_value alt_bc, alt_de, alt_hl, alt_af;
@@ -2419,44 +2443,6 @@ public:
 
     z80_cpu() {}
 
-    using base::get_b;
-    using base::set_b;
-    using base::get_c;
-    using base::set_c;
-    using base::get_d;
-    using base::set_d;
-    using base::get_e;
-    using base::set_e;
-    using base::get_h;
-    using base::set_h;
-    using base::get_l;
-    using base::set_l;
-    using base::get_a;
-    using base::set_a;
-    using base::get_f;
-    using base::set_f;
-    using base::get_ixh;
-    using base::set_ixh;
-    using base::get_ixl;
-    using base::set_ixl;
-    using base::get_iyh;
-    using base::set_iyh;
-    using base::get_iyl;
-    using base::set_iyl;
-    using base::get_i;
-    using base::set_i;
-    using base::get_r_reg;
-    using base::set_r_reg;
-    using base::get_sp;
-    using base::set_sp;
-    using base::get_pc;
-    using base::set_pc;
-    using base::get_wz;
-    using base::set_wz;
-    using base::get_iff1;
-    using base::set_iff1;
-    using base::get_iff2;
-    using base::set_iff2;
     using base::get_int_mode;
     using base::set_int_mode;
     using base::is_int_disabled;
@@ -2497,25 +2483,7 @@ public:
     using base::pf_inc;
     using base::cf_ari;
 
-    fast_u8 on_get_ixh() const { return get_ixh(); }
-    void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
-
-    fast_u8 on_get_ixl() const { return get_ixl(); }
-    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
-
-    fast_u8 on_get_iyh() const { return get_iyh(); }
-    void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
-
-    fast_u8 on_get_iyl() const { return get_iyl(); }
-    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
-
-    fast_u8 on_get_i() const { return get_i(); }
-    void on_set_i(fast_u8 i) { set_i(i); }
-
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
-
-    fast_u8 on_get_r_reg() const { return get_r_reg(); }
-    void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
 
     void on_inc_r_reg() {
         // TODO: Consider splitting R into R[7] and R[6:0].
@@ -2554,15 +2522,9 @@ public:
 
     fast_u16 get_ir_on_refresh() const { return self().on_get_ir(); }
 
-    bool on_get_iff1() const { return get_iff1(); }
-    void on_set_iff1(bool iff1) { set_iff1(iff1); }
-
     void set_iff1_on_di(bool iff1) { self().on_set_iff1(iff1); }
     void set_iff1_on_ei(bool iff1) { self().on_set_iff1(iff1); }
     void set_iff1_on_retn(bool iff1) { self().on_set_iff1(iff1); }
-
-    bool on_get_iff2() const { return get_iff2(); }
-    void on_set_iff2(bool iff2) { set_iff2(iff2); }
 
     void set_iff2_on_di(bool iff2) { self().on_set_iff2(iff2); }
     void set_iff2_on_ei(bool iff2) { self().on_set_iff2(iff2); }
@@ -3083,7 +3045,7 @@ public:
         fast_u8 n = self().on_get_r_reg();
         fast_u8 f = self().on_get_f();
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
-                ((get_iff2() ? 1u : 0u) << pf_bit);
+                ((self().on_get_iff2() ? 1u : 0u) << pf_bit);
         self().on_set_a(n);
         self().on_set_f(f); }
     void on_ld_r_a() {
@@ -3344,8 +3306,8 @@ public:
     }
 
     void initiate_int() {
-        set_iff1(false);
-        set_iff2(false);
+        self().on_set_iff1(false);
+        self().on_set_iff2(false);
 
         fast_u16 pc = self().on_get_pc();
 
@@ -3388,7 +3350,7 @@ public:
     }
 
     bool handle_active_int() {
-        if(!is_int_disabled() && get_iff1()) {
+        if(!is_int_disabled() && self().on_get_iff1()) {
             initiate_int();
             return true;
         }
