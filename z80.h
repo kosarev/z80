@@ -487,6 +487,7 @@ public:
         self().on_5t_fetch_cycle();
         self().on_ld_sp_irp(); }
 
+    // TODO: Move to base and rename to 'on_fetch_and_decode()'.
     void on_decode() {
         fast_u8 op = self().on_fetch();
 
@@ -1856,29 +1857,6 @@ public:
     using base::self;
 
     cpu_base() {}
-
-    using base::get_b;
-    using base::set_b;
-    using base::get_c;
-    using base::set_c;
-    using base::get_d;
-    using base::set_d;
-    using base::get_e;
-    using base::set_e;
-    using base::get_h;
-    using base::set_h;
-    using base::get_l;
-    using base::set_l;
-    using base::get_a;
-    using base::set_a;
-    using base::get_f;
-    using base::set_f;
-    using base::get_sp;
-    using base::set_sp;
-    using base::get_pc;
-    using base::set_pc;
-    using base::get_wz;
-    using base::set_wz;
 
     fast_u16 get_pc_on_fetch() const { return self().on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { self().on_set_pc(pc); }
