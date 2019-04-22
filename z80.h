@@ -1925,7 +1925,7 @@ public:
 
     fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read_access(addr);
+        fast_u8 b = self().on_read(addr);
         self().on_tick(ticks);
         base::set_last_read_addr(addr);
         return b; }
@@ -1956,7 +1956,7 @@ public:
 
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         self().on_set_addr_bus(addr);
-        self().on_write_access(addr, n);
+        self().on_write(addr, n);
         self().on_tick(ticks); }
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_write_cycle(addr, n, /* ticks= */ 3); }
@@ -2229,7 +2229,7 @@ public:
 
     fast_u8 on_fetch_cycle(fast_u16 addr) {
         self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read_access(addr);
+        fast_u8 b = self().on_read(addr);
         self().on_tick(4);
         base::set_last_read_addr(addr);
         return b; }
@@ -3241,7 +3241,7 @@ public:
 
     fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
         self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read_access(addr);
+        fast_u8 b = self().on_read(addr);
         self().on_tick(2);
         self().on_set_addr_bus(self().get_ir_on_refresh());
         if(m1)
@@ -3358,10 +3358,14 @@ protected:
     }
 };
 
-template<typename S>
-class memory_state : public S {
+template<typename B>
+class machine_memory : public B {
 public:
-    memory_state() { reset(); }
+    typedef B base;
+
+    using base::self;
+
+    machine_memory() { reset(); }
 
     // TODO: Initialize with random data.
     void reset() {}
@@ -3375,6 +3379,9 @@ public:
         assert(addr < memory_size);
         memory[addr] = static_cast<least_u8>(n);
     }
+
+    fast_u8 on_read(fast_u16 addr) { return read(addr); }
+    void on_write(fast_u16 addr, fast_u8 n) { write(addr, n); }
 
 private:
     static const unsigned memory_size = 0x10000;  // 64K bytes.
