@@ -161,10 +161,6 @@ public:
     index_regp on_get_index_rp_kind() const { return get_index_rp_kind(); }
     void on_set_index_rp_kind(index_regp irp) { set_index_rp_kind(irp); }
 
-    bool is_index_rp_hl() const {
-        return get_index_rp_kind() == index_regp::hl;
-    }
-
 private:
     index_regp index_rp = index_regp::hl;
 };
@@ -505,8 +501,6 @@ public:
 
     using base::self;
 
-    using base::is_index_rp_hl;
-
     z80_decoder() {}
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
@@ -789,6 +783,10 @@ protected:
     using base::get_y_part;
     using base::get_z_part;
     using base::get_p_part;
+
+    bool is_index_rp_hl() const {
+        return self().on_get_index_rp_kind() == index_regp::hl;
+    }
 };
 
 // TODO: internal?
@@ -2427,7 +2425,6 @@ public:
 
     z80_cpu() {}
 
-    using base::is_index_rp_hl;
     using base::get_b;
     using base::set_b;
     using base::get_c;
@@ -3402,6 +3399,11 @@ public:
             return true;
         }
         return false;
+    }
+
+protected:
+    bool is_index_rp_hl() const {
+        return self().on_get_index_rp_kind() == index_regp::hl;
     }
 };
 
