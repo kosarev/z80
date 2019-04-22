@@ -165,7 +165,8 @@ private:
     index_regp index_rp = index_regp::hl;
 };
 
-// TODO: Part of 'internal' namespace?
+namespace internal {
+
 template<typename B>
 class decoder_base : public B {
 public:
@@ -175,7 +176,7 @@ public:
 
     decoder_base() {}
 
-    // TODO: Rename to 'decode()'.
+    // TODO: Rename to 'on_decode()'.
     void decode_in_base(bool &handled, fast_u8 op) {
         handled = true;
 
@@ -440,10 +441,12 @@ protected:
     static const fast_u8 q_mask = 0010;
 };
 
+}  // namespace internal
+
 template<typename B>
-class i8080_decoder : public decoder_base<B> {
+class i8080_decoder : public internal::decoder_base<B> {
 public:
-    typedef decoder_base<B> base;
+    typedef internal::decoder_base<B> base;
 
     using base::self;
 
@@ -495,9 +498,9 @@ public:
 };
 
 template<typename B>
-class z80_decoder : public decoder_base<B> {
+class z80_decoder : public internal::decoder_base<B> {
 public:
-    typedef decoder_base<B> base;
+    typedef internal::decoder_base<B> base;
 
     using base::self;
 
@@ -789,7 +792,8 @@ protected:
     }
 };
 
-// TODO: internal?
+namespace internal {
+
 template<typename B>
 class disasm_base : public B {
 protected:
@@ -943,11 +947,13 @@ protected:
     }
 };
 
+}  // namespace internal
+
 // TODO: Split to a instructions verbalizer and a disassembler.
 template<typename D>
-class i8080_disasm : public disasm_base<i8080_decoder<root<D>>> {
+class i8080_disasm : public internal::disasm_base<i8080_decoder<root<D>>> {
 public:
-    typedef disasm_base<i8080_decoder<root<D>>> base;
+    typedef internal::disasm_base<i8080_decoder<root<D>>> base;
 
     using base::self;
 
@@ -1131,9 +1137,11 @@ protected:
 };
 
 template<typename D>
-class z80_disasm : public disasm_base<z80_decoder<z80_decoder_state<root<D>>>> {
+class z80_disasm
+    : public internal::disasm_base<z80_decoder<z80_decoder_state<root<D>>>> {
 public:
-    typedef disasm_base<z80_decoder<z80_decoder_state<root<D>>>> base;
+    typedef internal::disasm_base<z80_decoder<z80_decoder_state<root<D>>>>
+        base;
 
     using base::self;
 
@@ -1561,6 +1569,8 @@ private:
     bool v = false;
 };
 
+namespace internal {
+
 template<typename B>
 class cpu_state_base : public B {
 public:
@@ -1725,10 +1735,12 @@ protected:
     fast_u16 last_read_addr = 0;  // TODO: Remove.
 };
 
+}  // namespace internal
+
 template<typename B>
-class i8080_state : public cpu_state_base<B> {
+class i8080_state : public internal::cpu_state_base<B> {
 public:
-    typedef cpu_state_base<B> base;
+    typedef internal::cpu_state_base<B> base;
 
     bool get_iff() const { return iff.get(); }
     void set_iff(bool new_iff) { iff.set(new_iff); }
@@ -1754,9 +1766,9 @@ private:
 };
 
 template<typename B>
-class z80_state : public cpu_state_base<z80_decoder_state<B>> {
+class z80_state : public internal::cpu_state_base<z80_decoder_state<B>> {
 public:
-    typedef cpu_state_base<z80_decoder_state<B>> base;
+    typedef internal::cpu_state_base<z80_decoder_state<B>> base;
 
     z80_state() {}
 
@@ -1834,7 +1846,8 @@ protected:
     int_mode im;
 };
 
-// TODO: internal?
+namespace internal {
+
 template<typename B>
 class cpu_base : public B {
 public:
@@ -2106,10 +2119,13 @@ protected:
     }
 };
 
+}  // namespace internal
+
 template<typename D>
-class i8080_cpu : public cpu_base<i8080_decoder<i8080_state<root<D>>>> {
+class i8080_cpu
+    : public internal::cpu_base<i8080_decoder<i8080_state<root<D>>>> {
 public:
-    typedef cpu_base<i8080_decoder<i8080_state<root<D>>>> base;
+    typedef internal::cpu_base<i8080_decoder<i8080_state<root<D>>>> base;
 
     using base::self;
 
@@ -2417,9 +2433,9 @@ public:
 };
 
 template<typename D>
-class z80_cpu : public cpu_base<z80_decoder<z80_state<root<D>>>> {
+class z80_cpu : public internal::cpu_base<z80_decoder<z80_state<root<D>>>> {
 public:
-    typedef cpu_base<z80_decoder<z80_state<root<D>>>> base;
+    typedef internal::cpu_base<z80_decoder<z80_state<root<D>>>> base;
 
     using base::self;
 
