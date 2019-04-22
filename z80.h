@@ -152,7 +152,6 @@ template<typename B>
 class z80_decoder_state : public B {
 public:
     typedef B base;
-    typedef typename base::derived derived;
 
     z80_decoder_state() {}
 
@@ -172,7 +171,6 @@ template<typename B>
 class decoder_base : public B {
 public:
     typedef B base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -447,7 +445,6 @@ template<typename B>
 class i8080_decoder : public decoder_base<B> {
 public:
     typedef decoder_base<B> base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -502,7 +499,6 @@ template<typename B>
 class z80_decoder : public decoder_base<B> {
 public:
     typedef decoder_base<B> base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -802,7 +798,6 @@ protected:
 
 public:
     typedef B base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -954,7 +949,6 @@ template<typename D>
 class i8080_disasm : public disasm_base<i8080_decoder<root<D>>> {
 public:
     typedef disasm_base<i8080_decoder<root<D>>> base;
-    typedef D derived;
 
     using base::top;
 
@@ -1140,7 +1134,6 @@ protected:
 template<typename D>
 class z80_disasm : public disasm_base<z80_decoder<z80_decoder_state<root<D>>>> {
 public:
-    typedef D derived;
     typedef disasm_base<z80_decoder<z80_decoder_state<root<D>>>> base;
 
     using base::top;
@@ -1575,7 +1568,6 @@ template<typename B>
 class cpu_state_base : public B {
 public:
     typedef B base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -1740,7 +1732,6 @@ template<typename B>
 class i8080_state : public cpu_state_base<B> {
 public:
     typedef cpu_state_base<B> base;
-    typedef typename base::derived derived;
 
     bool get_iff() const { return iff.get(); }
     void set_iff(bool new_iff) { iff.set(new_iff); }
@@ -1769,7 +1760,6 @@ template<typename B>
 class z80_state : public cpu_state_base<z80_decoder_state<B>> {
 public:
     typedef cpu_state_base<z80_decoder_state<B>> base;
-    typedef typename base::derived derived;
 
     z80_state() {}
 
@@ -1852,7 +1842,6 @@ template<typename B>
 class cpu_base : public B {
 public:
     typedef B base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -2124,7 +2113,6 @@ template<typename D>
 class i8080_cpu : public cpu_base<i8080_decoder<i8080_state<root<D>>>> {
 public:
     typedef cpu_base<i8080_decoder<i8080_state<root<D>>>> base;
-    typedef typename base::derived derived;
 
     using base::top;
 
@@ -2435,7 +2423,6 @@ template<typename D>
 class z80_cpu : public cpu_base<z80_decoder<z80_state<root<D>>>> {
 public:
     typedef cpu_base<z80_decoder<z80_state<root<D>>>> base;
-    typedef typename base::derived derived;
 
     using base::top;
 
