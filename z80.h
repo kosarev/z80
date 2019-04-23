@@ -1875,13 +1875,13 @@ protected:
 namespace internal {
 
 template<typename B>
-class cpu_base : public B {
+class executor_base : public B {
 public:
     typedef B base;
 
     using base::self;
 
-    cpu_base() {}
+    executor_base() {}
 
     fast_u16 get_pc_on_fetch() const { return self().on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { self().on_set_pc(pc); }
@@ -2126,11 +2126,10 @@ protected:
 
 }  // namespace internal
 
-template<typename D>
-class i8080_cpu
-    : public internal::cpu_base<i8080_decoder<i8080_state<root<D>>>> {
+template<typename B>
+class i8080_executor : public internal::executor_base<B> {
 public:
-    typedef internal::cpu_base<i8080_decoder<i8080_state<root<D>>>> base;
+    typedef internal::executor_base<B> base;
 
     using base::self;
 
@@ -2437,14 +2436,14 @@ public:
         self().on_set_f(self().on_get_f() | base::cf_mask); }
 };
 
-template<typename D>
-class z80_cpu : public internal::cpu_base<z80_decoder<z80_state<root<D>>>> {
+template<typename B>
+class z80_executor : public internal::executor_base<B> {
 public:
-    typedef internal::cpu_base<z80_decoder<z80_state<root<D>>>> base;
+    typedef internal::executor_base<B> base;
 
     using base::self;
 
-    z80_cpu() {}
+    z80_executor() {}
 
     using base::is_halted;
     using base::set_is_halted;
@@ -3356,6 +3355,18 @@ protected:
     bool is_index_rp_hl() const {
         return self().on_get_index_rp_kind() == index_regp::hl;
     }
+};
+
+template<typename D>
+class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>> {
+    typedef i8080_executor<i8080_decoder<i8080_state<root<D>>>> base;
+    using base::self;
+};
+
+template<typename D>
+class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>> {
+    typedef z80_executor<z80_decoder<z80_state<root<D>>>> base;
+    using base::self;
 };
 
 static const unsigned address_space_size = 0x10000;  // 64K bytes.
