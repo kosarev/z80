@@ -1643,7 +1643,6 @@ public:
 
     bool is_halted() const { return halted; }
     void set_is_halted(bool is_halted) { halted.set(is_halted); }
-    void halt() { set_is_halted(true); }
 
     fast_u16 get_last_read_addr() const { return last_read_addr; }
     void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
@@ -1725,6 +1724,12 @@ public:
 
     bool on_is_int_disabled() const { return is_int_disabled(); }
     void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
+
+    bool on_is_halted() const { return is_halted(); }
+    void on_set_is_halted(bool f) { set_is_halted(f); }
+
+    fast_u16 on_get_last_read_addr() const { return get_last_read_addr(); }
+    void on_set_last_read_addr(fast_u16 addr) { set_last_read_addr(addr); }
 
 protected:
     using base::self;
@@ -1829,11 +1834,11 @@ public:
         unreachable("Unknown index register.");
     }
 
-    void ex_af_alt_af() {
+    void ex_af_alt_af_regs() {
         base::af.swap(alt_af);
     }
 
-    void exx() {
+    void exx_regs() {
         base::bc.swap(alt_bc);
         base::de.swap(alt_de);
         base::hl.swap(alt_hl);
@@ -1865,6 +1870,9 @@ public:
 
     bool on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
+
+    void on_ex_af_alt_af_regs() { ex_af_alt_af_regs(); }
+    void on_exx_regs() { exx_regs(); }
 
 protected:
     regp_value ix, iy, ir;
@@ -2006,7 +2014,7 @@ public:
     void on_ex_de_hl() {
         base::ex_de_hl(); }
     void on_halt() {
-        base::halt();
+        self().on_set_is_halted(true);
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
         self().set_pc_on_halt(dec16(self().get_pc_on_halt())); }
     void on_jp_nn(fast_u16 nn) {
@@ -2444,13 +2452,6 @@ public:
     typedef internal::executor_base<B> base;
 
     z80_executor() {}
-
-    using base::is_halted;
-    using base::set_is_halted;
-    using base::halt;
-    using base::set_last_read_addr;
-    using base::ex_af_alt_af;
-    using base::exx;
 
     using base::sf_bit;
     using base::zf_bit;
@@ -2985,7 +2986,7 @@ public:
         self().set_iff2_on_ei(true);
         self().disable_int_on_ei(); }
     void on_ex_af_alt_af() {
-        ex_af_alt_af(); }
+        self().on_ex_af_alt_af_regs(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = self().on_get_sp();
         fast_u8 lo = self().on_3t_read_cycle(sp);
@@ -3000,7 +3001,7 @@ public:
         self().on_set_wz(irp);
         self().on_set_index_rp(irp); }
     void on_exx() {
-        exx(); }
+        self().on_exx_regs(); }
     void on_im(unsigned mode) {
         self().on_set_int_mode(mode); }
     void on_in_a_n(fast_u8 n) {
@@ -3246,7 +3247,7 @@ public:
         if(m1)
             self().on_inc_r_reg();
         self().on_tick(2);
-        set_last_read_addr(addr);
+        self().on_set_last_read_addr(addr);
         return b;
     }
 
@@ -3309,10 +3310,10 @@ public:
         // HALT instructions need to be executed at least once to
         // be skipped on an interrupt, so checking if the PC is
         // at a HALT instruction is not enough here.
-        if(is_halted()) {
+        if(self().on_is_halted()) {
             pc = inc16(pc);
             self().on_set_pc(pc);
-            set_is_halted(false);
+            self().on_set_is_halted(false);
         }
 
         self().on_inc_r_reg();
