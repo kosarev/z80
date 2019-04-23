@@ -3369,8 +3369,13 @@ public:
 
     machine_memory() { reset(); }
 
-    // TODO: Initialize with random data.
-    void reset() {}
+    void reset() {
+        uint_fast32_t rnd = 0xde347a01;
+        for(auto &b : memory_bytes) {
+            b = static_cast<least_u8>(rnd & 0xff);
+            rnd = (rnd * 0x74392cef) ^ (rnd >> 16);
+        }
+    }
 
     fast_u8 read(fast_u16 addr) const {
         assert(addr < address_space_size);
@@ -3389,7 +3394,7 @@ private:
     least_u8 memory_bytes[address_space_size] = {};
 };
 
-class events {
+class events_mask {
 public:
     typedef fast_u32 type;
 
@@ -3420,17 +3425,17 @@ public:
         frame_tick += t;
         if(frame_tick >= ticks_per_frame) {
             frame_tick %= ticks_per_frame;
-            events |= events::end_of_frame;
+            events |= events_mask::end_of_frame;
         }
     }
 
     void on_set_pc(fast_u16 n) {
         if(is_marked(n, breakpoint_mark))
-            events |= events::breakpoint_hit;
+            events |= events_mask::breakpoint_hit;
         base::on_set_pc(n);
     }
 
-    events::type on_run() {
+    events_mask::type on_run() {
         events = 0;
         while(!events)
             self().on_step();
@@ -3453,7 +3458,7 @@ private:
     ticks_type frame_tick = 0;
     static const ticks_type ticks_per_frame = 100 * 1000;
 
-    events::type events = 0;
+    events_mask::type events = 0;
 
     static const fast_u8 breakpoint_mark = 1u << 0;
     least_u8 address_marks[address_space_size] = {};
