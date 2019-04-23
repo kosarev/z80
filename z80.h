@@ -3388,6 +3388,9 @@ private:
     least_u8 memory[memory_size] = {};
 };
 
+typedef fast_u32 events_mask;
+static const events_mask end_of_frame = 1u << 0;
+
 template<typename B>
 class machine_state : public B {
 public:
@@ -3399,11 +3402,18 @@ public:
     machine_state() {}
 
     void on_tick(unsigned t) {
-        ticks += t;
+        frame_tick += t;
+        if(frame_tick >= ticks_per_frame) {
+            frame_tick %= ticks_per_frame;
+            events |= end_of_frame;
+        }
     }
 
 private:
-    ticks_type ticks = 0;
+    ticks_type frame_tick = 0;
+    ticks_type ticks_per_frame = 50000;
+
+    events_mask events = 0;
 };
 
 }  // namespace z80
