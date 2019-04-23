@@ -3358,6 +3358,8 @@ protected:
     }
 };
 
+static const unsigned address_space_size = 0x10000;  // 64K bytes.
+
 template<typename B>
 class machine_memory : public B {
 public:
@@ -3371,25 +3373,30 @@ public:
     void reset() {}
 
     fast_u8 read(fast_u16 addr) const {
-        assert(addr < memory_size);
-        return memory[addr];
+        assert(addr < address_space_size);
+        return memory_bytes[addr];
     }
 
     void write(fast_u16 addr, fast_u8 n) {
-        assert(addr < memory_size);
-        memory[addr] = static_cast<least_u8>(n);
+        assert(addr < address_space_size);
+        memory_bytes[addr] = static_cast<least_u8>(n);
     }
 
     fast_u8 on_read(fast_u16 addr) { return read(addr); }
     void on_write(fast_u16 addr, fast_u8 n) { write(addr, n); }
 
 private:
-    static const unsigned memory_size = 0x10000;  // 64K bytes.
-    least_u8 memory[memory_size] = {};
+    least_u8 memory_bytes[address_space_size] = {};
 };
 
-typedef fast_u32 events_mask;
-static const events_mask end_of_frame = 1u << 0;
+class events {
+public:
+    typedef fast_u32 type;
+
+    static const type end_of_frame = 1u << 0;
+    static const type breakpoint_hit = 1u << 1;
+    static const type end = 1u << 2;
+};
 
 template<typename B>
 class machine_state : public B {
@@ -3401,19 +3408,55 @@ public:
 
     machine_state() {}
 
+    void set_breakpoint(fast_u16 addr) {
+        mark(addr, breakpoint_mark);
+    }
+
+    void clear_breakpoint(fast_u16 addr) {
+        unmark(addr, breakpoint_mark);
+    }
+
     void on_tick(unsigned t) {
         frame_tick += t;
         if(frame_tick >= ticks_per_frame) {
             frame_tick %= ticks_per_frame;
-            events |= end_of_frame;
+            events |= events::end_of_frame;
         }
     }
 
-private:
-    ticks_type frame_tick = 0;
-    ticks_type ticks_per_frame = 50000;
+    void on_set_pc(fast_u16 n) {
+        if(is_marked(n, breakpoint_mark))
+            events |= events::breakpoint_hit;
+        base::on_set_pc(n);
+    }
 
-    events_mask events = 0;
+    events::type on_run() {
+        events = 0;
+        while(!events)
+            self().on_step();
+        return events;
+    }
+
+private:
+    bool is_marked(fast_u16 addr, fast_u8 marks) {
+        return (address_marks[addr] & marks) == marks;
+    }
+
+    void mark(fast_u16 addr, fast_u8 marks) {
+        address_marks[addr] |= marks;
+    }
+
+    void unmark(fast_u16 addr, fast_u8 marks) {
+        address_marks[addr] &= ~marks;
+    }
+
+    ticks_type frame_tick = 0;
+    static const ticks_type ticks_per_frame = 100 * 1000;
+
+    events::type events = 0;
+
+    static const fast_u8 breakpoint_mark = 1u << 0;
+    least_u8 address_marks[address_space_size] = {};
 };
 
 }  // namespace z80
