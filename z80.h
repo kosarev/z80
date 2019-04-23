@@ -172,8 +172,6 @@ class decoder_base : public B {
 public:
     typedef B base;
 
-    using base::self;
-
     decoder_base() {}
 
     // TODO: Rename to 'on_decode()'.
@@ -427,6 +425,8 @@ public:
     void decode() { self().on_decode(); }
 
 protected:
+    using base::self;
+
     static const fast_u8 x_mask = 0300;
 
     static const fast_u8 y_mask = 0070;
@@ -447,8 +447,6 @@ template<typename B>
 class i8080_decoder : public internal::decoder_base<B> {
 public:
     typedef internal::decoder_base<B> base;
-
-    using base::self;
 
     void decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r); }
@@ -496,14 +494,15 @@ public:
         base::decode_in_base(handled, op);
         assert(handled);
     }
+
+protected:
+    using base::self;
 };
 
 template<typename B>
 class z80_decoder : public internal::decoder_base<B> {
 public:
     typedef internal::decoder_base<B> base;
-
-    using base::self;
 
     z80_decoder() {}
 
@@ -778,6 +777,8 @@ public:
     }
 
 protected:
+    using base::self;
+
     using base::x_mask;
     using base::y_mask;
     using base::z_mask;
@@ -802,8 +803,6 @@ protected:
 
 public:
     typedef B base;
-
-    using base::self;
 
     disasm_base() {}
 
@@ -887,6 +886,8 @@ public:
     }
 
 protected:
+    using base::self;
+
     class output_buff {
     public:
         output_buff() {}
@@ -955,8 +956,6 @@ template<typename D>
 class i8080_disasm : public internal::disasm_base<i8080_decoder<root<D>>> {
 public:
     typedef internal::disasm_base<i8080_decoder<root<D>>> base;
-
-    using base::self;
 
     i8080_disasm() {}
 
@@ -1131,6 +1130,8 @@ public:
     }
 
 protected:
+    using base::self;
+
     template<typename T>
     static T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
@@ -1143,8 +1144,6 @@ class z80_disasm
 public:
     typedef internal::disasm_base<z80_decoder<z80_decoder_state<root<D>>>>
         base;
-
-    using base::self;
 
     z80_disasm() {}
 
@@ -1519,6 +1518,8 @@ public:
     }
 
 protected:
+    using base::self;
+
     template<typename T>
     static T get_arg(const void **&args) {
         return base::template get_arg<T>(args);
@@ -1576,8 +1577,6 @@ template<typename B>
 class cpu_state_base : public B {
 public:
     typedef B base;
-
-    using base::self;
 
     fast_u8 get_b() const { return bc.get_high(); }
     void set_b(fast_u8 n) { bc.set_high(n); }
@@ -1728,6 +1727,8 @@ public:
     void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
 
 protected:
+    using base::self;
+
     regp_value bc, de, hl, af;
     reg16_value pc, sp, wz;
     flipflop int_disabled, halted;
@@ -1878,8 +1879,6 @@ template<typename B>
 class executor_base : public B {
 public:
     typedef B base;
-
-    using base::self;
 
     executor_base() {}
 
@@ -2059,6 +2058,8 @@ public:
     void step() { return self().on_step(); }
 
 protected:
+    using base::self;
+
     static const unsigned sf_bit = 7;
     static const unsigned zf_bit = 6;
     static const unsigned yf_bit = 5;
@@ -2130,8 +2131,6 @@ template<typename B>
 class i8080_executor : public internal::executor_base<B> {
 public:
     typedef internal::executor_base<B> base;
-
-    using base::self;
 
     using base::cf_mask;
     using base::hf_mask;
@@ -2434,14 +2433,15 @@ public:
         self().on_set_f(f); }
     void on_scf() {
         self().on_set_f(self().on_get_f() | base::cf_mask); }
+
+protected:
+    using base::self;
 };
 
 template<typename B>
 class z80_executor : public internal::executor_base<B> {
 public:
     typedef internal::executor_base<B> base;
-
-    using base::self;
 
     z80_executor() {}
 
@@ -3352,6 +3352,8 @@ public:
     }
 
 protected:
+    using base::self;
+
     bool is_index_rp_hl() const {
         return self().on_get_index_rp_kind() == index_regp::hl;
     }
@@ -3360,12 +3362,16 @@ protected:
 template<typename D>
 class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>> {
     typedef i8080_executor<i8080_decoder<i8080_state<root<D>>>> base;
+
+protected:
     using base::self;
 };
 
 template<typename D>
 class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>> {
     typedef z80_executor<z80_decoder<z80_state<root<D>>>> base;
+
+protected:
     using base::self;
 };
 
@@ -3375,8 +3381,6 @@ template<typename B>
 class machine_memory : public B {
 public:
     typedef B base;
-
-    using base::self;
 
     machine_memory() { reset(); }
 
@@ -3401,6 +3405,9 @@ public:
     fast_u8 on_read(fast_u16 addr) { return read(addr); }
     void on_write(fast_u16 addr, fast_u8 n) { write(addr, n); }
 
+protected:
+    using base::self;
+
 private:
     least_u8 memory_bytes[address_space_size] = {};
 };
@@ -3419,8 +3426,6 @@ class machine_state : public B {
 public:
     typedef B base;
     typedef unsigned ticks_type;
-
-    using base::self;
 
     machine_state() {}
 
@@ -3453,6 +3458,9 @@ public:
         return events;
     }
 
+protected:
+    using base::self;
+
 private:
     bool is_marked(fast_u16 addr, fast_u8 marks) {
         return (address_marks[addr] & marks) == marks;
@@ -3479,6 +3487,8 @@ template<typename D>
 class i8080_machine : public machine_memory<machine_state<i8080_cpu<D>>> {
 public:
     typedef machine_memory<machine_state<i8080_cpu<D>>> base;
+
+protected:
     using base::self;
 };
 
@@ -3486,6 +3496,8 @@ template<typename D>
 class z80_machine : public machine_memory<machine_state<z80_cpu<D>>> {
 public:
     typedef machine_memory<machine_state<z80_cpu<D>>> base;
+
+protected:
     using base::self;
 };
 
