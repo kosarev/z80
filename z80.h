@@ -3459,6 +3459,20 @@ private:
     least_u8 address_marks[address_space_size] = {};
 };
 
+template<typename D>
+class i8080_machine : public machine_memory<machine_state<i8080_cpu<D>>> {
+public:
+    typedef machine_memory<machine_state<i8080_cpu<D>>> base;
+    using base::self;
+};
+
+template<typename D>
+class z80_machine : public machine_memory<machine_state<z80_cpu<D>>> {
+public:
+    typedef machine_memory<machine_state<z80_cpu<D>>> base;
+    using base::self;
+};
+
 }  // namespace z80
 
 #endif  // Z80_H
