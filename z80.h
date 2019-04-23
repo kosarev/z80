@@ -3343,12 +3343,13 @@ public:
         self().on_jump(isr_addr);
     }
 
-    bool handle_active_int() {
+    bool on_handle_active_int() {
+        bool accepted = false;
         if(!self().on_is_int_disabled() && self().on_get_iff1()) {
             initiate_int();
-            return true;
+            accepted = true;
         }
-        return false;
+        return accepted;
     }
 
 protected:
