@@ -23,6 +23,15 @@ using z80::least_u8;
 using z80::least_u16;
 
 using z80::unused;
+using z80::get_low8;
+using z80::get_high8;
+using z80::make16;
+using z80::index_regp;
+
+static inline void split16(least_u8 &h, least_u8 &l, fast_u16 n) {
+    h = get_high8(n);
+    l = get_low8(n);
+}
 
 class decref_guard {
 public:
@@ -38,87 +47,74 @@ private:
     PyObject *object;
 };
 
-// TODO: Should be part of z80.h?
-struct __attribute__((packed)) cpu_state {
-    least_u16 bc;
-    least_u16 de;
-    least_u16 hl;
-    least_u16 af;
-    least_u16 ix;
-    least_u16 iy;
+struct __attribute__((packed)) z80_machine_state {
+    least_u8 c = 0;
+    least_u8 b = 0;
+    least_u8 e = 0;
+    least_u8 d = 0;
 
-    least_u16 alt_bc;
-    least_u16 alt_de;
-    least_u16 alt_hl;
-    least_u16 alt_af;
+    least_u8 l = 0;
+    least_u8 h = 0;
+    least_u8 f = 0;
+    least_u8 a = 0;
 
-    least_u16 pc;
-    least_u16 sp;
-    least_u16 ir;
-    least_u16 wz;
+    least_u8 ixl = 0;
+    least_u8 ixh = 0;
+    least_u8 iyl = 0;
+    least_u8 iyh = 0;
 
-    least_u8 iff1;
-    least_u8 iff2;
-    least_u8 int_mode;
-    least_u8 index_rp_kind;
+    least_u8 alt_c = 0;
+    least_u8 alt_b = 0;
+    least_u8 alt_e = 0;
+    least_u8 alt_d = 0;
+
+    least_u8 alt_l = 0;
+    least_u8 alt_h = 0;
+    least_u8 alt_f = 0;
+    least_u8 alt_a = 0;
+
+    least_u16 pc = 0;
+    least_u16 sp = 0;
+    least_u16 wz = 0;
+    least_u16 last_read_addr = 0;
+
+    least_u8 r = 0;
+    least_u8 i = 0;
+    least_u8 iff1 = 0;
+    least_u8 iff2 = 0;
+
+    least_u8 int_mode = 0;
+    least_u8 index_rp_kind = 0;
+    least_u8 int_disabled = 0;
+    least_u8 halted = 0;
+
+    least_u8 memory[z80::address_space_size] = {};
 };
 
-struct __attribute__((packed)) memory_image {
-    static const z80::size_type size = 0x10000;  // 64K bytes.
-    least_u8 bytes[size];
-
-    memory_image() {
-        uint_fast32_t rnd = 0xde347a01;
-        for(auto &cell : bytes) {
-            cell = static_cast<least_u8>(rnd);
-            rnd = (rnd * 0x74392cef) ^ (rnd >> 16);
-        }
-    }
-};
-
-struct __attribute__((packed)) machine_state {
-    cpu_state proc;
-    memory_image memory;
-};
-
-class z80_machine : public z80::cpu<z80_machine> {
+template<typename B, typename S>
+class machine : public B {
 public:
-    typedef z80::cpu<z80_machine> base;
+    typedef B base;
+    typedef S machine_state;
 
-    z80_machine() {
-        retrieve_state();
-    }
+    machine() {}
 
-    machine_state &get_machine_state() {
+    z80_machine_state &get_state() {
         return state;
     }
 
-    void retrieve_state() {
-        state.proc = get_cpu_state();
+    fast_u8 on_read(fast_u16 addr) {
+        assert(addr < z80::address_space_size);
+        return state.memory[addr];
     }
 
-    void install_state() {
-        set_cpu_state(state.proc);
-    }
-
-    memory_image &get_memory() { return state.memory; }
-
-    void on_tick(unsigned t) {
-        unused(t);
-    }
-
-    fast_u8 on_read_access(fast_u16 addr) {
-        assert(addr < memory_image::size);
-        return state.memory.bytes[addr];
-    }
-
-    void on_write_access(fast_u16 addr, fast_u8 n) {
-        assert(addr < memory_image::size);
-        state.memory.bytes[addr] = n;
+    void on_write(fast_u16 addr, fast_u8 n) {
+        assert(addr < z80::address_space_size);
+        state.memory[addr] = n;
     }
 
     fast_u8 on_input(fast_u16 addr) {
-        const fast_u8 default_value = 0xbf;
+        const fast_u8 default_value = 0xff;
         if(!on_input_callback)
             return default_value;
 
@@ -142,86 +138,140 @@ public:
         return z80::mask8(PyLong_AsUnsignedLong(result));
     }
 
-    void run() {
-        install_state();
-
-        // Execute some portion of instructions.
-        for(unsigned i = 0; i != 5000; ++i)
-            base::step();
-
-        retrieve_state();
-    }
-
-    bool handle_active_int() {
-        install_state();
-        bool int_initiated = base::handle_active_int();
-        retrieve_state();
-        return int_initiated;
-    }
-
     PyObject *set_on_input_callback(PyObject *callback) {
         PyObject *old_callback = on_input_callback;
         on_input_callback = callback;
         return old_callback;
     }
 
+    fast_u8 on_get_b() const { return state.b; }
+    void on_set_b(fast_u8 n) { state.b = n; }
+
+    fast_u8 on_get_c() const { return state.c; }
+    void on_set_c(fast_u8 n) { state.c = n; }
+
+    fast_u8 on_get_d() const { return state.d; }
+    void on_set_d(fast_u8 n) { state.d = n; }
+
+    fast_u8 on_get_e() const { return state.e; }
+    void on_set_e(fast_u8 n) { state.e = n; }
+
+    fast_u8 on_get_h() const { return state.h; }
+    void on_set_h(fast_u8 n) { state.h = n; }
+
+    fast_u8 on_get_l() const { return state.l; }
+    void on_set_l(fast_u8 n) { state.l = n; }
+
+    fast_u8 on_get_a() const { return state.a; }
+    void on_set_a(fast_u8 n) { state.a = n; }
+
+    fast_u8 on_get_f() const { return state.f; }
+    void on_set_f(fast_u8 n) { state.f = n; }
+
+    fast_u8 on_get_ixh() const { return state.ixh; }
+    void on_set_ixh(fast_u8 n) { state.ixh = n; }
+
+    fast_u8 on_get_ixl() const { return state.ixl; }
+    void on_set_ixl(fast_u8 n) { state.ixl = n; }
+
+    fast_u8 on_get_iyh() const { return state.iyh; }
+    void on_set_iyh(fast_u8 n) { state.iyh = n; }
+
+    fast_u8 on_get_iyl() const { return state.iyl; }
+    void on_set_iyl(fast_u8 n) { state.iyl = n; }
+
+    fast_u16 on_get_bc() const { return make16(state.b, state.c); }
+    void on_set_bc(fast_u16 n) { split16(state.b, state.c, n); }
+
+    fast_u16 on_get_de() const { return make16(state.d, state.e); }
+    void on_set_de(fast_u16 n) { split16(state.d, state.e, n); }
+
+    fast_u16 on_get_hl() const { return make16(state.h, state.l); }
+    void on_set_hl(fast_u16 n) { split16(state.h, state.l, n); }
+
+    fast_u16 on_get_af() const { return make16(state.a, state.f); }
+    void on_set_af(fast_u16 n) { split16(state.a, state.f, n); }
+
+    fast_u16 on_get_ix() const { return make16(state.ixh, state.ixl); }
+    void on_set_ix(fast_u16 n) { split16(state.ixh, state.ixl, n); }
+
+    fast_u16 on_get_iy() const { return make16(state.iyh, state.iyl); }
+    void on_set_iy(fast_u16 n) { split16(state.iyh, state.iyl, n); }
+
+    fast_u8 on_get_i() const { return state.i; }
+    void on_set_i(fast_u8 n) { state.i = n; }
+
+    fast_u8 on_get_r_reg() const { return state.r; }
+    void on_set_r_reg(fast_u8 n) { state.r = n; }
+
+    fast_u16 on_get_ir() const { return make16(state.i, state.r); }
+
+    fast_u16 on_get_pc() const { return state.pc; }
+    void on_set_pc(fast_u16 n) { state.pc = n; }
+
+    fast_u16 on_get_sp() const { return state.sp; }
+    void on_set_sp(fast_u16 n) { state.sp = n; }
+
+    fast_u16 on_get_wz() const { return state.wz; }
+    void on_set_wz(fast_u16 n) { state.wz = n; }
+
+    fast_u16 on_get_last_read_addr() const { return state.last_read_addr; }
+    void on_set_last_read_addr(fast_u16 n) { state.last_read_addr = n; }
+
+    index_regp on_get_index_rp_kind() const {
+        return static_cast<index_regp>(state.index_rp_kind); }
+    void on_set_index_rp_kind(index_regp irp) {
+        state.index_rp_kind = static_cast<least_u8>(irp); }
+
+    bool on_is_int_disabled() const { return state.int_disabled; }
+    void on_set_is_int_disabled(bool f) { state.int_disabled = f; }
+
+    bool on_get_iff1() const { return state.iff1 != 0; }
+    void on_set_iff1(bool f) { state.iff1 = f; }
+
+    bool on_get_iff2() const { return state.iff2 != 0; }
+    void on_set_iff2(bool f) { state.iff2 = f; }
+
+    unsigned on_get_int_mode() const { return state.int_mode; }
+    void on_set_int_mode(unsigned mode) { state.int_mode = mode; }
+
+    bool on_is_halted() const { return state.halted; }
+    void on_set_is_halted(bool f) { state.halted = f; }
+
+    void on_ex_af_alt_af_regs() {
+        std::swap(state.a, state.alt_a);
+        std::swap(state.f, state.alt_f);
+    }
+
+    void on_ex_de_hl_regs() {
+        std::swap(state.d, state.h);
+        std::swap(state.e, state.l);
+    }
+
+    void on_exx_regs() {
+        std::swap(state.b, state.alt_b);
+        std::swap(state.c, state.alt_c);
+
+        std::swap(state.d, state.alt_d);
+        std::swap(state.e, state.alt_e);
+
+        std::swap(state.h, state.alt_h);
+        std::swap(state.l, state.alt_l);
+    }
+
 protected:
-    cpu_state get_cpu_state() {
-        cpu_state state;
-
-        state.bc = get_bc();
-        state.de = get_de();
-        state.hl = get_hl();
-        state.af = get_af();
-        state.ix = get_ix();
-        state.iy = get_iy();
-
-        state.alt_bc = get_alt_bc();
-        state.alt_de = get_alt_de();
-        state.alt_hl = get_alt_hl();
-        state.alt_af = get_alt_af();
-
-        state.pc = get_pc();
-        state.sp = get_sp();
-        state.ir = get_ir();
-        state.wz = get_wz();
-
-        state.iff1 = get_iff1() ? 1 : 0;
-        state.iff2 = get_iff2() ? 1 : 0;
-        state.int_mode = get_int_mode();
-        state.index_rp_kind = static_cast<least_u8>(get_index_rp_kind());
-
-        return state;
-    }
-
-    void set_cpu_state(const cpu_state &state) {
-        set_bc(state.bc);
-        set_de(state.de);
-        set_hl(state.hl);
-        set_af(state.af);
-        set_ix(state.ix);
-        set_iy(state.iy);
-
-        set_alt_bc(state.alt_bc);
-        set_alt_de(state.alt_de);
-        set_alt_hl(state.alt_hl);
-        set_alt_af(state.alt_af);
-
-        set_pc(state.pc);
-        set_sp(state.sp);
-        set_ir(state.ir);
-        set_wz(state.wz);
-
-        set_iff1(state.iff1);
-        set_iff2(state.iff2);
-        set_int_mode(state.int_mode);
-        set_index_rp_kind(static_cast<z80::index_regp>(state.index_rp_kind));
-    }
+    using base::self;
 
 private:
     machine_state state;
     PyObject *on_input_callback = nullptr;
 };
+
+class z80_machine
+    : public machine<z80::machine_state<z80::z80_executor<
+                         z80::z80_decoder<z80::root<z80_machine>>>>,
+                     z80_machine_state>
+{};
 
 struct object_instance {
     PyObject_HEAD
@@ -237,15 +287,9 @@ static inline z80_machine &cast_machine(PyObject *p) {
 }
 
 PyObject *get_state_image(PyObject *self, PyObject *args) {
-    auto &state = cast_machine(self).get_machine_state();
+    auto &state = cast_machine(self).get_state();
     return PyMemoryView_FromMemory(reinterpret_cast<char*>(&state),
                                    sizeof(state), PyBUF_WRITE);
-}
-
-PyObject *get_memory(PyObject *self, PyObject *args) {
-    auto &memory = cast_machine(self).get_memory();
-    return PyMemoryView_FromMemory(reinterpret_cast<char*>(memory.bytes),
-                                   sizeof(memory), PyBUF_WRITE);
 }
 
 static PyObject *set_on_input_callback(PyObject *self, PyObject *args) {
@@ -267,14 +311,14 @@ static PyObject *set_on_input_callback(PyObject *self, PyObject *args) {
 
 PyObject *run(PyObject *self, PyObject *args) {
     auto &machine = cast_machine(self);
-    machine.run();
+    z80::events_mask::type events = machine.on_run();
     if(PyErr_Occurred())
         return nullptr;
-    Py_RETURN_NONE;
+    return Py_BuildValue("i", events);
 }
 
-PyObject *handle_active_int(PyObject *self, PyObject *args) {
-    bool int_initiated = cast_machine(self).handle_active_int();
+PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
+    bool int_initiated = cast_machine(self).on_handle_active_int();
     return PyBool_FromLong(int_initiated);
 }
 
@@ -282,20 +326,17 @@ PyMethodDef methods[] = {
     {"get_state_image", get_state_image, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
      "emulated machine."},
-    {"get_memory", get_memory, METH_NOARGS,
-     "Return a MemoryView object that exposes the memory of the emulated "
-     "machine."},
     {"set_on_input_callback", set_on_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
-    {"handle_active_int", handle_active_int, METH_NOARGS,
+    {"on_handle_active_int", on_handle_active_int, METH_NOARGS,
      "Attempts to initiate a masked interrupt."},
     { nullptr }  // Sentinel.
 };
 
 PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
-    if(!PyArg_ParseTuple(args, ":Spectrum48Base.__new__"))
+    if(!PyArg_ParseTuple(args, ":_Z80Machine.__new__"))
         return nullptr;
 
     auto *self = cast_object(type->tp_alloc(type, /* nitems= */ 0));

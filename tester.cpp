@@ -209,7 +209,7 @@ public:
         return instr_code[index++];
     }
 
-    fast_u16 get_last_read_addr() const {
+    fast_u16 on_get_last_read_addr() const {
         assert(index != 0);
         return index - 1;
     }

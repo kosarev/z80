@@ -23,7 +23,7 @@ z80_emulator_module = Extension(
                         '-O3',
                         '-UNDEBUG',  # TODO
                        ],
-    sources=['z80.cpp', 'z80/_z80module.cpp'],
+    sources=['z80/_z80module.cpp'],
     language='c++')
 
 
