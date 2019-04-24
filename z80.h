@@ -626,7 +626,7 @@ public:
         // TODO
         std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().get_last_read_addr()));
+                     static_cast<unsigned>(self().on_get_last_read_addr()));
         std::abort();
     }
 
@@ -684,7 +684,7 @@ public:
 
         std::fprintf(stderr, "Unknown CB-prefixed opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().get_last_read_addr()));
+                     static_cast<unsigned>(self().on_get_last_read_addr()));
         std::abort();
     }
 
@@ -765,7 +765,7 @@ public:
 
         std::fprintf(stderr, "Unknown ED-prefixed opcode 0x%02x at 0x%04x.\n",
                      static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().get_last_read_addr()));
+                     static_cast<unsigned>(self().on_get_last_read_addr()));
         std::abort();
     }
 
@@ -1647,7 +1647,7 @@ public:
     fast_u16 get_last_read_addr() const { return last_read_addr; }
     void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
 
-    void ex_de_hl() { de.swap(hl); }
+    void on_ex_de_hl_regs() { de.swap(hl); }
 
     fast_u8 on_get_b() const { return get_b(); }
     void on_set_b(fast_u8 b) { set_b(b); }
@@ -1862,13 +1862,15 @@ public:
     fast_u8 on_get_r_reg() const { return get_r_reg(); }
     void on_set_r_reg(fast_u8 r) { set_r_reg(r); }
 
+    fast_u16 on_get_ir() const { return get_ir(); }
+
     bool on_get_iff1() const { return get_iff1(); }
     void on_set_iff1(bool f) { set_iff1(f); }
 
     bool on_get_iff2() const { return get_iff2(); }
     void on_set_iff2(bool f) { set_iff2(f); }
 
-    bool on_get_int_mode() const { return get_int_mode(); }
+    unsigned on_get_int_mode() const { return get_int_mode(); }
     void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
     void on_ex_af_alt_af_regs() { ex_af_alt_af_regs(); }
@@ -1934,7 +1936,7 @@ public:
         self().on_set_addr_bus(addr);
         fast_u8 b = self().on_read(addr);
         self().on_tick(ticks);
-        base::set_last_read_addr(addr);
+        self().on_set_last_read_addr(addr);
         return b; }
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         return self().on_read_cycle(addr, /* ticks= */ 3); }
@@ -2012,7 +2014,7 @@ public:
         else
             self().on_set_wz(nn); }
     void on_ex_de_hl() {
-        base::ex_de_hl(); }
+        self().on_ex_de_hl_regs(); }
     void on_halt() {
         self().on_set_is_halted(true);
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
@@ -2487,7 +2489,7 @@ public:
         // TODO: Consider splitting R into R[7] and R[6:0].
         fast_u8 r = self().on_get_r_reg();
         r = (r & 0x80) | (inc8(r) & 0x7f);
-        self().set_r_reg(r);
+        self().on_set_r_reg(r);
     }
 
     fast_u16 on_get_ix() {
@@ -2515,8 +2517,6 @@ public:
 
     fast_u16 get_pc_on_block_instr() const { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
-
-    fast_u16 on_get_ir() const { return self().get_ir(); }
 
     fast_u16 get_ir_on_refresh() const { return self().on_get_ir(); }
 
