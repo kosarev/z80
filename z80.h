@@ -2263,58 +2263,57 @@ public:
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = 0;
+        fast_u8 f = self().on_get_f();
         switch(k) {
         case alu::add: {
-            f = self().on_get_f();
             fast_u8 t = add8(a, n);
+            fast_u8 hf = (a & 0xf) + (n & 0xf) > 0xf ? hf_mask : 0;
             f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(t) | hf_ari(t, a, n) | pf_log(t) | cf_ari(t < a);
+                    zf_ari(t) | hf | pf_log(t) | cf_ari(t < a);
             a = t;
             break; }
         case alu::adc: {
-            f = self().on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a + n + cfv);
+            fast_u8 hf = (a & 0xf) + (n & 0xf) + cfv > 0xf ? hf_mask : 0;
             f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(t) | hf_ari(t, a, n) | pf_log(t) |
+                    zf_ari(t) | hf | pf_log(t) |
                     cf_ari(t < a || (cfv && n == 0xff));
             a = t;
             break; }
         case alu::sub:
         case alu::cp: {
-            f = self().on_get_f();
             fast_u8 t = sub8(a, n);
-            fast_u8 hf = (a & 0xf) + (~n & 0xf) + 1 > 0xf ? hf_mask : 0;  // TODO
+            fast_u8 hf = (a & 0xf) >= (n & 0xf) ? hf_mask : 0;
             f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(t) | hf | pf_log(t) | cf_ari(t > a);
             a = t;
             break; }
         case alu::sbc: {
-            f = self().on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a - n - cfv);
-            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv ? hf_mask : 0;  // TODO
+            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv ? hf_mask : 0;
             f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(t) | hf | pf_log(t) |
                     cf_ari(t > a || (cfv && n == 0xff));
             a = t;
             break; }
         case alu::and_a: {
-            f = self().on_get_f();
-            fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;  // TODO
+            // Alexander Demin notes that the half-carry flag has
+            // its own special logic for the ANA and ANI
+            // instructions.
+            // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
+            fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;
             a &= n;
             f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a) | hf;
             break; }
         case alu::xor_a:
-            f = self().on_get_f();
             a ^= n;
             f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a);
             break;
         case alu::or_a:
-            f = self().on_get_f();
             a |= n;
             f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a);
