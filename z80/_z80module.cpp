@@ -138,7 +138,7 @@ public:
         return z80::mask8(PyLong_AsUnsignedLong(result));
     }
 
-    PyObject *set_on_input_callback(PyObject *callback) {
+    PyObject *set_input_callback(PyObject *callback) {
         PyObject *old_callback = on_input_callback;
         on_input_callback = callback;
         return old_callback;
@@ -292,7 +292,7 @@ PyObject *get_state_image(PyObject *self, PyObject *args) {
                                    sizeof(state), PyBUF_WRITE);
 }
 
-static PyObject *set_on_input_callback(PyObject *self, PyObject *args) {
+static PyObject *set_input_callback(PyObject *self, PyObject *args) {
     PyObject *new_callback;
     if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
         return nullptr;
@@ -303,7 +303,7 @@ static PyObject *set_on_input_callback(PyObject *self, PyObject *args) {
     }
 
     auto &machine = cast_machine(self);
-    PyObject *old_callback = machine.set_on_input_callback(new_callback);
+    PyObject *old_callback = machine.set_input_callback(new_callback);
     Py_XINCREF(new_callback);
     Py_XDECREF(old_callback);
     Py_RETURN_NONE;
@@ -326,7 +326,7 @@ PyMethodDef methods[] = {
     {"get_state_image", get_state_image, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
      "emulated machine."},
-    {"set_on_input_callback", set_on_input_callback, METH_VARARGS,
+    {"set_input_callback", set_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
