@@ -182,6 +182,9 @@ public:
     bool on_is_int_disabled() const { return state.int_disabled; }
     void on_set_is_int_disabled(bool f) { state.int_disabled = f; }
 
+    bool on_get_iff() const { return state.iff != 0; }
+    void on_set_iff(bool f) { state.iff = f; }
+
     bool on_get_iff1() const { return state.iff1 != 0; }
     void on_set_iff1(bool f) { state.iff1 = f; }
 
@@ -223,6 +226,12 @@ private:
     PyObject *on_input_callback = nullptr;
 };
 
+namespace i8080_machine {
+#define I8080_MACHINE
+#include "machine.inc"
+#undef I8080_MACHINE
+}
+
 namespace z80_machine {
 #define Z80_MACHINE
 #include "machine.inc"
@@ -251,10 +260,15 @@ extern "C" PyMODINIT_FUNC PyInit__z80(void) {
 
     if(PyType_Ready(&z80_machine::type_object) < 0)
         return nullptr;
+    if(PyType_Ready(&i8080_machine::type_object) < 0)
+        return nullptr;
     Py_INCREF(&z80_machine::type_object);
+    Py_INCREF(&i8080_machine::type_object);
 
     // TODO: Check the returning value.
     PyModule_AddObject(m, "_Z80Machine",
                        &z80_machine::type_object.ob_base.ob_base);
+    PyModule_AddObject(m, "_I8080Machine",
+                       &i8080_machine::type_object.ob_base.ob_base);
     return m;
 }

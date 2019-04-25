@@ -1975,6 +1975,9 @@ public:
     void on_3t_exec_cycle() {
         self().on_tick(3); }
 
+    void on_set_addr_bus(fast_u16 addr) {
+        unused(addr); }
+
     void on_push(fast_u16 nn) {
         fast_u16 sp = self().on_get_sp();
         sp = dec16(sp);
@@ -2239,7 +2242,7 @@ public:
         self().on_set_addr_bus(addr);
         fast_u8 b = self().on_read(addr);
         self().on_tick(4);
-        base::set_last_read_addr(addr);
+        self().on_set_last_read_addr(addr);
         return b; }
     void on_7t_fetch_cycle() {
         self().on_tick(3); }
@@ -3233,10 +3236,6 @@ public:
         fast_u8 op = self().on_fetch_cycle(pc, m1);
         self().set_pc_on_fetch(inc16(pc));
         return op;
-    }
-
-    void on_set_addr_bus(fast_u16 addr) {
-        unused(addr);
     }
 
     fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {

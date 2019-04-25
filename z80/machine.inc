@@ -19,6 +19,17 @@ struct __attribute__((packed)) object_state {
     least_u8 f = 0;
     least_u8 a = 0;
 
+    least_u16 pc = 0;
+    least_u16 sp = 0;
+    least_u16 wz = 0;
+    least_u16 last_read_addr = 0;
+
+#if defined(I8080_MACHINE)
+    least_u8 iff = 0;
+    least_u8 int_disabled = 0;
+    least_u8 halted = 0;
+    least_u16 padding = 0;
+#elif defined(Z80_MACHINE)
     least_u8 ixl = 0;
     least_u8 ixh = 0;
     least_u8 iyl = 0;
@@ -34,29 +45,37 @@ struct __attribute__((packed)) object_state {
     least_u8 alt_f = 0;
     least_u8 alt_a = 0;
 
-    least_u16 pc = 0;
-    least_u16 sp = 0;
-    least_u16 wz = 0;
-    least_u16 last_read_addr = 0;
-
     least_u8 r = 0;
     least_u8 i = 0;
     least_u8 iff1 = 0;
     least_u8 iff2 = 0;
 
-    least_u8 int_mode = 0;
-    least_u8 index_rp_kind = 0;
     least_u8 int_disabled = 0;
     least_u8 halted = 0;
+    least_u8 int_mode = 0;
+    least_u8 index_rp_kind = 0;
+#else
+#error Unknown machine!
+#endif
 
     least_u8 memory[z80::address_space_size] = {};
 };
 
+#if defined(I8080_MACHINE)
+class machine_object
+    : public machine<z80::machine_state<z80::i8080_executor<
+                         z80::i8080_decoder<z80::root<machine_object>>>>,
+                     object_state>
+{};
+#elif defined(Z80_MACHINE)
 class machine_object
     : public machine<z80::machine_state<z80::z80_executor<
                          z80::z80_decoder<z80::root<machine_object>>>>,
                      object_state>
 {};
+#else
+#error Unknown machine!
+#endif
 
 struct object_instance {
     PyObject_HEAD
@@ -102,10 +121,12 @@ static PyObject *run(PyObject *self, PyObject *args) {
     return Py_BuildValue("i", events);
 }
 
+#if defined(Z80_MACHINE)
 static PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
     bool int_initiated = cast_machine(self).on_handle_active_int();
     return PyBool_FromLong(int_initiated);
 }
+#endif  // defined(Z80_MACHINE)
 
 static PyMethodDef methods[] = {
     {"get_state_image", get_state_image, METH_NOARGS,
@@ -115,14 +136,23 @@ static PyMethodDef methods[] = {
      "Set a callback function handling reading from ports."},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
+#if defined(Z80_MACHINE)
     {"on_handle_active_int", on_handle_active_int, METH_NOARGS,
      "Attempts to initiate a masked interrupt."},
+#endif  // defined(Z80_MACHINE)
     { nullptr }  // Sentinel.
 };
 
 static PyObject *object_new(PyTypeObject *type, PyObject *args,
                             PyObject *kwds) {
-    if(!PyArg_ParseTuple(args, ":_Z80Machine.__new__"))
+#if defined(I8080_MACHINE)
+    static const char format[] = ":_I8080Machine.__new__";
+#elif defined(Z80_MACHINE)
+    static const char format[] = ":_Z80Machine.__new__";
+#else
+#error Unknown machine!
+#endif
+    if(!PyArg_ParseTuple(args, format))
         return nullptr;
 
     auto *self = cast_object(type->tp_alloc(type, /* nitems= */ 0));
@@ -142,8 +172,15 @@ static void object_dealloc(PyObject *self) {
 
 static PyTypeObject type_object = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    "z80._z80._Z80Machine",
-                                // tp_name
+
+#if defined(I8080_MACHINE)
+    "z80._z80._I8080Machine",   // tp_name
+#elif defined(Z80_MACHINE)
+    "z80._z80._Z80Machine",     // tp_name
+#else
+#error Unknown machine!
+#endif
+
     sizeof(object_instance),    // tp_basicsize
     0,                          // tp_itemsize
     object_dealloc,             // tp_dealloc
@@ -163,7 +200,15 @@ static PyTypeObject type_object = {
     0,                          // tp_as_buffer
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
                                 // tp_flags
+
+#if defined(I8080_MACHINE)
+    "i8080 Machine Emulator",   // tp_doc
+#elif defined(Z80_MACHINE)
     "Z80 Machine Emulator",     // tp_doc
+#else
+#error Unknown machine!
+#endif
+
     0,                          // tp_traverse
     0,                          // tp_clear
     0,                          // tp_richcompare
