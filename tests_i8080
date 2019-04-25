@@ -21,7 +21,7 @@ ce16 aci 0x16
  7 get_a 00
  7 get_f 00
  7 set_a 00 -> 16
- 7 set_f 00 -> 02
+ 7 set_f 00 -> 00
  7 done
 
 # ADD r
@@ -32,6 +32,7 @@ ce16 aci 0x16
  4 set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
+ 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -61,8 +62,9 @@ c616 adi 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
+ 7 get_f 00
  7 set_a 00 -> 16
- 7 set_f 00 -> 02
+ 7 set_f 00 -> 00
  7 done
 
 # ANA r
@@ -73,8 +75,9 @@ a7 ana a
  4 set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
+ 4 get_f 00
  4 set_a 00 -> 00
- 4 set_f 00 -> 54
+ 4 set_f 00 -> 44
  4 done
 
 # ANI n
@@ -89,8 +92,9 @@ e616 ani 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
+ 7 get_f 00
  7 set_a 00 -> 00
- 7 set_f 00 -> 54
+ 7 set_f 00 -> 44
  7 done
 
 # CALL nn
@@ -169,7 +173,8 @@ bc cmp h
  4 set_pc_on_fetch 0000 -> 0001
  4 get_h 00
  4 get_a 00
- 4 set_f 00 -> 44
+ 4 get_f 00
+ 4 set_f 00 -> 54
  4 done
 
 # CPI n
@@ -184,7 +189,8 @@ fe16 cpi 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 set_f 00 -> bb
+ 7 get_f 00
+ 7 set_f 00 -> 81
  7 done
 
 # DAA
@@ -233,7 +239,7 @@ fe16 cpi 0x16
  7 get_h 00
  7 3t_write 35 -> 34 at 0000
  7   set_addr_bus 0000 -> 0000
-10 set_f 00 -> 00
+10 set_f 00 -> 10
 10 done
 
 # DCX rp
@@ -452,6 +458,7 @@ b3 ora e
  4 set_pc_on_fetch 0000 -> 0001
  4 get_e 00
  4 get_a 00
+ 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -468,8 +475,9 @@ f616 ori 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
+ 7 get_f 00
  7 set_a 00 -> 16
- 7 set_f 00 -> 02
+ 7 set_f 00 -> 00
  7 done
 
 # OUT n
@@ -557,7 +565,7 @@ e9 pchl
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
- 4 set_f 00 -> 44
+ 4 set_f 00 -> 54
  4 done
 
 # SBI n
@@ -574,7 +582,7 @@ de16 sbi 0x16
  7 get_a 00
  7 get_f 00
  7 set_a 00 -> ea
- 7 set_f 00 -> bb
+ 7 set_f 00 -> 81
  7 done
 
 # SPHL
@@ -597,8 +605,9 @@ f9 sphl
  4 set_pc_on_fetch 0000 -> 0001
  4 get_c 00
  4 get_a 00
+ 4 get_f 00
  4 set_a 00 -> 00
- 4 set_f 00 -> 44
+ 4 set_f 00 -> 54
  4 done
 
 # SUI n
@@ -613,8 +622,9 @@ d616 sui 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
+ 7 get_f 00
  7 set_a 00 -> ea
- 7 set_f 00 -> bb
+ 7 set_f 00 -> 81
  7 done
 
 # MVI r, n
@@ -816,6 +826,7 @@ af xra a
  4 set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
+ 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -832,8 +843,9 @@ ee16 xri 0x16
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
+ 7 get_f 00
  7 set_a 00 -> 16
- 7 set_f 00 -> 02
+ 7 set_f 00 -> 00
  7 done
 
 # XTHL
