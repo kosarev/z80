@@ -2303,6 +2303,8 @@ public:
             // its own special logic for the ANA and ANI
             // instructions.
             // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
+            // TODO: AMD chips do not set the flag. Support them
+            // as a variant of the original Intel chip.
             fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;
             a &= n;
             f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
