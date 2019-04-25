@@ -2294,7 +2294,7 @@ public:
             f = self().on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a - n - cfv);
-            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv;  // TODO
+            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv ? hf_mask : 0;  // TODO
             f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(t) | hf | pf_log(t) |
                     cf_ari(t > a || (cfv && n == 0xff));
