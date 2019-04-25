@@ -28,7 +28,7 @@ struct __attribute__((packed)) object_state {
     least_u8 iff = 0;
     least_u8 int_disabled = 0;
     least_u8 halted = 0;
-    least_u16 padding = 0;
+    least_u8 padding = 0;
 #elif defined(Z80_MACHINE)
     least_u8 ixl = 0;
     least_u8 ixh = 0;
