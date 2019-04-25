@@ -16,7 +16,7 @@ struct __attribute__((packed)) object_state {
 
     least_u8 l = 0;
     least_u8 h = 0;
-    least_u8 f = 0;
+    least_u8 f = 2;  // TODO
     least_u8 a = 0;
 
     least_u16 pc = 0;

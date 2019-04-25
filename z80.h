@@ -2050,8 +2050,6 @@ public:
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         self().on_set_rp(rp, nn); }
     void on_nop() {}
-    void on_pop_rp(regp2 rp) {
-        self().on_set_rp2(rp, self().on_pop()); }
     void on_push_rp(regp2 rp) {
         self().on_push(self().on_get_rp2(rp)); }
     void on_ret() {
@@ -2151,6 +2149,8 @@ public:
     using base::sf_mask;
     using base::xf_mask;
     using base::yf_mask;
+    using base::zf_mask;
+    using base::pf_mask;
 
     using base::cf_ari;
     using base::hf_ari;
@@ -2266,49 +2266,57 @@ public:
         fast_u8 f = 0;
         switch(k) {
         case alu::add: {
+            f = self().on_get_f();
             fast_u8 t = add8(a, n);
-            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_log(t) | cf_ari(t < a);
+            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(t) | hf_ari(t, a, n) | pf_log(t) | cf_ari(t < a);
             a = t;
             break; }
         case alu::adc: {
             f = self().on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a + n + cfv);
-            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_log(t) |
+            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(t) | hf_ari(t, a, n) | pf_log(t) |
                     cf_ari(t < a || (cfv && n == 0xff));
             a = t;
             break; }
         case alu::sub:
         case alu::cp: {
+            f = self().on_get_f();
             fast_u8 t = sub8(a, n);
-            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_log(t) | cf_ari(t > a);
+            fast_u8 hf = (a & 0xf) + (~n & 0xf) + 1 > 0xf ? hf_mask : 0;  // TODO
+            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(t) | hf | pf_log(t) | cf_ari(t > a);
             a = t;
             break; }
         case alu::sbc: {
             f = self().on_get_f();
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a - n - cfv);
-            f = (t & (sf_mask | yf_mask | xf_mask | nf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_log(t) |
+            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv;  // TODO
+            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(t) | hf | pf_log(t) |
                     cf_ari(t > a || (cfv && n == 0xff));
             a = t;
             break; }
-        case alu::and_a:
+        case alu::and_a: {
+            f = self().on_get_f();
+            fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;  // TODO
             a &= n;
-            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(a) | pf_log(a) | hf_mask;
-            break;
+            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
+                    zf_ari(a) | pf_log(a) | hf;
+            break; }
         case alu::xor_a:
+            f = self().on_get_f();
             a ^= n;
-            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
+            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a);
             break;
         case alu::or_a:
+            f = self().on_get_f();
             a |= n;
-            f = (a & (sf_mask | yf_mask | xf_mask | nf_mask)) |
+            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
                     zf_ari(a) | pf_log(a);
             break;
         }
@@ -2351,18 +2359,18 @@ public:
         }
 
         fast_u8 n = add8(a, d);
-        f = (f & ~(cf_mask | xf_mask | yf_mask | nf_mask)) |
-                ((a & 0x0f) > 0x09 ? hf_mask : 0) | (n & sf_mask) |
-                pf_log(n) | zf_ari(n);
-
+        fast_u8 hfm = (a & 0x0f) > 0x09 ? hf_mask : 0;  // TODO
+        f = (f & (cf_mask | xf_mask | yf_mask | nf_mask)) |
+                (n & sf_mask) | zf_ari(n) | hfm | pf_log(n);
         self().on_set_a(n);
         self().on_set_f(f); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_r(r);
         fast_u8 f = self().on_get_f();
+        fast_u8 hf = (n & 0xf) + ((~1 + 1) & 0xf) > 0xf ? hf_mask : 0;  // TODO
         n = dec8(n);
         f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
-                (n & sf_mask) | zf_ari(n) | hf_dec(n) | pf_log(n);
+                (n & sf_mask) | zf_ari(n) | hf | pf_log(n);
         self().on_set_r(r, n);
         self().on_set_f(f); }
     void on_di() {
@@ -2390,9 +2398,10 @@ public:
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_r(r);
         fast_u8 f = self().on_get_f();
+        fast_u8 hf = (n & 0xf) + (1 & 0xf) > 0xf ? hf_mask : 0;  // TODO
         n = inc8(n);
         f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
-                (n & sf_mask) | zf_ari(n) | hf_inc(n) | pf_log(n);
+                (n & sf_mask) | zf_ari(n) | hf | pf_log(n);
         self().on_set_r(r, n);
         self().on_set_f(f); }
     void on_ld_r_n(reg r, fast_u8 n) {
@@ -2416,6 +2425,13 @@ public:
         self().on_3t_write_cycle(nn, get_high8(irp)); }
     void on_out_n_a(fast_u8 n) {
         self().on_output_cycle(n, self().on_get_a()); }
+    void on_pop_rp(regp2 rp) {
+        fast_u16 n = self().on_pop();
+        if(rp == regp2::af) {
+            // Not all flags are updated on pop psw.
+            n = (n & ~(xf_mask | yf_mask)) | nf_mask;
+        }
+        self().on_set_rp2(rp, n); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -3104,6 +3120,8 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_output_cycle(make16(a, n), a);
         self().on_set_wz(make16(a, inc8(n))); }
+    void on_pop_rp(regp2 rp) {
+        self().on_set_rp2(rp, self().on_pop()); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         index_regp irp = self().on_get_index_rp_kind();
         reg access_r = irp == index_regp::hl ? r : reg::at_hl;

@@ -218,6 +218,23 @@ public:
         std::swap(state.l, state.alt_l);
     }
 
+#if 0  // TODO
+    void on_step() {
+        fprintf(stderr, "PC=%04x SP=%04x BC=%04x DE=%04x HL=%04x AF=%04x %02x%02x%02x%02x\n",
+                static_cast<unsigned>(state.pc),
+                static_cast<unsigned>(state.sp),
+                static_cast<unsigned>(make16(state.b, state.c)),
+                static_cast<unsigned>(make16(state.d, state.e)),
+                static_cast<unsigned>(make16(state.h, state.l)),
+                static_cast<unsigned>(make16(state.a, state.f)),
+                static_cast<unsigned>(state.memory[(state.pc + 0) & 0xffff]),
+                static_cast<unsigned>(state.memory[(state.pc + 1) & 0xffff]),
+                static_cast<unsigned>(state.memory[(state.pc + 2) & 0xffff]),
+                static_cast<unsigned>(state.memory[(state.pc + 3) & 0xffff]));
+        base::on_step();
+    }
+#endif
+
 protected:
     using base::self;
 
