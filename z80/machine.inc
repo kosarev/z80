@@ -90,7 +90,7 @@ static inline machine_object &cast_machine(PyObject *p) {
     return cast_object(p)->machine;
 }
 
-static PyObject *get_state_image(PyObject *self, PyObject *args) {
+static PyObject *get_state_view(PyObject *self, PyObject *args) {
     auto &state = cast_machine(self).get_state();
     return PyMemoryView_FromMemory(reinterpret_cast<char*>(&state),
                                    sizeof(state), PyBUF_WRITE);
@@ -129,7 +129,7 @@ static PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
 #endif  // defined(Z80_MACHINE)
 
 static PyMethodDef methods[] = {
-    {"get_state_image", get_state_image, METH_NOARGS,
+    {"get_state_view", get_state_view, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
      "emulated machine."},
     {"set_input_callback", set_input_callback, METH_VARARGS,
