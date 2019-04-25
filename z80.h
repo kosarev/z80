@@ -3430,12 +3430,33 @@ public:
 
     machine_state() {}
 
+    bool is_marked_addr(fast_u16 addr, fast_u8 marks) const {
+        return (address_marks[mask16(addr)] & marks) != 0;
+    }
+
+    void mark_addr(fast_u16 addr, fast_u8 marks) {
+        address_marks[mask16(addr)] |= static_cast<least_u8>(marks);
+    }
+
+    void mark_addrs(fast_u16 addr, fast_u16 size, fast_u8 marks) {
+        for(fast_u16 i = 0; i != size; ++i)
+            mark_addr(addr + i, marks);
+    }
+
+    void unmark_addr(fast_u16 addr, fast_u8 marks) {
+        address_marks[addr] &= ~marks;
+    }
+
+    bool is_breakpoint_addr(fast_u16 addr) const {
+        return is_marked_addr(addr, breakpoint_mark);
+    }
+
     void set_breakpoint(fast_u16 addr) {
-        mark(addr, breakpoint_mark);
+        mark_addr(addr, breakpoint_mark);
     }
 
     void clear_breakpoint(fast_u16 addr) {
-        unmark(addr, breakpoint_mark);
+        unmark_addr(addr, breakpoint_mark);
     }
 
     void on_tick(unsigned t) {
@@ -3447,7 +3468,7 @@ public:
     }
 
     void on_set_pc(fast_u16 n) {
-        if(is_marked(n, breakpoint_mark))
+        if(is_breakpoint_addr(n))
             events |= events_mask::breakpoint_hit;
         base::on_set_pc(n);
     }
@@ -3463,18 +3484,6 @@ protected:
     using base::self;
 
 private:
-    bool is_marked(fast_u16 addr, fast_u8 marks) {
-        return (address_marks[addr] & marks) == marks;
-    }
-
-    void mark(fast_u16 addr, fast_u8 marks) {
-        address_marks[addr] |= marks;
-    }
-
-    void unmark(fast_u16 addr, fast_u8 marks) {
-        address_marks[addr] &= ~marks;
-    }
-
     ticks_type frame_tick = 0;
     static const ticks_type ticks_per_frame = 100 * 1000;
 

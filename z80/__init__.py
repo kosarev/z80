@@ -34,8 +34,17 @@ class I8080State(object):
         size = struct.calcsize(format)
         self._image[offset:offset + size] = struct.pack(format, n)
 
+    def get_c(self):
+        return self.get('c')
+
+    def get_e(self):
+        return self.get('e')
+
     def get_bc(self):
         return self.get('bc')
+
+    def get_de(self):
+        return self.get('de')
 
     def get_pc(self):
         return self.get('pc')
@@ -46,16 +55,30 @@ class I8080State(object):
     def _get_memory_view(self):
         return self._image[20:]
 
-    def set_memory(self, addr, block):
+    def get_memory_byte(self, addr):
+        memory = self._get_memory_view()
+        return memory[addr]
+
+    def set_memory_block(self, addr, block):
         memory = self._get_memory_view()
         memory[addr:addr + len(block)] = block
 
 
 class I8080Machine(_I8080Machine, I8080State):
     # Events.
-    _NO_EVENTS         = 0
-    _END_OF_FRAME      = 1 << 1
-    _BREAKPOINT_HIT    = 1 << 2
+    _NO_EVENTS       = 0
+    _END_OF_FRAME    = 1 << 0
+    _BREAKPOINT_HIT  = 1 << 1
+
+    # Address marks.
+    _NO_MARKS        = 0
+    _BREAKPOINT_MARK = 1 << 0
 
     def __init__(self):
         I8080State.__init__(self, self.get_state_view())
+
+    def mark_addr(self, addr, marks):
+        self.mark_addrs(addr, 1, marks)
+
+    def set_breakpoint(self, addr):
+        self.mark_addr(addr, self._BREAKPOINT_MARK)

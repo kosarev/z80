@@ -63,15 +63,17 @@ struct __attribute__((packed)) object_state {
 
 #if defined(I8080_MACHINE)
 class machine_object
-    : public machine<z80::machine_state<z80::i8080_executor<
-                         z80::i8080_decoder<z80::root<machine_object>>>>,
-                     object_state>
+    : public z80::machine_state<
+        machine<z80::i8080_executor<
+            z80::i8080_decoder<z80::root<machine_object>>>,
+        object_state>>
 {};
 #elif defined(Z80_MACHINE)
 class machine_object
-    : public machine<z80::machine_state<z80::z80_executor<
-                         z80::z80_decoder<z80::root<machine_object>>>>,
-                     object_state>
+    : public z80::machine_state<
+        machine<z80::z80_executor<
+            z80::z80_decoder<z80::root<machine_object>>>,
+        object_state>>
 {};
 #else
 #error Unknown machine!
@@ -94,6 +96,15 @@ static PyObject *get_state_view(PyObject *self, PyObject *args) {
     auto &state = cast_machine(self).get_state();
     return PyMemoryView_FromMemory(reinterpret_cast<char*>(&state),
                                    sizeof(state), PyBUF_WRITE);
+}
+
+static PyObject *mark_addrs(PyObject *self, PyObject *args) {
+    unsigned addr, size, marks;
+    if(!PyArg_ParseTuple(args, "III", &addr, &size, &marks))
+        return nullptr;
+
+    cast_machine(self).mark_addrs(addr, size, marks);
+    Py_RETURN_NONE;
 }
 
 static PyObject *set_input_callback(PyObject *self, PyObject *args) {
@@ -132,6 +143,9 @@ static PyMethodDef methods[] = {
     {"get_state_view", get_state_view, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
      "emulated machine."},
+    {"mark_addrs", mark_addrs, METH_VARARGS,
+     "Mark a range of memory bytes as ones that require custom "
+     "processing on reading, writing or executing them."},
     {"set_input_callback", set_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
     {"run", run, METH_NOARGS,
