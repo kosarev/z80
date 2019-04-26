@@ -2119,14 +2119,13 @@ protected:
         return ((x >> 6) ^ (x >> 5)) & pf_mask;
     }
 
-    bool pf_log4(fast_u8 n) {
-        return 0x9669 & (1 << (n & 0xf));
-    }
-
     fast_u8 pf_log(fast_u8 n) {
-        bool lo = pf_log4(n);
-        bool hi = pf_log4(n >> 4);
-        return lo == hi ? pf_mask : 0;
+        // Compute parity. First, half the range of bits to
+        // consider by xor'ing nibbles of the passed value. Then,
+        // use a bit pattern to determine whether the resulting
+        // four-bit value has an even number of raised bits.
+        fast_u8 n4 = ((n >> 4) ^ n) & 0xf;
+        return ((0x9669 << pf_bit) >> n4) & pf_mask;
     }
 
     fast_u8 pf_dec(fast_u8 n) {
