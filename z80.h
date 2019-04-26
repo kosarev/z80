@@ -743,18 +743,22 @@ public:
             return self().on_block_cp(k); }
         }
         switch(op) {
-        case 0x47: {
+        case 0x47:
             // LD I, A  f(4) f(5)
             self().on_5t_fetch_cycle();
-            return self().on_ld_i_a(); }
-        case 0x4f: {
+            return self().on_ld_i_a();
+        case 0x4f:
             // LD R, A  f(4) f(5)
             self().on_5t_fetch_cycle();
-            return self().on_ld_r_a(); }
-        case 0x5f: {
+            return self().on_ld_r_a();
+        case 0x57:
+            // LD A, I  f(4) f(5)
+            self().on_5t_fetch_cycle();
+            return self().on_ld_a_i();
+        case 0x5f:
             // LD A, R  f(4) f(5)
             self().on_5t_fetch_cycle();
-            return self().on_ld_a_r(); }
+            return self().on_ld_a_r();
         case 0x67:
             // RRD  f(4) f(4) r(3) e(4) w(3)
             return self().on_rrd();
@@ -1308,6 +1312,8 @@ public:
         self().on_format("ld a, r"); }
     void on_ld_r_a() {
         self().on_format("ld r, a"); }
+    void on_ld_a_i() {
+        self().on_format("ld a, i"); }
     void on_ld_i_a() {
         self().on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
@@ -3065,6 +3071,13 @@ public:
         self().on_set_f(f); }
     void on_ld_r_a() {
         self().on_set_r_reg(self().on_get_a()); }
+    void on_ld_a_i() {
+        fast_u8 i = self().on_get_i();
+        fast_u8 f = self().on_get_f();
+        f = (f & cf_mask) | (i & (sf_mask | yf_mask | xf_mask)) |
+                zf_ari(i) | (self().on_get_iff2() ? pf_mask : 0);
+        self().on_set_a(i);
+        self().on_set_f(f); }
     void on_ld_i_a() {
         self().set_i_on_ld(self().on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {

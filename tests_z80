@@ -679,7 +679,29 @@ c3cdab jp 0xabcd
 12 set_pc_on_jump 0002 -> 000c
 12 done
 
-# LD a, r
+# LD A, I
+ed57 ld a, i
+ 0 get_pc_on_fetch 0000
+ 0 m1_fetch ed at 0000
+ 0   set_addr_bus 0000 -> 0000
+ 2   get_ir_on_refresh 0000
+ 2   set_addr_bus 0000 -> 0000
+ 2   set_r 00 -> 01
+ 4 set_pc_on_fetch 0000 -> 0001
+ 4 get_pc_on_fetch 0001
+ 4 m1_fetch 57 at 0001
+ 4   set_addr_bus 0000 -> 0001
+ 6   get_ir_on_refresh 0001
+ 6   set_addr_bus 0001 -> 0001
+ 6   set_r 01 -> 02
+ 8 set_pc_on_fetch 0001 -> 0002
+ 8 5t_fetch
+ 9 get_f 00
+ 9 set_a 00 -> 00
+ 9 set_f 00 -> 40
+ 9 done
+
+# LD A, R
 ed5f ld a, r
  0 get_pc_on_fetch 0000
  0 m1_fetch ed at 0000
