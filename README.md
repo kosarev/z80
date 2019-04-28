@@ -18,7 +18,7 @@ Fast and flexible i8080/Z80 emulator.
 * Employs compile-time polymorphism for zero performance
   overhead.
 
-* Cache-friendly implementation without huge code switches and
+* Cache-friendly implementation without large code switches and
   data tables.
 
 * Offers default modules for the breakpoints support and generic
