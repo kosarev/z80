@@ -31,17 +31,20 @@ z80_emulator_module = Extension(
 # TODO: Do we have a name for the emulator?
 setup(name='z80',
       version='0.1a0',
-      description='Z80 Emulator',
+      description='Fast and flexible i8080/Z80 Emulator',
       # TODO: long_description=...
       author='Ivan Kosarev',
       author_email='ivan@kosarev.info',
-      url='https://github.com/kosarev/z80/',
+      url='https://github.com/kosarev/z80',
+      license='MIT',
       ext_modules=[z80_emulator_module],
       packages=['z80'],
       install_requires=[],
+      # TODO: test_suite='test',
       classifiers=[
-          'Development Status :: 1 - Planning',
+          'Development Status :: 3 - Alpha',
           'Intended Audience :: Developers',
+          'Intended Audience :: Information Technology',
           'Intended Audience :: Education',
           'License :: OSI Approved :: MIT License',
           'Operating System :: OS Independent',
@@ -52,6 +55,4 @@ setup(name='z80',
           'Topic :: Software Development :: Libraries',
           'Topic :: System :: Emulators',
       ],
-      # TODO: license=...
-      # TODO: Respect other parameters.
       )
