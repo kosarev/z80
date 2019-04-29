@@ -33,8 +33,8 @@ Fast and flexible i8080/Z80 emulator.
 
 * Single-header implementation.
 
-* Provides a generic Python API and instruments to create custom
-  bindings.
+* Provides a generic Python 3 API and instruments to create
+  custom bindings.
 
 
 ## Feedback
