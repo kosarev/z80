@@ -159,16 +159,6 @@ static PyMethodDef methods[] = {
 
 static PyObject *object_new(PyTypeObject *type, PyObject *args,
                             PyObject *kwds) {
-#if defined(I8080_MACHINE)
-    static const char format[] = ":_I8080Machine.__new__";
-#elif defined(Z80_MACHINE)
-    static const char format[] = ":_Z80Machine.__new__";
-#else
-#error Unknown machine!
-#endif
-    if(!PyArg_ParseTuple(args, format))
-        return nullptr;
-
     auto *self = cast_object(type->tp_alloc(type, /* nitems= */ 0));
     if(!self)
       return nullptr;
