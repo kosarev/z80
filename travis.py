@@ -25,3 +25,13 @@ def language_cpp(**kwargs):
 
 language_cpp(compiler='gcc')
 language_cpp(compiler='clang')
+
+print('''\
+    - language: python
+      python:
+        - "3.6"
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py''')
