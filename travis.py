@@ -26,12 +26,21 @@ def language_cpp(**kwargs):
 language_cpp(compiler='gcc')
 language_cpp(compiler='clang')
 
-print('''\
+def language_python(**kwargs):
+    print('''\
     - language: python
-      python:
-        - "3.6"
+      python: {version}
       install:
         - python setup.py install
       script:
         - cd examples
-        - ./exercisers.py''')
+        - ./exercisers.py'''.format(**kwargs))
+
+PYTHON_VERSIONS = [
+    '3.4',
+    '3.5', '3.5-dev',
+    '3.6', '3.6-dev',
+]
+
+for version in PYTHON_VERSIONS:
+    language_python(version=version)
