@@ -36,6 +36,8 @@ Fast and flexible i8080/Z80 emulator.
 * Provides a generic Python 3 API and instruments to create
   custom bindings.
 
+* MIT license.
+
 
 ## Feedback
 
