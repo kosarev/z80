@@ -5,17 +5,25 @@ import z80
 
 
 class _CPMLikeMachineMixin(object):
+    _QUIT = 0x0000
+    _BDOS_CALL = 0x0005
+    _ENTRY = 0x0100
+
+    # BDOS routines.
+    _C_WRITE = 0x02
+    _C_WRITESTR = 0x09
+
     def __init__(self, filename):
         with open(filename, 'rb') as f:
             image = f.read()
 
-        self.set_memory_block(0x0100, image)
-        self.set_pc(0x0100)
+        self.set_memory_block(self._ENTRY, image)
+        self.set_pc(self._ENTRY)
 
-        self.set_breakpoint(0x0005)  # BDOS calls.
-        self.set_memory_block(0x0005, b'\xc9')  # ret
+        self.set_breakpoint(self._BDOS_CALL)
+        self.set_memory_block(self._BDOS_CALL, b'\xc9')  # ret
 
-        self.set_breakpoint(0x0000)  # Quit program.
+        self.set_breakpoint(self._QUIT)
 
         self._output = []
 
@@ -26,10 +34,10 @@ class _CPMLikeMachineMixin(object):
         self._output.append(s)
         sys.stdout.write(s)
 
-    def _C_WRITE(self):
+    def _handle_c_write(self):
         self.output(chr(self.get_e()))
 
-    def _C_WRITESTR(self):
+    def _handle_writestr(self):
         addr = self.get_de()
         while True:
             c = self.get_memory_byte(addr)
@@ -42,9 +50,9 @@ class _CPMLikeMachineMixin(object):
     def _handle_bdos_call(self):
         c = self.get_c()
         if c == 0x02:
-            self._C_WRITE()
+            self._handle_c_write()
         elif c == 0x09:
-            self._C_WRITESTR()
+            self._handle_writestr()
         else:
             assert 0, 'BDOS call: c = 0x%02x' % c
 
