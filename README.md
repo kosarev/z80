@@ -234,8 +234,8 @@ transparent to the custom code in overridden handlers.
 For this purpose the default state interface implemented in the
 `i8080_state<>` and `z80_state<>` classes provdes a number of
 getters and setters for registers, register pairs, interrupt
-flip-flops and other field constituting the internal state of the
-emulator.
+flip-flops and other fields constituting the internal state of
+the emulator.
 By convention, calling such functions does not fire up any
 handlers. The example below demonstrates a typical usage.
 
