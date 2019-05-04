@@ -7,9 +7,9 @@ public:
 
     my_emulator() {}
 
-    void on_step() {
-        std::printf("pc = 0x%04x\n", static_cast<unsigned>(get_pc()));
-        base::on_step();
+    void on_set_pc(z80::fast_u16 pc) {
+        std::printf("pc = 0x%04x\n", static_cast<unsigned>(pc));
+        base::on_set_pc(pc);
     }
 };
 

@@ -39,6 +39,56 @@ Fast and flexible i8080/Z80 emulator.
 * MIT license.
 
 
+## Hello world
+
+```c++
+#include "z80.h"
+
+class my_emulator : public z80::z80_cpu<my_emulator> {
+public:
+    typedef z80::z80_cpu<my_emulator> base;
+
+    my_emulator() {}
+
+    void on_set_pc(z80::fast_u16 pc) {
+        std::printf("pc = 0x%04x\n", static_cast<unsigned>(pc));
+        base::on_set_pc(pc);
+    }
+};
+
+int main() {
+    my_emulator e;
+    e.on_step();
+    e.on_step();
+    e.on_step();
+}
+```
+[hello.cpp](https://github.com/kosarev/z80/blob/master/examples/hello.cpp)
+
+Output:
+```
+pc = 0x0000
+pc = 0x0001
+pc = 0x0002
+```
+
+In this example we derive our custom emulator class,
+`my_emulator`, from a
+[mix-in](https://en.wikipedia.org/wiki/Mixin) that implements the
+logic and default interfaces necessary to emulate the Z80
+processor.
+
+The `on_set_pc()` method overrides its default counterpart to
+print the current value of the `PC` register before changing it.
+For this compile-time polymorphism to be able to do its job, we
+pass the type of the custom emulator to the processor mix-in as a
+parameter.
+
+The `main()` function creates an instance of the emulator and
+asks it to execute a few instructions, thus triggering the custom
+version of `on_set_pc()`.
+
+
 ## Feedback
 
 Any notes on overall design, improving performance and testing
