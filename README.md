@@ -155,6 +155,57 @@ write 0x07 at 0x1234
 ```
 
 
+## Input and output
+
+Aside of memory, another major way the processors use to
+communicate with the outside world is via input and output ports.
+If you read the previous sections, it's now easy to guess that
+there is a couple of handlers that do that.
+These are `on_input()` and `on_output()`.
+
+Note that the handlers have different types of parameters that
+store the port address, because i8080 only supports 256 ports
+while Z80 extends that number to 64K.
+
+```c++
+    // i8080_cpu
+    fast_u8 on_input(fast_u8 port)
+    void on_output(fast_u8 port, fast_u8 n)
+
+    // z80_cpu
+    fast_u8 on_input(fast_u16 port)
+    void on_output(fast_u16 port, fast_u8 n)
+```
+
+The example:
+```c++
+class my_emulator : public z80::z80_cpu<my_emulator> {
+public:
+    ...
+
+    fast_u8 on_input(fast_u16 port) {
+        fast_u8 n = 0xfe;
+        std::printf("input 0x%02x from 0x%04x\n", static_cast<unsigned>(n),
+                    static_cast<unsigned>(port));
+        return n;
+    }
+
+    void on_output(fast_u16 port, fast_u8 n) {
+        std::printf("output 0x%02x to 0x%04x\n", static_cast<unsigned>(n),
+                    static_cast<unsigned>(port));
+    }
+
+private:
+    least_u8 memory[z80::address_space_size] = {
+        0xdb,        // in a, (0xfe)
+        0xee, 0x07,  // xor 7
+        0xd3,        // out (0xfe), a
+    };
+};
+```
+[input_and_output.cpp](https://github.com/kosarev/z80/blob/master/examples/input_and_output.cpp)
+
+
 ## Feedback
 
 Any notes on overall design, improving performance and testing

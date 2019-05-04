@@ -1,7 +1,8 @@
 
 set(EXAMPLES
     adding_memory
-    hello)
+    hello
+    input_and_output)
 
 foreach(example ${EXAMPLES})
     add_executable(${example} EXCLUDE_FROM_ALL "${example}.cpp")
