@@ -77,6 +77,8 @@ In this example we derive our custom emulator class,
 [mix-in](https://en.wikipedia.org/wiki/Mixin) that implements the
 logic and default interfaces necessary to emulate the Z80
 processor.
+As you may guess, replacing `z80_cpu` with `i8080_cpu` would give
+us a similar Intel 8080 emulator.
 
 The `on_set_pc()` method overrides its default counterpart to
 print the current value of the `PC` register before changing it.
