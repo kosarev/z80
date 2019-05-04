@@ -306,11 +306,12 @@ the processor state, e.g., `set_hl()`.
 They also define corresponding handlers, like `on_set_hl()`, that
 other modules use to inspect and modify the state.
 
-The decoder classes analyze op-codes and fire up handlers for
-specific instructions, e.g, `on_halt()`.
+`i8080_decoder<>` and `z80_decoder<>` modules analyze op-codes
+and fire up handlers for specific instructions, e.g, `on_halt()`.
 
-Finally, the executors' job is to implement handlers like
-`on_halt()` to actually execute corresponding instructions.
+Finally, the job of `i8080_executor<>` and `z80_executor<>` is to
+implement handlers like `on_halt()` to actually execute
+corresponding instructions.
 
 The convention is that modules shall communicate with each other
 only via handlers.
