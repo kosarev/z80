@@ -75,7 +75,7 @@ pc = 0x0002
 In this example we derive our custom emulator class,
 `my_emulator`, from a
 [mix-in](https://en.wikipedia.org/wiki/Mixin) that implements the
-logic and default interfaces necessary to emulate the Z80
+logic and default interfaces necessary to emulate the Zilog Z80
 processor.
 As you may guess, replacing `z80_cpu` with `i8080_cpu` would give
 us a similar Intel 8080 emulator.
@@ -90,7 +90,7 @@ The `main()` function creates an instance of the emulator and
 asks it to execute a few instructions, thus triggering the custom
 version of `on_set_pc()`.
 The following section reveals what are those instructions and
-where the emulator get them from.
+where the emulator gets them from.
 
 
 ## Adding memory
