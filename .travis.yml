@@ -16,7 +16,10 @@ matrix:
       script:
         - mkdir build
         - cd build
-        - ${DEPS_DIR}/cmake/bin/cmake .. && make && make test
+        - ${DEPS_DIR}/cmake/bin/cmake ..
+        - make
+        - make test
+        - make examples
     - language: cpp
       compiler: clang
       install:
@@ -32,7 +35,10 @@ matrix:
       script:
         - mkdir build
         - cd build
-        - ${DEPS_DIR}/cmake/bin/cmake .. && make && make test
+        - ${DEPS_DIR}/cmake/bin/cmake ..
+        - make
+        - make test
+        - make examples
     - language: python
       python: 3.4
       install:

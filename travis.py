@@ -21,7 +21,10 @@ def language_cpp(**kwargs):
       script:
         - mkdir build
         - cd build
-        - ${{DEPS_DIR}}/cmake/bin/cmake .. && make && make test'''.format(**kwargs))
+        - ${{DEPS_DIR}}/cmake/bin/cmake ..
+        - make
+        - make test
+        - make examples'''.format(**kwargs))
 
 language_cpp(compiler='gcc')
 language_cpp(compiler='clang')
