@@ -39,6 +39,15 @@ Fast and flexible i8080/Z80 emulator.
 * MIT license.
 
 
+## Contents
+
+* [Hello world](#hello-world)
+* [Adding memory](#adding-memory)
+* [Input and output](#input-and-output)
+* [Accessing processor's state](#accessing-processors-state)
+* [Feedback](#feedback)
+
+
 ## Hello world
 
 ```c++
