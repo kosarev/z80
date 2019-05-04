@@ -1,5 +1,10 @@
 
-add_executable(hello EXCLUDE_FROM_ALL hello.cpp)
+set(EXAMPLES
+    adding_memory
+    hello)
 
-add_custom_target(examples
-  DEPENDS hello)
+foreach(example ${EXAMPLES})
+    add_executable(${example} EXCLUDE_FROM_ALL "${example}.cpp")
+endforeach()
+
+add_custom_target(examples DEPENDS ${EXAMPLES})
