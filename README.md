@@ -65,8 +65,18 @@ int main() {
 ```
 [hello.cpp](https://github.com/kosarev/z80/blob/master/examples/hello.cpp)
 
-Output:
+Building:
+```shell
+$ git clone git@github.com:kosarev/z80.git
+$ cmake z80
+$ make
+$ make test
+$ make hello  # Or 'make examples' to build all examples at once.
 ```
+
+Running:
+```
+$ ./examples/hello
 pc = 0x0000
 pc = 0x0001
 pc = 0x0002
