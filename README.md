@@ -216,6 +216,39 @@ private:
 [input_and_output.cpp](https://github.com/kosarev/z80/blob/master/examples/input_and_output.cpp)
 
 
+## Accessing processor's state
+
+Sometimes it's necessary to examine and/or alter the current
+state of the CPU emulator and do that in a way that is
+transparent to the custom code in overridden handlers.
+For this purpose the default state interface implemented in the
+`i8080_state` and `z80_state` classes provdes a number of getters
+and setters for registers, register pairs, interrupt flip-flops
+and other field constituting the internal state of the emulator.
+By convention, calling such functions does not fire up any
+handlers. The example below demonstrates a typical usage.
+
+Note that there are no such accessors for memory as it is
+external to the processor emulators and they themselves have to
+use handlers, namely, the `on_read()` and `on_write()` ones, to
+deal with memory.
+
+```c++
+class my_emulator : public z80::z80_cpu<my_emulator> {
+public:
+    ...
+
+    void on_step() {
+        std::printf("hl = %04x\n", static_cast<unsigned>(get_hl()));
+        base::on_step();
+
+        // Start over on every new instruction.
+        set_pc(0x0000);
+    }
+```
+[accessing_state.cpp](https://github.com/kosarev/z80/blob/master/examples/accessing_state.cpp)
+
+
 ## Feedback
 
 Any notes on overall design, improving performance and testing

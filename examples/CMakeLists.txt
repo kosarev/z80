@@ -1,5 +1,6 @@
 
 set(EXAMPLES
+    accessing_state
     adding_memory
     hello
     input_and_output)
