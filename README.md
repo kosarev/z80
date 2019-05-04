@@ -8,7 +8,7 @@ Fast and flexible i8080/Z80 emulator.
 
 * Implements accurate machine cycle-level emulation.
 
-* Supports undocumented flags and instructions.
+* Supports undocumented instructions, flags and registers.
 
 * Passes the well-known `cputest`, `8080pre`, `8080exer`,
   `8080exm`, `prelim` and `zexall` tests.
