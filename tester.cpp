@@ -200,7 +200,7 @@ public:
         return output_buff;
     }
 
-    void on_output(const char *out) {
+    void on_emit(const char *out) {
         std::snprintf(output_buff, max_output_buff_size, "%s", out);
     }
 
@@ -270,9 +270,13 @@ public:
         image[addr] = static_cast<least_u8>(n);
     }
 
-    fast_u8 on_input(fast_u16 addr) {
-        z80::unused(addr);
+    fast_u8 on_input(fast_u16 port) {
+        z80::unused(port);
         return 0xff;
+    }
+
+    void on_output(fast_u16 port, fast_u8 n) {
+        z80::unused(port, n);
     }
 
     void set_instr_code(const least_u8 *code, unsigned size) {

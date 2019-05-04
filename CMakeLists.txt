@@ -34,7 +34,6 @@ check_cxx_compiler_flag("-Werror" WERROR_FLAG)
 check_cxx_compiler_flag("-ferror-limit=1" ERROR_LIMIT_FLAG)
 check_cxx_compiler_flag("-g" G_FLAG)
 
-set(CXX_FLAGS)
 append_if(DIAGNOSTICS_COLOR_FLAG "-fdiagnostics-color" CMAKE_CXX_FLAGS)
 append_if(NO_EXCEPTIONS_FLAG "-fno-exceptions" CMAKE_CXX_FLAGS)
 append_if(NO_RTTI_FLAG "-fno-rtti" CMAKE_CXX_FLAGS)
@@ -54,8 +53,11 @@ append_if(WNO_PADDED_FLAG "-Wno-padded" CMAKE_CXX_FLAGS)
 append_if(WERROR_FLAG "-Werror" CMAKE_CXX_FLAGS)
 append_if(ERROR_LIMIT_FLAG "-ferror-limit=1" CMAKE_CXX_FLAGS)
 append_if(G_FLAG "-g" CMAKE_CXX_FLAGS)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_SOURCE_DIR}")
 
 add_executable(tester tester.cpp)
 
 add_test(i8080_tests tester i8080 "${CMAKE_SOURCE_DIR}/tests_i8080")
 add_test(z80_tests tester z80 "${CMAKE_SOURCE_DIR}/tests_z80")
+
+add_subdirectory(examples)

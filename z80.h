@@ -143,6 +143,20 @@ class root {
 public:
     typedef D derived;
 
+    void on_tick(unsigned t) {
+        unused(t); }
+
+    fast_u8 on_read(fast_u16 addr) {
+        unused(addr);
+        return 0x00; }
+    void on_write(fast_u16 addr, fast_u8 n) {
+        unused(addr, n); }
+    fast_u8 on_input(fast_u16 port) {
+        unused(port);
+         return 0xff; }
+    void on_output(fast_u16 port, fast_u8 n) {
+        unused(port, n); }
+
 protected:
     const derived &self() const{ return static_cast<const derived&>(*this); }
     derived &self() { return static_cast<derived&>(*this); }
@@ -857,7 +871,7 @@ public:
         for(const char *p = fmt; *p != '\0'; ++p)
             self().on_format_char(*p, args, out);
         out.append('\0');
-        self().on_output(out.get_buff());
+        self().on_emit(out.get_buff());
     }
 
     void on_call_nn(fast_u16 nn) {
@@ -1647,7 +1661,7 @@ public:
     bool is_int_disabled() const { return int_disabled.get(); }
     void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
 
-    bool is_halted() const { return halted; }
+    bool is_halted() const { return halted.get(); }
     void set_is_halted(bool is_halted) { halted.set(is_halted); }
 
     fast_u16 get_last_read_addr() const { return last_read_addr; }
@@ -2259,12 +2273,12 @@ public:
         return op;
     }
 
-    fast_u8 on_input_cycle(fast_u8 n) {
+    fast_u8 on_input_cycle(fast_u8 port) {
         self().on_tick(3);
-        return self().on_input(n); }
-    void on_output_cycle(fast_u8 n, fast_u8 v) {
-        unused(n, v);
-        self().on_tick(3); }
+        return self().on_input(port); }
+    void on_output_cycle(fast_u8 port, fast_u8 n) {
+        self().on_tick(3);
+        self().on_output(port, n); }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -3031,9 +3045,9 @@ public:
         self().on_set_int_mode(mode); }
     void on_in_a_n(fast_u8 n) {
         fast_u8 a = self().on_get_a();
-        fast_u16 addr = make16(a, n);
-        self().on_set_wz(inc16(addr));
-        self().on_set_a(self().on_input_cycle(addr)); }
+        fast_u16 port = make16(a, n);
+        self().on_set_wz(inc16(port));
+        self().on_set_a(self().on_input_cycle(port)); }
     void on_in_r_c(reg r) {
         fast_u16 bc = self().on_get_bc();
         fast_u8 f = self().on_get_f();
@@ -3301,19 +3315,19 @@ public:
         self().on_tick(5);
     }
 
-    fast_u8 on_input_cycle(fast_u16 addr) {
+    fast_u8 on_input_cycle(fast_u16 port) {
         // Z80 samples the value at t4 of the input cycle, see
         // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
         self().on_tick(4);
         // TODO: Shall we set the address bus here?
-        fast_u8 n = self().on_input(addr);
+        fast_u8 n = self().on_input(port);
         return n;
     }
 
-    void on_output_cycle(fast_u16 addr, fast_u8 n) {
+    void on_output_cycle(fast_u16 port, fast_u8 n) {
         // TODO: Shall we set the address bus here?
-        unused(addr, n);
         self().on_tick(4);
+        self().on_output(port, n);
     }
 
     fast_u8 on_5t_imm8_read() {
