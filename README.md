@@ -45,6 +45,7 @@ Fast and flexible i8080/Z80 emulator.
 * [Adding memory](#adding-memory)
 * [Input and output](#input-and-output)
 * [Accessing processor's state](#accessing-processors-state)
+* [Modules](#modules)
 * [Feedback](#feedback)
 
 
@@ -231,9 +232,10 @@ Sometimes it's necessary to examine and/or alter the current
 state of the CPU emulator and do that in a way that is
 transparent to the custom code in overridden handlers.
 For this purpose the default state interface implemented in the
-`i8080_state` and `z80_state` classes provdes a number of getters
-and setters for registers, register pairs, interrupt flip-flops
-and other field constituting the internal state of the emulator.
+`i8080_state<>` and `z80_state<>` classes provdes a number of
+getters and setters for registers, register pairs, interrupt
+flip-flops and other field constituting the internal state of the
+emulator.
 By convention, calling such functions does not fire up any
 handlers. The example below demonstrates a typical usage.
 
@@ -256,6 +258,77 @@ public:
     }
 ```
 [accessing_state.cpp](https://github.com/kosarev/z80/blob/master/examples/accessing_state.cpp)
+
+
+## Modules
+
+By overriding handlers we can extend and otherwise alter the
+default behavior of CPU emulators.
+That's good, but what do we do if it's not enough?
+For example, what if the default representation of the
+processor's internal state doesn't fit the needs of your
+application?
+Say, you might be forced to follow a different order of registers
+or you just want to control the way they are packed in a
+structure because there's some external binary API to be
+compatible with.
+Or, what if you don't need to emulate the whole processor's
+logic, and just want to check if a given sequence of bytes forms
+a specific instruction?
+
+That's where modules come into play.
+To understand what they are and how to use them, let's take a
+look at the definitions of the emulator classes and see what's
+under the hood.
+
+```c++
+template<typename D>
+class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>>
+{};
+
+template<typename D>
+class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>>
+{};
+```
+
+Each of these classes is no more than a stack of a few other
+mix-ins.
+The `root<>` template provides helpers that make it possible to
+call handlers of the most derived class in the heirarchy, `D`,
+which is why it takes that class as its type parameter.
+It also contains dummy implementations of the standard handlers,
+such as `on_output()`, so you don't have to define them when you
+don't need them.
+
+`i8080_state<>` and `z80_state<>` have been mentioned in the
+previous section as classes that define transparent accessors to
+the processor state, e.g., `set_hl()`.
+They also define corresponding handlers, like `on_set_hl()`, that
+other modules use to inspect and modify the state.
+
+The decoder classes analyze op-codes and fire up handlers for
+specific instructions, e.g, `on_halt()`.
+
+Finally, the executors' job is to implement handlers like
+`on_halt()` to actually execute corresponding instructions.
+
+The convention is that modules shall communicate with each other
+only via handlers.
+Indeed, if they would call the transparent accessors or refer to
+data fields directly, then those accessors wouldn't be
+transparent anymore and handlers would never be called.
+This also means that modules are free to define transparent
+accessors in a way that seems best for their purpose or even not
+define them at all.
+
+All and any of the standard modules can be used and customized
+independently of each other.
+Moreover, all and any of the modules can be replaced with custom
+implementations.
+New modules can be developed and used separately or together with
+the standard ones.
+In all cases the only requirement is to implement handlers other
+modules rely on.
 
 
 ## Feedback

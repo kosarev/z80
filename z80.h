@@ -3406,20 +3406,12 @@ protected:
 };
 
 template<typename D>
-class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>> {
-    typedef i8080_executor<i8080_decoder<i8080_state<root<D>>>> base;
-
-protected:
-    using base::self;
-};
+class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>>
+{};
 
 template<typename D>
-class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>> {
-    typedef z80_executor<z80_decoder<z80_state<root<D>>>> base;
-
-protected:
-    using base::self;
-};
+class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>>
+{};
 
 static const unsigned address_space_size = 0x10000;  // 64K bytes.
 
