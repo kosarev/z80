@@ -644,7 +644,7 @@ public:
     z80_decoder() {}
 
     fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(is_index_rp_hl() || !may_need_disp)
+        if(is_hl_iregp() || !may_need_disp)
             return 0;
         fast_u8 d = self().on_disp_read();
         self().on_5t_exec_cycle();
@@ -699,7 +699,7 @@ public:
         self().on_inc_rp(rp); }
     void decode_ld_r_n(reg r) {
         fast_u8 d, n;
-        if(r != reg::at_hl || is_index_rp_hl()) {
+        if(r != reg::at_hl || is_hl_iregp()) {
             d = 0;
             n = self().on_3t_imm8_read();
         } else {
@@ -929,7 +929,7 @@ protected:
     using base::get_z_part;
     using base::get_p_part;
 
-    bool is_index_rp_hl() const {
+    bool is_hl_iregp() const {
         return self().on_get_iregp_kind() == iregp::hl;
     }
 };
@@ -2104,7 +2104,7 @@ public:
     void on_alu_n(alu k, fast_u8 n) {
         self().do_alu(k, n); }
     void on_dec_rp(regp rp) {
-        self().on_set_rp(rp, dec16(self().on_get_rp(rp))); }
+        self().on_set_regp(rp, dec16(self().on_get_regp(rp))); }
     void on_call_nn(fast_u16 nn) {
         self().on_call(nn); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2126,7 +2126,7 @@ public:
         else
             self().on_set_wz(nn); }
     void on_inc_rp(regp rp) {
-        self().on_set_rp(rp, inc16(self().on_get_rp(rp))); }
+        self().on_set_regp(rp, inc16(self().on_get_regp(rp))); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_set_wz(inc16(nn));
         self().on_set_a(self().on_3t_read_cycle(nn)); }
@@ -2135,19 +2135,19 @@ public:
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
         self().on_3t_write_cycle(nn, a); }
     void on_ld_a_at_rp(regp rp) {
-        fast_u16 nn = self().on_get_rp(rp);
+        fast_u16 nn = self().on_get_regp(rp);
         self().on_set_wz(inc16(nn));
         self().on_set_a(self().on_3t_read_cycle(nn)); }
     void on_ld_at_rp_a(regp rp) {
-        fast_u16 nn = self().on_get_rp(rp);
+        fast_u16 nn = self().on_get_regp(rp);
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, get_low8(nn + 1)));
         self().on_3t_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        self().on_set_rp(rp, nn); }
+        self().on_set_regp(rp, nn); }
     void on_nop() {}
     void on_push_rp(regp2 rp) {
-        self().on_push(self().on_get_rp2(rp)); }
+        self().on_push(self().on_get_regp2(rp)); }
     void on_ret() {
         self().on_return(); }
     void on_ret_cc(condition cc) {
@@ -2288,7 +2288,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_rp(regp rp) {
+    fast_u16 on_get_regp(regp rp) {
         switch(rp) {
         case regp::bc: return self().on_get_bc();
         case regp::de: return self().on_get_de();
@@ -2298,7 +2298,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_rp(regp rp, fast_u16 nn) {
+    void on_set_regp(regp rp, fast_u16 nn) {
         switch(rp) {
         case regp::bc: return self().on_set_bc(nn);
         case regp::de: return self().on_set_de(nn);
@@ -2308,7 +2308,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_rp2(regp2 rp) {
+    fast_u16 on_get_regp2(regp2 rp) {
         switch(rp) {
         case regp2::bc: return self().on_get_bc();
         case regp2::de: return self().on_get_de();
@@ -2318,7 +2318,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_rp2(regp2 rp, fast_u16 nn) {
+    void on_set_regp2(regp2 rp, fast_u16 nn) {
         switch(rp) {
         case regp2::bc: return self().on_set_bc(nn);
         case regp2::de: return self().on_set_de(nn);
@@ -2421,7 +2421,7 @@ public:
         self().on_3t_exec_cycle();
 
         fast_u16 i = self().on_get_hl();
-        fast_u16 n = self().on_get_rp(rp);
+        fast_u16 n = self().on_get_regp(rp);
         fast_u8 f = self().on_get_f();
         fast_u16 r = add16(i, n);
         f = (f & ~base::cf_mask) | base::cf_ari(r < i);
@@ -2522,7 +2522,7 @@ public:
             // Not all flags are updated on pop psw.
             n = (n & ~(xf_mask | yf_mask)) | nf_mask;
         }
-        self().on_set_rp2(rp, n); }
+        self().on_set_regp2(rp, n); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -2644,18 +2644,18 @@ public:
     }
 
     fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
-        fast_u16 addr = get_disp_target(self().on_get_index_rp(), d);
+        fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
         fast_u8 res = long_read_cycle ? self().on_4t_read_cycle(addr) :
                                         self().on_3t_read_cycle(addr);
-        if(!is_index_rp_hl())
+        if(!is_hl_iregp())
             self().on_set_wz(addr);
         return res;
     }
 
     void write_at_disp(fast_u8 d, fast_u8 n) {
-        fast_u16 addr = get_disp_target(self().on_get_index_rp(), d);
+        fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
         self().on_3t_write_cycle(addr, n);
-        if(!is_index_rp_hl())
+        if(!is_hl_iregp())
             self().on_set_wz(addr);
     }
 
@@ -2712,47 +2712,47 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_rp(regp rp) {
+    fast_u16 on_get_regp(regp rp) {
         switch(rp) {
         case regp::bc: return self().on_get_bc();
         case regp::de: return self().on_get_de();
-        case regp::hl: return self().on_get_index_rp();
+        case regp::hl: return self().on_get_iregp();
         case regp::sp: return self().on_get_sp();
         }
         unreachable("Unknown register.");
     }
 
-    void on_set_rp(regp rp, fast_u16 nn) {
+    void on_set_regp(regp rp, fast_u16 nn) {
         switch(rp) {
         case regp::bc: return self().on_set_bc(nn);
         case regp::de: return self().on_set_de(nn);
-        case regp::hl: return self().on_set_index_rp(nn);
+        case regp::hl: return self().on_set_iregp(nn);
         case regp::sp: return self().on_set_sp(nn);
         }
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_rp2(regp2 rp) {
+    fast_u16 on_get_regp2(regp2 rp) {
         switch(rp) {
         case regp2::bc: return self().on_get_bc();
         case regp2::de: return self().on_get_de();
-        case regp2::hl: return self().on_get_index_rp();
+        case regp2::hl: return self().on_get_iregp();
         case regp2::af: return self().on_get_af();
         }
         unreachable("Unknown register.");
     }
 
-    void on_set_rp2(regp2 rp, fast_u16 nn) {
+    void on_set_regp2(regp2 rp, fast_u16 nn) {
         switch(rp) {
         case regp2::bc: return self().on_set_bc(nn);
         case regp2::de: return self().on_set_de(nn);
-        case regp2::hl: return self().on_set_index_rp(nn);
+        case regp2::hl: return self().on_set_iregp(nn);
         case regp2::af: return self().on_set_af(nn);
         }
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_index_rp() {
+    fast_u16 on_get_iregp() {
         switch(self().on_get_iregp_kind()) {
         case iregp::hl: return self().on_get_hl();
         case iregp::ix: return self().on_get_ix();
@@ -2761,7 +2761,7 @@ public:
         unreachable("Unknown index register.");
     }
 
-    void on_set_index_rp(fast_u16 nn) {
+    void on_set_iregp(fast_u16 nn) {
         switch(self().on_get_iregp_kind()) {
         case iregp::hl: return self().on_set_hl(nn);
         case iregp::ix: return self().on_set_ix(nn);
@@ -2898,8 +2898,8 @@ public:
     }
 
     void on_add_irp_rp(regp rp) {
-        fast_u16 i = self().on_get_index_rp();
-        fast_u16 n = self().on_get_rp(rp);
+        fast_u16 i = self().on_get_iregp();
+        fast_u16 n = self().on_get_regp(rp);
         fast_u8 f = self().on_get_f();
 
         self().on_4t_exec_cycle();
@@ -2911,11 +2911,11 @@ public:
                 hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
 
         self().on_set_wz(inc16(i));
-        self().on_set_index_rp(r);
+        self().on_set_iregp(r);
         self().on_set_f(f); }
     void on_adc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
-        fast_u16 n = self().on_get_rp(rp);
+        fast_u16 n = self().on_get_regp(rp);
         bool cf = self().on_get_f() & cf_mask;
 
         self().on_4t_exec_cycle();
@@ -3026,7 +3026,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u8 m = v & (1u << b);
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
-        if(!is_index_rp_hl() || r == reg::at_hl)
+        if(!is_hl_iregp() || r == reg::at_hl)
             v = get_high8(self().on_get_wz());
         f |= v & (xf_mask | yf_mask);
         self().on_set_f(f); }
@@ -3103,13 +3103,13 @@ public:
         sp = inc16(sp);
         fast_u8 hi = self().on_4t_read_cycle(sp);
         fast_u16 nn = make16(hi, lo);
-        fast_u16 irp = self().on_get_index_rp();
+        fast_u16 irp = self().on_get_iregp();
         std::swap(nn, irp);
         self().on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         self().on_5t_write_cycle(sp, get_low8(nn));
         self().on_set_wz(irp);
-        self().on_set_index_rp(irp); }
+        self().on_set_iregp(irp); }
     void on_exx() {
         self().on_exx_regs(); }
     void on_im(unsigned mode) {
@@ -3140,7 +3140,7 @@ public:
         self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
     void on_jp_irp() {
-        self().set_pc_on_jump(self().on_get_index_rp()); }
+        self().set_pc_on_jump(self().on_get_iregp()); }
     void on_jr(fast_u8 d) {
         self().on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -3177,9 +3177,9 @@ public:
         nn = inc16(nn);
         self().on_set_wz(nn);
         fast_u8 hi = self().on_3t_read_cycle(nn);
-        self().on_set_index_rp(make16(hi, lo)); }
+        self().on_set_iregp(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
-        fast_u16 irp = self().on_get_index_rp();
+        fast_u16 irp = self().on_get_iregp();
         self().on_3t_write_cycle(nn, get_low8(irp));
         nn = inc16(nn);
         self().on_set_wz(nn);
@@ -3190,15 +3190,15 @@ public:
         nn = inc16(nn);
         self().on_set_wz(nn);
         fast_u8 hi = self().on_3t_read_cycle(nn);
-        self().on_set_rp(rp, make16(hi, lo)); }
+        self().on_set_regp(rp, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
-        fast_u16 rpv = self().on_get_rp(rp);
+        fast_u16 rpv = self().on_get_regp(rp);
         self().on_3t_write_cycle(nn, get_low8(rpv));
         nn = inc16(nn);
         self().on_set_wz(nn);
         self().on_3t_write_cycle(nn, get_high8(rpv)); }
     void on_ld_sp_irp() {
-        self().on_set_sp(self().on_get_index_rp()); }
+        self().on_set_sp(self().on_get_iregp()); }
     void on_neg() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -3219,7 +3219,7 @@ public:
         self().on_output_cycle(make16(a, n), a);
         self().on_set_wz(make16(a, inc8(n))); }
     void on_pop_rp(regp2 rp) {
-        self().on_set_rp2(rp, self().on_pop()); }
+        self().on_set_regp2(rp, self().on_pop()); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         reg access_r = irp == iregp::hl ? r : reg::at_hl;
@@ -3327,7 +3327,7 @@ public:
             self().on_set_reg(r, irp, /* d= */ 0, v); }
     void on_sbc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
-        fast_u16 n = self().on_get_rp(rp);
+        fast_u16 n = self().on_get_regp(rp);
         bool cf = self().on_get_f() & cf_mask;
 
         self().on_4t_exec_cycle();
@@ -3471,7 +3471,7 @@ public:
 protected:
     using base::self;
 
-    bool is_index_rp_hl() const {
+    bool is_hl_iregp() const {
         return self().on_get_iregp_kind() == iregp::hl;
     }
 };
