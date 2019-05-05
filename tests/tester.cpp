@@ -747,8 +747,8 @@ public:
         return base::on_fetch_cycle(addr);
     }
 
-    void step() {
-        base::step();
+    void on_step() {
+        base::on_step();
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
     }
 };
@@ -775,11 +775,11 @@ public:
         return base::on_fetch_cycle(addr, m1);
     }
 
-    void step() {
+    void on_step() {
         // Skip prefixes.
-        base::step();
+        base::on_step();
         while(base::get_iregp_kind() != z80::iregp::hl)
-            base::step();
+            base::on_step();
 
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
     }
@@ -890,7 +890,7 @@ void handle_test_entry(test_input &input) {
                     instr, p);
 
     mach.set_instr_code(instr_code, instr_size);
-    mach.step();
+    mach.on_step();
 
     input.handle_end_of_test_entry();
 }

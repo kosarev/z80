@@ -2155,9 +2155,6 @@ public:
         self().on_decode();
     }
 
-    // TODO: Remove. Use on_step() instead.
-    void step() { return self().on_step(); }
-
 protected:
     using base::self;
 
