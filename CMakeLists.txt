@@ -55,10 +55,5 @@ append_if(ERROR_LIMIT_FLAG "-ferror-limit=1" CMAKE_CXX_FLAGS)
 append_if(G_FLAG "-g" CMAKE_CXX_FLAGS)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_SOURCE_DIR}")
 
-add_executable(tester tester.cpp)
-
-add_test(i8080_tests tester i8080 "${CMAKE_SOURCE_DIR}/tests_i8080")
-add_test(z80_tests tester z80 "${CMAKE_SOURCE_DIR}/tests_z80")
-
 add_subdirectory(tests)
 add_subdirectory(examples)
