@@ -294,8 +294,6 @@ protected:
 template<typename B>
 class z80_decoder_state : public B {
 public:
-    typedef B base;
-
     z80_decoder_state() {}
 
     iregp get_iregp_kind() const { return irp; }
@@ -3602,22 +3600,12 @@ private:
 };
 
 template<typename D>
-class i8080_machine : public machine_memory<machine_state<i8080_cpu<D>>> {
-public:
-    typedef machine_memory<machine_state<i8080_cpu<D>>> base;
-
-protected:
-    using base::self;
-};
+class i8080_machine : public machine_memory<machine_state<i8080_cpu<D>>>
+{};
 
 template<typename D>
-class z80_machine : public machine_memory<machine_state<z80_cpu<D>>> {
-public:
-    typedef machine_memory<machine_state<z80_cpu<D>>> base;
-
-protected:
-    using base::self;
-};
+class z80_machine : public machine_memory<machine_state<z80_cpu<D>>>
+{};
 
 }  // namespace z80
 
