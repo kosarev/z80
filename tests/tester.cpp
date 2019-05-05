@@ -236,11 +236,11 @@ class i8080_disasm : public disasm_base<z80::i8080_disasm<i8080_disasm>>
 
 class z80_disasm : public disasm_base<z80::z80_disasm<z80_disasm>> {
 public:
-    void disassemble() {
+    void on_disassemble() {
         // Skip prefixes.
-        base::disassemble();
+        base::on_disassemble();
         while(base::get_iregp_kind() != z80::iregp::hl)
-            base::disassemble();
+            base::on_disassemble();
     }
 };
 
@@ -883,7 +883,7 @@ void handle_test_entry(test_input &input) {
     // Test instruction disassembly.
     disasm dis;
     dis.set_instr_code(instr_code, instr_size);
-    dis.disassemble();
+    dis.on_disassemble();
     const char *instr = dis.get_output();
     if(std::strcmp(instr, p) != 0)
         input.error("instruction disassembly mismatch: '%s' vs '%s'",

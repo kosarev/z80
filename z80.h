@@ -559,8 +559,6 @@ public:
         handled = false;
     }
 
-    void decode() { self().on_decode(); }
-
 protected:
     using base::self;
 
@@ -1021,6 +1019,8 @@ public:
         unreachable("Unknown condition code.");
     }
 
+    void on_disassemble() { self().on_decode(); }
+
 protected:
     using base::self;
 
@@ -1198,8 +1198,6 @@ public:
         self().on_format("rC", cc); }
     void on_scf() {
         self().on_format("stc"); }
-
-    void disassemble() { self().decode(); }
 
     static const char *get_reg_name(reg r) {
         switch(r) {
@@ -1536,8 +1534,6 @@ public:
                                r, iregp::hl, /* d= */ 0); }
     void on_sbc_hl_rp(regp rp) {
         self().on_format("sbc hl, P", rp, iregp::hl); }
-
-    void disassemble() { self().decode(); }
 
     static const char *get_reg_name(reg r, iregp irp = iregp::hl) {
         switch(r) {
@@ -2156,7 +2152,7 @@ public:
 
     void on_step() {
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
-        self().decode();
+        self().on_decode();
     }
 
     // TODO: Remove. Use on_step() instead.
