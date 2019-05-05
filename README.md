@@ -46,6 +46,7 @@ Fast and flexible i8080/Z80 emulator.
 * [Input and output](#input-and-output)
 * [Accessing processor's state](#accessing-processors-state)
 * [Modules](#modules)
+* [The `root<>` module](#the-root-module)
 * [Feedback](#feedback)
 
 
@@ -119,7 +120,7 @@ Every time the CPU emulator needs to access memory, it calls
 `on_read()` and `on_write()` methods.
 Their default implementations do not really access any memory;
 `on_read()` simply returns `0x00`, meaning the emulator in the
-example above actually executes a series of `NOP`s, and
+example above actually executes a series of `nop`s, and
 `on_write()` does literally nothing.
 
 Since both the reading and writing functions are considered by
@@ -330,6 +331,45 @@ New modules can be developed and used separately or together with
 the standard ones.
 In all cases the only requirement is to implement handlers other
 modules rely on.
+
+
+## The `root<>` module
+
+```c++
+template<typename D>
+class root {
+public:
+    typedef D derived;
+
+    ...
+
+    fast_u8 on_read(fast_u16 addr) {
+        unused(addr);
+        return 0x00;
+    }
+
+    void on_write(fast_u16 addr, fast_u8 n) {
+        unused(addr, n);
+    }
+
+    ...
+
+protected:
+    const derived &self() const{ return static_cast<const derived&>(*this); }
+    derived &self() { return static_cast<derived&>(*this); }
+};
+```
+
+The main function of the root module is to define the `self()`
+method that other modules can use to call handlers. For example,
+a decoder could do `self().on_ret()` whenever it runs into a
+`ret` instruction.
+
+Aside of that, the module contains dummy implementations of the
+standard handlers that do nothing or, if they have to return
+something, return some default values.
+
+
 
 
 ## Feedback

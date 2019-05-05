@@ -136,8 +136,6 @@ enum class block_cp { cpi, cpd, cpir, cpdr };
 
 enum class condition { nz, z, nc, c, po, pe, p, m };
 
-// TODO: Rename to 'base' when all references to base members are
-// eliminated.
 template<typename D>
 class root {
 public:
