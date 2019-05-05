@@ -1845,7 +1845,7 @@ public:
     typedef internals::cpu_state_base<B> base;
 
     bool get_iff() const { return iff.get(); }
-    void set_iff(bool new_iff) { iff.set(new_iff); }
+    void set_iff(bool f) { iff.set(f); }
 
 private:
     flipflop iff;
@@ -1914,10 +1914,10 @@ public:
     void set_ir(fast_u16 n) { ir.set(n); }
 
     bool get_iff1() const { return iff1.get(); }
-    void set_iff1(bool iff) { iff1.set(iff); }
+    void set_iff1(bool f) { iff1.set(f); }
 
     bool get_iff2() const { return iff2.get(); }
-    void set_iff2(bool iff) { iff2.set(iff); }
+    void set_iff2(bool f) { iff2.set(f); }
 
     unsigned get_int_mode() const { return im.get(); }
     void set_int_mode(unsigned mode) { im.set(mode); }
@@ -2630,12 +2630,12 @@ public:
 
     fast_u16 get_ir_on_refresh() const { return self().on_get_ir(); }
 
-    void set_iff1_on_di(bool iff1) { self().on_set_iff1(iff1); }
-    void set_iff1_on_ei(bool iff1) { self().on_set_iff1(iff1); }
-    void set_iff1_on_retn(bool iff1) { self().on_set_iff1(iff1); }
+    void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
+    void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
+    void set_iff1_on_retn(bool f) { self().on_set_iff1(f); }
 
-    void set_iff2_on_di(bool iff2) { self().on_set_iff2(iff2); }
-    void set_iff2_on_ei(bool iff2) { self().on_set_iff2(iff2); }
+    void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
+    void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
 
     bool get_iff2_on_retn() const { return self().on_get_iff2(); }
 

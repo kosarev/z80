@@ -649,22 +649,22 @@ public:
         base::set_iff_on_di(iff);
     }
 
-    void set_iff1_on_di(bool iff1) {
+    void set_iff1_on_di(bool f) {
         input.read_and_match("set_iff1_on_di %u -> %u",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(base::get_iff1()),
-                             static_cast<unsigned>(iff1));
+                             static_cast<unsigned>(f));
         input_level_guard guard(input);
-        base::set_iff1_on_di(iff1);
+        base::set_iff1_on_di(f);
     }
 
-    void set_iff2_on_di(bool iff2) {
+    void set_iff2_on_di(bool f) {
         input.read_and_match("set_iff2_on_di %u -> %u",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(base::get_iff2()),
-                             static_cast<unsigned>(iff2));
+                             static_cast<unsigned>(f));
         input_level_guard guard(input);
-        base::set_iff2_on_di(iff2);
+        base::set_iff2_on_di(f);
     }
 
     void set_iff_on_ei(bool iff) {
@@ -676,22 +676,22 @@ public:
         base::set_iff_on_ei(iff);
     }
 
-    void set_iff1_on_ei(bool iff1) {
+    void set_iff1_on_ei(bool f) {
         input.read_and_match("set_iff1_on_ei %u -> %u",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(base::get_iff1()),
-                             static_cast<unsigned>(iff1));
+                             static_cast<unsigned>(f));
         input_level_guard guard(input);
-        base::set_iff1_on_ei(iff1);
+        base::set_iff1_on_ei(f);
     }
 
-    void set_iff2_on_ei(bool iff2) {
+    void set_iff2_on_ei(bool f) {
         input.read_and_match("set_iff2_on_ei %u -> %u",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(base::get_iff2()),
-                             static_cast<unsigned>(iff2));
+                             static_cast<unsigned>(f));
         input_level_guard guard(input);
-        base::set_iff2_on_ei(iff2);
+        base::set_iff2_on_ei(f);
     }
 
     void on_set_int_mode(unsigned mode) {

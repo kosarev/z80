@@ -380,7 +380,7 @@ public:
     ...
 
     bool get_iff() const { ... }
-    void set_iff(bool new_iff) { ... }
+    void set_iff(bool f) { ... }
 
     ...
 };
