@@ -45,7 +45,7 @@ class _CPMLikeMachineMixin(object):
                 break
 
             self.output(chr(c))
-            addr = (addr + 1) % 0xffff
+            addr = (addr + 1) & 0xffff
 
     def _handle_bdos_call(self):
         c = self.get_c()
