@@ -261,12 +261,12 @@ public:
     ticks_type get_ticks() const { return ticks; }
 
     fast_u8 on_read(fast_u16 addr) {
-        assert(addr < image_size);
+        assert(addr < z80::address_space_size);
         return image[addr];
     }
 
     void on_write(fast_u16 addr, fast_u8 n) {
-        assert(addr < image_size);
+        assert(addr < z80::address_space_size);
         image[addr] = static_cast<least_u8>(n);
     }
 
@@ -728,8 +728,7 @@ private:
     ticks_type ticks = 0;
     fast_u16 addr_bus = 0;
 
-    static const z80::size_type image_size = 0x10000;  // 64K bytes.
-    least_u8 image[image_size];
+    least_u8 image[z80::address_space_size];
 };
 
 class i8080_machine : public machine_base<z80::i8080_cpu<i8080_machine>> {

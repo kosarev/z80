@@ -37,8 +37,6 @@ typedef uint_fast32_t fast_u32;
 typedef uint_least8_t least_u8;
 typedef uint_least16_t least_u16;
 
-typedef fast_u32 size_type;
-
 static inline void unused(...) {}
 
 [[noreturn]] static inline void unreachable(const char *msg) {
@@ -3475,7 +3473,7 @@ template<typename D>
 class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>>
 {};
 
-static const unsigned address_space_size = 0x10000;  // 64K bytes.
+static const fast_u32 address_space_size = 0x10000;  // 64K bytes.
 
 template<typename B>
 class machine_memory : public B {
