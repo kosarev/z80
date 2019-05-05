@@ -2,6 +2,7 @@
 set(EXAMPLES
     accessing_state
     adding_memory
+    custom_state
     hello
     input_and_output)
 

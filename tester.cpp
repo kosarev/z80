@@ -239,7 +239,7 @@ public:
     void disassemble() {
         // Skip prefixes.
         base::disassemble();
-        while(base::get_index_rp_kind() != z80::index_regp::hl)
+        while(base::get_iregp_kind() != z80::iregp::hl)
             base::disassemble();
     }
 };
@@ -381,11 +381,11 @@ public:
                                return base::on_set_a(i); }
 
 #if 0  // TODO
-    fast_u8 on_get_r_reg() { match_get_r("r", get_r_reg());
-                             return base::on_get_r_reg(); }
+    fast_u8 on_get_r() { match_get_r("r", get_r());
+                         return base::on_get_r(); }
 #endif
-    void on_set_r_reg(fast_u8 r) { match_set_r("r", base::get_r_reg(), r);
-                                   return base::on_set_r_reg(r); }
+    void on_set_r(fast_u8 r) { match_set_r("r", base::get_r(), r);
+                               return base::on_set_r(r); }
 
     fast_u16 on_get_sp() { match_get_rp("sp", base::get_sp());
                            return base::on_get_sp(); }
@@ -710,15 +710,15 @@ public:
         base::on_set_is_int_disabled(f);
     }
 
-    void on_set_index_rp_kind(z80::index_regp irp) {
-        if(irp != base::get_index_rp_kind()) {
+    void on_set_iregp_kind(z80::iregp irp) {
+        if(irp != base::get_iregp_kind()) {
             input.read_and_match(
                 "set_index_rp %s -> %s",
                 static_cast<unsigned>(get_ticks()),
-                disasm::get_reg_name(base::get_index_rp_kind()),
+                disasm::get_reg_name(base::get_iregp_kind()),
                 disasm::get_reg_name(irp));
         }
-        base::on_set_index_rp_kind(irp);
+        base::on_set_iregp_kind(irp);
     }
 
 protected:
@@ -778,7 +778,7 @@ public:
     void step() {
         // Skip prefixes.
         base::step();
-        while(base::get_index_rp_kind() != z80::index_regp::hl)
+        while(base::get_iregp_kind() != z80::iregp::hl)
             base::step();
 
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));

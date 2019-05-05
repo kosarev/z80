@@ -47,6 +47,7 @@ Fast and flexible i8080/Z80 emulator.
 * [Accessing processor's state](#accessing-processors-state)
 * [Modules](#modules)
 * [The `root<>` module](#the-root-module)
+* [State modules](#state-modules)
 * [Feedback](#feedback)
 
 
@@ -269,9 +270,9 @@ That's good, but what do we do if it's not enough?
 For example, what if the default representation of the
 processor's internal state doesn't fit the needs of your
 application?
-Say, you might be forced to follow a different order of registers
-or you just want to control the way they are packed in a
-structure because there's some external binary API to be
+Say, you might be forced to follow a particular order of
+registers or you just want to control the way they are packed in
+a structure because there's some external binary API to be
 compatible with.
 Or, what if you don't need to emulate the whole processor's
 logic, and just want to check if a given sequence of bytes forms
@@ -370,6 +371,114 @@ standard handlers that do nothing or, if they have to return
 something, return some default values.
 
 
+## State modules
+
+```c++
+template<typename B>
+class i8080_state : public internals::cpu_state_base<B> {
+public:
+    ...
+
+    bool get_iff() const { ... }
+    void set_iff(bool new_iff) { ... }
+
+    ...
+};
+
+template<typename B>
+class z80_state : public internals::cpu_state_base<z80_decoder_state<B>> {
+public:
+    ...
+
+    void exx_regs() { ... }
+    void on_exx_regs() { exx_regs(); }
+
+    ...
+};
+```
+
+The purpose of state modules is to provide handlers to access the
+internal state of the emulated CPU.
+They also usually store the fields of the state, thus defining
+its layout in memory.
+
+Regardless of the way the fields are represented and stored, the
+default getting and setting handlers for register pairs use
+access handlers for the corresponding 8-bit registers to obtain
+or set the 16-bit values.
+Furthermore, the low half of the register pair is always
+retrieved and set before the high half.
+This means that by default handlers for 8-bit registers are
+getting called even if originally a value of a register pair they
+are part of has been queried.
+Custom implementations of processor states, however, are not
+required to do so.
+
+```c++
+    fast_u16 on_get_bc() {
+        // Always get the low byte first.
+        fast_u8 l = self().on_get_c();
+        fast_u8 h = self().on_get_b();
+        return make16(h, l);
+
+    void on_set_bc(fast_u16 n) {
+        // Always set the low byte first.
+        self().on_set_c(get_low8(n));
+        self().on_set_b(get_high8(n));
+    }
+```
+
+Aside of the usual getters and setters for the registers and
+flip-flops, both the i8080 and Z80 states have to provide an
+`on_ex_de_hl_regs()` handler that exchanges `hl` and `de`
+registers the same way the `xchg` and `ex de, hl` do.
+And the Z80 state additionally has to have an `on_exx_regs()`
+that swaps register pairs just as the `exx` instruction does.
+The default swapping handlers do their work by accessing
+registers directly, without relying on the getting and setting
+handlers, similarly to how silicon implementations of the
+processors toggle internal flip-flops demux'ing access to
+register cells without actually transferring their values.
+
+Because the CPUs have a lot of similarities, processor-specific
+variants of modules usually share some common code in helper base
+classes that in turn are defined in the `internal` class.
+That class defines entities that are internal to the
+implementation of the library.
+The client code is therefore supposed to be written as if the
+module classes are derived directly from their type parameters,
+`B`.
+
+Note that `z80_state` has an additional mix-in in its inheritance
+chain, `z80_decoder_state<>`, whereas `i8080_state` is derived
+directly from the generic base.
+This is because Z80 decoders are generally not stateless objects;
+they have to track which of the `IX`, `IY` or `HL` registers has
+to be used as the index register for the current instruction.
+The decoder state class stores and provides access to that
+information.
+
+```c++
+template<typename B>
+class z80_decoder_state : public B {
+public:
+    ...
+
+    iregp get_iregp_kind() const { ... }
+    void set_iregp_kind(iregp r) { ... }
+
+    iregp on_get_iregp_kind() const { return get_iregp_kind(); }
+    void on_set_iregp_kind(iregp r) { set_iregp_kind(r); }
+
+    ...
+};
+```
+
+In its simplest form, a custom state module can be a structure defining the
+necessary state fields together with corresponding access handlers.
+The
+[custom_state.cpp](https://github.com/kosarev/z80/blob/master/examples/custom_state.cpp)
+example demonstrates the approach.
 
 
 ## Feedback

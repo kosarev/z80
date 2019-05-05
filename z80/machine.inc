@@ -53,7 +53,7 @@ struct __attribute__((packed)) object_state {
     least_u8 int_disabled = 0;
     least_u8 halted = 0;
     least_u8 int_mode = 0;
-    least_u8 index_rp_kind = 0;
+    least_u8 irp_kind = 0;
 #else
 #error Unknown machine!
 #endif

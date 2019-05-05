@@ -26,7 +26,7 @@ using z80::unused;
 using z80::get_low8;
 using z80::get_high8;
 using z80::make16;
-using z80::index_regp;
+using z80::iregp;
 
 static inline void split16(least_u8 &h, least_u8 &l, fast_u16 n) {
     h = get_high8(n);
@@ -157,8 +157,8 @@ public:
     fast_u8 on_get_i() const { return state.i; }
     void on_set_i(fast_u8 n) { state.i = n; }
 
-    fast_u8 on_get_r_reg() const { return state.r; }
-    void on_set_r_reg(fast_u8 n) { state.r = n; }
+    fast_u8 on_get_r() const { return state.r; }
+    void on_set_r(fast_u8 n) { state.r = n; }
 
     fast_u16 on_get_ir() const { return make16(state.i, state.r); }
 
@@ -174,10 +174,10 @@ public:
     fast_u16 on_get_last_read_addr() const { return state.last_read_addr; }
     void on_set_last_read_addr(fast_u16 n) { state.last_read_addr = n; }
 
-    index_regp on_get_index_rp_kind() const {
-        return static_cast<index_regp>(state.index_rp_kind); }
-    void on_set_index_rp_kind(index_regp irp) {
-        state.index_rp_kind = static_cast<least_u8>(irp); }
+    iregp on_get_iregp_kind() const {
+        return static_cast<iregp>(state.irp_kind); }
+    void on_set_iregp_kind(iregp irp) {
+        state.irp_kind = static_cast<least_u8>(irp); }
 
     bool on_is_int_disabled() const { return state.int_disabled; }
     void on_set_is_int_disabled(bool f) { state.int_disabled = f; }
