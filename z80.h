@@ -218,6 +218,7 @@ public:
     void on_set_iff2(bool f) { unused(f); }
     unsigned on_get_int_mode() const { return 0; }
     void on_set_int_mode(unsigned mode) { unused(mode); }
+    void on_set_is_int_disabled(bool f) { unused(f); }
 
     fast_u16 on_get_bc() {
         // Always get the low byte first.
@@ -658,7 +659,6 @@ public:
         return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 
-    void on_set_is_int_disabled(bool f) { unused(f); }
     void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
 
     void on_instr_prefix(iregp irp) {
@@ -2157,7 +2157,7 @@ public:
         self().on_call(nn); }
 
     void on_step() {
-        self().on_set_is_int_disabled(false);
+        self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
         self().decode();
     }
 
@@ -2251,9 +2251,6 @@ public:
     using base::hf_inc;
     using base::pf_log;
     using base::zf_ari;
-
-    bool on_get_iff() const { return base::get_iff(); }
-    void on_set_iff(bool iff) { base::set_iff(iff); }
 
     void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
