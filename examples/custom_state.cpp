@@ -11,14 +11,19 @@ using z80::least_u8;
 template<typename B>
 struct my_state : public B {
     fast_u16 pc;
-    fast_u16 hl;
+    fast_u8 l, h;
     fast_u8 a;
 
-    fast_u16 on_get_hl() const { return hl; }
-    void on_set_hl(fast_u16 n) { hl = n; }
+    fast_u16 get_hl() const { return z80::make16(h, l); }
 
     fast_u16 on_get_pc() const { return pc; }
     void on_set_pc(fast_u16 n) { pc = n; }
+
+    fast_u8 on_get_l() const { return l; }
+    void on_set_l(fast_u8 n) { l = n; }
+
+    fast_u8 on_get_h() const { return h; }
+    void on_set_h(fast_u8 n) { h = n; }
 
     fast_u8 on_get_a() const { return a; }
     void on_set_a(fast_u8 n) { a = n; }
@@ -63,6 +68,6 @@ int main() {
 
     std::printf("pc = 0x%04x, hl = 0x%04x, a = 0x%02x\n",
                 static_cast<unsigned>(e.pc),
-                static_cast<unsigned>(e.hl),
+                static_cast<unsigned>(e.get_hl()),
                 static_cast<unsigned>(e.a));
 }
