@@ -660,6 +660,22 @@ d616 sui 0x16
  4 set_pc_on_fetch 0000 -> 0001
  4 done
 
+08 xnop 0x08
+...
+ 4 done
+
+18 xnop 0x18
+...
+ 4 done
+
+28 xnop 0x28
+...
+ 4 done
+
+38 xnop 0x38
+...
+ 4 done
+
 # POP rp2
 c1 pop b
  0 get_pc_on_fetch 0000

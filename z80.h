@@ -284,6 +284,10 @@ public:
     void on_output(fast_u16 port, fast_u8 n) {
         unused(port, n); }
 
+    void on_xnop(fast_u8 op) {
+        unused(op);
+        self().on_nop(); }
+
 protected:
     const derived &self() const{ return static_cast<const derived&>(*this); }
     derived &self() { return static_cast<derived&>(*this); }
@@ -455,6 +459,10 @@ public:
             auto rp = static_cast<regp>(p);
             return self().on_ld_a_at_rp(rp); }
         }
+        if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
+            // JR cc[y-4], d  f(4) r(3) + e(5)
+            return self().decode_jr_cc(op);
+        }
         switch(op) {
         case 0x00:
             // NOP  f(4)
@@ -463,6 +471,9 @@ public:
             // RLC   f(4)
             // RLCA  f(4)
             return self().on_rlca();
+        case 0x08:
+            // EX AF, AF'  f(4)
+            return self().decode_ex_af_alt_af();
         case 0x0f:
             // RRC   f(4)
             // RRCA  f(4)
@@ -471,6 +482,9 @@ public:
             // RAL  f(4)
             // RLA  f(4)
             return self().on_rla();
+        case 0x18:
+            // JR d  f(4) r(3) e(5)
+            return self().decode_jr();
         case 0x1f:
             // RAR  f(4)
             // RRA  f(4)
@@ -591,9 +605,15 @@ public:
     void decode_dec_rp(regp rp) {
         self().on_5t_fetch_cycle();
         self().on_dec_rp(rp); }
+    void decode_ex_af_alt_af() {
+        self().on_xnop(/* op= */ 0x08); }
     void decode_ex_de_hl() {
         self().on_5t_fetch_cycle();
         self().on_ex_de_hl(); }
+    void decode_jr() {
+        self().on_xnop(/* op= */ 0x18); }
+    void decode_jr_cc(fast_u8 op) {
+        self().on_xnop(op); }
     void decode_halt() {
         self().on_7t_fetch_cycle();
         self().on_halt(); }
@@ -679,8 +699,15 @@ public:
     void decode_dec_rp(regp rp) {
         self().on_6t_fetch_cycle();
         self().on_dec_rp(rp); }
+    void decode_ex_af_alt_af() {
+        self().on_ex_af_alt_af(); }
     void decode_ex_de_hl() {
         self().on_ex_de_hl(); }
+    void decode_jr() {
+        self().on_jr(self().on_disp_read()); }
+    void decode_jr_cc(fast_u8 op) {
+        auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
+        return self().on_jr_cc(cc, self().on_disp_read()); }
     void decode_halt() {
         self().on_halt(); }
     void decode_jp_irp() {
@@ -716,23 +743,11 @@ public:
             if(handled)
                 return;
         }
-
-        if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
-            // JR cc[y-4], d  f(4) r(3) + e(5)
-            auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
-            return self().on_jr_cc(cc, self().on_disp_read());
-        }
         switch(op) {
-        case 0x08:
-            // EX AF, AF'  f(4)
-            return self().on_ex_af_alt_af();
         case 0x10:
             // DJNZ  f(5) r(3) + e(5)
             self().on_5t_fetch_cycle();
             return self().on_djnz(self().on_disp_read());
-        case 0x18:
-            // JR d  f(4) r(3) e(5)
-            return self().on_jr(self().on_disp_read());
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
@@ -1195,6 +1210,8 @@ public:
         self().on_format("rC", cc); }
     void on_scf() {
         self().on_format("stc"); }
+    void on_xnop(fast_u8 op) {
+        self().on_format("xnop N", op); }
 
     static const char *get_reg_name(reg r) {
         switch(r) {
