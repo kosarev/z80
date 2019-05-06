@@ -476,9 +476,27 @@ public:
 
 In its simplest form, a custom state module can be a structure defining the
 necessary state fields together with corresponding access handlers.
-The
+
+```c++
+template<typename B>
+struct my_state : public B {
+    fast_u16 pc;
+
+    ...
+
+    fast_u16 on_get_pc() const { return pc; }
+    void on_set_pc(fast_u16 n) { pc = n; }
+
+    ...
+
+    // These always have to be explicitly defined.
+    void on_ex_de_hl_regs() {}
+    void on_ex_af_alt_af_regs() {}
+    void on_exx_regs() {}
+};
+
+```
 [custom_state.cpp](https://github.com/kosarev/z80/blob/master/examples/custom_state.cpp)
-example demonstrates the approach.
 
 
 ## Feedback
