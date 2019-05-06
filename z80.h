@@ -342,8 +342,8 @@ public:
             auto rd = static_cast<reg>(y);
             auto rs = static_cast<reg>(z);
             if(rd == reg::at_hl && rs == reg::at_hl)
-                return self().decode_halt();
-            return self().decode_ld_r_r(rd, rs); }
+                return self().on_decode_halt();
+            return self().on_decode_ld_r_r(rd, rs); }
         case 0200: {
             // alu[y] r[z]
             // alu r            f(4)                 (both i8080 and z80)
@@ -352,7 +352,7 @@ public:
             // alu (i+d)   f(4) f(4) r(3) e(5) r(3)
             auto k = static_cast<alu>(y);
             auto r = static_cast<reg>(z);
-            return self().decode_alu_r(k, r); }
+            return self().on_decode_alu_r(k, r); }
         }
         switch(op & (x_mask | z_mask)) {
         case 0004: {
@@ -363,7 +363,7 @@ public:
             // INC (HL)         f(4)           r(4) w(3)
             // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
-            return self().decode_inc_r(r); }
+            return self().on_decode_inc_r(r); }
         case 0005: {
             // DCR/DEC r[y]
             // DCR r            f(5)
@@ -372,7 +372,7 @@ public:
             // DEC (HL)         f(4)           r(4) w(3)
             // DEC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
             auto r = static_cast<reg>(y);
-            return self().decode_dec_r(r); }
+            return self().on_decode_dec_r(r); }
         case 0006: {
             // LD/MVI r[y], n
             // MVI r, n             f(4)      r(3)
@@ -380,7 +380,7 @@ public:
             // LD (HL), n           f(4)      r(3) w(3)
             // LD (i+d), n     f(4) f(4) r(3) r(5) w(3)
             auto r = static_cast<reg>(y);
-            return self().decode_ld_r_n(r); }
+            return self().on_decode_ld_r_n(r); }
         case 0300: {
             // RET cc[y]/Rcc[y]  f(5) + r(3) r(3)
             self().on_5t_fetch_cycle();
@@ -400,7 +400,7 @@ public:
             // cc met:      f(4) r(3) r(4) w(3) w(3)
             // cc not met:  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
-            return self().decode_call_cc_nn(cc); }
+            return self().on_decode_call_cc_nn(cc); }
         case 0306: {
             // alu[y] n  f(4) r(3)  (both i8080 and z80)
             auto k = static_cast<alu>(y);
@@ -431,14 +431,14 @@ public:
             // DEC rp           f(6)
             // DEC i       f(4) f(6)
             auto rp = static_cast<regp>(p);
-            return self().decode_dec_rp(rp); }
+            return self().on_decode_dec_rp(rp); }
         case 0003: {
             // INC/INX rp[p]
             // INX rp           f(5)
             // INC rp           f(6)
             // INC i       f(4) f(6)
             auto rp = static_cast<regp>(p);
-            return self().decode_inc_rp(rp); }
+            return self().on_decode_inc_rp(rp); }
         case 0301: {
             // POP rp2[p]
             // POP rr           f(4) r(3) r(3)
@@ -467,7 +467,7 @@ public:
         }
         if((op & (x_mask | z_mask | (y_mask - 0030))) == 0040) {
             // JR cc[y-4], d  f(4) r(3) + e(5)
-            return self().decode_jr_cc(op);
+            return self().on_decode_jr_cc(op);
         }
         switch(op) {
         case 0x00:
@@ -479,21 +479,21 @@ public:
             return self().on_rlca();
         case 0x08:
             // EX AF, AF'  f(4)
-            return self().decode_ex_af_alt_af();
+            return self().on_decode_ex_af_alt_af();
         case 0x0f:
             // RRC   f(4)
             // RRCA  f(4)
             return self().on_rrca();
         case 0x10:
             // DJNZ  f(5) r(3) + e(5)
-            return self().decode_djnz();
+            return self().on_decode_djnz();
         case 0x17:
             // RAL  f(4)
             // RLA  f(4)
             return self().on_rla();
         case 0x18:
             // JR d  f(4) r(3) e(5)
-            return self().decode_jr();
+            return self().on_decode_jr();
         case 0x1f:
             // RAR  f(4)
             // RRA  f(4)
@@ -541,7 +541,7 @@ public:
         case 0xcb:
             // CB prefix   f(4)
             // XJMP nn     f(4) r(3) r(3)
-            return self().decode_cb_prefixed();
+            return self().on_decode_cb_prefix();
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return self().on_call_nn(self().on_3t_4t_imm16_read());
@@ -552,7 +552,7 @@ public:
         case 0xd9:
             // EXX   f(4)
             // XRET  f(4)
-            return self().decode_exx();
+            return self().on_decode_exx();
         case 0xdb:
             // IN n       f(4) r(3) i(3)
             // IN A, (n)  f(4) r(3) i(4)
@@ -561,7 +561,7 @@ public:
             // DD prefix (IX-indexed instructions)
             // DD        f(4)
             // XCALL nn  f(4) r(3) r(4) w(3) w(3)
-            return self().decode_dd_prefix();
+            return self().on_decode_dd_prefix();
         case 0xe3:
             // EX (SP), irp / XHTL
             // XTHL                 f(4) r(3) r(3) w(3) w(5)
@@ -572,15 +572,15 @@ public:
             // PCHL        f(5)
             // JP HL       f(4)
             // JP i   f(4) f(4)
-            return self().decode_jp_irp();
+            return self().on_decode_jp_irp();
         case 0xeb:
             // XCHG       f(5)
             // EX DE, HL  f(4)
-            return self().decode_ex_de_hl();
+            return self().on_decode_ex_de_hl();
         case 0xed:
             // ED prefix  f(4)
             // XCALL nn   f(4) r(3) r(4) w(3) w(3)
-            return self().decode_ed_prefixed();
+            return self().on_decode_ed_prefix();
         case 0xf3:
             // DI  f(4)
             return self().on_di();
@@ -588,7 +588,7 @@ public:
             // SPHL            f(5)
             // LD SP, HL       f(6)
             // LD SP, i   f(4) f(6)
-            return self().decode_ld_sp_irp();
+            return self().on_decode_ld_sp_irp();
         case 0xfb:
             // EI  f(4)
             return self().on_ei();
@@ -596,7 +596,7 @@ public:
             // FD prefix (IY-indexed instructions)
             // FD        f(4)
             // XCALL nn  f(4) r(3) r(4) w(3) w(3)
-            return self().decode_fd_prefix();
+            return self().on_decode_fd_prefix();
         }
 
         unreachable("Unknown opcode encountered!");
@@ -628,61 +628,61 @@ class i8080_decoder : public internals::decoder_base<B> {
 public:
     typedef internals::decoder_base<B> base;
 
-    void decode_alu_r(alu k, reg r) {
+    void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r); }
-    void decode_call_cc_nn(condition cc) {
+    void on_decode_call_cc_nn(condition cc) {
         self().on_5t_fetch_cycle();
         self().on_call_cc_nn(cc, self().on_3t_3t_imm16_read()); }
-    void decode_cb_prefixed() {
+    void on_decode_cb_prefix() {
         self().on_xjp_nn(self().on_3t_3t_imm16_read()); }
-    void decode_dd_prefix() {
-        decode_xcall_nn(0xdd); }
-    void decode_fd_prefix() {
-        decode_xcall_nn(0xfd); }
-    void decode_dec_r(reg r) {
+    void on_decode_dd_prefix() {
+        self().on_decode_xcall_nn(0xdd); }
+    void on_decode_fd_prefix() {
+        self().on_decode_xcall_nn(0xfd); }
+    void on_decode_dec_r(reg r) {
         if(r != reg::at_hl)
             self().on_5t_fetch_cycle();
         self().on_dec_r(r); }
-    void decode_dec_rp(regp rp) {
+    void on_decode_dec_rp(regp rp) {
         self().on_5t_fetch_cycle();
         self().on_dec_rp(rp); }
-    void decode_djnz() {
+    void on_decode_djnz() {
         self().on_xnop(/* op= */ 0x10); }
-    void decode_ed_prefixed() {
-        decode_xcall_nn(0xed); }
-    void decode_ex_af_alt_af() {
+    void on_decode_ed_prefix() {
+        self().on_decode_xcall_nn(0xed); }
+    void on_decode_ex_af_alt_af() {
         self().on_xnop(/* op= */ 0x08); }
-    void decode_ex_de_hl() {
+    void on_decode_ex_de_hl() {
         self().on_5t_fetch_cycle();
         self().on_ex_de_hl(); }
-    void decode_exx() {
+    void on_decode_exx() {
         self().on_xret(); }
-    void decode_jr() {
+    void on_decode_jr() {
         self().on_xnop(/* op= */ 0x18); }
-    void decode_jr_cc(fast_u8 op) {
+    void on_decode_jr_cc(fast_u8 op) {
         self().on_xnop(op); }
-    void decode_halt() {
+    void on_decode_halt() {
         self().on_7t_fetch_cycle();
         self().on_halt(); }
-    void decode_inc_r(reg r) {
+    void on_decode_inc_r(reg r) {
         if(r != reg::at_hl)
             self().on_5t_fetch_cycle();
         self().on_inc_r(r); }
-    void decode_inc_rp(regp rp) {
+    void on_decode_inc_rp(regp rp) {
         self().on_5t_fetch_cycle();
         self().on_inc_rp(rp); }
-    void decode_jp_irp() {
+    void on_decode_jp_irp() {
         self().on_5t_fetch_cycle();
         self().on_jp_irp(); }
-    void decode_ld_r_n(reg r) {
+    void on_decode_ld_r_n(reg r) {
         fast_u8 n = self().on_3t_imm8_read();
         self().on_ld_r_n(r, n); }
-    void decode_ld_r_r(reg rd, reg rs) {
+    void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs); }
-    void decode_ld_sp_irp() {
+    void on_decode_ld_sp_irp() {
         self().on_5t_fetch_cycle();
         self().on_ld_sp_irp(); }
-    void decode_xcall_nn(fast_u8 op) {
+    void on_decode_xcall_nn(fast_u8 op) {
         self().on_xcall_nn(op, self().on_3t_4t_imm16_read()); }
 
 protected:
@@ -724,9 +724,9 @@ public:
         return y < 2 ? 0 : y - 1;
     }
 
-    void decode_alu_r(alu k, reg r) {
+    void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r, read_disp_or_null(r)); }
-    void decode_call_cc_nn(condition cc) {
+    void on_decode_call_cc_nn(condition cc) {
         // TODO: Read imm16 as r(3) r(3) and do extra tick on
         // execution if the condition is met. Do not check the
         // condition on decoding.
@@ -734,39 +734,39 @@ public:
         fast_u16 nn = cc_met ? self().on_3t_4t_imm16_read() :
                                self().on_3t_3t_imm16_read();
         self().on_call_cc_nn(cc, nn); }
-    void decode_dd_prefix() {
+    void on_decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
-    void decode_fd_prefix() {
+    void on_decode_fd_prefix() {
         self().on_instr_prefix(iregp::iy); }
-    void decode_dec_r(reg r) {
+    void on_decode_dec_r(reg r) {
         self().on_dec_r(r, read_disp_or_null(r)); }
-    void decode_dec_rp(regp rp) {
+    void on_decode_dec_rp(regp rp) {
         self().on_6t_fetch_cycle();
         self().on_dec_rp(rp); }
-    void decode_djnz() {
+    void on_decode_djnz() {
         self().on_5t_fetch_cycle();
         self().on_djnz(self().on_disp_read()); }
-    void decode_ex_af_alt_af() {
+    void on_decode_ex_af_alt_af() {
         self().on_ex_af_alt_af(); }
-    void decode_ex_de_hl() {
+    void on_decode_ex_de_hl() {
         self().on_ex_de_hl(); }
-    void decode_exx() {
+    void on_decode_exx() {
         self().on_exx(); }
-    void decode_jr() {
+    void on_decode_jr() {
         self().on_jr(self().on_disp_read()); }
-    void decode_jr_cc(fast_u8 op) {
+    void on_decode_jr_cc(fast_u8 op) {
         auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
         return self().on_jr_cc(cc, self().on_disp_read()); }
-    void decode_halt() {
+    void on_decode_halt() {
         self().on_halt(); }
-    void decode_jp_irp() {
+    void on_decode_jp_irp() {
         self().on_jp_irp(); }
-    void decode_inc_r(reg r) {
+    void on_decode_inc_r(reg r) {
         self().on_inc_r(r, read_disp_or_null(r)); }
-    void decode_inc_rp(regp rp) {
+    void on_decode_inc_rp(regp rp) {
         self().on_6t_fetch_cycle();
         self().on_inc_rp(rp); }
-    void decode_ld_r_n(reg r) {
+    void on_decode_ld_r_n(reg r) {
         fast_u8 d, n;
         if(r != reg::at_hl || is_hl_iregp()) {
             d = 0;
@@ -776,13 +776,13 @@ public:
             n = self().on_5t_imm8_read();
         }
         self().on_ld_r_n(r, d, n); }
-    void decode_ld_r_r(reg rd, reg rs) {
+    void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
-    void decode_ld_sp_irp() {
+    void on_decode_ld_sp_irp() {
         self().on_6t_fetch_cycle();
         self().on_ld_sp_irp(); }
 
-    void decode_cb_prefixed() {
+    void on_decode_cb_prefix() {
         fast_u8 d = 0;
         iregp irp = self().on_get_iregp_kind();
         if(irp != iregp::hl)
@@ -840,7 +840,7 @@ public:
         std::abort();
     }
 
-    void decode_ed_prefixed() {
+    void on_decode_ed_prefix() {
         fast_u8 op = self().on_fetch();
         fast_u8 y = get_y_part(op);
         fast_u8 p = get_p_part(op);
