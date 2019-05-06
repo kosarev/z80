@@ -320,10 +320,7 @@ class internals::decoder_base : public B {
 public:
     typedef B base;
 
-    // TODO: Rename to 'on_decode()'.
-    void decode_in_base(bool &handled, fast_u8 op) {
-        handled = true;
-
+    void on_decode(fast_u8 op) {
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
@@ -600,7 +597,11 @@ public:
             return self().decode_fd_prefix();
         }
 
-        handled = false;
+        unreachable("Unknown opcode encountered!");
+    }
+
+    void on_fetch_and_decode() {
+        self().on_decode(self().on_fetch());
     }
 
 protected:
@@ -681,15 +682,6 @@ public:
         self().on_ld_sp_irp(); }
     void decode_xcall_nn(fast_u8 op) {
         self().on_xcall_nn(op, self().on_3t_4t_imm16_read()); }
-
-    void on_fetch_and_decode() {
-        fast_u8 op = self().on_fetch();
-
-        // TODO
-        bool handled = false;
-        base::decode_in_base(handled, op);
-        assert(handled);
-    }
 
 protected:
     using base::self;
@@ -787,22 +779,6 @@ public:
     void decode_ld_sp_irp() {
         self().on_6t_fetch_cycle();
         self().on_ld_sp_irp(); }
-
-    void decode_unprefixed(fast_u8 op) {
-        // TODO
-        {
-            bool handled = false;
-            base::decode_in_base(handled, op);
-            if(handled)
-                return;
-        }
-
-        // TODO
-        std::fprintf(stderr, "Unknown opcode 0x%02x at 0x%04x.\n",
-                     static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().on_get_last_read_addr()));
-        std::abort();
-    }
 
     void decode_cb_prefixed() {
         fast_u8 d = 0;
@@ -947,9 +923,8 @@ public:
         std::abort();
     }
 
-    void on_fetch_and_decode() {
-        fast_u8 op = self().on_fetch();
-        decode_unprefixed(op);
+    void on_decode(fast_u8 op) {
+        base::on_decode(op);
 
         // Reset current index register.
         if(op != 0xdd && op != 0xfd)
