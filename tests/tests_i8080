@@ -301,6 +301,10 @@ c3cdab jmp 0xabcd
 10 set_pc_on_jump 0003 -> abcd
 10 done
 
+cbcdab xjmp 0xcb, 0xabcd
+...
+10 done
+
 # Jcc nn
 d2d90a jnc 0x0ad9
  0 get_pc_on_fetch 0000

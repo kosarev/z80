@@ -284,6 +284,8 @@ public:
     void on_output(fast_u16 port, fast_u8 n) {
         unused(port, n); }
 
+    void on_xjp_nn(fast_u16 nn) {
+        self().on_jp_nn(nn); }
     void on_xnop(fast_u8 op) {
         unused(op);
         self().on_nop(); }
@@ -534,6 +536,10 @@ public:
         case 0xc9:
             // RET  f(4) r(3) r(3)
             return self().on_ret();
+        case 0xcb:
+            // CB prefix   f(4)
+            // XJMP nn     f(4) r(3) r(3)
+            return self().decode_cb_prefixed();
         case 0xcd:
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             return self().on_call_nn(self().on_3t_4t_imm16_read());
@@ -542,7 +548,8 @@ public:
             // OUT (n), A  f(4) r(3) o(4)
             return self().on_out_n_a(self().on_3t_imm8_read());
         case 0xd9:
-            // EXX  f(4)
+            // EXX   f(4)
+            // XRET  f(4)
             return self().decode_exx();
         case 0xdb:
             // IN n       f(4) r(3) i(3)
@@ -606,6 +613,8 @@ public:
     void decode_call_cc_nn(condition cc) {
         self().on_5t_fetch_cycle();
         self().on_call_cc_nn(cc, self().on_3t_3t_imm16_read()); }
+    void decode_cb_prefixed() {
+        self().on_xjp_nn(self().on_3t_3t_imm16_read()); }
     void decode_dec_r(reg r) {
         if(r != reg::at_hl)
             self().on_5t_fetch_cycle();
@@ -761,9 +770,6 @@ public:
                 return;
         }
         switch(op) {
-        case 0xcb:
-            // CB prefix.
-            return decode_cb_prefixed();
         case 0xdd:
             // DD prefix (IX-indexed instructions).
             reset_index_rp = false;
@@ -1220,6 +1226,8 @@ public:
         self().on_format("rC", cc); }
     void on_scf() {
         self().on_format("stc"); }
+    void on_xjp_nn(fast_u16 nn) {
+        self().on_format("xjmp N, W", 0xcb, nn); }
     void on_xnop(fast_u8 op) {
         self().on_format("xnop N", op); }
     void on_xret() {
