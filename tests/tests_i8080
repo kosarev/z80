@@ -664,11 +664,23 @@ d616 sui 0x16
 ...
  4 done
 
+10 xnop 0x10
+...
+ 4 done
+
 18 xnop 0x18
 ...
  4 done
 
+20 xnop 0x20
+...
+ 4 done
+
 28 xnop 0x28
+...
+ 4 done
+
+30 xnop 0x30
 ...
  4 done
 

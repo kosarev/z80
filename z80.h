@@ -478,6 +478,9 @@ public:
             // RRC   f(4)
             // RRCA  f(4)
             return self().on_rrca();
+        case 0x10:
+            // DJNZ  f(5) r(3) + e(5)
+            return self().decode_djnz();
         case 0x17:
             // RAL  f(4)
             // RLA  f(4)
@@ -605,6 +608,8 @@ public:
     void decode_dec_rp(regp rp) {
         self().on_5t_fetch_cycle();
         self().on_dec_rp(rp); }
+    void decode_djnz() {
+        self().on_xnop(/* op= */ 0x10); }
     void decode_ex_af_alt_af() {
         self().on_xnop(/* op= */ 0x08); }
     void decode_ex_de_hl() {
@@ -699,6 +704,9 @@ public:
     void decode_dec_rp(regp rp) {
         self().on_6t_fetch_cycle();
         self().on_dec_rp(rp); }
+    void decode_djnz() {
+        self().on_5t_fetch_cycle();
+        self().on_djnz(self().on_disp_read()); }
     void decode_ex_af_alt_af() {
         self().on_ex_af_alt_af(); }
     void decode_ex_de_hl() {
@@ -744,10 +752,6 @@ public:
                 return;
         }
         switch(op) {
-        case 0x10:
-            // DJNZ  f(5) r(3) + e(5)
-            self().on_5t_fetch_cycle();
-            return self().on_djnz(self().on_disp_read());
         case 0xcb:
             // CB prefix.
             return decode_cb_prefixed();
