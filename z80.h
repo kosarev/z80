@@ -696,22 +696,6 @@ public:
 
     z80_decoder() {}
 
-    fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(is_hl_iregp() || !may_need_disp)
-            return 0;
-        fast_u8 d = self().on_disp_read();
-        self().on_5t_exec_cycle();
-        return d;
-    }
-
-    fast_u8 read_disp_or_null(reg r) {
-        return read_disp_or_null(r == reg::at_hl);
-    }
-
-    fast_u8 read_disp_or_null(reg r1, reg r2) {
-        return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
-    }
-
     void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
 
     void on_instr_prefix(iregp irp) {
@@ -948,6 +932,23 @@ protected:
 
     bool is_hl_iregp() const {
         return self().on_get_iregp_kind() == iregp::hl;
+    }
+
+private:
+    fast_u8 read_disp_or_null(bool may_need_disp = true) {
+        if(is_hl_iregp() || !may_need_disp)
+            return 0;
+        fast_u8 d = self().on_disp_read();
+        self().on_5t_exec_cycle();
+        return d;
+    }
+
+    fast_u8 read_disp_or_null(reg r) {
+        return read_disp_or_null(r == reg::at_hl);
+    }
+
+    fast_u8 read_disp_or_null(reg r1, reg r2) {
+        return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
     }
 };
 
