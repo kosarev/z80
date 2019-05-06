@@ -616,8 +616,7 @@ public:
         self().on_5t_fetch_cycle();
         self().on_ld_sp_irp(); }
 
-    // TODO: Move to base and rename to 'on_fetch_and_decode()'.
-    void on_decode() {
+    void on_fetch_and_decode() {
         fast_u8 op = self().on_fetch();
 
         // TODO
@@ -903,7 +902,7 @@ public:
         std::abort();
     }
 
-    void on_decode() {
+    void on_fetch_and_decode() {
         bool reset_index_rp = true;
         decode_unprefixed(reset_index_rp);
         if(reset_index_rp)
@@ -1017,7 +1016,7 @@ public:
         unreachable("Unknown condition code.");
     }
 
-    void on_disassemble() { self().on_decode(); }
+    void on_disassemble() { self().on_fetch_and_decode(); }
 
 protected:
     using base::self;
@@ -2150,7 +2149,7 @@ public:
 
     void on_step() {
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
-        self().on_decode();
+        self().on_fetch_and_decode();
     }
 
 protected:
