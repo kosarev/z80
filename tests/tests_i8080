@@ -737,6 +737,10 @@ c9 ret
 10 set_pc_on_return 0001 -> 00c9
 10 done
 
+d9 xret 0xd9
+...
+10 done
+
 # Rcc
 c0 rnz
  0 get_pc_on_fetch 0000
