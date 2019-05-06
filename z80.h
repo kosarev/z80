@@ -593,6 +593,11 @@ public:
         case 0xfb:
             // EI  f(4)
             return self().on_ei();
+        case 0xfd:
+            // FD prefix (IY-indexed instructions)
+            // FD        f(4)
+            // XCALL nn  f(4) r(3) r(4) w(3) w(3)
+            return self().decode_fd_prefix();
         }
 
         handled = false;
@@ -629,6 +634,8 @@ public:
         self().on_xjp_nn(self().on_3t_3t_imm16_read()); }
     void decode_dd_prefix() {
         decode_xcall_nn(0xdd); }
+    void decode_fd_prefix() {
+        decode_xcall_nn(0xfd); }
     void decode_dec_r(reg r) {
         if(r != reg::at_hl)
             self().on_5t_fetch_cycle();
@@ -735,6 +742,8 @@ public:
         self().on_call_cc_nn(cc, nn); }
     void decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
+    void decode_fd_prefix() {
+        self().on_instr_prefix(iregp::iy); }
     void decode_dec_r(reg r) {
         self().on_dec_r(r, read_disp_or_null(r)); }
     void decode_dec_rp(regp rp) {
@@ -786,11 +795,6 @@ public:
             base::decode_in_base(handled, op);
             if(handled)
                 return;
-        }
-        switch(op) {
-        case 0xfd:
-            // FD prefix (IY-indexed instructions).
-            return self().on_instr_prefix(iregp::iy);
         }
 
         // TODO
