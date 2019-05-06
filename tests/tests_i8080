@@ -120,6 +120,10 @@ cddf0e call 0x0edf
 17 set_pc_on_call 0003 -> 0edf
 17 done
 
+eddf0e xcall 0xed, 0x0edf
+...
+17 done
+
 # Ccc, nn
 c4550c cnz 0x0c55
  0 get_pc_on_fetch 0000
