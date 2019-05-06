@@ -325,6 +325,8 @@ public:
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
 
+        // TODO: Collect some statistics and see if these
+        //       switches come in a good order.
         switch(op & x_mask) {
         case 0100: {
             // LD/MOV r[y], r[z] or
