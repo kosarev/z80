@@ -767,9 +767,7 @@ public:
         self().on_6t_fetch_cycle();
         self().on_ld_sp_irp(); }
 
-    void decode_unprefixed(bool &reset_index_rp) {
-        fast_u8 op = self().on_fetch();
-
+    void decode_unprefixed(fast_u8 op) {
         // TODO
         {
             bool handled = false;
@@ -780,11 +778,9 @@ public:
         switch(op) {
         case 0xdd:
             // DD prefix (IX-indexed instructions).
-            reset_index_rp = false;
             return self().on_instr_prefix(iregp::ix);
         case 0xfd:
             // FD prefix (IY-indexed instructions).
-            reset_index_rp = false;
             return self().on_instr_prefix(iregp::iy);
         }
 
@@ -939,9 +935,11 @@ public:
     }
 
     void on_fetch_and_decode() {
-        bool reset_index_rp = true;
-        decode_unprefixed(reset_index_rp);
-        if(reset_index_rp)
+        fast_u8 op = self().on_fetch();
+        decode_unprefixed(op);
+
+        // Reset current index register.
+        if(op != 0xdd && op != 0xfd)
             self().on_set_iregp_kind(iregp::hl);
     }
 
