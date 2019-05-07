@@ -286,6 +286,9 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    void on_read_cycle_extra_1t(fast_u16 addr) {
+        unused(addr);
+        self().on_tick(1); }
     void on_read_cycle_extra_2t(fast_u16 addr) {
         unused(addr);
         self().on_tick(2); }
@@ -2073,8 +2076,6 @@ public:
         return b; }
     fast_u8 on_3t_read_cycle(fast_u16 addr) {
         return self().on_read_cycle(addr, /* ticks= */ 3); }
-    fast_u8 on_4t_read_cycle(fast_u16 addr) {
-        return self().on_read_cycle(addr, /* ticks= */ 4); }
 
     fast_u8 on_3t_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
@@ -2092,7 +2093,8 @@ public:
         fast_u16 pc = self().get_pc_on_imm16_read();
         fast_u8 lo = self().on_3t_read_cycle(pc);
         pc = inc16(pc);
-        fast_u8 hi = self().on_4t_read_cycle(pc);
+        fast_u8 hi = self().xon_read_cycle(pc);
+        self().on_read_cycle_extra_1t(pc);
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
 
@@ -2679,8 +2681,9 @@ public:
 
     fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
         fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
-        fast_u8 res = long_read_cycle ? self().on_4t_read_cycle(addr) :
-                                        self().on_3t_read_cycle(addr);
+        fast_u8 res = self().xon_read_cycle(addr);
+        if(long_read_cycle)  // TODO: Remove. Do extra ticks manually.
+            self().on_read_cycle_extra_1t(addr);
         if(!is_hl_iregp())
             self().on_set_wz(addr);
         return res;
@@ -3135,7 +3138,8 @@ public:
         fast_u16 sp = self().on_get_sp();
         fast_u8 lo = self().on_3t_read_cycle(sp);
         sp = inc16(sp);
-        fast_u8 hi = self().on_4t_read_cycle(sp);
+        fast_u8 hi = self().xon_read_cycle(sp);
+        self().on_read_cycle_extra_1t(sp);
         fast_u16 nn = make16(hi, lo);
         fast_u16 irp = self().on_get_iregp();
         std::swap(nn, irp);
