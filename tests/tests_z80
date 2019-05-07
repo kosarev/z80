@@ -348,7 +348,7 @@ edb1 cpir
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 6t_fetch
+ 4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
  6 set_l 00 -> ff
@@ -521,7 +521,7 @@ ed56 im 1
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 6t_fetch
+ 4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
  6 set_l 00 -> 01
@@ -1154,7 +1154,7 @@ f9 ld sp, hl
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 6t_fetch
+ 4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
  6 set_sp 0000 -> 0000

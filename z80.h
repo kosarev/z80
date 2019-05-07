@@ -286,6 +286,8 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    void on_fetch_cycle_extra_2t() {
+        self().on_tick(2); }
     void on_fetch_cycle_extra_3t() {
         self().on_tick(3); }
     fast_u8 on_read_cycle(fast_u16 addr) {
@@ -751,7 +753,7 @@ public:
     void on_decode_dec_r(reg r) {
         self().on_dec_r(r, read_disp_or_null(r)); }
     void on_decode_dec_rp(regp rp) {
-        self().on_6t_fetch_cycle();
+        self().on_fetch_cycle_extra_2t();
         self().on_dec_rp(rp); }
     void on_decode_djnz() {
         self().on_5t_fetch_cycle();
@@ -774,7 +776,7 @@ public:
     void on_decode_inc_r(reg r) {
         self().on_inc_r(r, read_disp_or_null(r)); }
     void on_decode_inc_rp(regp rp) {
-        self().on_6t_fetch_cycle();
+        self().on_fetch_cycle_extra_2t();
         self().on_inc_rp(rp); }
     void on_decode_ld_r_n(reg r) {
         fast_u8 d, n;
@@ -790,7 +792,7 @@ public:
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
     void on_decode_ld_sp_irp() {
-        self().on_6t_fetch_cycle();
+        self().on_fetch_cycle_extra_2t();
         self().on_ld_sp_irp(); }
 
     void on_decode_cb_prefix() {
@@ -1335,7 +1337,6 @@ public:
     fast_u8 on_fetch(bool m1 = true) {
         unused(m1);
         return self().on_read_next_byte(); }
-    void on_6t_fetch_cycle() {}
 
     // 'call cc, nn' instructions require this function to disambiguate between
     // read cycles of various lengths. This disambiguation does not affect
@@ -3380,10 +3381,6 @@ public:
         self().on_tick(2);
         self().on_set_last_read_addr(addr);
         return b;
-    }
-
-    void on_6t_fetch_cycle() {
-        self().on_tick(2);
     }
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {

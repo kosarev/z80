@@ -485,10 +485,16 @@ public:
         base::on_5t_fetch_cycle();
     }
 
-    void on_6t_fetch_cycle() {
-        input.read_and_match("6t_fetch",
+    void on_fetch_cycle_extra_2t() {
+        input.read_and_match("fetch_cycle_extra_2t",
                              static_cast<unsigned>(get_ticks()));
-        base::on_6t_fetch_cycle();
+        base::on_fetch_cycle_extra_2t();
+    }
+
+    void on_fetch_cycle_extra_3t() {
+        input.read_and_match("fetch_cycle_extra_3t",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_fetch_cycle_extra_3t();
     }
 
     fast_u8 on_read_cycle(fast_u16 addr) {
