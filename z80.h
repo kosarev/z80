@@ -423,7 +423,7 @@ public:
         case 0306: {
             // alu[y] n  f(4) r(3)  (both i8080 and z80)
             auto k = static_cast<alu>(y);
-            return self().on_alu_n(k, self().on_3t_imm8_read()); }
+            return self().on_alu_n(k, self().on_imm8_read()); }
         case 0307:
             // RST y*8  f(5) w(3) w(3)
             self().on_5t_fetch_cycle();
@@ -569,7 +569,7 @@ public:
         case 0xd3:
             // OUT n       f(4) r(3) o(3)
             // OUT (n), A  f(4) r(3) o(4)
-            return self().on_out_n_a(self().on_3t_imm8_read());
+            return self().on_out_n_a(self().on_imm8_read());
         case 0xd9:
             // EXX   f(4)
             // XRET  f(4)
@@ -577,7 +577,7 @@ public:
         case 0xdb:
             // IN n       f(4) r(3) i(3)
             // IN A, (n)  f(4) r(3) i(4)
-            return self().on_in_a_n(self().on_3t_imm8_read());
+            return self().on_in_a_n(self().on_imm8_read());
         case 0xdd:
             // DD prefix (IX-indexed instructions)
             // DD        f(4)
@@ -696,7 +696,7 @@ public:
         self().on_5t_fetch_cycle();
         self().on_jp_irp(); }
     void on_decode_ld_r_n(reg r) {
-        fast_u8 n = self().on_3t_imm8_read();
+        fast_u8 n = self().on_imm8_read();
         self().on_ld_r_n(r, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs); }
@@ -778,10 +778,10 @@ public:
         fast_u8 d, n;
         if(r != reg::at_hl || is_hl_iregp()) {
             d = 0;
-            n = self().on_3t_imm8_read();
+            n = self().on_imm8_read();
         } else {
             d = self().on_disp_read();
-            n = self().on_3t_imm8_read();
+            n = self().on_imm8_read();
             self().on_read_cycle_extra_2t();
         }
         self().on_ld_r_n(r, d, n); }
@@ -989,7 +989,7 @@ public:
 
     void on_5t_fetch_cycle() {}
 
-    fast_u8 on_3t_imm8_read() { return self().on_read_next_byte(); }
+    fast_u8 on_imm8_read() { return self().on_read_next_byte(); }
 
     fast_u16 on_imm16_read() {
         fast_u8 lo = self().on_read_next_byte();
@@ -2071,7 +2071,7 @@ public:
         self().on_tick(1);
     }
 
-    fast_u8 on_3t_imm8_read() {
+    fast_u8 on_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
         fast_u8 op = self().on_read_cycle(pc);
         self().set_pc_on_imm8_read(inc16(pc));

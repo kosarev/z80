@@ -13,7 +13,7 @@ ce16 aci 0x16
  0 fetch ce at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -56,7 +56,7 @@ c616 adi 0x16
  0 fetch c6 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -86,7 +86,7 @@ e616 ani 0x16
  0 fetch e6 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -196,7 +196,7 @@ fe16 cpi 0x16
  0 fetch fe at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -342,7 +342,7 @@ dbfe in 0xfe
  0 fetch db at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read fe at 0001
+ 4 imm8_read fe at 0001
  4   get_pc_on_imm8_read 0001
  4   read fe at 0001
  4     set_addr_bus 0000 -> 0001
@@ -486,7 +486,7 @@ f616 ori 0x16
  0 fetch f6 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -503,7 +503,7 @@ d3ab out 0xab
  0 fetch d3 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read ab at 0001
+ 4 imm8_read ab at 0001
  4   get_pc_on_imm8_read 0001
  4   read ab at 0001
  4     set_addr_bus 0000 -> 0001
@@ -591,7 +591,7 @@ de16 sbi 0x16
  0 fetch de at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -633,7 +633,7 @@ d616 sui 0x16
  0 fetch d6 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -650,7 +650,7 @@ d616 sui 0x16
  0 fetch 3e at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read af at 0001
+ 4 imm8_read af at 0001
  4   get_pc_on_imm8_read 0001
  4   read af at 0001
  4     set_addr_bus 0000 -> 0001
@@ -886,7 +886,7 @@ ee16 xri 0x16
  0 fetch ee at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_imm8_read 16 at 0001
+ 4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001

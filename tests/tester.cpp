@@ -576,14 +576,14 @@ public:
         base::on_output_cycle(addr, b);
     }
 
-    fast_u8 on_3t_imm8_read() {
+    fast_u8 on_imm8_read() {
         fast_u16 addr = base::get_pc();
-        input.read_and_match("3t_imm8_read %02x at %04x",
+        input.read_and_match("imm8_read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_read(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
-        return base::on_3t_imm8_read();
+        return base::on_imm8_read();
     }
 
     fast_u16 on_imm16_read() {
