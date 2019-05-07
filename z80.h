@@ -298,6 +298,10 @@ public:
     void on_read_cycle_extra_2t(fast_u16 addr) {
         unused(addr);
         self().on_tick(2); }
+    void on_write_cycle(fast_u16 addr, fast_u8 n) {
+        self().on_set_addr_bus(addr);
+        self().on_write(addr, n);
+        self().on_tick(3); }
     void on_write_cycle_extra_2t(fast_u16 addr) {
         unused(addr);
         self().on_tick(2); }
@@ -2091,18 +2095,6 @@ public:
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
 
-    // TODO: Rename and move to the root.
-    void xon_write_cycle(fast_u16 addr, fast_u8 n) {
-        self().on_set_addr_bus(addr);
-        self().on_write(addr, n);
-        self().on_tick(3); }
-    void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
-        self().on_set_addr_bus(addr);
-        self().on_write(addr, n);
-        self().on_tick(ticks); }
-    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
-        self().on_write_cycle(addr, n, /* ticks= */ 3); }
-
     void on_3t_exec_cycle() {
         self().on_tick(3); }
 
@@ -2112,9 +2104,9 @@ public:
     void on_push(fast_u16 nn) {
         fast_u16 sp = self().on_get_sp();
         sp = dec16(sp);
-        self().on_3t_write_cycle(sp, get_high8(nn));
+        self().on_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
-        self().on_3t_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle(sp, get_low8(nn));
         self().on_set_sp(sp); }
     fast_u16 on_pop() {
         fast_u16 sp = self().on_get_sp();
@@ -2168,7 +2160,7 @@ public:
     void on_ld_at_nn_a(fast_u16 nn) {
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
-        self().on_3t_write_cycle(nn, a); }
+        self().on_write_cycle(nn, a); }
     void on_ld_a_at_rp(regp rp) {
         fast_u16 nn = self().on_get_regp(rp);
         self().on_set_wz(inc16(nn));
@@ -2177,7 +2169,7 @@ public:
         fast_u16 nn = self().on_get_regp(rp);
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, get_low8(nn + 1)));
-        self().on_3t_write_cycle(nn, a); }
+        self().on_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         self().on_set_regp(rp, nn); }
     void on_nop() {}
@@ -2290,7 +2282,7 @@ public:
     fast_u8 on_get_m() {
         return self().on_read_cycle(self().on_get_hl()); }
     void on_set_m(fast_u8 n) {
-        self().on_3t_write_cycle(self().on_get_hl(), n); }
+        self().on_write_cycle(self().on_get_hl(), n); }
 
     fast_u8 on_get_reg(reg r) {
         switch(r) {
@@ -2509,9 +2501,9 @@ public:
         fast_u16 nn = make16(hi, lo);
         fast_u16 hl = self().on_get_hl();
         std::swap(nn, hl);
-        self().on_3t_write_cycle(sp, get_high8(nn));
+        self().on_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
-        self().xon_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle(sp, get_low8(nn));
         self().on_write_cycle_extra_2t(sp);
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
@@ -2543,10 +2535,10 @@ public:
         self().on_set_hl(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = self().on_get_hl();
-        self().on_3t_write_cycle(nn, get_low8(irp));
+        self().on_write_cycle(nn, get_low8(irp));
         nn = inc16(nn);
         self().on_set_wz(nn);
-        self().on_3t_write_cycle(nn, get_high8(irp)); }
+        self().on_write_cycle(nn, get_high8(irp)); }
     void on_out_n_a(fast_u8 n) {
         self().on_output_cycle(n, self().on_get_a()); }
     void on_pop_rp(regp2 rp) {
@@ -2688,7 +2680,7 @@ public:
 
     void write_at_disp(fast_u8 d, fast_u8 n) {
         fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
-        self().on_3t_write_cycle(addr, n);
+        self().on_write_cycle(addr, n);
         if(!is_hl_iregp())
             self().on_set_wz(addr);
     }
@@ -3026,7 +3018,7 @@ public:
 
         fast_u8 t = self().on_read_cycle(hl);
 
-        self().xon_write_cycle(de, t);
+        self().on_write_cycle(de, t);
         self().on_write_cycle_extra_2t(de);
         bc = dec16(bc);
 
@@ -3141,9 +3133,9 @@ public:
         fast_u16 nn = make16(hi, lo);
         fast_u16 irp = self().on_get_iregp();
         std::swap(nn, irp);
-        self().on_3t_write_cycle(sp, get_high8(nn));
+        self().on_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
-        self().xon_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle(sp, get_low8(nn));
         self().on_write_cycle_extra_2t(sp);
         self().on_set_wz(irp);
         self().on_set_iregp(irp); }
@@ -3217,10 +3209,10 @@ public:
         self().on_set_iregp(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = self().on_get_iregp();
-        self().on_3t_write_cycle(nn, get_low8(irp));
+        self().on_write_cycle(nn, get_low8(irp));
         nn = inc16(nn);
         self().on_set_wz(nn);
-        self().on_3t_write_cycle(nn, get_high8(irp)); }
+        self().on_write_cycle(nn, get_high8(irp)); }
 
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         fast_u8 lo = self().on_read_cycle(nn);
@@ -3230,10 +3222,10 @@ public:
         self().on_set_regp(rp, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         fast_u16 rpv = self().on_get_regp(rp);
-        self().on_3t_write_cycle(nn, get_low8(rpv));
+        self().on_write_cycle(nn, get_low8(rpv));
         nn = inc16(nn);
         self().on_set_wz(nn);
-        self().on_3t_write_cycle(nn, get_high8(rpv)); }
+        self().on_write_cycle(nn, get_high8(rpv)); }
     void on_ld_sp_irp() {
         self().on_set_sp(self().on_get_iregp()); }
     void on_neg() {
@@ -3303,7 +3295,7 @@ public:
 
         self().on_set_a(a);
         self().on_set_f(f);
-        self().on_3t_write_cycle(hl, get_low8(t)); }
+        self().on_write_cycle(hl, get_low8(t)); }
     void on_rot(rot k, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         reg access_r = irp == iregp::hl ? r : reg::at_hl;
@@ -3346,7 +3338,7 @@ public:
 
         self().on_set_a(a);
         self().on_set_f(f);
-        self().on_3t_write_cycle(hl, get_low8(t)); }
+        self().on_write_cycle(hl, get_low8(t)); }
     void on_scf() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();

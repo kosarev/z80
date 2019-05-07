@@ -514,24 +514,14 @@ public:
         base::on_read_cycle_extra_2t(addr);
     }
 
-    void xon_write_cycle(fast_u16 addr, fast_u8 n) {
+    void on_write_cycle(fast_u16 addr, fast_u8 n) {
         input.read_and_match("write %02x -> %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_read(addr)),
                              static_cast<unsigned>(n),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
-        base::xon_write_cycle(addr, n);
-    }
-
-    void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
-        input.read_and_match("3t_write %02x -> %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(n),
-                             static_cast<unsigned>(addr));
-        input_level_guard guard(input);
-        base::on_3t_write_cycle(addr, n);
+        base::on_write_cycle(addr, n);
     }
 
     void on_write_cycle_extra_2t(fast_u16 addr) {

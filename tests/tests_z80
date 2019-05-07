@@ -183,9 +183,9 @@ cddf0e call 0x0edf
 10   read_cycle_extra_1t at 0002
 11   set_pc_on_imm16_read 0001 -> 0003
 11 get_sp 0000
-11 3t_write 00 -> 00 at ffff
+11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff
-14 3t_write 00 -> 03 at fffe
+14 write 00 -> 03 at fffe
 14   set_addr_bus ffff -> fffe
 17 set_sp 0000 -> fffe
 17 set_wz 0000 -> 0edf
@@ -213,9 +213,9 @@ c4550c call nz, 0x0c55
 11   set_pc_on_imm16_read 0001 -> 0003
 11 get_f 00
 11 get_sp 0000
-11 3t_write 00 -> 00 at ffff
+11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff
-14 3t_write 00 -> 03 at fffe
+14 write 00 -> 03 at fffe
 14   set_addr_bus ffff -> fffe
 17 set_sp 0000 -> fffe
 17 set_wz 0000 -> 0c55
@@ -334,7 +334,7 @@ edb1 cpir
  8 get_f 00
  8 get_l 00
  8 get_h 00
- 8 3t_write 35 -> 34 at 0000
+ 8 write 35 -> 34 at 0000
  8   set_addr_bus 0000 -> 0000
 11 set_f 00 -> 22
 11 done
@@ -444,7 +444,7 @@ e3 ex (sp), hl
 10 read_cycle_extra_1t at 0001
 11 get_l 00
 11 get_h 00
-11 3t_write 00 -> 00 at 0001
+11 write 00 -> 00 at 0001
 11   set_addr_bus 0001 -> 0001
 14 write e3 -> 00 at 0000
 14   set_addr_bus 0001 -> 0000
@@ -850,7 +850,7 @@ fd6e12 ld l, (iy + 18)
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_l 00
  7 get_h 00
- 7 3t_write 36 -> 02 at 0000
+ 7 write 36 -> 02 at 0000
  7   set_addr_bus 0001 -> 0000
 10 done
 
@@ -1050,7 +1050,7 @@ ed4bb45c ld bc, (0x5cb4)
 10   set_pc_on_imm16_read 0001 -> 0003
 10 get_a 00
 10 set_wz 0000 -> 008e
-10 3t_write 00 -> 00 at 5c8d
+10 write 00 -> 00 at 5c8d
 10   set_addr_bus 0002 -> 5c8d
 13 done
 
@@ -1072,10 +1072,10 @@ ed4bb45c ld bc, (0x5cb4)
 10   set_pc_on_imm16_read 0001 -> 0003
 10 get_l 00
 10 get_h 00
-10 3t_write 00 -> 00 at 5c7b
+10 write 00 -> 00 at 5c7b
 10   set_addr_bus 0002 -> 5c7b
 13 set_wz 0000 -> 5c7c
-13 3t_write 00 -> 00 at 5c7c
+13 write 00 -> 00 at 5c7c
 13   set_addr_bus 5c7b -> 5c7c
 16 done
 
@@ -1104,10 +1104,10 @@ ed43b45c ld (0x5cb4), bc
 14   set_pc_on_imm16_read 0002 -> 0004
 14 get_c 00
 14 get_b 00
-14 3t_write 00 -> 00 at 5cb4
+14 write 00 -> 00 at 5cb4
 14   set_addr_bus 0003 -> 5cb4
 17 set_wz 0000 -> 5cb5
-17 3t_write 00 -> 00 at 5cb5
+17 write 00 -> 00 at 5cb5
 17   set_addr_bus 5cb4 -> 5cb5
 20 done
 
@@ -1141,7 +1141,7 @@ ed43b45c ld (0x5cb4), bc
  4 get_d 00
  4 get_a 00
  4 set_wz 0000 -> 0001
- 4 3t_write 12 -> 00 at 0000
+ 4 write 12 -> 00 at 0000
  4   set_addr_bus 0000 -> 0000
  7 done
 
@@ -1324,9 +1324,9 @@ c5 push bc
  5 get_c 00
  5 get_b 00
  5 get_sp 0000
- 5 3t_write 00 -> 00 at ffff
+ 5 write 00 -> 00 at ffff
  5   set_addr_bus 0000 -> ffff
- 8 3t_write 00 -> 00 at fffe
+ 8 write 00 -> 00 at fffe
  8   set_addr_bus ffff -> fffe
 11 set_sp 0000 -> fffe
 11 done
@@ -1433,7 +1433,7 @@ ddcb463e srl (ix + 70)
 20 get_f 00
 20 get_ixl 00
 20 get_ixh 00
-20 3t_write 00 -> 00 at 0046
+20 write 00 -> 00 at 0046
 20   set_addr_bus 0046 -> 0046
 23 set_wz 0046 -> 0046
 23 set_f 00 -> 44
@@ -1518,7 +1518,7 @@ ed6f rld
 11 4t_exec
 15 set_a 00 -> 0e
 15 set_f 00 -> 08
-15 3t_write ed -> d0 at 0000
+15 write ed -> d0 at 0000
 15   set_addr_bus 0000 -> 0000
 18 done
 
@@ -1600,7 +1600,7 @@ ed67 rrd
 11 4t_exec
 15 set_a 00 -> 0d
 15 set_f 00 -> 08
-15 3t_write ed -> 0e at 0000
+15 write ed -> 0e at 0000
 15   set_addr_bus 0000 -> 0000
 18 done
 
@@ -1615,9 +1615,9 @@ d7 rst 0x0010
  4 set_pc_on_fetch 0000 -> 0001
  4 5t_fetch
  5 get_sp 0000
- 5 3t_write 00 -> 00 at ffff
+ 5 write 00 -> 00 at ffff
  5   set_addr_bus 0000 -> ffff
- 8 3t_write 00 -> 01 at fffe
+ 8 write 00 -> 01 at fffe
  8   set_addr_bus ffff -> fffe
 11 set_sp 0000 -> fffe
 11 set_wz 0000 -> 0010
@@ -1662,7 +1662,7 @@ fdcb308e res 1, (iy + 48)
 20 set_wz 0000 -> 0030
 20 get_iyl 00
 20 get_iyh 00
-20 3t_write 00 -> 00 at 0030
+20 write 00 -> 00 at 0030
 20   set_addr_bus 0030 -> 0030
 23 set_wz 0030 -> 0030
 23 set_index_rp iy -> hl
@@ -1853,7 +1853,7 @@ fdcb01ce set 1, (iy + 1)
 20 set_wz 0000 -> 0001
 20 get_iyl 00
 20 get_iyh 00
-20 3t_write cb -> cb at 0001
+20 write cb -> cb at 0001
 20   set_addr_bus 0001 -> 0001
 23 set_wz 0001 -> 0001
 23 set_index_rp iy -> hl
