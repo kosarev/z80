@@ -292,18 +292,15 @@ public:
         self().on_tick(3);
         self().on_set_last_read_addr(addr);
         return n; }
-    void on_read_cycle_extra_1t(fast_u16 addr) {
-        unused(addr);
+    void on_read_cycle_extra_1t() {
         self().on_tick(1); }
-    void on_read_cycle_extra_2t(fast_u16 addr) {
-        unused(addr);
+    void on_read_cycle_extra_2t() {
         self().on_tick(2); }
     void on_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_set_addr_bus(addr);
         self().on_write(addr, n);
         self().on_tick(3); }
-    void on_write_cycle_extra_2t(fast_u16 addr) {
-        unused(addr);
+    void on_write_cycle_extra_2t() {
         self().on_tick(2); }
 
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -567,7 +564,7 @@ public:
         case 0xcd: {
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
             fast_u16 nn = self().on_imm16_read();
-            self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
+            self().on_read_cycle_extra_1t();
             return self().on_call_nn(nn); }
         case 0xd3:
             // OUT n       f(4) r(3) o(3)
@@ -708,7 +705,7 @@ public:
         self().on_ld_sp_irp(); }
     void on_decode_xcall_nn(fast_u8 op) {
         fast_u16 nn = self().on_imm16_read();
-        self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
+        self().on_read_cycle_extra_1t();
         self().on_xcall_nn(op, nn); }
 
 protected:
@@ -743,7 +740,7 @@ public:
         bool cc_met = self().check_condition(cc);
         fast_u16 nn = self().on_imm16_read();
         if(cc_met)  // TODO: Do this in the executor.
-            self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
+            self().on_read_cycle_extra_1t();
         self().on_call_cc_nn(cc, nn); }
     void on_decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
@@ -2497,7 +2494,7 @@ public:
         self().on_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         self().on_write_cycle(sp, get_low8(nn));
-        self().on_write_cycle_extra_2t(sp);
+        self().on_write_cycle_extra_2t();
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
     void on_jp_irp() {
@@ -2665,7 +2662,7 @@ public:
         fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
         fast_u8 res = self().on_read_cycle(addr);
         if(long_read_cycle)  // TODO: Remove. Do extra ticks manually.
-            self().on_read_cycle_extra_1t(addr);
+            self().on_read_cycle_extra_1t();
         if(!is_hl_iregp())
             self().on_set_wz(addr);
         return res;
@@ -3012,7 +3009,7 @@ public:
         fast_u8 t = self().on_read_cycle(hl);
 
         self().on_write_cycle(de, t);
-        self().on_write_cycle_extra_2t(de);
+        self().on_write_cycle_extra_2t();
         bc = dec16(bc);
 
         t += a;
@@ -3122,14 +3119,14 @@ public:
         fast_u8 lo = self().on_read_cycle(sp);
         sp = inc16(sp);
         fast_u8 hi = self().on_read_cycle(sp);
-        self().on_read_cycle_extra_1t(sp);
+        self().on_read_cycle_extra_1t();
         fast_u16 nn = make16(hi, lo);
         fast_u16 irp = self().on_get_iregp();
         std::swap(nn, irp);
         self().on_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
         self().on_write_cycle(sp, get_low8(nn));
-        self().on_write_cycle_extra_2t(sp);
+        self().on_write_cycle_extra_2t();
         self().on_set_wz(irp);
         self().on_set_iregp(irp); }
     void on_exx() {
@@ -3422,7 +3419,7 @@ public:
     fast_u8 on_5t_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
         fast_u8 op = self().on_read_cycle(pc);
-        self().on_read_cycle_extra_2t(pc);
+        self().on_read_cycle_extra_2t();
         self().set_pc_on_imm8_read(inc16(pc));
         return op;
     }

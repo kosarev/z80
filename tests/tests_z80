@@ -158,7 +158,7 @@ fdcb014e bit 1, (iy + 1)
 16 get_iyh 00
 16 read cb at 0001
 16   set_addr_bus 0002 -> 0001
-19 read_cycle_extra_1t at 0001
+19 read_cycle_extra_1t
 20 set_wz 0000 -> 0001
 20 get_f 00
 20 set_f 00 -> 10
@@ -181,7 +181,7 @@ cddf0e call 0x0edf
  7   read 0e at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
-10 read_cycle_extra_1t at 0002
+10 read_cycle_extra_1t
 11 get_sp 0000
 11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff
@@ -210,7 +210,7 @@ c4550c call nz, 0x0c55
  7   read 0c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
-10 read_cycle_extra_1t at 0002
+10 read_cycle_extra_1t
 11 get_f 00
 11 get_sp 0000
 11 write 00 -> 00 at ffff
@@ -330,7 +330,7 @@ edb1 cpir
  4 get_h 00
  4 read 35 at 0000
  4   set_addr_bus 0000 -> 0000
- 7 read_cycle_extra_1t at 0000
+ 7 read_cycle_extra_1t
  8 get_f 00
  8 get_l 00
  8 get_h 00
@@ -441,14 +441,14 @@ e3 ex (sp), hl
  4   set_addr_bus 0000 -> 0000
  7 read 00 at 0001
  7   set_addr_bus 0000 -> 0001
-10 read_cycle_extra_1t at 0001
+10 read_cycle_extra_1t
 11 get_l 00
 11 get_h 00
 11 write 00 -> 00 at 0001
 11   set_addr_bus 0001 -> 0001
 14 write e3 -> 00 at 0000
 14   set_addr_bus 0001 -> 0000
-17 write_cycle_extra_2t at 0000
+17 write_cycle_extra_2t
 19 set_wz 0000 -> 00e3
 19 set_l 00 -> e3
 19 set_h 00 -> 00
@@ -1188,7 +1188,7 @@ edb8 lddr
  8   set_addr_bus 0001 -> 0000
 11 write ed -> ed at 0000
 11   set_addr_bus 0000 -> 0000
-14 write_cycle_extra_2t at 0000
+14 write_cycle_extra_2t
 16 set_c 00 -> ff
 16 set_b 00 -> ff
 16 set_e 00 -> ff
@@ -1428,7 +1428,7 @@ ddcb463e srl (ix + 70)
 16 get_ixh 00
 16 read 00 at 0046
 16   set_addr_bus 0002 -> 0046
-19 read_cycle_extra_1t at 0046
+19 read_cycle_extra_1t
 20 set_wz 0000 -> 0046
 20 get_f 00
 20 get_ixl 00
@@ -1658,7 +1658,7 @@ fdcb308e res 1, (iy + 48)
 16 get_iyh 00
 16 read 00 at 0030
 16   set_addr_bus 0002 -> 0030
-19 read_cycle_extra_1t at 0030
+19 read_cycle_extra_1t
 20 set_wz 0000 -> 0030
 20 get_iyl 00
 20 get_iyh 00
@@ -1849,7 +1849,7 @@ fdcb01ce set 1, (iy + 1)
 16 get_iyh 00
 16 read cb at 0001
 16   set_addr_bus 0002 -> 0001
-19 read_cycle_extra_1t at 0001
+19 read_cycle_extra_1t
 20 set_wz 0000 -> 0001
 20 get_iyl 00
 20 get_iyh 00

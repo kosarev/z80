@@ -500,18 +500,16 @@ public:
         return base::on_read_cycle(addr);
     }
 
-    void on_read_cycle_extra_1t(fast_u16 addr) {
-        input.read_and_match("read_cycle_extra_1t at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr));
-        base::on_read_cycle_extra_1t(addr);
+    void on_read_cycle_extra_1t() {
+        input.read_and_match("read_cycle_extra_1t",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_read_cycle_extra_1t();
     }
 
-    void on_read_cycle_extra_2t(fast_u16 addr) {
-        input.read_and_match("read_cycle_extra_2t at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr));
-        base::on_read_cycle_extra_2t(addr);
+    void on_read_cycle_extra_2t() {
+        input.read_and_match("read_cycle_extra_2t",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_read_cycle_extra_2t();
     }
 
     void on_write_cycle(fast_u16 addr, fast_u8 n) {
@@ -524,11 +522,10 @@ public:
         base::on_write_cycle(addr, n);
     }
 
-    void on_write_cycle_extra_2t(fast_u16 addr) {
-        input.read_and_match("write_cycle_extra_2t at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr));
-        base::on_write_cycle_extra_2t(addr);
+    void on_write_cycle_extra_2t() {
+        input.read_and_match("write_cycle_extra_2t",
+                             static_cast<unsigned>(get_ticks()));
+        base::on_write_cycle_extra_2t();
     }
 
     void on_3t_exec_cycle() {

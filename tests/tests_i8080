@@ -110,7 +110,7 @@ cddf0e call 0x0edf
  7   read 0e at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
-10 read_cycle_extra_1t at 0002
+10 read_cycle_extra_1t
 11 get_sp 0000
 11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff
@@ -914,7 +914,7 @@ e3 xthl
 10   set_addr_bus 0001 -> 0001
 13 write e3 -> 00 at 0000
 13   set_addr_bus 0001 -> 0000
-16 write_cycle_extra_2t at 0000
+16 write_cycle_extra_2t
 18 set_wz 0000 -> 00e3
 18 set_l 00 -> e3
 18 set_h 00 -> 00
