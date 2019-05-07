@@ -286,6 +286,8 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    void on_fetch_cycle_extra_3t() {
+        self().on_tick(3); }
     fast_u8 on_read_cycle(fast_u16 addr) {
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
@@ -683,7 +685,7 @@ public:
     void on_decode_jr_cc(fast_u8 op) {
         self().on_xnop(op); }
     void on_decode_halt() {
-        self().on_7t_fetch_cycle();
+        self().on_fetch_cycle_extra_3t();
         self().on_halt(); }
     void on_decode_inc_r(reg r) {
         if(r != reg::at_hl)
@@ -1135,8 +1137,6 @@ public:
     typedef internals::disasm_base<i8080_decoder<root<D>>> base;
 
     i8080_disasm() {}
-
-    void on_7t_fetch_cycle() {}
 
     fast_u8 on_fetch() {
         return self().on_read_next_byte(); }
@@ -2347,8 +2347,6 @@ public:
         self().on_tick(4);
         self().on_set_last_read_addr(addr);
         return b; }
-    void on_7t_fetch_cycle() {
-        self().on_tick(3); }
 
     fast_u8 on_fetch() {
         fast_u16 pc = self().get_pc_on_fetch();
