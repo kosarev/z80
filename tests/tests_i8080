@@ -103,14 +103,14 @@ cddf0e call 0x0edf
  0 fetch cd at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_4t_imm16_read 0edf at 0001
+ 4 imm16_read 0edf at 0001
  4   get_pc_on_imm16_read 0001
  4   read df at 0001
  4     set_addr_bus 0000 -> 0001
  7   read 0e at 0002
  7     set_addr_bus 0001 -> 0002
-10   read_cycle_extra_1t at 0002
-11   set_pc_on_imm16_read 0001 -> 0003
+10   set_pc_on_imm16_read 0001 -> 0003
+10 read_cycle_extra_1t at 0002
 11 get_sp 0000
 11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff

@@ -564,9 +564,11 @@ public:
             // CB prefix   f(4)
             // XJMP nn     f(4) r(3) r(3)
             return self().on_decode_cb_prefix();
-        case 0xcd:
+        case 0xcd: {
             // CALL nn  f(4) r(3) r(4) w(3) w(3)
-            return self().on_call_nn(self().on_3t_4t_imm16_read());
+            fast_u16 nn = self().on_imm16_read();
+            self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
+            return self().on_call_nn(nn); }
         case 0xd3:
             // OUT n       f(4) r(3) o(3)
             // OUT (n), A  f(4) r(3) o(4)
@@ -705,7 +707,9 @@ public:
         self().on_5t_fetch_cycle();
         self().on_ld_sp_irp(); }
     void on_decode_xcall_nn(fast_u8 op) {
-        self().on_xcall_nn(op, self().on_3t_4t_imm16_read()); }
+        fast_u16 nn = self().on_imm16_read();
+        self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
+        self().on_xcall_nn(op, nn); }
 
 protected:
     using base::self;
@@ -737,8 +741,9 @@ public:
         // execution if the condition is met. Do not check the
         // condition on decoding.
         bool cc_met = self().check_condition(cc);
-        fast_u16 nn = cc_met ? self().on_3t_4t_imm16_read() :
-                               self().on_imm16_read();
+        fast_u16 nn = self().on_imm16_read();
+        if(cc_met)  // TODO: Do this in the executor.
+            self().on_read_cycle_extra_1t(self().on_get_pc() - 1);  // TODO: Do not do that extra get_pc().
         self().on_call_cc_nn(cc, nn); }
     void on_decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
@@ -989,10 +994,6 @@ public:
     fast_u8 on_3t_imm8_read() { return self().on_read_next_byte(); }
 
     fast_u16 on_imm16_read() {
-        fast_u8 lo = self().on_read_next_byte();
-        fast_u8 hi = self().on_read_next_byte();
-        return make16(hi, lo); }
-    fast_u16 on_3t_4t_imm16_read() {
         fast_u8 lo = self().on_read_next_byte();
         fast_u8 hi = self().on_read_next_byte();
         return make16(hi, lo); }
@@ -2084,14 +2085,6 @@ public:
         fast_u8 lo = self().on_read_cycle(pc);
         pc = inc16(pc);
         fast_u8 hi = self().on_read_cycle(pc);
-        self().set_pc_on_imm16_read(inc16(pc));
-        return make16(hi, lo); }
-    fast_u16 on_3t_4t_imm16_read() {
-        fast_u16 pc = self().get_pc_on_imm16_read();
-        fast_u8 lo = self().on_read_cycle(pc);
-        pc = inc16(pc);
-        fast_u8 hi = self().on_read_cycle(pc);
-        self().on_read_cycle_extra_1t(pc);
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
 
