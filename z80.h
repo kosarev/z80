@@ -286,6 +286,8 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    void on_fetch_cycle_extra_1t() {
+        self().on_tick(1); }
     void on_fetch_cycle_extra_2t() {
         self().on_tick(2); }
     void on_fetch_cycle_extra_3t() {
@@ -406,7 +408,7 @@ public:
             return self().on_decode_ld_r_n(r); }
         case 0300: {
             // RET cc[y]/Rcc[y]  f(5) + r(3) r(3)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             auto cc = static_cast<condition>(y);
             return self().on_ret_cc(cc); }
         case 0302: {
@@ -430,7 +432,7 @@ public:
             return self().on_alu_n(k, self().on_imm8_read()); }
         case 0307:
             // RST y*8  f(5) w(3) w(3)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             return self().on_rst(y * 8);
         }
         switch(op & (x_mask | z_mask | q_mask)) {
@@ -472,7 +474,7 @@ public:
             // PUSH rp2[p]
             // PUSH rr          f(5) w(3) w(3)
             // PUSH i      f(4) f(5) w(3) w(3)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             auto rp = static_cast<regp2>(p);
             return self().on_push_rp(rp); }
         }
@@ -656,7 +658,7 @@ public:
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r); }
     void on_decode_call_cc_nn(condition cc) {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_call_cc_nn(cc, self().on_imm16_read()); }
     void on_decode_cb_prefix() {
         self().on_xjp_nn(self().on_imm16_read()); }
@@ -666,10 +668,10 @@ public:
         self().on_decode_xcall_nn(0xfd); }
     void on_decode_dec_r(reg r) {
         if(r != reg::at_hl)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
         self().on_dec_r(r); }
     void on_decode_dec_rp(regp rp) {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_dec_rp(rp); }
     void on_decode_djnz() {
         self().on_xnop(/* op= */ 0x10); }
@@ -678,7 +680,7 @@ public:
     void on_decode_ex_af_alt_af() {
         self().on_xnop(/* op= */ 0x08); }
     void on_decode_ex_de_hl() {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_ex_de_hl(); }
     void on_decode_exx() {
         self().on_xret(); }
@@ -691,13 +693,13 @@ public:
         self().on_halt(); }
     void on_decode_inc_r(reg r) {
         if(r != reg::at_hl)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
         self().on_inc_r(r); }
     void on_decode_inc_rp(regp rp) {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_inc_rp(rp); }
     void on_decode_jp_irp() {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_jp_irp(); }
     void on_decode_ld_r_n(reg r) {
         fast_u8 n = self().on_imm8_read();
@@ -705,7 +707,7 @@ public:
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs); }
     void on_decode_ld_sp_irp() {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_ld_sp_irp(); }
     void on_decode_xcall_nn(fast_u8 op) {
         fast_u16 nn = self().on_imm16_read();
@@ -756,7 +758,7 @@ public:
         self().on_fetch_cycle_extra_2t();
         self().on_dec_rp(rp); }
     void on_decode_djnz() {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_djnz(self().on_disp_read()); }
     void on_decode_ex_af_alt_af() {
         self().on_ex_af_alt_af(); }
@@ -808,7 +810,7 @@ public:
             // In ddcb- and fdcb-prefixed instructions the
             // reading of the 3rd opcode is not an M1 cycle.
             op = self().on_fetch(/* m1= */ false);
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
         }
 
         fast_u8 y = get_y_part(op);
@@ -910,19 +912,19 @@ public:
         switch(op) {
         case 0x47:
             // LD I, A  f(4) f(5)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             return self().on_ld_i_a();
         case 0x4f:
             // LD R, A  f(4) f(5)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             return self().on_ld_r_a();
         case 0x57:
             // LD A, I  f(4) f(5)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             return self().on_ld_a_i();
         case 0x5f:
             // LD A, R  f(4) f(5)
-            self().on_5t_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
             return self().on_ld_a_r();
         case 0x67:
             // RRD  f(4) f(4) r(3) e(4) w(3)
@@ -990,8 +992,6 @@ public:
     typedef B base;
 
     disasm_base() {}
-
-    void on_5t_fetch_cycle() {}
 
     fast_u8 on_imm8_read() { return self().on_read_next_byte(); }
 
@@ -2068,10 +2068,6 @@ public:
         return actual == expected;
     }
 
-    void on_5t_fetch_cycle() {
-        self().on_tick(1);
-    }
-
     fast_u8 on_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
         fast_u8 op = self().on_read_cycle(pc);
@@ -2511,7 +2507,7 @@ public:
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
-        self().on_5t_fetch_cycle();
+        self().on_fetch_cycle_extra_1t();
         self().on_set_reg(rd, self().on_get_reg(rs)); }
     void on_ld_sp_irp() {
         self().on_set_sp(self().on_get_hl()); }

@@ -139,7 +139,7 @@ c4550c cnz 0x0c55
  0 fetch c4 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 imm16_read 0c55 at 0001
  5   get_pc_on_imm16_read 0001
  5   read 55 at 0001
@@ -261,7 +261,7 @@ fe16 cpi 0x16
  0 fetch 2b at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_l 00
  5 get_h 00
  5 set_l 00 -> ff
@@ -358,7 +358,7 @@ dbfe in 0xfe
  0 fetch 04 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_b 00
  5 get_f 00
  5 set_b 00 -> 01
@@ -389,7 +389,7 @@ dbfe in 0xfe
  0 fetch 23 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_l 00
  5 get_h 00
  5 set_l 00 -> 01
@@ -519,7 +519,7 @@ e9 pchl
  0 fetch e9 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_l 00
  5 get_h 00
  5 set_pc_on_jump 0001 -> 0000
@@ -609,7 +609,7 @@ f9 sphl
  0 fetch f9 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_l 00
  5 get_h 00
  5 set_sp 0000 -> 0000
@@ -665,7 +665,7 @@ d616 sui 0x16
  0 fetch 47 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_a 00
  5 set_b 00 -> 00
  5 done
@@ -728,7 +728,7 @@ c5 push b
  0 fetch c5 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_c 00
  5 get_b 00
  5 get_sp 0000
@@ -765,7 +765,7 @@ c0 rnz
  0 fetch c0 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_f 00
  5 get_sp 0000
  5 read c0 at 0000
@@ -783,7 +783,7 @@ d7 rst 0x0010
  0 fetch d7 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_sp 0000
  5 write 00 -> 00 at ffff
  5   set_addr_bus 0000 -> ffff
@@ -865,7 +865,7 @@ eb xchg
  0 fetch eb at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 done
 
 # XRA r

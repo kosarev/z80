@@ -153,7 +153,7 @@ fdcb014e bit 1, (iy + 1)
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
 15 set_pc_on_fetch 0003 -> 0004
-15 5t_fetch
+15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
 16 read cb at 0001
@@ -377,7 +377,7 @@ f3 di
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 disp_read fc at 0001
  5   get_pc_on_disp_read 0001
  5   read fc at 0001
@@ -701,7 +701,7 @@ ed57 ld a, i
  6   set_addr_bus 0001 -> 0001
  6   set_r 01 -> 02
  8 set_pc_on_fetch 0001 -> 0002
- 8 5t_fetch
+ 8 fetch_cycle_extra_1t
  9 get_f 00
  9 set_a 00 -> 00
  9 set_f 00 -> 40
@@ -723,7 +723,7 @@ ed5f ld a, r
  6   set_addr_bus 0001 -> 0001
  6   set_r 01 -> 02
  8 set_pc_on_fetch 0001 -> 0002
- 8 5t_fetch
+ 8 fetch_cycle_extra_1t
  9 get_f 00
  9 set_a 00 -> 02
  9 set_f 00 -> 00
@@ -745,7 +745,7 @@ ed4f ld r, a
  6   set_addr_bus 0001 -> 0001
  6   set_r 01 -> 02
  8 set_pc_on_fetch 0001 -> 0002
- 8 5t_fetch
+ 8 fetch_cycle_extra_1t
  9 get_a 00
  9 set_r 02 -> 00
  9 done
@@ -870,7 +870,7 @@ ed47 ld i, a
  6   set_addr_bus 0001 -> 0001
  6   set_r 01 -> 02
  8 set_pc_on_fetch 0001 -> 0002
- 8 5t_fetch
+ 8 fetch_cycle_extra_1t
  9 get_a 00
  9 set_i 00 -> 00
  9 done
@@ -1320,7 +1320,7 @@ c5 push bc
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_c 00
  5 get_b 00
  5 get_sp 0000
@@ -1423,7 +1423,7 @@ ddcb463e srl (ix + 70)
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
 15 set_pc_on_fetch 0003 -> 0004
-15 5t_fetch
+15 fetch_cycle_extra_1t
 16 get_ixl 00
 16 get_ixh 00
 16 read 00 at 0046
@@ -1613,7 +1613,7 @@ d7 rst 0x0010
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_sp 0000
  5 write 00 -> 00 at ffff
  5   set_addr_bus 0000 -> ffff
@@ -1653,7 +1653,7 @@ fdcb308e res 1, (iy + 48)
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
 15 set_pc_on_fetch 0003 -> 0004
-15 5t_fetch
+15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
 16 read 00 at 0030
@@ -1696,7 +1696,7 @@ c0 ret nz
  2   set_addr_bus 0000 -> 0000
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
- 4 5t_fetch
+ 4 fetch_cycle_extra_1t
  5 get_f 00
  5 get_sp 0000
  5 read c0 at 0000
@@ -1844,7 +1844,7 @@ fdcb01ce set 1, (iy + 1)
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
 15 set_pc_on_fetch 0003 -> 0004
-15 5t_fetch
+15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
 16 read cb at 0001
