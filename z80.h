@@ -781,7 +781,8 @@ public:
             n = self().on_3t_imm8_read();
         } else {
             d = self().on_disp_read();
-            n = self().on_5t_imm8_read();
+            n = self().on_3t_imm8_read();
+            self().on_read_cycle_extra_2t();
         }
         self().on_ld_r_n(r, d, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
@@ -1343,8 +1344,6 @@ public:
         unused(cc);
         return false;
     }
-
-    fast_u8 on_5t_imm8_read() { return self().on_read_next_byte(); }
 
     fast_u8 on_disp_read() { return self().on_read_next_byte(); }
 
@@ -3414,14 +3413,6 @@ public:
         // TODO: Shall we set the address bus here?
         self().on_tick(4);
         self().on_output(port, n);
-    }
-
-    fast_u8 on_5t_imm8_read() {
-        fast_u16 pc = self().get_pc_on_imm8_read();
-        fast_u8 op = self().on_read_cycle(pc);
-        self().on_read_cycle_extra_2t();
-        self().set_pc_on_imm8_read(inc16(pc));
-        return op;
     }
 
     fast_u8 on_disp_read() {
