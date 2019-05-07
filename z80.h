@@ -286,6 +286,12 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    fast_u8 on_read_cycle(fast_u16 addr) {
+        self().on_set_addr_bus(addr);
+        fast_u8 n = self().on_read(addr);
+        self().on_tick(3);
+        self().on_set_last_read_addr(addr);
+        return n; }
     void on_read_cycle_extra_1t(fast_u16 addr) {
         unused(addr);
         self().on_tick(1); }
@@ -2061,39 +2067,23 @@ public:
         self().on_tick(1);
     }
 
-    // TODO: Rename and move to the root.
-    fast_u8 xon_read_cycle(fast_u16 addr) {
-        self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read(addr);
-        self().on_tick(3);
-        self().on_set_last_read_addr(addr);
-        return b; }
-    fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
-        self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read(addr);
-        self().on_tick(ticks);
-        self().on_set_last_read_addr(addr);
-        return b; }
-    fast_u8 on_3t_read_cycle(fast_u16 addr) {
-        return self().on_read_cycle(addr, /* ticks= */ 3); }
-
     fast_u8 on_3t_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
-        fast_u8 op = self().on_3t_read_cycle(pc);
+        fast_u8 op = self().on_read_cycle(pc);
         self().set_pc_on_imm8_read(inc16(pc));
         return op; }
     fast_u16 on_imm16_read() {
         fast_u16 pc = self().get_pc_on_imm16_read();
-        fast_u8 lo = self().on_3t_read_cycle(pc);
+        fast_u8 lo = self().on_read_cycle(pc);
         pc = inc16(pc);
-        fast_u8 hi = self().on_3t_read_cycle(pc);
+        fast_u8 hi = self().on_read_cycle(pc);
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
     fast_u16 on_3t_4t_imm16_read() {
         fast_u16 pc = self().get_pc_on_imm16_read();
-        fast_u8 lo = self().on_3t_read_cycle(pc);
+        fast_u8 lo = self().on_read_cycle(pc);
         pc = inc16(pc);
-        fast_u8 hi = self().xon_read_cycle(pc);
+        fast_u8 hi = self().on_read_cycle(pc);
         self().on_read_cycle_extra_1t(pc);
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
@@ -2122,9 +2112,9 @@ public:
         self().on_set_sp(sp); }
     fast_u16 on_pop() {
         fast_u16 sp = self().on_get_sp();
-        fast_u8 lo = self().on_3t_read_cycle(sp);
+        fast_u8 lo = self().on_read_cycle(sp);
         sp = inc16(sp);
-        fast_u8 hi = self().on_3t_read_cycle(sp);
+        fast_u8 hi = self().on_read_cycle(sp);
         sp = inc16(sp);
         self().on_set_sp(sp);
         return make16(hi, lo); }
@@ -2168,7 +2158,7 @@ public:
         self().on_set_regp(rp, inc16(self().on_get_regp(rp))); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_set_wz(inc16(nn));
-        self().on_set_a(self().on_3t_read_cycle(nn)); }
+        self().on_set_a(self().on_read_cycle(nn)); }
     void on_ld_at_nn_a(fast_u16 nn) {
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
@@ -2176,7 +2166,7 @@ public:
     void on_ld_a_at_rp(regp rp) {
         fast_u16 nn = self().on_get_regp(rp);
         self().on_set_wz(inc16(nn));
-        self().on_set_a(self().on_3t_read_cycle(nn)); }
+        self().on_set_a(self().on_read_cycle(nn)); }
     void on_ld_at_rp_a(regp rp) {
         fast_u16 nn = self().on_get_regp(rp);
         fast_u8 a = self().on_get_a();
@@ -2292,7 +2282,7 @@ public:
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
 
     fast_u8 on_get_m() {
-        return self().on_3t_read_cycle(self().on_get_hl()); }
+        return self().on_read_cycle(self().on_get_hl()); }
     void on_set_m(fast_u8 n) {
         self().on_3t_write_cycle(self().on_get_hl(), n); }
 
@@ -2507,9 +2497,9 @@ public:
         self().disable_int_on_ei(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = self().on_get_sp();
-        fast_u8 lo = self().on_3t_read_cycle(sp);
+        fast_u8 lo = self().on_read_cycle(sp);
         sp = inc16(sp);
-        fast_u8 hi = self().on_3t_read_cycle(sp);
+        fast_u8 hi = self().on_read_cycle(sp);
         fast_u16 nn = make16(hi, lo);
         fast_u16 hl = self().on_get_hl();
         std::swap(nn, hl);
@@ -2539,10 +2529,10 @@ public:
     void on_ld_sp_irp() {
         self().on_set_sp(self().on_get_hl()); }
     void on_ld_irp_at_nn(fast_u16 nn) {
-        fast_u8 lo = self().on_3t_read_cycle(nn);
+        fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
         self().on_set_wz(nn);
-        fast_u8 hi = self().on_3t_read_cycle(nn);
+        fast_u8 hi = self().on_read_cycle(nn);
         self().on_set_hl(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = self().on_get_hl();
@@ -2681,7 +2671,7 @@ public:
 
     fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
         fast_u16 addr = get_disp_target(self().on_get_iregp(), d);
-        fast_u8 res = self().xon_read_cycle(addr);
+        fast_u8 res = self().on_read_cycle(addr);
         if(long_read_cycle)  // TODO: Remove. Do extra ticks manually.
             self().on_read_cycle_extra_1t(addr);
         if(!is_hl_iregp())
@@ -2984,7 +2974,7 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
 
-        fast_u8 t = self().on_3t_read_cycle(hl);
+        fast_u8 t = self().on_read_cycle(hl);
         fast_u8 tf = f;
         do_cp(a, tf, t);
 
@@ -3027,7 +3017,7 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
 
-        fast_u8 t = self().on_3t_read_cycle(hl);
+        fast_u8 t = self().on_read_cycle(hl);
 
         self().on_5t_write_cycle(de, t);
         bc = dec16(bc);
@@ -3136,9 +3126,9 @@ public:
         self().on_ex_af_alt_af_regs(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = self().on_get_sp();
-        fast_u8 lo = self().on_3t_read_cycle(sp);
+        fast_u8 lo = self().on_read_cycle(sp);
         sp = inc16(sp);
-        fast_u8 hi = self().xon_read_cycle(sp);
+        fast_u8 hi = self().on_read_cycle(sp);
         self().on_read_cycle_extra_1t(sp);
         fast_u16 nn = make16(hi, lo);
         fast_u16 irp = self().on_get_iregp();
@@ -3211,10 +3201,10 @@ public:
         iregp irp = self().on_get_iregp_kind();
         self().on_set_reg(r, irp, d, n); }
     void on_ld_irp_at_nn(fast_u16 nn) {
-        fast_u8 lo = self().on_3t_read_cycle(nn);
+        fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
         self().on_set_wz(nn);
-        fast_u8 hi = self().on_3t_read_cycle(nn);
+        fast_u8 hi = self().on_read_cycle(nn);
         self().on_set_iregp(make16(hi, lo)); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         fast_u16 irp = self().on_get_iregp();
@@ -3224,10 +3214,10 @@ public:
         self().on_3t_write_cycle(nn, get_high8(irp)); }
 
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
-        fast_u8 lo = self().on_3t_read_cycle(nn);
+        fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
         self().on_set_wz(nn);
-        fast_u8 hi = self().on_3t_read_cycle(nn);
+        fast_u8 hi = self().on_read_cycle(nn);
         self().on_set_regp(rp, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         fast_u16 rpv = self().on_get_regp(rp);
@@ -3294,7 +3284,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u16 hl = self().on_get_hl();
         self().on_set_wz(inc16(hl));
-        fast_u16 t = make16(a, self().on_3t_read_cycle(hl));
+        fast_u16 t = make16(a, self().on_read_cycle(hl));
         self().on_4t_exec_cycle();
 
         t = (t & 0xf000) | ((t & 0xff) << 4) | ((t & 0x0f00) >> 8);
@@ -3337,7 +3327,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u16 hl = self().on_get_hl();
         self().on_set_wz(inc16(hl));
-        fast_u16 t = make16(a, self().on_3t_read_cycle(hl));
+        fast_u16 t = make16(a, self().on_read_cycle(hl));
         self().on_4t_exec_cycle();
 
         t = (t & 0xf000) | ((t & 0xf) << 8) | ((t & 0x0ff0) >> 4);
@@ -3409,7 +3399,7 @@ public:
     }
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
-        return self().on_3t_read_cycle(addr);
+        return self().on_read_cycle(addr);
     }
 
     void on_4t_exec_cycle() {
@@ -3437,7 +3427,7 @@ public:
 
     fast_u8 on_5t_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
-        fast_u8 op = self().xon_read_cycle(pc);
+        fast_u8 op = self().on_read_cycle(pc);
         self().on_read_cycle_extra_2t(pc);
         self().set_pc_on_imm8_read(inc16(pc));
         return op;
@@ -3483,8 +3473,8 @@ public:
         case 2: {
             // ack(7) w(3) w(3) r(3) r(3)
             fast_u16 vector_addr = make16(self().on_get_i(), 0xff);
-            fast_u8 lo = self().on_3t_read_cycle(vector_addr);
-            fast_u8 hi = self().on_3t_read_cycle(inc16(vector_addr));
+            fast_u8 lo = self().on_read_cycle(vector_addr);
+            fast_u8 hi = self().on_read_cycle(inc16(vector_addr));
             isr_addr = make16(hi, lo); }
             break;
         default:

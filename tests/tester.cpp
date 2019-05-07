@@ -491,22 +491,13 @@ public:
         base::on_6t_fetch_cycle();
     }
 
-    fast_u8 xon_read_cycle(fast_u16 addr) {
+    fast_u8 on_read_cycle(fast_u16 addr) {
         input.read_and_match("read %02x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(on_read(addr)),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
-        return base::xon_read_cycle(addr);
-    }
-
-    fast_u8 on_3t_read_cycle(fast_u16 addr) {
-        input.read_and_match("3t_read %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
-        input_level_guard guard(input);
-        return base::on_3t_read_cycle(addr);
+        return base::on_read_cycle(addr);
     }
 
     void on_read_cycle_extra_1t(fast_u16 addr) {

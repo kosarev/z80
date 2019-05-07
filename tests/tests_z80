@@ -34,7 +34,7 @@ c616 add a, 0x16
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
- 4   3t_read 16 at 0001
+ 4   read 16 at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
@@ -144,7 +144,7 @@ fdcb014e bit 1, (iy + 1)
  8 set_pc_on_fetch 0001 -> 0002
  8 disp_read 01 at 0002
  8   get_pc_on_disp_read 0002
- 8   3t_read 01 at 0002
+ 8   read 01 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
 11 get_pc_on_fetch 0003
@@ -176,7 +176,7 @@ cddf0e call 0x0edf
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_4t_imm16_read 0edf at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read df at 0001
+ 4   read df at 0001
  4     set_addr_bus 0000 -> 0001
  7   read 0e at 0002
  7     set_addr_bus 0001 -> 0002
@@ -205,7 +205,7 @@ c4550c call nz, 0x0c55
  4 get_f 00
  4 3t_4t_imm16_read 0c55 at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read 55 at 0001
+ 4   read 55 at 0001
  4     set_addr_bus 0000 -> 0001
  7   read 0c at 0002
  7     set_addr_bus 0001 -> 0002
@@ -272,7 +272,7 @@ edb1 cpir
  8 get_h 00
  8 get_a 00
  8 get_f 00
- 8 3t_read ed at 0000
+ 8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
 11 5t_exec
 16 set_c 00 -> ff
@@ -380,7 +380,7 @@ f3 di
  4 5t_fetch
  5 disp_read fc at 0001
  5   get_pc_on_disp_read 0001
- 5   3t_read fc at 0001
+ 5   read fc at 0001
  5     set_addr_bus 0000 -> 0001
  8   set_pc_on_disp_read 0001 -> 0002
  8 get_b 00
@@ -437,7 +437,7 @@ e3 ex (sp), hl
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
  4 get_sp 0000
- 4 3t_read e3 at 0000
+ 4 read e3 at 0000
  4   set_addr_bus 0000 -> 0000
  7 read 00 at 0001
  7   set_addr_bus 0000 -> 0001
@@ -538,7 +538,7 @@ dbfe in a, (0xfe)
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_imm8_read fe at 0001
  4   get_pc_on_imm8_read 0001
- 4   3t_read fe at 0001
+ 4   read fe at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
@@ -583,9 +583,9 @@ d2d90a jp nc, 0x0ad9
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 0ad9 at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read d9 at 0001
+ 4   read d9 at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 0a at 0002
+ 7   read 0a at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 get_f 00
@@ -618,9 +618,9 @@ c3cdab jp 0xabcd
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read abcd at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read cd at 0001
+ 4   read cd at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read ab at 0002
+ 7   read ab at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 set_wz 0000 -> abcd
@@ -638,7 +638,7 @@ c3cdab jp 0xabcd
  4 set_pc_on_fetch 0000 -> 0001
  4 disp_read 04 at 0001
  4   get_pc_on_disp_read 0001
- 4   3t_read 04 at 0001
+ 4   read 04 at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_disp_read 0001 -> 0002
  7 5t_exec
@@ -658,7 +658,7 @@ c3cdab jp 0xabcd
  4 set_pc_on_fetch 0000 -> 0001
  4 disp_read fa at 0001
  4   get_pc_on_disp_read 0001
- 4   3t_read fa at 0001
+ 4   read fa at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_disp_read 0001 -> 0002
  7 get_f 00
@@ -674,7 +674,7 @@ c3cdab jp 0xabcd
  4 set_pc_on_fetch 0000 -> 0001
  4 disp_read 0a at 0001
  4   get_pc_on_disp_read 0001
- 4   3t_read 0a at 0001
+ 4   read 0a at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_disp_read 0001 -> 0002
  7 get_f 00
@@ -804,7 +804,7 @@ fd6e12 ld l, (iy + 18)
  8 set_pc_on_fetch 0001 -> 0002
  8 disp_read 12 at 0002
  8   get_pc_on_disp_read 0002
- 8   3t_read 12 at 0002
+ 8   read 12 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
 11 5t_exec
@@ -828,7 +828,7 @@ fd6e12 ld l, (iy + 18)
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_imm8_read af at 0001
  4   get_pc_on_imm8_read 0001
- 4   3t_read af at 0001
+ 4   read af at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 set_a 00 -> af
@@ -844,7 +844,7 @@ fd6e12 ld l, (iy + 18)
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_imm8_read 02 at 0001
  4   get_pc_on_imm8_read 0001
- 4   3t_read 02 at 0001
+ 4   read 02 at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_l 00
@@ -885,9 +885,9 @@ ed47 ld i, a
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 3456 at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read 56 at 0001
+ 4   read 56 at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 34 at 0002
+ 7   read 34 at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 set_e 00 -> 56
@@ -913,9 +913,9 @@ fd213a5c ld iy, 0x5c3a
  8 set_pc_on_fetch 0001 -> 0002
  8 imm16_read 5c3a at 0002
  8   get_pc_on_imm16_read 0002
- 8   3t_read 3a at 0002
+ 8   read 3a at 0002
  8     set_addr_bus 0001 -> 0002
-11   3t_read 5c at 0003
+11   read 5c at 0003
 11     set_addr_bus 0002 -> 0003
 14   set_pc_on_imm16_read 0002 -> 0004
 14 set_iyl 00 -> 3a
@@ -942,9 +942,9 @@ dd21d103 ld ix, 0x03d1
  8 set_pc_on_fetch 0001 -> 0002
  8 imm16_read 03d1 at 0002
  8   get_pc_on_imm16_read 0002
- 8   3t_read d1 at 0002
+ 8   read d1 at 0002
  8     set_addr_bus 0001 -> 0002
-11   3t_read 03 at 0003
+11   read 03 at 0003
 11     set_addr_bus 0002 -> 0003
 14   set_pc_on_imm16_read 0002 -> 0004
 14 set_ixl 00 -> d1
@@ -970,15 +970,15 @@ ed4bb45c ld bc, (0x5cb4)
  8 set_pc_on_fetch 0001 -> 0002
  8 imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
- 8   3t_read b4 at 0002
+ 8   read b4 at 0002
  8     set_addr_bus 0001 -> 0002
-11   3t_read 5c at 0003
+11   read 5c at 0003
 11     set_addr_bus 0002 -> 0003
 14   set_pc_on_imm16_read 0002 -> 0004
-14 3t_read 00 at 5cb4
+14 read 00 at 5cb4
 14   set_addr_bus 0003 -> 5cb4
 17 set_wz 0000 -> 5cb5
-17 3t_read 00 at 5cb5
+17 read 00 at 5cb5
 17   set_addr_bus 5cb4 -> 5cb5
 20 set_c 00 -> 00
 20 set_b 00 -> 00
@@ -995,15 +995,15 @@ ed4bb45c ld bc, (0x5cb4)
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 5cb2 at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read b2 at 0001
+ 4   read b2 at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 5c at 0002
+ 7   read 5c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
-10 3t_read 00 at 5cb2
+10 read 00 at 5cb2
 10   set_addr_bus 0002 -> 5cb2
 13 set_wz 0000 -> 5cb3
-13 3t_read 00 at 5cb3
+13 read 00 at 5cb3
 13   set_addr_bus 5cb2 -> 5cb3
 16 set_l 00 -> 00
 16 set_h 00 -> 00
@@ -1020,13 +1020,13 @@ ed4bb45c ld bc, (0x5cb4)
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read 8d at 0001
+ 4   read 8d at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 5c at 0002
+ 7   read 5c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 set_wz 0000 -> 5c8e
-10 3t_read 00 at 5c8d
+10 read 00 at 5c8d
 10   set_addr_bus 0002 -> 5c8d
 13 set_a 00 -> 00
 13 done
@@ -1042,9 +1042,9 @@ ed4bb45c ld bc, (0x5cb4)
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read 8d at 0001
+ 4   read 8d at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 5c at 0002
+ 7   read 5c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 get_a 00
@@ -1064,9 +1064,9 @@ ed4bb45c ld bc, (0x5cb4)
  4 set_pc_on_fetch 0000 -> 0001
  4 imm16_read 5c7b at 0001
  4   get_pc_on_imm16_read 0001
- 4   3t_read 7b at 0001
+ 4   read 7b at 0001
  4     set_addr_bus 0000 -> 0001
- 7   3t_read 5c at 0002
+ 7   read 5c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
 10 get_l 00
@@ -1096,9 +1096,9 @@ ed43b45c ld (0x5cb4), bc
  8 set_pc_on_fetch 0001 -> 0002
  8 imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
- 8   3t_read b4 at 0002
+ 8   read b4 at 0002
  8     set_addr_bus 0001 -> 0002
-11   3t_read 5c at 0003
+11   read 5c at 0003
 11     set_addr_bus 0002 -> 0003
 14   set_pc_on_imm16_read 0002 -> 0004
 14 get_c 00
@@ -1122,7 +1122,7 @@ ed43b45c ld (0x5cb4), bc
  4 get_e 00
  4 get_d 00
  4 set_wz 0000 -> 0001
- 4 3t_read 1a at 0000
+ 4 read 1a at 0000
  4   set_addr_bus 0000 -> 0000
  7 set_a 00 -> 1a
  7 done
@@ -1183,7 +1183,7 @@ edb8 lddr
  8 get_h 00
  8 get_a 00
  8 get_f 00
- 8 3t_read ed at 0000
+ 8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
 11 5t_write ed -> ed at 0000
 11   set_addr_bus 0000 -> 0000
@@ -1282,7 +1282,7 @@ d3ab out (0xab), a
  4 set_pc_on_fetch 0000 -> 0001
  4 3t_imm8_read ab at 0001
  4   get_pc_on_imm8_read 0001
- 4   3t_read ab at 0001
+ 4   read ab at 0001
  4     set_addr_bus 0000 -> 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
@@ -1300,9 +1300,9 @@ c1 pop bc
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
  4 get_sp 0000
- 4 3t_read c1 at 0000
+ 4 read c1 at 0000
  4   set_addr_bus 0000 -> 0000
- 7 3t_read 00 at 0001
+ 7 read 00 at 0001
  7   set_addr_bus 0000 -> 0001
 10 set_sp 0000 -> 0002
 10 set_c 00 -> c1
@@ -1412,7 +1412,7 @@ ddcb463e srl (ix + 70)
  8 set_pc_on_fetch 0001 -> 0002
  8 disp_read 46 at 0002
  8   get_pc_on_disp_read 0002
- 8   3t_read 46 at 0002
+ 8   read 46 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
 11 get_pc_on_fetch 0003
@@ -1511,7 +1511,7 @@ ed6f rld
  8 get_l 00
  8 get_h 00
  8 set_wz 0000 -> 0001
- 8 3t_read ed at 0000
+ 8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
 11 4t_exec
 15 set_a 00 -> 0e
@@ -1593,7 +1593,7 @@ ed67 rrd
  8 get_l 00
  8 get_h 00
  8 set_wz 0000 -> 0001
- 8 3t_read ed at 0000
+ 8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
 11 4t_exec
 15 set_a 00 -> 0d
@@ -1642,7 +1642,7 @@ fdcb308e res 1, (iy + 48)
  8 set_pc_on_fetch 0001 -> 0002
  8 disp_read 30 at 0002
  8   get_pc_on_disp_read 0002
- 8   3t_read 30 at 0002
+ 8   read 30 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
 11 get_pc_on_fetch 0003
@@ -1676,9 +1676,9 @@ c9 ret
  2   set_r 00 -> 01
  4 set_pc_on_fetch 0000 -> 0001
  4 get_sp 0000
- 4 3t_read c9 at 0000
+ 4 read c9 at 0000
  4   set_addr_bus 0000 -> 0000
- 7 3t_read 00 at 0001
+ 7 read 00 at 0001
  7   set_addr_bus 0000 -> 0001
 10 set_sp 0000 -> 0002
 10 set_wz 0000 -> 00c9
@@ -1697,9 +1697,9 @@ c0 ret nz
  4 5t_fetch
  5 get_f 00
  5 get_sp 0000
- 5 3t_read c0 at 0000
+ 5 read c0 at 0000
  5   set_addr_bus 0000 -> 0000
- 8 3t_read 00 at 0001
+ 8 read 00 at 0001
  8   set_addr_bus 0000 -> 0001
 11 set_sp 0000 -> 0002
 11 set_wz 0000 -> 00c0
@@ -1723,9 +1723,9 @@ ed4d reti
  6   set_r 01 -> 02
  8 set_pc_on_fetch 0001 -> 0002
  8 get_sp 0000
- 8 3t_read ed at 0000
+ 8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
-11 3t_read 4d at 0001
+11 read 4d at 0001
 11   set_addr_bus 0000 -> 0001
 14 set_sp 0000 -> 0002
 14 set_wz 0000 -> 4ded
@@ -1833,7 +1833,7 @@ fdcb01ce set 1, (iy + 1)
  8 set_pc_on_fetch 0001 -> 0002
  8 disp_read 01 at 0002
  8   get_pc_on_disp_read 0002
- 8   3t_read 01 at 0002
+ 8   read 01 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
 11 get_pc_on_fetch 0003
