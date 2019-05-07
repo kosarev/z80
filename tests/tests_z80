@@ -203,7 +203,6 @@ cddf0e call 0x0edf
 17 done
 
 # CALL cc, nn
-# TODO: Get rid of the first f register reading.
 c4550c call nz, 0x0c55
  0 m1_fetch
  0   fetch c4 at 0000
@@ -213,7 +212,6 @@ c4550c call nz, 0x0c55
  2     set_addr_bus 0000 -> 0000
  4     set_pc_on_fetch 0000 -> 0001
  4   set_r 00 -> 01
- 4 get_f 00
  4 imm16_read 0c55 at 0001
  4   get_pc_on_imm16_read 0001
  4   read 55 at 0001
@@ -221,8 +219,8 @@ c4550c call nz, 0x0c55
  7   read 0c at 0002
  7     set_addr_bus 0001 -> 0002
 10   set_pc_on_imm16_read 0001 -> 0003
+10 get_f 00
 10 read_cycle_extra_1t
-11 get_f 00
 11 get_sp 0000
 11 write 00 -> 00 at ffff
 11   set_addr_bus 0002 -> ffff

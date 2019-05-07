@@ -743,14 +743,7 @@ public:
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r, read_disp_or_null(r)); }
     void on_decode_call_cc_nn(condition cc) {
-        // TODO: Read imm16 as r(3) r(3) and do extra tick on
-        // execution if the condition is met. Do not check the
-        // condition on decoding.
-        bool cc_met = self().check_condition(cc);
-        fast_u16 nn = self().on_imm16_read();
-        if(cc_met)  // TODO: Do this in the executor.
-            self().on_read_cycle_extra_1t();
-        self().on_call_cc_nn(cc, nn); }
+        self().on_call_cc_nn(cc, self().on_imm16_read()); }
     void on_decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
     void on_decode_fd_prefix() {
@@ -1337,14 +1330,6 @@ public:
 
     fast_u8 on_fetch_cycle() {
         return self().on_read_next_byte(); }
-
-    // 'call cc, nn' instructions require this function to disambiguate between
-    // read cycles of various lengths. This disambiguation does not affect
-    // disassembling so we just return false here.
-    bool check_condition(condition cc) {
-        unused(cc);
-        return false;
-    }
 
     fast_u8 on_disp_read() { return self().on_read_next_byte(); }
 
@@ -2120,11 +2105,6 @@ public:
         self().on_set_regp(rp, dec16(self().on_get_regp(rp))); }
     void on_call_nn(fast_u16 nn) {
         self().on_call(nn); }
-    void on_call_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_call(nn);
-        else
-            self().on_set_wz(nn); }
     void on_ex_de_hl() {
         self().on_ex_de_hl_regs(); }
     void on_halt() {
@@ -2433,6 +2413,12 @@ public:
         self().on_set_f(f); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        if(base::check_condition(cc))
+            self().on_call(nn);
+        else
+            self().on_set_wz(nn);
+        }
     void on_ccf() {
         self().on_set_f(self().on_get_f() ^ base::cf_mask); }
     void on_cpl() {
@@ -3036,6 +3022,13 @@ public:
             v = get_high8(self().on_get_wz());
         f |= v & (xf_mask | yf_mask);
         self().on_set_f(f); }
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        if(base::check_condition(cc)) {
+            self().on_read_cycle_extra_1t();
+            self().on_call(nn);
+        } else {
+            self().on_set_wz(nn);
+        } }
     void on_ccf() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
