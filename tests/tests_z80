@@ -10,13 +10,14 @@
 
 # ADD r
 87 add a, a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 87 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 87 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_a 00
  4 set_a 00 -> 00
@@ -25,13 +26,14 @@
 
 # ADD A, n
 c616 add a, 0x16
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c6 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c6 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm8_read 16 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 16 at 0001
@@ -44,13 +46,14 @@ c616 add a, 0x16
 
 # ADD HL, rp
 19 add hl, de
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 19 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 19 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_l 00
  4 get_h 00
  4 get_e 00
@@ -66,13 +69,14 @@ c616 add a, 0x16
 
 # ADC A, r
 89 adc a, c
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 89 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 89 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_c 00
  4 get_a 00
  4 get_f 00
@@ -82,20 +86,22 @@ c616 add a, 0x16
 
 # ADC HL, rp
 ed5a adc hl, de
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 5a at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 5a at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_l 00
  8 get_h 00
  8 get_e 00
@@ -111,13 +117,14 @@ ed5a adc hl, de
 
 # AND r
 a7 and a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch a7 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch a7 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_a 00
  4 set_a 00 -> 00
@@ -126,33 +133,35 @@ a7 and a
 
 # BIT b, r
 fdcb014e bit 1, (iy + 1)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> iy
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch cb at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch cb at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 disp_read 01 at 0002
  8   get_pc_on_disp_read 0002
  8   read 01 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
-11 get_pc_on_fetch 0003
 11 fetch 4e at 0003
+11   get_pc_on_fetch 0003
 11   set_addr_bus 0002 -> 0003
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
-15 set_pc_on_fetch 0003 -> 0004
+15   set_pc_on_fetch 0003 -> 0004
 15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
@@ -167,13 +176,14 @@ fdcb014e bit 1, (iy + 1)
 
 # CALL nn
 cddf0e call 0x0edf
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch cd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 0edf at 0001
  4   get_pc_on_imm16_read 0001
  4   read df at 0001
@@ -195,13 +205,14 @@ cddf0e call 0x0edf
 # CALL cc, nn
 # TODO: Get rid of the first f register reading.
 c4550c call nz, 0x0c55
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c4 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c4 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_f 00
  4 imm16_read 0c55 at 0001
  4   get_pc_on_imm16_read 0001
@@ -224,13 +235,14 @@ c4550c call nz, 0x0c55
 
 # CCF
 3f ccf
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 3f at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 3f at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_f 00 -> 01
@@ -238,13 +250,14 @@ c4550c call nz, 0x0c55
 
 # CP r
 bc cp h
- 0 get_pc_on_fetch 0000
- 0 m1_fetch bc at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch bc at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_h 00
  4 get_a 00
  4 set_f 00 -> 42
@@ -252,20 +265,22 @@ bc cp h
 
 # CPIR
 edb1 cpir
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch b1 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch b1 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_c 00
  8 get_b 00
  8 get_l 00
@@ -289,13 +304,14 @@ edb1 cpir
 
 # CPL
 2f cpl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 2f at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 2f at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> ff
@@ -304,13 +320,14 @@ edb1 cpir
 
 # DAA
 27 daa
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 27 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 27 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
@@ -319,13 +336,14 @@ edb1 cpir
 
 # DEC r
 35 dec (hl)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 35 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 35 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_l 00
  4 get_h 00
  4 read 35 at 0000
@@ -341,13 +359,14 @@ edb1 cpir
 
 # DEC rp
 2b dec hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 2b at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 2b at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
@@ -357,26 +376,28 @@ edb1 cpir
 
 # DI
 f3 di
- 0 get_pc_on_fetch 0000
- 0 m1_fetch f3 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch f3 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_iff1_on_di 0 -> 0
  4 set_iff2_on_di 0 -> 0
  4 done
 
 # DJNZ d
 10fc djnz $ - 2
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 10 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 10 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_1t
  5 disp_read fc at 0001
  5   get_pc_on_disp_read 0001
@@ -393,13 +414,14 @@ f3 di
 
 # EI
 fb ei
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_iff1_on_ei 0 -> 1
  4 set_iff2_on_ei 0 -> 1
  4 disable_int
@@ -407,35 +429,38 @@ fb ei
 
 # EX AF, AF'
 08 ex af, af'
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 08 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 08 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 done
 
 # EX DE, HL
 eb ex de, hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch eb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch eb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 done
 
 # EX (SP), irp
 e3 ex (sp), hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch e3 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch e3 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_sp 0000
  4 read e3 at 0000
  4   set_addr_bus 0000 -> 0000
@@ -456,56 +481,61 @@ e3 ex (sp), hl
 
 # EXX
 d9 exx
- 0 get_pc_on_fetch 0000
- 0 m1_fetch d9 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch d9 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 done
 
 # HALT
 76 halt
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 76 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 76 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_pc_on_halt 0001
  4 set_pc_on_halt 0001 -> 0000
  4 done
 
 # IM n
 ed56 im 1
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 56 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 56 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 set_int_mode 0 -> 1
  8 done
 
 # INC r
 04 inc b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 04 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 04 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_b 00
  4 get_f 00
  4 set_b 00 -> 01
@@ -514,13 +544,14 @@ ed56 im 1
 
 # INC rp
 23 inc hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 23 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 23 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
@@ -530,13 +561,14 @@ ed56 im 1
 
 # IN A, (n)
 dbfe in a, (0xfe)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch db at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch db at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm8_read fe at 0001
  4   get_pc_on_imm8_read 0001
  4   read fe at 0001
@@ -550,20 +582,22 @@ dbfe in a, (0xfe)
 
 # IN r, (C)
 ed78 in a, (c)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 78 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 78 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_c 00
  8 get_b 00
  8 get_f 00
@@ -575,13 +609,14 @@ ed78 in a, (c)
 
 # JP cc, nn
 d2d90a jp nc, 0x0ad9
- 0 get_pc_on_fetch 0000
- 0 m1_fetch d2 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch d2 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 0ad9 at 0001
  4   get_pc_on_imm16_read 0001
  4   read d9 at 0001
@@ -596,13 +631,14 @@ d2d90a jp nc, 0x0ad9
 
 # JP irp
 e9 jp (hl)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch e9 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch e9 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_l 00
  4 get_h 00
  4 set_pc_on_jump 0001 -> 0000
@@ -610,13 +646,14 @@ e9 jp (hl)
 
 # JP nn
 c3cdab jp 0xabcd
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c3 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c3 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read abcd at 0001
  4   get_pc_on_imm16_read 0001
  4   read cd at 0001
@@ -630,13 +667,14 @@ c3cdab jp 0xabcd
 
 # JR d
 1804 jr $ + 6
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 18 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 18 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 disp_read 04 at 0001
  4   get_pc_on_disp_read 0001
  4   read 04 at 0001
@@ -650,13 +688,14 @@ c3cdab jp 0xabcd
 
 # JR cc, d
 28fa jr z, $ - 4
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 28 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 28 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 disp_read fa at 0001
  4   get_pc_on_disp_read 0001
  4   read fa at 0001
@@ -666,13 +705,14 @@ c3cdab jp 0xabcd
  7 done
 
 200a jr nz, $ + 12
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 20 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 20 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 disp_read 0a at 0001
  4   get_pc_on_disp_read 0001
  4   read 0a at 0001
@@ -687,20 +727,22 @@ c3cdab jp 0xabcd
 
 # LD A, I
 ed57 ld a, i
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 57 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 57 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 fetch_cycle_extra_1t
  9 get_f 00
  9 set_a 00 -> 00
@@ -709,20 +751,22 @@ ed57 ld a, i
 
 # LD A, R
 ed5f ld a, r
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 5f at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 5f at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 fetch_cycle_extra_1t
  9 get_f 00
  9 set_a 00 -> 02
@@ -731,20 +775,22 @@ ed5f ld a, r
 
 # LD r, a
 ed4f ld r, a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 4f at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 4f at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 fetch_cycle_extra_1t
  9 get_a 00
  9 set_r 02 -> 00
@@ -752,34 +798,37 @@ ed4f ld r, a
 
 # LD r, r
 47 ld b, a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 47 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 47 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 set_b 00 -> 00
  4 done
 
 dd6b ld ixl, e
- 0 get_pc_on_fetch 0000
- 0 m1_fetch dd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> ix
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 6b at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch 6b at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_e 00
  8 set_ixl 00 -> 00
  8 set_index_rp ix -> hl
@@ -787,22 +836,24 @@ dd6b ld ixl, e
 
 # 0x6e LD L,(REGISTER+dd)
 fd6e12 ld l, (iy + 18)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> iy
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 6e at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch 6e at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 disp_read 12 at 0002
  8   get_pc_on_disp_read 0002
  8   read 12 at 0002
@@ -820,13 +871,14 @@ fd6e12 ld l, (iy + 18)
 
 # LD r, n
 3eaf ld a, 0xaf
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 3e at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 3e at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm8_read af at 0001
  4   get_pc_on_imm8_read 0001
  4   read af at 0001
@@ -836,13 +888,14 @@ fd6e12 ld l, (iy + 18)
  7 done
 
 3602 ld (hl), 0x02
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 36 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 36 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm8_read 02 at 0001
  4   get_pc_on_imm8_read 0001
  4   read 02 at 0001
@@ -856,20 +909,22 @@ fd6e12 ld l, (iy + 18)
 
 # LD I, A
 ed47 ld i, a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 47 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 47 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 fetch_cycle_extra_1t
  9 get_a 00
  9 set_i 00 -> 00
@@ -877,13 +932,14 @@ ed47 ld i, a
 
 # LD rp, nn
 115634 ld de, 0x3456
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 11 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 11 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 3456 at 0001
  4   get_pc_on_imm16_read 0001
  4   read 56 at 0001
@@ -896,22 +952,24 @@ ed47 ld i, a
 10 done
 
 fd213a5c ld iy, 0x5c3a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> iy
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 21 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch 21 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 imm16_read 5c3a at 0002
  8   get_pc_on_imm16_read 0002
  8   read 3a at 0002
@@ -925,22 +983,24 @@ fd213a5c ld iy, 0x5c3a
 14 done
 
 dd21d103 ld ix, 0x03d1
- 0 get_pc_on_fetch 0000
- 0 m1_fetch dd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> ix
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 21 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch 21 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 imm16_read 03d1 at 0002
  8   get_pc_on_imm16_read 0002
  8   read d1 at 0002
@@ -955,20 +1015,22 @@ dd21d103 ld ix, 0x03d1
 
 # LD rp, (nn)
 ed4bb45c ld bc, (0x5cb4)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 4b at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 4b at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
  8   read b4 at 0002
@@ -987,13 +1049,14 @@ ed4bb45c ld bc, (0x5cb4)
 
 # LD irp, (nn)
 2ab25c ld hl, (0x5cb2)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 2a at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 2a at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 5cb2 at 0001
  4   get_pc_on_imm16_read 0001
  4   read b2 at 0001
@@ -1012,13 +1075,14 @@ ed4bb45c ld bc, (0x5cb4)
 
 # LD A, (nn)
 3a8d5c ld a, (0x5c8d)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 3a at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 3a at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
  4   read 8d at 0001
@@ -1034,13 +1098,14 @@ ed4bb45c ld bc, (0x5cb4)
 
 # LD (nn), A
 328d5c ld (0x5c8d), a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 32 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 32 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
  4   read 8d at 0001
@@ -1056,13 +1121,14 @@ ed4bb45c ld bc, (0x5cb4)
 
 # LD (nn), irp
 227b5c ld (0x5c7b), hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 22 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 22 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm16_read 5c7b at 0001
  4   get_pc_on_imm16_read 0001
  4   read 7b at 0001
@@ -1081,20 +1147,22 @@ ed4bb45c ld bc, (0x5cb4)
 
 # LD (nn), rp
 ed43b45c ld (0x5cb4), bc
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 43 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 43 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 imm16_read 5cb4 at 0002
  8   get_pc_on_imm16_read 0002
  8   read b4 at 0002
@@ -1113,13 +1181,14 @@ ed43b45c ld (0x5cb4), bc
 
 # LD A, (rp)
 1a ld a, (de)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 1a at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 1a at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_e 00
  4 get_d 00
  4 set_wz 0000 -> 0001
@@ -1130,13 +1199,14 @@ ed43b45c ld (0x5cb4), bc
 
 # LD (rp), A
 12 ld (de), a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 12 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 12 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_e 00
  4 get_d 00
  4 get_a 00
@@ -1147,13 +1217,14 @@ ed43b45c ld (0x5cb4), bc
 
 # LD SP, irp
 f9 ld sp, hl
- 0 get_pc_on_fetch 0000
- 0 m1_fetch f9 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch f9 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_2t
  6 get_l 00
  6 get_h 00
@@ -1162,20 +1233,22 @@ f9 ld sp, hl
 
 # Block transfers.
 edb8 lddr
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch b8 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch b8 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_c 00
  8 get_b 00
  8 get_e 00
@@ -1204,20 +1277,22 @@ edb8 lddr
 
 # NEG
 ed44 neg
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 44 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 44 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_a 00
  8 get_f 00
  8 set_a 00 -> 00
@@ -1226,24 +1301,26 @@ ed44 neg
 
 # NOP
 00 nop
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 00 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 00 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 done
 
 # OR r
 b3 or e
- 0 get_pc_on_fetch 0000
- 0 m1_fetch b3 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch b3 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_e 00
  4 get_a 00
  4 set_a 00 -> 00
@@ -1252,20 +1329,22 @@ b3 or e
 
 # OUT (C), r
 ed79 out (c), a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 79 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 79 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_c 00
  8 get_b 00
  8 set_wz 0000 -> 0001
@@ -1275,13 +1354,14 @@ ed79 out (c), a
 
 # OUT (n), r
 d3ab out (0xab), a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch d3 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch d3 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 imm8_read ab at 0001
  4   get_pc_on_imm8_read 0001
  4   read ab at 0001
@@ -1294,13 +1374,14 @@ d3ab out (0xab), a
 
 # POP rp2
 c1 pop bc
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c1 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c1 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_sp 0000
  4 read c1 at 0000
  4   set_addr_bus 0000 -> 0000
@@ -1313,13 +1394,14 @@ c1 pop bc
 
 # PUSH rp2
 c5 push bc
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c5 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c5 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_1t
  5 get_c 00
  5 get_b 00
@@ -1333,20 +1415,22 @@ c5 push bc
 
 # rot r
 cb00 rlc b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 00 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 00 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_b 00
  8 get_f 00
  8 set_b 00 -> 00
@@ -1354,20 +1438,22 @@ cb00 rlc b
  8 done
 
 cb23 sla e
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 23 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 23 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_e 00
  8 get_f 00
  8 set_e 00 -> 00
@@ -1375,20 +1461,22 @@ cb23 sla e
  8 done
 
 cb3c srl h
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 3c at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 3c at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_h 00
  8 get_f 00
  8 set_h 00 -> 00
@@ -1396,33 +1484,35 @@ cb3c srl h
  8 done
 
 ddcb463e srl (ix + 70)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch dd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> ix
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch cb at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch cb at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 disp_read 46 at 0002
  8   get_pc_on_disp_read 0002
  8   read 46 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
-11 get_pc_on_fetch 0003
 11 fetch 3e at 0003
+11   get_pc_on_fetch 0003
 11   set_addr_bus 0002 -> 0003
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
-15 set_pc_on_fetch 0003 -> 0004
+15   set_pc_on_fetch 0003 -> 0004
 15 fetch_cycle_extra_1t
 16 get_ixl 00
 16 get_ixh 00
@@ -1442,20 +1532,22 @@ ddcb463e srl (ix + 70)
 
 # RL r
 cb11 rl c
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 11 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 11 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_c 00
  8 get_f 00
  8 set_c 00 -> 00
@@ -1464,13 +1556,14 @@ cb11 rl c
 
 # RLA
 17 rla
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 17 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 17 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
@@ -1479,13 +1572,14 @@ cb11 rl c
 
 # RLCA
 07 rlca
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 07 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 07 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
@@ -1494,20 +1588,22 @@ cb11 rl c
 
 # RLD
 ed6f rld
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 6f at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 6f at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_a 00
  8 get_f 00
  8 get_l 00
@@ -1524,13 +1620,14 @@ ed6f rld
 
 # RRA
 1f rra
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 1f at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 1f at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
@@ -1539,20 +1636,22 @@ ed6f rld
 
 # RRC
 cb08 rrc b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 08 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 08 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_b 00
  8 get_f 00
  8 set_b 00 -> 00
@@ -1561,13 +1660,14 @@ cb08 rrc b
 
 # RRCA
 0f rrca
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 0f at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 0f at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_a 00 -> 00
@@ -1576,20 +1676,22 @@ cb08 rrc b
 
 # RRD
 ed67 rrd
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 67 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 67 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_a 00
  8 get_f 00
  8 get_l 00
@@ -1606,13 +1708,14 @@ ed67 rrd
 
 # RST nn
 d7 rst 0x0010
- 0 get_pc_on_fetch 0000
- 0 m1_fetch d7 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch d7 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_1t
  5 get_sp 0000
  5 write 00 -> 00 at ffff
@@ -1626,33 +1729,35 @@ d7 rst 0x0010
 
 # RES b, r
 fdcb308e res 1, (iy + 48)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> iy
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch cb at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch cb at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 disp_read 30 at 0002
  8   get_pc_on_disp_read 0002
  8   read 30 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
-11 get_pc_on_fetch 0003
 11 fetch 8e at 0003
+11   get_pc_on_fetch 0003
 11   set_addr_bus 0002 -> 0003
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
-15 set_pc_on_fetch 0003 -> 0004
+15   set_pc_on_fetch 0003 -> 0004
 15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
@@ -1670,13 +1775,14 @@ fdcb308e res 1, (iy + 48)
 
 # RET
 c9 ret
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c9 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c9 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_sp 0000
  4 read c9 at 0000
  4   set_addr_bus 0000 -> 0000
@@ -1689,13 +1795,14 @@ c9 ret
 
 # RET cc
 c0 ret nz
- 0 get_pc_on_fetch 0000
- 0 m1_fetch c0 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch c0 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 fetch_cycle_extra_1t
  5 get_f 00
  5 get_sp 0000
@@ -1710,20 +1817,22 @@ c0 ret nz
 
 # RETI
 ed4d reti
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 4d at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 4d at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_sp 0000
  8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
@@ -1736,20 +1845,22 @@ ed4d reti
 
 # RR
 cb18 rr b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 18 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 18 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_b 00
  8 get_f 00
  8 set_b 00 -> 00
@@ -1758,13 +1869,14 @@ cb18 rr b
 
 # SBC r
 9f sbc a, a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 9f at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 9f at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_a 00
  4 get_f 00
@@ -1774,20 +1886,22 @@ cb18 rr b
 
 # SBC HL, rp
 ed52 sbc hl, de
- 0 get_pc_on_fetch 0000
- 0 m1_fetch ed at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 52 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 52 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_l 00
  8 get_h 00
  8 get_e 00
@@ -1803,13 +1917,14 @@ ed52 sbc hl, de
 
 # SCF
 37 scf
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 37 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 37 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_f 00
  4 set_f 00 -> 01
@@ -1817,33 +1932,35 @@ ed52 sbc hl, de
 
 # SET b, r
 fdcb01ce set 1, (iy + 1)
- 0 get_pc_on_fetch 0000
- 0 m1_fetch fd at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch fd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 set_index_rp hl -> iy
  4 disable_int
- 4 get_pc_on_fetch 0001
- 4 m1_fetch cb at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 4 m1_fetch
+ 4   fetch cb at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 disp_read 01 at 0002
  8   get_pc_on_disp_read 0002
  8   read 01 at 0002
  8     set_addr_bus 0001 -> 0002
 11   set_pc_on_disp_read 0002 -> 0003
-11 get_pc_on_fetch 0003
 11 fetch ce at 0003
+11   get_pc_on_fetch 0003
 11   set_addr_bus 0002 -> 0003
 13   get_ir_on_refresh 0002
 13   set_addr_bus 0003 -> 0002
-15 set_pc_on_fetch 0003 -> 0004
+15   set_pc_on_fetch 0003 -> 0004
 15 fetch_cycle_extra_1t
 16 get_iyl 00
 16 get_iyh 00
@@ -1861,20 +1978,22 @@ fdcb01ce set 1, (iy + 1)
 
 # SLL r
 cb30 sll b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 30 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 30 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_b 00
  8 get_f 00
  8 set_b 00 -> 01
@@ -1891,20 +2010,22 @@ cb30 sll b
 
 # SRA r
 cb28 sra b
- 0 get_pc_on_fetch 0000
- 0 m1_fetch cb at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
- 4 get_pc_on_fetch 0001
- 4 m1_fetch 28 at 0001
- 4   set_addr_bus 0000 -> 0001
- 6   get_ir_on_refresh 0001
- 6   set_addr_bus 0001 -> 0001
- 6   set_r 01 -> 02
- 8 set_pc_on_fetch 0001 -> 0002
+ 0 m1_fetch
+ 0   fetch cb at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 28 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
  8 get_b 00
  8 get_f 00
  8 set_b 00 -> 00
@@ -1921,13 +2042,14 @@ cb28 sra b
 
 # SUB r
 91 sub c
- 0 get_pc_on_fetch 0000
- 0 m1_fetch 91 at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch 91 at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_c 00
  4 get_a 00
  4 set_a 00 -> 00
@@ -1936,13 +2058,14 @@ cb28 sra b
 
 # XOR r
 af xor a
- 0 get_pc_on_fetch 0000
- 0 m1_fetch af at 0000
- 0   set_addr_bus 0000 -> 0000
- 2   get_ir_on_refresh 0000
- 2   set_addr_bus 0000 -> 0000
- 2   set_r 00 -> 01
- 4 set_pc_on_fetch 0000 -> 0001
+ 0 m1_fetch
+ 0   fetch af at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
  4 get_a 00
  4 get_a 00
  4 set_a 00 -> 00

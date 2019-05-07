@@ -479,6 +479,16 @@ public:
         addr_bus = addr;
     }
 
+    fast_u8 on_fetch_cycle() {
+        fast_u16 addr = base::get_pc();
+        input.read_and_match("fetch %02x at %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(on_read(addr)),
+                             static_cast<unsigned>(addr));
+        input_level_guard guard(input);
+        return base::on_fetch_cycle();
+    }
+
     void on_fetch_cycle_extra_1t() {
         input.read_and_match("fetch_cycle_extra_1t",
                              static_cast<unsigned>(get_ticks()));
@@ -711,15 +721,6 @@ public:
         : machine_base<z80::i8080_cpu<i8080_machine>>(input)
     {}
 
-    fast_u8 on_fetch_cycle(fast_u16 addr) {
-        input.read_and_match("fetch %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
-        input_level_guard guard(input);
-        return base::on_fetch_cycle(addr);
-    }
-
     void on_step() {
         base::on_step();
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
@@ -732,20 +733,11 @@ public:
         : machine_base<z80::z80_cpu<z80_machine>>(input)
     {}
 
-    fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
-        if(m1) {
-            input.read_and_match("m1_fetch %02x at %04x",
-                                 static_cast<unsigned>(get_ticks()),
-                                 static_cast<unsigned>(on_read(addr)),
-                                 static_cast<unsigned>(addr));
-        } else {
-            input.read_and_match("fetch %02x at %04x",
-                                 static_cast<unsigned>(get_ticks()),
-                                 static_cast<unsigned>(on_read(addr)),
-                                 static_cast<unsigned>(addr));
-        }
+    fast_u8 on_m1_fetch_cycle() {
+        input.read_and_match("m1_fetch",
+                             static_cast<unsigned>(get_ticks()));
         input_level_guard guard(input);
-        return base::on_fetch_cycle(addr, m1);
+        return base::on_m1_fetch_cycle();
     }
 
     void on_step() {

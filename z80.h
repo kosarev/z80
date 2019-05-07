@@ -286,6 +286,9 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    fast_u8 on_m1_fetch_cycle() {
+        fast_u8 n = self().on_fetch_cycle();
+        return n; }
     void on_fetch_cycle_extra_1t() {
         self().on_tick(1); }
     void on_fetch_cycle_extra_2t() {
@@ -630,7 +633,7 @@ public:
     }
 
     void on_fetch_and_decode() {
-        self().on_decode(self().on_fetch());
+        self().on_decode(self().on_m1_fetch_cycle());
     }
 
 protected:
@@ -805,11 +808,11 @@ public:
 
         fast_u8 op;
         if(irp == iregp::hl) {
-            op = self().on_fetch(/* m1= */ true);
+            op = self().on_m1_fetch_cycle();
         } else {
             // In ddcb- and fdcb-prefixed instructions the
             // reading of the 3rd opcode is not an M1 cycle.
-            op = self().on_fetch(/* m1= */ false);
+            op = self().on_fetch_cycle();
             self().on_fetch_cycle_extra_1t();
         }
 
@@ -856,7 +859,7 @@ public:
     }
 
     void on_decode_ed_prefix() {
-        fast_u8 op = self().on_fetch();
+        fast_u8 op = self().on_m1_fetch_cycle();
         fast_u8 y = get_y_part(op);
         fast_u8 p = get_p_part(op);
 
@@ -1140,7 +1143,7 @@ public:
 
     i8080_disasm() {}
 
-    fast_u8 on_fetch() {
+    fast_u8 on_fetch_cycle() {
         return self().on_read_next_byte(); }
 
     void on_format_char(char c, const void **&args,
@@ -1332,10 +1335,7 @@ public:
 
     z80_disasm() {}
 
-    // TODO: What if to replace 'on_fetch(false)' with a special
-    // method like 'on_non_m1_fetch()'?
-    fast_u8 on_fetch(bool m1 = true) {
-        unused(m1);
+    fast_u8 on_fetch_cycle() {
         return self().on_read_next_byte(); }
 
     // 'call cc, nn' instructions require this function to disambiguate between
@@ -2338,19 +2338,14 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u8 on_fetch_cycle(fast_u16 addr) {
+    fast_u8 on_fetch_cycle() {
+        fast_u16 addr = self().get_pc_on_fetch();
         self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read(addr);
+        fast_u8 n = self().on_read(addr);
         self().on_tick(4);
         self().on_set_last_read_addr(addr);
-        return b; }
-
-    fast_u8 on_fetch() {
-        fast_u16 pc = self().get_pc_on_fetch();
-        fast_u8 op = self().on_fetch_cycle(pc);
-        self().set_pc_on_fetch(inc16(pc));
-        return op;
-    }
+        self().set_pc_on_fetch(inc16(addr));
+        return n; }
 
     fast_u8 on_input_cycle(fast_u8 port) {
         self().on_tick(3);
@@ -3360,23 +3355,22 @@ public:
         self().on_set_hl(r16);
         self().on_set_f(f); }
 
-    fast_u8 on_fetch(bool m1 = true) {
-        fast_u16 pc = self().get_pc_on_fetch();
-        fast_u8 op = self().on_fetch_cycle(pc, m1);
-        self().set_pc_on_fetch(inc16(pc));
-        return op;
-    }
-
-    fast_u8 on_fetch_cycle(fast_u16 addr, bool m1 = true) {
+    fast_u8 on_fetch_cycle() {
+        fast_u16 addr = self().get_pc_on_fetch();
         self().on_set_addr_bus(addr);
-        fast_u8 b = self().on_read(addr);
+        fast_u8 n = self().on_read(addr);
         self().on_tick(2);
         self().on_set_addr_bus(self().get_ir_on_refresh());
-        if(m1)
-            self().on_inc_r_reg();
         self().on_tick(2);
         self().on_set_last_read_addr(addr);
-        return b;
+        self().set_pc_on_fetch(inc16(addr));
+        return n;
+    }
+
+    fast_u8 on_m1_fetch_cycle() {
+        fast_u8 n = self().on_fetch_cycle();
+        self().on_inc_r_reg();
+        return n;
     }
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
