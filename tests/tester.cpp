@@ -606,16 +606,16 @@ public:
         return base::on_5t_imm8_read();
     }
 
-    fast_u16 on_3t_3t_imm16_read() {
+    fast_u16 on_imm16_read() {
         fast_u16 addr = base::get_pc();
         fast_u16 v = z80::make16(on_read(z80::inc16(addr)),
                                  on_read(addr));
-        input.read_and_match("3t_3t_imm16_read %04x at %04x",
+        input.read_and_match("imm16_read %04x at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(v),
                              static_cast<unsigned>(addr));
         input_level_guard guard(input);
-        return base::on_3t_3t_imm16_read();
+        return base::on_imm16_read();
     }
 
     fast_u16 on_3t_4t_imm16_read() {

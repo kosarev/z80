@@ -139,7 +139,7 @@ c4550c cnz 0x0c55
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
  4 5t_fetch
- 5 3t_3t_imm16_read 0c55 at 0001
+ 5 imm16_read 0c55 at 0001
  5   get_pc_on_imm16_read 0001
  5   3t_read 55 at 0001
  5     set_addr_bus 0000 -> 0001
@@ -302,7 +302,7 @@ c3cdab jmp 0xabcd
  0 fetch c3 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read abcd at 0001
+ 4 imm16_read abcd at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read cd at 0001
  4     set_addr_bus 0000 -> 0001
@@ -323,7 +323,7 @@ d2d90a jnc 0x0ad9
  0 fetch d2 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 0ad9 at 0001
+ 4 imm16_read 0ad9 at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read d9 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -400,7 +400,7 @@ dbfe in 0xfe
  0 fetch 3a at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 5c8d at 0001
+ 4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 8d at 0001
  4     set_addr_bus 0000 -> 0001
@@ -433,7 +433,7 @@ dbfe in 0xfe
  0 fetch 2a at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 5cb2 at 0001
+ 4 imm16_read 5cb2 at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read b2 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -455,7 +455,7 @@ dbfe in 0xfe
  0 fetch 11 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 3456 at 0001
+ 4 imm16_read 3456 at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 56 at 0001
  4     set_addr_bus 0000 -> 0001
@@ -808,7 +808,7 @@ d7 rst 0x0010
  0 fetch 22 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 5c7b at 0001
+ 4 imm16_read 5c7b at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 7b at 0001
  4     set_addr_bus 0000 -> 0001
@@ -830,7 +830,7 @@ d7 rst 0x0010
  0 fetch 32 at 0000
  0   set_addr_bus 0000 -> 0000
  4 set_pc_on_fetch 0000 -> 0001
- 4 3t_3t_imm16_read 5c8d at 0001
+ 4 imm16_read 5c8d at 0001
  4   get_pc_on_imm16_read 0001
  4   3t_read 8d at 0001
  4     set_addr_bus 0000 -> 0001

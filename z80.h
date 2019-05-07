@@ -392,7 +392,7 @@ public:
             // Jcc[y] nn     f(4) r(3) r(3)
             // JP cc[y], nn  f(4) r(3) r(3)
             auto cc = static_cast<condition>(y);
-            return self().on_jp_cc_nn(cc, self().on_3t_3t_imm16_read()); }
+            return self().on_jp_cc_nn(cc, self().on_imm16_read()); }
         case 0304: {
             // Ccc[y], nn
             // cc met:      f(5) r(3) r(3) w(3) w(3)
@@ -419,7 +419,7 @@ public:
             // LD rp, nn        f(4) r(3) r(3)
             // LD i, nn    f(4) f(4) r(3) r(3)
             auto rp = static_cast<regp>(p);
-            return self().on_ld_rp_nn(rp, self().on_3t_3t_imm16_read()); }
+            return self().on_ld_rp_nn(rp, self().on_imm16_read()); }
         case 0011: {
             // ADD HL, rp[p] / DAD rp
             // DAD rp               f(4) e(3) e(3)
@@ -504,7 +504,7 @@ public:
             // SHLD nn              f(4) r(3) r(3) w(3) w(3)
             // LD (nn), HL          f(4) r(3) r(3) w(3) w(3)
             // LD (nn), i      f(4) f(4) r(3) r(3) w(3) w(3)
-            return self().on_ld_at_nn_irp(self().on_3t_3t_imm16_read());
+            return self().on_ld_at_nn_irp(self().on_imm16_read());
         case 0x27:
             // DAA  f(4)  (both i8080 and z80)
             return self().on_daa();
@@ -512,7 +512,7 @@ public:
             // LHLD nn              f(4) r(3) r(3) r(3) r(3)
             // LD HL, (nn)          f(4) r(3) r(3) r(3) r(3)
             // LD i, (nn)      f(4) f(4) r(3) r(3) r(3) r(3)
-            return self().on_ld_irp_at_nn(self().on_3t_3t_imm16_read());
+            return self().on_ld_irp_at_nn(self().on_imm16_read());
         case 0x2f:
             // CMA  f(4)
             // CPL  f(4)
@@ -520,7 +520,7 @@ public:
         case 0x32:
             // STA nn      f(4) r(3) r(3) w(3)
             // LD (nn), A  f(4) r(3) r(3) w(3)
-            return self().on_ld_at_nn_a(self().on_3t_3t_imm16_read());
+            return self().on_ld_at_nn_a(self().on_imm16_read());
         case 0x37:
             // STC  f(4)
             // SCF  f(4)
@@ -532,11 +532,11 @@ public:
         case 0x3a:
             // LDA nn      f(4) r(3) r(3) r(3)
             // LD A, (nn)  f(4) r(3) r(3) r(3)
-            return self().on_ld_a_at_nn(self().on_3t_3t_imm16_read());
+            return self().on_ld_a_at_nn(self().on_imm16_read());
         case 0xc3:
             // JMP nn  f(4) r(3) r(3)
             // JP nn   f(4) r(3) r(3)
-            return self().on_jp_nn(self().on_3t_3t_imm16_read());
+            return self().on_jp_nn(self().on_imm16_read());
         case 0xc9:
             // RET  f(4) r(3) r(3)
             return self().on_ret();
@@ -634,9 +634,9 @@ public:
         self().on_alu_r(k, r); }
     void on_decode_call_cc_nn(condition cc) {
         self().on_5t_fetch_cycle();
-        self().on_call_cc_nn(cc, self().on_3t_3t_imm16_read()); }
+        self().on_call_cc_nn(cc, self().on_imm16_read()); }
     void on_decode_cb_prefix() {
-        self().on_xjp_nn(self().on_3t_3t_imm16_read()); }
+        self().on_xjp_nn(self().on_imm16_read()); }
     void on_decode_dd_prefix() {
         self().on_decode_xcall_nn(0xdd); }
     void on_decode_fd_prefix() {
@@ -718,7 +718,7 @@ public:
         // condition on decoding.
         bool cc_met = self().check_condition(cc);
         fast_u16 nn = cc_met ? self().on_3t_4t_imm16_read() :
-                               self().on_3t_3t_imm16_read();
+                               self().on_imm16_read();
         self().on_call_cc_nn(cc, nn); }
     void on_decode_dd_prefix() {
         self().on_instr_prefix(iregp::ix); }
@@ -852,7 +852,7 @@ public:
             // LD rp[p], (nn)  f(4) f(4) r(3) r(3) r(3) r(3)
             // LD (nn), rp[p]  f(4) f(4) r(3) r(3) w(3) w(3)
             auto rp = static_cast<regp>(p);
-            fast_u16 nn = self().on_3t_3t_imm16_read();
+            fast_u16 nn = self().on_imm16_read();
             return op & q_mask ? self().on_ld_rp_at_nn(rp, nn) :
                                  self().on_ld_at_nn_rp(nn, rp); }
         case 0104:
@@ -968,7 +968,7 @@ public:
 
     fast_u8 on_3t_imm8_read() { return self().on_read_next_byte(); }
 
-    fast_u16 on_3t_3t_imm16_read() {
+    fast_u16 on_imm16_read() {
         fast_u8 lo = self().on_read_next_byte();
         fast_u8 hi = self().on_read_next_byte();
         return make16(hi, lo); }
@@ -2070,7 +2070,7 @@ public:
         fast_u8 op = self().on_3t_read_cycle(pc);
         self().set_pc_on_imm8_read(inc16(pc));
         return op; }
-    fast_u16 on_3t_3t_imm16_read() {
+    fast_u16 on_imm16_read() {
         fast_u16 pc = self().get_pc_on_imm16_read();
         fast_u8 lo = self().on_3t_read_cycle(pc);
         pc = inc16(pc);
