@@ -845,10 +845,7 @@ public:
             return self().on_set(b, r, d); }
         }
 
-        std::fprintf(stderr, "Unknown CB-prefixed opcode 0x%02x at 0x%04x.\n",
-                     static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().on_get_last_read_addr()));
-        std::abort();
+        unreachable("Unknown opcode encountered!");
     }
 
     void on_decode_ed_prefix() {
@@ -930,10 +927,7 @@ public:
             return self().on_rld();
         }
 
-        std::fprintf(stderr, "Unknown ED-prefixed opcode 0x%02x at 0x%04x.\n",
-                     static_cast<unsigned>(op),
-                     static_cast<unsigned>(self().on_get_last_read_addr()));
-        std::abort();
+        unreachable("Unknown opcode encountered!");
     }
 
     void on_decode(fast_u8 op) {
