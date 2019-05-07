@@ -912,8 +912,9 @@ e3 xthl
 10 get_h 00
 10 3t_write 00 -> 00 at 0001
 10   set_addr_bus 0001 -> 0001
-13 5t_write e3 -> 00 at 0000
+13 write e3 -> 00 at 0000
 13   set_addr_bus 0001 -> 0000
+16 write_cycle_extra_2t at 0000
 18 set_wz 0000 -> 00e3
 18 set_l 00 -> e3
 18 set_h 00 -> 00

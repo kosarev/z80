@@ -298,6 +298,9 @@ public:
     void on_read_cycle_extra_2t(fast_u16 addr) {
         unused(addr);
         self().on_tick(2); }
+    void on_write_cycle_extra_2t(fast_u16 addr) {
+        unused(addr);
+        self().on_tick(2); }
 
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         unused(op);
@@ -2088,14 +2091,17 @@ public:
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
 
+    // TODO: Rename and move to the root.
+    void xon_write_cycle(fast_u16 addr, fast_u8 n) {
+        self().on_set_addr_bus(addr);
+        self().on_write(addr, n);
+        self().on_tick(3); }
     void on_write_cycle(fast_u16 addr, fast_u8 n, unsigned ticks) {
         self().on_set_addr_bus(addr);
         self().on_write(addr, n);
         self().on_tick(ticks); }
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_write_cycle(addr, n, /* ticks= */ 3); }
-    void on_5t_write_cycle(fast_u16 addr, fast_u8 n) {
-        self().on_write_cycle(addr, n, /* ticks= */ 5); }
 
     void on_3t_exec_cycle() {
         self().on_tick(3); }
@@ -2505,7 +2511,8 @@ public:
         std::swap(nn, hl);
         self().on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
-        self().on_5t_write_cycle(sp, get_low8(nn));
+        self().xon_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle_extra_2t(sp);
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
     void on_jp_irp() {
@@ -3019,7 +3026,8 @@ public:
 
         fast_u8 t = self().on_read_cycle(hl);
 
-        self().on_5t_write_cycle(de, t);
+        self().xon_write_cycle(de, t);
+        self().on_write_cycle_extra_2t(de);
         bc = dec16(bc);
 
         t += a;
@@ -3135,7 +3143,8 @@ public:
         std::swap(nn, irp);
         self().on_3t_write_cycle(sp, get_high8(nn));
         sp = dec16(sp);
-        self().on_5t_write_cycle(sp, get_low8(nn));
+        self().xon_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle_extra_2t(sp);
         self().on_set_wz(irp);
         self().on_set_iregp(irp); }
     void on_exx() {
