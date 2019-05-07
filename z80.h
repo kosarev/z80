@@ -165,9 +165,6 @@ class root {
 public:
     typedef D derived;
 
-    void on_tick(unsigned t) {
-        unused(t); }
-
     iregp on_get_iregp_kind() const { return iregp::hl; }
     void on_set_iregp_kind(iregp r) { unused(r); }
     fast_u8 on_get_b() const { return 0; }
@@ -285,6 +282,13 @@ public:
         return 0xff; }
     void on_output(fast_u16 port, fast_u8 n) {
         unused(port, n); }
+
+    void on_tick(unsigned t) {
+        unused(t); }
+
+    void on_read_cycle_extra_2t(fast_u16 addr) {
+        unused(addr);
+        self().on_tick(2); }
 
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         unused(op);
@@ -2054,6 +2058,13 @@ public:
         self().on_tick(1);
     }
 
+    // TODO: Rename and move to the root.
+    fast_u8 xon_read_cycle(fast_u16 addr) {
+        self().on_set_addr_bus(addr);
+        fast_u8 b = self().on_read(addr);
+        self().on_tick(3);
+        self().on_set_last_read_addr(addr);
+        return b; }
     fast_u8 on_read_cycle(fast_u16 addr, unsigned ticks) {
         self().on_set_addr_bus(addr);
         fast_u8 b = self().on_read(addr);
@@ -3393,10 +3404,6 @@ public:
         self().on_tick(2);
     }
 
-    fast_u8 on_5t_read_cycle(fast_u16 addr) {
-        return self().on_read_cycle(addr, /* ticks= */ 5);
-    }
-
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         return self().on_3t_read_cycle(addr);
     }
@@ -3426,7 +3433,8 @@ public:
 
     fast_u8 on_5t_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
-        fast_u8 op = self().on_5t_read_cycle(pc);
+        fast_u8 op = self().xon_read_cycle(pc);
+        self().on_read_cycle_extra_2t(pc);
         self().set_pc_on_imm8_read(inc16(pc));
         return op;
     }

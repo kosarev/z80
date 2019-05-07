@@ -509,13 +509,11 @@ public:
         return base::on_4t_read_cycle(addr);
     }
 
-    fast_u8 on_5t_read_cycle(fast_u16 addr) {
-        input.read_and_match("5t_read %02x at %04x",
+    void on_read_cycle_extra_2t(fast_u16 addr) {
+        input.read_and_match("read_extra_2t %02x",
                              static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
                              static_cast<unsigned>(addr));
-        input_level_guard guard(input);
-        return base::on_5t_read_cycle(addr);
+        base::on_read_cycle_extra_2t(addr);
     }
 
     void on_3t_write_cycle(fast_u16 addr, fast_u8 n) {
