@@ -278,9 +278,11 @@ public:
         return 0x00; }
     void on_write(fast_u16 addr, fast_u8 n) {
         unused(addr, n); }
+    // TODO: Should we provide separate 8-bit and 16-bit versions
+    //       of these?
     fast_u8 on_input(fast_u16 port) {
         unused(port);
-         return 0xff; }
+        return 0xff; }
     void on_output(fast_u16 port, fast_u8 n) {
         unused(port, n); }
 
