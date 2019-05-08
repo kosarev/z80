@@ -312,6 +312,9 @@ public:
     void on_write_cycle_extra_2t() {
         self().on_tick(2); }
 
+    void on_ed_xnop(fast_u8 op) {
+        unused(op);
+        self().on_nop(); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         unused(op);
         self().on_call_nn(nn); }
@@ -892,13 +895,13 @@ public:
         case 0200: {
             // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
             if(y < 4)
-                return self().on_noni_ed(op);
+                return self().on_ed_xnop(op);
             auto k = static_cast<block_ld>(y - 4);
             return self().on_block_ld(k); }
         case 0201: {
             // CPI, CPD, CPIR, CPDR  f(4) f(4) r(3) e(5) + e(5)
             if(y < 4)
-                return self().on_noni_ed(op);
+                return self().on_ed_xnop(op);
             auto k = static_cast<block_cp>(y - 4);
             return self().on_block_cp(k); }
         }
@@ -1394,9 +1397,6 @@ public:
         }
     }
 
-    void on_noni_ed(fast_u8 op) {
-        self().on_format("noni N, N", 0xed, op); }
-
     void on_add_irp_rp(regp rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("add P, P", regp::hl, irp, rp, irp); }
@@ -1428,6 +1428,8 @@ public:
         self().on_format("dec P", rp, irp); }
     void on_djnz(fast_u8 d) {
         self().on_format("djnz D", sign_extend8(d) + 2); }
+    void on_ed_xnop(fast_u8 op) {
+        self().on_format("xnop W", 0xed00 | op); }
     void on_ex_af_alt_af() {
         self().on_format("ex af, af'"); }
     void on_ex_de_hl() {
@@ -2870,11 +2872,6 @@ public:
                     cf_ari(t & 0x1);
             break;
         }
-    }
-
-    void on_noni_ed(fast_u8 op) {
-        // TODO: Forbid INT after this instruction.
-        unused(op);
     }
 
     void on_relative_jump(fast_u8 d) {
