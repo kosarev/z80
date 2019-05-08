@@ -46,7 +46,7 @@ Fast and flexible i8080/Z80 emulator.
 * [Input and output](#input-and-output)
 * [Accessing processor's state](#accessing-processors-state)
 * [Modules](#modules)
-* [The `root<>` module](#the-root-module)
+* [The root module](#the-root-module)
 * [State modules](#state-modules)
 * [Feedback](#feedback)
 
@@ -334,7 +334,7 @@ In all cases the only requirement is to implement handlers other
 modules rely on.
 
 
-## The `root<>` module
+## The root module
 
 ```c++
 template<typename D>
