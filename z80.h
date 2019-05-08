@@ -937,14 +937,15 @@ public:
             }
         }
         if((op & x_mask) == 0200 && y >= 4) {
+            fast_u8 n = y - 4;
             switch(op & z_mask) {
             case 0: {
                 // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
-                auto k = static_cast<block_ld>(y - 4);
+                auto k = static_cast<block_ld>(n);
                 return self().on_block_ld(k); }
             case 1: {
                 // CPI, CPD, CPIR, CPDR  f(4) f(4) r(3) e(5) + e(5)
-                auto k = static_cast<block_cp>(y - 4);
+                auto k = static_cast<block_cp>(n);
                 return self().on_block_cp(k); }
             case 2:
                 assert(0);  // TODO
