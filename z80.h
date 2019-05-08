@@ -865,10 +865,11 @@ public:
             // NEG  f(4) f(4)
             return self().on_neg();
         case 0x46:
+            // IM im[y]  f(4) f(4)
+            return self().on_im(0);
         case 0x56:
         case 0x5e:
-            // IM im[y]  f(4) f(4)
-            return self().on_im(y == 0 ? 0 : y - 1);
+            return self().on_im(y - 1);
         case 0x4d:
             // RETI  f(4) f(4) r(3) r(3)
             return self().on_reti();
@@ -931,8 +932,8 @@ public:
                 return self().on_xretn(op);
             case 6: {
                 // IM im[y]  f(4) f(4)
-                y &= 3;
-                return self().on_xim(op, y == 0 ? 0 : y - 1); }
+                fast_u8 n = y & 3;
+                return self().on_xim(op, n == 0 ? 0 : n - 1); }
             }
         }
         if((op & x_mask) == 0200 && y >= 4) {
