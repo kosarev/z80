@@ -524,6 +524,34 @@ ed56 im 1
  8 set_int_mode 0 -> 1
  8 done
 
+ed46 im 0
+...
+ 8 done
+
+ed5e im 2
+...
+ 8 done
+
+ed4e xim 0x4e, 0
+...
+ 8 done
+
+ed66 xim 0x66, 0
+...
+ 8 done
+
+ed6e xim 0x6e, 0
+...
+ 8 done
+
+ed76 xim 0x76, 1
+...
+ 8 done
+
+ed7e xim 0x7e, 2
+...
+ 8 done
+
 # INC r
 04 inc b
  0 m1_fetch
@@ -1297,6 +1325,14 @@ ed44 neg
  8 set_f 00 -> 42
  8 done
 
+ed4c xneg 0x4c
+...
+ 8 done
+
+ed7c xneg 0x7c
+...
+ 8 done
+
 # NOP
 00 nop
  0 m1_fetch
@@ -1308,6 +1344,74 @@ ed44 neg
  4     set_pc_on_fetch 0000 -> 0001
  4   set_r 00 -> 01
  4 done
+
+ed00 xnop 0xed00
+...
+ 8 done
+
+ed3f xnop 0xed3f
+...
+ 8 done
+
+ed77 xnop 0xed77
+...
+ 8 done
+
+ed7f xnop 0xed7f
+...
+ 8 done
+
+ed80 xnop 0xed80
+...
+ 8 done
+
+ed87 xnop 0xed87
+...
+ 8 done
+
+ed9f xnop 0xed9f
+...
+ 8 done
+
+eda4 xnop 0xeda4
+...
+ 8 done
+
+eda7 xnop 0xeda7
+...
+ 8 done
+
+edac xnop 0xedac
+...
+ 8 done
+
+edaf xnop 0xedaf
+...
+ 8 done
+
+edb4 xnop 0xedb4
+...
+ 8 done
+
+edb7 xnop 0xedb7
+...
+ 8 done
+
+edbc xnop 0xedbc
+...
+ 8 done
+
+edbf xnop 0xedbf
+...
+ 8 done
+
+edc0 xnop 0xedc0
+...
+ 8 done
+
+edff xnop 0xedff
+...
+ 8 done
 
 # OR r
 b3 or e
@@ -1839,6 +1943,58 @@ ed4d reti
 14 set_sp 0000 -> 0002
 14 set_wz 0000 -> 4ded
 14 set_pc_on_return 0002 -> 4ded
+14 done
+
+# RETN
+ed45 retn
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch 45 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 get_sp 0000
+ 8 read ed at 0000
+ 8   set_addr_bus 0001 -> 0000
+11 read 45 at 0001
+11   set_addr_bus 0000 -> 0001
+14 set_sp 0000 -> 0002
+14 set_wz 0000 -> 45ed
+14 set_pc_on_return 0002 -> 45ed
+14 done
+
+ed55 xretn 0x55
+...
+14 done
+
+ed5d xretn 0x5d
+...
+14 done
+
+ed65 xretn 0x65
+...
+14 done
+
+ed6d xretn 0x6d
+...
+14 done
+
+ed75 xretn 0x75
+...
+14 done
+
+ed7d xretn 0x7d
+...
 14 done
 
 # RR
