@@ -897,79 +897,64 @@ public:
         case 0x6f:
             // RLD  f(4) f(4) r(3) e(4) w(3)
             return self().on_rld();
-        case 0x77:
-        case 0x7f:
-            return self().on_ed_xnop(op);
         }
-        switch(op & (x_mask | z_mask)) {
-        case 0100: {
-            // IN r[y], (C)  f(4) f(4) i(4)
-            // IN (C)        f(4) f(4) i(4)
-            auto r = static_cast<reg>(y);
-            return self().on_in_r_c(r); }
-        case 0101: {
-            // OUT (C), r[y]  f(4) f(4) o(4)
-            // OUT (C), 0     f(4) f(4) o(4)
-            auto r = static_cast<reg>(y);
-            return self().on_out_c_r(r); }
-        case 0102: {
-            // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
-            // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
-            auto rp = static_cast<regp>(p);
-            return op & q_mask ? self().on_adc_hl_rp(rp) :
-                                 self().on_sbc_hl_rp(rp); }
-        case 0103: {
-            // LD rp[p], (nn)  f(4) f(4) r(3) r(3) r(3) r(3)
-            // LD (nn), rp[p]  f(4) f(4) r(3) r(3) w(3) w(3)
-            auto rp = static_cast<regp>(p);
-            fast_u16 nn = self().on_imm16_read();
-            return op & q_mask ? self().on_ld_rp_at_nn(rp, nn) :
-                                 self().on_ld_at_nn_rp(nn, rp); }
-        case 0104:
-            // XNEG  f(4) f(4)
-            return self().on_xneg(op);
-        case 0105:
-            // XRETN  f(4) f(4) r(3) r(3)
-            return self().on_xretn(op);
-        case 0106: {
-            // IM im[y]  f(4) f(4)
-            y &= 3;
-            return self().on_xim(op, y == 0 ? 0 : y - 1); }
-        case 0200: {
-            // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
-            if(y < 4)
-                return self().on_ed_xnop(op);
-            auto k = static_cast<block_ld>(y - 4);
-            return self().on_block_ld(k); }
-        case 0201: {
-            // CPI, CPD, CPIR, CPDR  f(4) f(4) r(3) e(5) + e(5)
-            if(y < 4)
-                return self().on_ed_xnop(op);
-            auto k = static_cast<block_cp>(y - 4);
-            return self().on_block_cp(k); }
-        case 0202:
-            if(y < 4)
-                return self().on_ed_xnop(op);
-            assert(0);  // TODO
-            return;
-        case 0203:
-            if(y < 4)
-                return self().on_ed_xnop(op);
-            assert(0);  // TODO
-            return;
-        case 0204:
-        case 0205:
-        case 0206:
-        case 0207:
-            return self().on_ed_xnop(op);
+        if((op & x_mask) == 0100) {
+            switch(op & z_mask) {
+            case 0: {
+                // IN r[y], (C)  f(4) f(4) i(4)
+                // IN (C)        f(4) f(4) i(4)
+                auto r = static_cast<reg>(y);
+                return self().on_in_r_c(r); }
+            case 1: {
+                // OUT (C), r[y]  f(4) f(4) o(4)
+                // OUT (C), 0     f(4) f(4) o(4)
+                auto r = static_cast<reg>(y);
+                return self().on_out_c_r(r); }
+            case 2: {
+                // ADC HL, rp[p]  f(4) f(4) e(4) e(3)
+                // SBC HL, rp[p]  f(4) f(4) e(4) e(3)
+                auto rp = static_cast<regp>(p);
+                return op & q_mask ? self().on_adc_hl_rp(rp) :
+                                     self().on_sbc_hl_rp(rp); }
+            case 3: {
+                // LD rp[p], (nn)  f(4) f(4) r(3) r(3) r(3) r(3)
+                // LD (nn), rp[p]  f(4) f(4) r(3) r(3) w(3) w(3)
+                auto rp = static_cast<regp>(p);
+                fast_u16 nn = self().on_imm16_read();
+                return op & q_mask ? self().on_ld_rp_at_nn(rp, nn) :
+                                     self().on_ld_at_nn_rp(nn, rp); }
+            case 4:
+                // XNEG  f(4) f(4)
+                return self().on_xneg(op);
+            case 5:
+                // XRETN  f(4) f(4) r(3) r(3)
+                return self().on_xretn(op);
+            case 6: {
+                // IM im[y]  f(4) f(4)
+                y &= 3;
+                return self().on_xim(op, y == 0 ? 0 : y - 1); }
+            }
         }
-        switch(op & x_mask) {
-        case 0000:
-        case 0300:
-            return self().on_ed_xnop(op);
+        if((op & x_mask) == 0200 && y >= 4) {
+            switch(op & z_mask) {
+            case 0: {
+                // LDI, LDD, LDIR, LDDR  f(4) f(4) r(3) w(5) + e(5)
+                auto k = static_cast<block_ld>(y - 4);
+                return self().on_block_ld(k); }
+            case 1: {
+                // CPI, CPD, CPIR, CPDR  f(4) f(4) r(3) e(5) + e(5)
+                auto k = static_cast<block_cp>(y - 4);
+                return self().on_block_cp(k); }
+            case 2:
+                assert(0);  // TODO
+                return;
+            case 3:
+                assert(0);  // TODO
+                return;
+            }
         }
 
-        unreachable("Unknown opcode encountered!");
+        return self().on_ed_xnop(op);
     }
 
     void on_decode(fast_u8 op) {
