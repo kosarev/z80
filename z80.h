@@ -201,8 +201,6 @@ public:
     void on_set_sp(fast_u16 n) { unused(n); }
     fast_u16 on_get_wz() const { return 0; }
     void on_set_wz(fast_u16 n) { unused(n); }
-    fast_u16 on_get_last_read_addr() const { return 0; }  // TODO: Remove.
-    void on_set_last_read_addr(fast_u16 addr) { unused(addr); }  // TODO: Remove.
     bool on_is_halted() const { return false; }
     void on_set_is_halted(bool f) { unused(f); }
     bool on_get_iff() const { return false; }
@@ -299,7 +297,6 @@ public:
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
         self().on_tick(3);
-        self().on_set_last_read_addr(addr);
         return n; }
     void on_read_cycle_extra_1t() {
         self().on_tick(1); }
@@ -1836,9 +1833,6 @@ public:
     bool is_halted() const { return halted.get(); }
     void set_is_halted(bool is_halted) { halted.set(is_halted); }
 
-    fast_u16 get_last_read_addr() const { return last_read_addr; }
-    void set_last_read_addr(fast_u16 addr) { last_read_addr = addr; }
-
     void on_ex_de_hl_regs() { de.swap(hl); }
 
     fast_u8 on_get_b() const { return get_b(); }
@@ -1880,9 +1874,6 @@ public:
     bool on_is_halted() const { return is_halted(); }
     void on_set_is_halted(bool f) { set_is_halted(f); }
 
-    fast_u16 on_get_last_read_addr() const { return get_last_read_addr(); }
-    void on_set_last_read_addr(fast_u16 addr) { set_last_read_addr(addr); }
-
 protected:
     using base::self;
 
@@ -1890,7 +1881,6 @@ private:
     regp_value bc, de, hl, af;
     reg16_value pc, sp, wz;
     flipflop int_disabled, halted;
-    fast_u16 last_read_addr = 0;  // TODO: Remove.
 
     template<typename XB> friend class i8080_state;
     template<typename XB> friend class z80_state;
@@ -2351,7 +2341,6 @@ public:
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
         self().on_tick(4);
-        self().on_set_last_read_addr(addr);
         self().set_pc_on_fetch(inc16(addr));
         return n; }
 
@@ -3378,7 +3367,6 @@ public:
         self().on_tick(2);
         self().on_set_addr_bus(self().get_ir_on_refresh());
         self().on_tick(2);
-        self().on_set_last_read_addr(addr);
         self().set_pc_on_fetch(inc16(addr));
         return n;
     }
