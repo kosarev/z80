@@ -1871,9 +1871,13 @@ protected:
     using base::self;
 
 private:
-    regp_value bc, de, hl, af;
-    reg16_value pc, sp;
-    flipflop int_disabled, halted;
+    // Most frequently used registers shall come first to reduce cache stress.
+    reg16_value pc;
+    regp_value af;
+    flipflop int_disabled;
+    reg16_value sp;
+    regp_value hl, de, bc;
+    flipflop halted;
 
     template<typename XB> friend class i8080_state;
     template<typename XB> friend class z80_state;
