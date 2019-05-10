@@ -49,9 +49,9 @@ class _CPMLikeMachineMixin(object):
 
     def _handle_bdos_call(self):
         c = self.get_c()
-        if c == 0x02:
+        if c == self._C_WRITE:
             self._handle_c_write()
-        elif c == 0x09:
+        elif c == self._C_WRITESTR:
             self._handle_writestr()
         else:
             assert 0, 'BDOS call: c = 0x%02x' % c
