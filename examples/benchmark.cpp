@@ -103,9 +103,10 @@ public:
     typedef B base;
 
     // The benchmark emulator provides no support for interrupts,
-    // so no need to track the flag.
+    // so no need to track the flags.
     // TODO: Remove that flag from the emulator's state at all.
     void on_set_is_int_disabled(bool f) { unused(f); }
+    void on_set_iff(bool f) { unused(f); }
 
     void on_report() {}
 
@@ -170,41 +171,46 @@ public:
         ++is_halted_writes;
         base::on_set_is_halted(f); }
 
+    bool on_get_iff() { ++iff_reads; return base::on_get_iff(); }
+    void on_set_iff(bool f) { ++iff_writes; base::on_set_iff(f); }
+
     void on_report() {
-        std::printf("pc reads:  %10.0f\n"
-                    "pc writes: %10.0f\n"
-                    "sp reads:  %10.0f\n"
-                    "sp writes: %10.0f\n"
-                    "wz reads:  %10.0f\n"
-                    "wz writes: %10.0f\n"
-                    "bc reads:  %10.0f\n"
-                    "bc writes: %10.0f\n"
-                    "b  reads:  %10.0f\n"
-                    "b  writes: %10.0f\n"
-                    "c  reads:  %10.0f\n"
-                    "c  writes: %10.0f\n"
-                    "de reads:  %10.0f\n"
-                    "de writes: %10.0f\n"
-                    "d  reads:  %10.0f\n"
-                    "d  writes: %10.0f\n"
-                    "e  reads:  %10.0f\n"
-                    "e  writes: %10.0f\n"
-                    "hl reads:  %10.0f\n"
-                    "hl writes: %10.0f\n"
-                    "h  reads:  %10.0f\n"
-                    "h  writes: %10.0f\n"
-                    "l  reads:  %10.0f\n"
-                    "l  writes: %10.0f\n"
-                    "af reads:  %10.0f\n"
-                    "af writes: %10.0f\n"
-                    "a  reads:  %10.0f\n"
-                    "a  writes: %10.0f\n"
-                    "f  reads:  %10.0f\n"
-                    "f  writes: %10.0f\n"
+        std::printf("             pc reads:  %10.0f\n"
+                    "             pc writes: %10.0f\n"
+                    "             sp reads:  %10.0f\n"
+                    "             sp writes: %10.0f\n"
+                    "             wz reads:  %10.0f\n"
+                    "             wz writes: %10.0f\n"
+                    "             bc reads:  %10.0f\n"
+                    "             bc writes: %10.0f\n"
+                    "              b reads:  %10.0f\n"
+                    "              b writes: %10.0f\n"
+                    "              c reads:  %10.0f\n"
+                    "              c writes: %10.0f\n"
+                    "             de reads:  %10.0f\n"
+                    "             de writes: %10.0f\n"
+                    "              d reads:  %10.0f\n"
+                    "              d writes: %10.0f\n"
+                    "              e reads:  %10.0f\n"
+                    "              e writes: %10.0f\n"
+                    "             hl reads:  %10.0f\n"
+                    "             hl writes: %10.0f\n"
+                    "              h reads:  %10.0f\n"
+                    "              h writes: %10.0f\n"
+                    "              l reads:  %10.0f\n"
+                    "              l writes: %10.0f\n"
+                    "             af reads:  %10.0f\n"
+                    "             af writes: %10.0f\n"
+                    "              a reads:  %10.0f\n"
+                    "              a writes: %10.0f\n"
+                    "              f reads:  %10.0f\n"
+                    "              f writes: %10.0f\n"
+                    "            iff reads:  %10.0f\n"
+                    "            iff writes: %10.0f\n"
                     "is_int_disabled reads:  %10.0f\n"
                     "is_int_disabled writes: %10.0f\n"
-                    "is_halted reads:        %10.0f\n"
-                    "is_halted writes:       %10.0f\n",
+                    "      is_halted reads:  %10.0f\n"
+                    "      is_halted writes: %10.0f\n",
                     static_cast<double>(pc_reads),
                     static_cast<double>(pc_writes),
                     static_cast<double>(sp_reads),
@@ -235,6 +241,8 @@ public:
                     static_cast<double>(a_writes),
                     static_cast<double>(f_reads),
                     static_cast<double>(f_writes),
+                    static_cast<double>(iff_reads),
+                    static_cast<double>(iff_writes),
                     static_cast<double>(is_int_disabled_reads),
                     static_cast<double>(is_int_disabled_writes),
                     static_cast<double>(is_halted_reads),
@@ -274,6 +282,8 @@ protected:
     double a_writes = 0;
     double f_reads = 0;
     double f_writes = 0;
+    double iff_reads = 0;
+    double iff_writes = 0;
     double is_int_disabled_reads = 0;
     double is_int_disabled_writes = 0;
     double is_halted_reads = 0;
