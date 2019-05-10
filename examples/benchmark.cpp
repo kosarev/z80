@@ -85,6 +85,8 @@ public:
         base::on_step();
     }
 
+    void on_report() {}
+
 protected:
     using base::self;
 
@@ -99,8 +101,177 @@ class empty_watcher : public B {
 public:
     typedef B base;
 
+    void on_report() {}
+
 protected:
     using base::self;
+};
+
+// Tracks use of CPU state.
+template<typename B>
+class state_watcher : public B {
+public:
+    typedef B base;
+
+    fast_u16 on_get_pc() { ++pc_reads; return base::on_get_pc(); }
+    void on_set_pc(fast_u16 nn) { ++pc_writes; base::on_set_pc(nn); }
+
+    fast_u16 on_get_sp() { ++sp_reads; return base::on_get_sp(); }
+    void on_set_sp(fast_u16 nn) { ++sp_writes; base::on_set_sp(nn); }
+
+    fast_u16 on_get_wz() { ++wz_reads; return base::on_get_wz(); }
+    void on_set_wz(fast_u16 nn) { ++wz_writes; base::on_set_wz(nn); }
+
+    fast_u16 on_get_bc() { ++bc_reads; return base::on_get_bc(); }
+    void on_set_bc(fast_u16 nn) { ++bc_writes; base::on_set_bc(nn); }
+    fast_u8 on_get_b() { ++b_reads; return base::on_get_b(); }
+    void on_set_b(fast_u8 n) { ++b_writes; base::on_set_b(n); }
+    fast_u8 on_get_c() { ++c_reads; return base::on_get_c(); }
+    void on_set_c(fast_u8 n) { ++c_writes; base::on_set_c(n); }
+
+    fast_u16 on_get_de() { ++de_reads; return base::on_get_de(); }
+    void on_set_de(fast_u16 nn) { ++de_writes; base::on_set_de(nn); }
+    fast_u8 on_get_d() { ++d_reads; return base::on_get_d(); }
+    void on_set_d(fast_u8 n) { ++d_writes; base::on_set_d(n); }
+    fast_u8 on_get_e() { ++e_reads; return base::on_get_e(); }
+    void on_set_e(fast_u8 n) { ++e_writes; base::on_set_e(n); }
+
+    fast_u16 on_get_hl() { ++hl_reads; return base::on_get_hl(); }
+    void on_set_hl(fast_u16 nn) { ++hl_writes; base::on_set_hl(nn); }
+    fast_u8 on_get_h() { ++h_reads; return base::on_get_h(); }
+    void on_set_h(fast_u8 n) { ++h_writes; base::on_set_h(n); }
+    fast_u8 on_get_l() { ++l_reads; return base::on_get_l(); }
+    void on_set_l(fast_u8 n) { ++l_writes; base::on_set_l(n); }
+
+    fast_u16 on_get_af() { ++af_reads; return base::on_get_af(); }
+    void on_set_af(fast_u16 nn) { ++af_writes; base::on_set_af(nn); }
+    fast_u8 on_get_a() { ++a_reads; return base::on_get_a(); }
+    void on_set_a(fast_u8 n) { ++a_writes; base::on_set_a(n); }
+    fast_u8 on_get_f() { ++f_reads; return base::on_get_f(); }
+    void on_set_f(fast_u8 n) { ++f_writes; base::on_set_f(n); }
+
+    bool on_is_int_disabled() {
+        ++is_int_disabled_reads;
+        return base::on_is_int_disabled(); }
+    void on_set_is_int_disabled(bool f) {
+        ++is_int_disabled_writes;
+        base::on_set_is_int_disabled(f); }
+
+    bool on_is_halted() {
+        ++is_halted_reads;
+        return base::on_is_halted(); }
+    void on_set_is_halted(bool f) {
+        ++is_halted_writes;
+        base::on_set_is_halted(f); }
+
+    void on_report() {
+        std::printf("pc reads:  %10.0f\n"
+                    "pc writes: %10.0f\n"
+                    "sp reads:  %10.0f\n"
+                    "sp writes: %10.0f\n"
+                    "wz reads:  %10.0f\n"
+                    "wz writes: %10.0f\n"
+                    "bc reads:  %10.0f\n"
+                    "bc writes: %10.0f\n"
+                    "b  reads:  %10.0f\n"
+                    "b  writes: %10.0f\n"
+                    "c  reads:  %10.0f\n"
+                    "c  writes: %10.0f\n"
+                    "de reads:  %10.0f\n"
+                    "de writes: %10.0f\n"
+                    "d  reads:  %10.0f\n"
+                    "d  writes: %10.0f\n"
+                    "e  reads:  %10.0f\n"
+                    "e  writes: %10.0f\n"
+                    "hl reads:  %10.0f\n"
+                    "hl writes: %10.0f\n"
+                    "h  reads:  %10.0f\n"
+                    "h  writes: %10.0f\n"
+                    "l  reads:  %10.0f\n"
+                    "l  writes: %10.0f\n"
+                    "af reads:  %10.0f\n"
+                    "af writes: %10.0f\n"
+                    "a  reads:  %10.0f\n"
+                    "a  writes: %10.0f\n"
+                    "f  reads:  %10.0f\n"
+                    "f  writes: %10.0f\n"
+                    "is_int_disabled reads:  %10.0f\n"
+                    "is_int_disabled writes: %10.0f\n"
+                    "is_halted reads:        %10.0f\n"
+                    "is_halted writes:       %10.0f\n",
+                    static_cast<double>(pc_reads),
+                    static_cast<double>(pc_writes),
+                    static_cast<double>(sp_reads),
+                    static_cast<double>(sp_writes),
+                    static_cast<double>(wz_reads),
+                    static_cast<double>(wz_writes),
+                    static_cast<double>(bc_reads),
+                    static_cast<double>(bc_writes),
+                    static_cast<double>(b_reads),
+                    static_cast<double>(b_writes),
+                    static_cast<double>(c_reads),
+                    static_cast<double>(c_writes),
+                    static_cast<double>(de_reads),
+                    static_cast<double>(de_writes),
+                    static_cast<double>(d_reads),
+                    static_cast<double>(d_writes),
+                    static_cast<double>(e_reads),
+                    static_cast<double>(e_writes),
+                    static_cast<double>(hl_reads),
+                    static_cast<double>(hl_writes),
+                    static_cast<double>(h_reads),
+                    static_cast<double>(h_writes),
+                    static_cast<double>(l_reads),
+                    static_cast<double>(l_writes),
+                    static_cast<double>(af_reads),
+                    static_cast<double>(af_writes),
+                    static_cast<double>(a_reads),
+                    static_cast<double>(a_writes),
+                    static_cast<double>(f_reads),
+                    static_cast<double>(f_writes),
+                    static_cast<double>(is_int_disabled_reads),
+                    static_cast<double>(is_int_disabled_writes),
+                    static_cast<double>(is_halted_reads),
+                    static_cast<double>(is_halted_writes));
+    }
+
+protected:
+    using base::self;
+
+    double pc_reads = 0;
+    double pc_writes = 0;
+    double sp_reads = 0;
+    double sp_writes = 0;
+    double wz_reads = 0;
+    double wz_writes = 0;
+    double bc_reads = 0;
+    double bc_writes = 0;
+    double b_reads = 0;
+    double b_writes = 0;
+    double c_reads = 0;
+    double c_writes = 0;
+    double de_reads = 0;
+    double de_writes = 0;
+    double d_reads = 0;
+    double d_writes = 0;
+    double e_reads = 0;
+    double e_writes = 0;
+    double hl_reads = 0;
+    double hl_writes = 0;
+    double h_reads = 0;
+    double h_writes = 0;
+    double l_reads = 0;
+    double l_writes = 0;
+    double af_reads = 0;
+    double af_writes = 0;
+    double a_reads = 0;
+    double a_writes = 0;
+    double f_reads = 0;
+    double f_writes = 0;
+    double is_int_disabled_reads = 0;
+    double is_int_disabled_writes = 0;
+    double is_halted_reads = 0;
+    double is_halted_writes = 0;
 };
 
 #define WATCHER default_watcher
@@ -156,6 +327,8 @@ public:
 
             self().on_step();
         }
+
+        self().on_report();
     }
 
 protected:

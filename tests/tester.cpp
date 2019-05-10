@@ -405,42 +405,42 @@ public:
                              static_cast<unsigned>(base::get_pc()),
                              static_cast<unsigned>(pc)); }
 
-    fast_u16 get_pc_on_fetch() const {
+    fast_u16 get_pc_on_fetch() {
         match_get_pc("fetch");
         return base::get_pc_on_fetch(); }
     void set_pc_on_fetch(fast_u16 pc) {
         match_set_pc("fetch", pc);
         base::set_pc_on_fetch(pc); }
 
-    fast_u16 get_pc_on_imm8_read() const {
+    fast_u16 get_pc_on_imm8_read() {
         match_get_pc("imm8_read");
         return base::get_pc_on_imm8_read(); }
     void set_pc_on_imm8_read(fast_u16 pc) {
         match_set_pc("imm8_read", pc);
         base::set_pc_on_imm8_read(pc); }
 
-    fast_u16 get_pc_on_imm16_read() const {
+    fast_u16 get_pc_on_imm16_read() {
         match_get_pc("imm16_read");
         return base::get_pc_on_imm16_read(); }
     void set_pc_on_imm16_read(fast_u16 pc) {
         match_set_pc("imm16_read", pc);
         base::set_pc_on_imm16_read(pc); }
 
-    fast_u16 get_pc_on_disp_read() const {
+    fast_u16 get_pc_on_disp_read() {
         match_get_pc("disp_read");
         return base::get_pc_on_disp_read(); }
     void set_pc_on_disp_read(fast_u16 pc) {
         match_set_pc("disp_read", pc);
         base::set_pc_on_disp_read(pc); }
 
-    fast_u16 get_pc_on_jump() const {
+    fast_u16 get_pc_on_jump() {
         match_get_pc("jump");
         return base::get_pc_on_jump(); }
     void set_pc_on_jump(fast_u16 pc) {
         match_set_pc("jump", pc);
         base::set_pc_on_jump(pc); }
 
-    fast_u16 get_pc_on_block_instr() const {
+    fast_u16 get_pc_on_block_instr() {
         match_get_pc("block_instr");
         return base::get_pc_on_block_instr(); }
     void set_pc_on_block_instr(fast_u16 pc) {
@@ -455,7 +455,7 @@ public:
         match_set_pc("return", pc);
         base::set_pc_on_return(pc); }
 
-    fast_u16 get_pc_on_halt() const {
+    fast_u16 get_pc_on_halt() {
         match_get_pc("halt");
         return base::get_pc_on_halt(); }
     void set_pc_on_halt(fast_u16 pc) {
@@ -467,7 +467,7 @@ public:
                              static_cast<unsigned>(get_ticks()), name,
                              static_cast<unsigned>(base::get_ir())); }
 
-    fast_u16 get_ir_on_refresh() const {
+    fast_u16 get_ir_on_refresh() {
         match_get_ir("refresh");
         return base::get_ir_on_refresh(); }
 

@@ -2035,19 +2035,19 @@ public:
 
     executor_base() {}
 
-    fast_u16 get_pc_on_fetch() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_fetch() { return self().on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_jump() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_jump() { return self().on_get_pc(); }
     void set_pc_on_jump(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_imm8_read() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_imm8_read() { return self().on_get_pc(); }
     void set_pc_on_imm8_read(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_imm16_read() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_imm16_read() { return self().on_get_pc(); }
     void set_pc_on_imm16_read(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_halt() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_halt() { return self().on_get_pc(); }
     void set_pc_on_halt(fast_u16 pc) { self().on_set_pc(pc); }
 
     void set_pc_on_call(fast_u16 pc) { self().on_set_pc(pc); }
@@ -2629,13 +2629,13 @@ public:
         self().on_set_iyl(get_low8(iy));
         self().on_set_iyh(get_high8(iy)); }
 
-    fast_u16 get_pc_on_disp_read() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
     void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_block_instr() const { return self().on_get_pc(); }
+    fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_ir_on_refresh() const { return self().on_get_ir(); }
+    fast_u16 get_ir_on_refresh() { return self().on_get_ir(); }
 
     void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
     void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
