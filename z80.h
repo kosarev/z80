@@ -249,7 +249,7 @@ public:
         // Always set the low byte first.
         self().on_set_f(get_low8(n));
         self().on_set_a(get_high8(n)); }
-    fast_u16 on_get_ir() const {
+    fast_u16 on_get_ir() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_i();
         fast_u8 h = self().on_get_r();
@@ -977,7 +977,7 @@ protected:
     using base::get_z_part;
     using base::get_p_part;
 
-    bool is_hl_iregp() const {
+    bool is_hl_iregp() {
         return self().on_get_iregp_kind() == iregp::hl;
     }
 
@@ -2644,7 +2644,7 @@ public:
     void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
     void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
 
-    bool get_iff2_on_retn() const { return self().on_get_iff2(); }
+    bool get_iff2_on_retn() { return self().on_get_iff2(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -3467,7 +3467,7 @@ public:
 protected:
     using base::self;
 
-    bool is_hl_iregp() const {
+    bool is_hl_iregp() {
         return self().on_get_iregp_kind() == iregp::hl;
     }
 };
