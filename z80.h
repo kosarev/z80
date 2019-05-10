@@ -1823,10 +1823,6 @@ public:
     fast_u16 get_sp() const { return sp.get(); }
     void set_sp(fast_u16 n) { sp.set(n); }
 
-    // TODO: Do we really need it for i8080?
-    fast_u16 get_wz() const { return wz.get(); }
-    void set_wz(fast_u16 n) { wz.set(n); }
-
     bool is_int_disabled() const { return int_disabled.get(); }
     void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
 
@@ -1865,9 +1861,6 @@ public:
     fast_u16 on_get_sp() { return get_sp(); }
     void on_set_sp(fast_u16 n) { set_sp(n); }
 
-    fast_u16 on_get_wz() const { return get_wz(); }
-    void on_set_wz(fast_u16 n) { set_wz(n); }
-
     bool on_is_int_disabled() const { return is_int_disabled(); }
     void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
 
@@ -1879,7 +1872,7 @@ protected:
 
 private:
     regp_value bc, de, hl, af;
-    reg16_value pc, sp, wz;
+    reg16_value pc, sp;
     flipflop int_disabled, halted;
 
     template<typename XB> friend class i8080_state;
@@ -1960,6 +1953,9 @@ public:
     fast_u16 get_ir() const { return ir.get(); }
     void set_ir(fast_u16 n) { ir.set(n); }
 
+    fast_u16 on_get_wz() const { return get_wz(); }
+    void on_set_wz(fast_u16 n) { set_wz(n); }
+
     bool get_iff1() const { return iff1.get(); }
     void set_iff1(bool f) { iff1.set(f); }
 
@@ -2009,6 +2005,9 @@ public:
     // TODO: on_get_i() + on_get_r() ?
     fast_u16 on_get_ir() const { return get_ir(); }
 
+    fast_u16 get_wz() const { return wz.get(); }
+    void set_wz(fast_u16 n) { wz.set(n); }
+
     bool on_get_iff1() const { return get_iff1(); }
     void on_set_iff1(bool f) { set_iff1(f); }
 
@@ -2023,6 +2022,7 @@ public:
 
 private:
     regp_value ix, iy, ir;
+    reg16_value wz;
     reg16_value alt_bc, alt_de, alt_hl, alt_af;
     flipflop iff1, iff2;
     int_mode im;

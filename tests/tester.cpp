@@ -392,9 +392,6 @@ public:
     void on_set_sp(fast_u16 sp) { match_set_rp("sp", base::get_sp(), sp);
                                   return base::on_set_sp(sp); }
 
-    void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);
-                                  return base::on_set_wz(wz); }
-
     void match_get_pc(const char *name) const {
         input.read_and_match("get_pc_on_%s %04x",
                              static_cast<unsigned>(get_ticks()), name,
@@ -721,6 +718,9 @@ public:
         : machine_base<z80::i8080_cpu<i8080_machine>>(input)
     {}
 
+    void on_set_wz(fast_u16 wz) { match_set_rp("wz", 0, wz);
+                                  return base::on_set_wz(wz); }
+
     void on_step() {
         base::on_step();
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
@@ -739,6 +739,9 @@ public:
         input_level_guard guard(input);
         return base::on_m1_fetch_cycle();
     }
+
+    void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);
+                                  return base::on_set_wz(wz); }
 
     void on_step() {
         // Skip prefixes.
