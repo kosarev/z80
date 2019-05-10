@@ -37,22 +37,14 @@ void error(const char *format, ...) {
     va_end(args);
 }
 
+static constexpr fast_u16 quit_addr = 0x0000;
+static constexpr fast_u16 bdos_addr = 0x0005;
+static constexpr fast_u16 entry_addr = 0x0100;
+
 template<typename B>
-class emulator : public B {
+class default_watcher : public B {
 public:
     typedef B base;
-
-    emulator() {}
-
-    fast_u8 on_read(fast_u16 addr) {
-        assert(addr < z80::address_space_size);
-        return memory[addr];
-    }
-
-    void on_write(fast_u16 addr, fast_u8 n) {
-        assert(addr < z80::address_space_size);
-        memory[addr] = static_cast<least_u8>(n);
-    }
 
     void write_char(fast_u8 c) {
         std::putchar(static_cast<char>(c));
@@ -65,7 +57,7 @@ public:
     void handle_c_writestr() {
         fast_u16 addr = base::get_de();
         for(;;) {
-            fast_u8 c = memory[addr];
+            fast_u8 c = self().on_read(addr);
             if(c == '$')
                 break;
 
@@ -83,6 +75,38 @@ public:
             handle_c_writestr();
             break;
         }
+    }
+
+    void on_step() {
+        if(base::get_pc() == bdos_addr)
+            handle_bdos_call();
+
+        base::on_step();
+    }
+
+protected:
+    using base::self;
+
+private:
+    static constexpr fast_u8 c_write = 0x02;
+    static constexpr fast_u8 c_writestr = 0x09;
+};
+
+template<typename B>
+class emulator : public default_watcher<B> {
+public:
+    typedef default_watcher<B> base;
+
+    emulator() {}
+
+    fast_u8 on_read(fast_u16 addr) {
+        assert(addr < z80::address_space_size);
+        return memory[addr];
+    }
+
+    void on_write(fast_u16 addr, fast_u8 n) {
+        assert(addr < z80::address_space_size);
+        memory[addr] = static_cast<least_u8>(n);
     }
 
     void run(const char *program) {
@@ -117,9 +141,6 @@ public:
             if(pc == quit_addr)
                 break;
 
-            if(pc == bdos_addr)
-                handle_bdos_call();
-
             self().on_step();
         }
     }
@@ -128,13 +149,6 @@ protected:
     using base::self;
 
 private:
-    static constexpr fast_u16 quit_addr = 0x0000;
-    static constexpr fast_u16 bdos_addr = 0x0005;
-    static constexpr fast_u16 entry_addr = 0x0100;
-
-    static constexpr fast_u8 c_write = 0x02;
-    static constexpr fast_u8 c_writestr = 0x09;
-
     least_u8 memory[z80::address_space_size] = {};
 };
 
