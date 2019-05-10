@@ -41,6 +41,7 @@ static constexpr fast_u16 quit_addr = 0x0000;
 static constexpr fast_u16 bdos_addr = 0x0005;
 static constexpr fast_u16 entry_addr = 0x0100;
 
+// Handles CP/M BDOS calls to write text messages.
 template<typename B>
 class default_watcher : public B {
 public:
@@ -92,10 +93,22 @@ private:
     static constexpr fast_u8 c_writestr = 0x09;
 };
 
+// Lets the emulator to perform at full speed.
 template<typename B>
-class emulator : public default_watcher<B> {
+class empty_watcher : public B {
 public:
-    typedef default_watcher<B> base;
+    typedef B base;
+
+protected:
+    using base::self;
+};
+
+#define WATCHER default_watcher
+
+template<typename B>
+class emulator : public WATCHER<B> {
+public:
+    typedef WATCHER<B> base;
 
     emulator() {}
 
