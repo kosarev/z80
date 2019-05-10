@@ -11,6 +11,7 @@ namespace {
 using z80::fast_u8;
 using z80::fast_u16;
 using z80::least_u8;
+using z80::unused;
 
 #if defined(__GNUC__) || defined(__clang__)
 # define LIKE_PRINTF(format, args) \
@@ -100,6 +101,11 @@ template<typename B>
 class empty_watcher : public B {
 public:
     typedef B base;
+
+    // The benchmark emulator provides no support for interrupts,
+    // so no need to track the flag.
+    // TODO: Remove that flag from the emulator's state at all.
+    void on_set_is_int_disabled(bool f) { unused(f); }
 
     void on_report() {}
 
