@@ -290,6 +290,37 @@ protected:
     double is_halted_writes = 0;
 };
 
+// Tracks use of memory.
+template<typename B>
+class memory_watcher : public B {
+public:
+    typedef B base;
+
+    fast_u8 on_read(fast_u16 addr) {
+        ++memory_reads;
+        return base::on_read(addr);
+    }
+
+    void on_write(fast_u16 addr, fast_u8 n) {
+        ++memory_writes;
+        base::on_write(addr, n);
+    }
+
+    void on_report() {
+        std::printf("         memory reads:  %10.0f\n"
+                    "         memory writes: %10.0f\n",
+                    static_cast<double>(memory_reads),
+                    static_cast<double>(memory_writes));
+    }
+
+protected:
+    using base::self;
+
+    double memory_reads = 0;
+    double memory_writes = 0;
+};
+
+
 #define WATCHER default_watcher
 
 template<typename B>
@@ -301,11 +332,13 @@ public:
 
     fast_u8 on_read(fast_u16 addr) {
         assert(addr < z80::address_space_size);
+        base::on_read(addr);
         return memory[addr];
     }
 
     void on_write(fast_u16 addr, fast_u8 n) {
         assert(addr < z80::address_space_size);
+        base::on_write(addr, n);
         memory[addr] = static_cast<least_u8>(n);
     }
 
