@@ -2468,7 +2468,7 @@ public:
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        fast_u8 hf = (n & 0xf) + ((~1 + 1) & 0xf) > 0xf ? hf_mask : 0;  // TODO
+        fast_u8 hf = (n & 0xf) > 0 ? hf_mask : 0;
         n = dec8(n);
         f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
                 (n & sf_mask) | zf_ari(n) | hf | pf_log(n);
@@ -2500,7 +2500,7 @@ public:
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        fast_u8 hf = (n & 0xf) + (1 & 0xf) > 0xf ? hf_mask : 0;  // TODO
+        fast_u8 hf = (n & 0xf) > 0xe ? hf_mask : 0;
         n = inc8(n);
         f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
                 (n & sf_mask) | zf_ari(n) | hf | pf_log(n);
