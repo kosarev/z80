@@ -21,7 +21,7 @@ Fast and flexible i8080/Z80 emulator.
 * Cache-friendly implementation without large code switches and
   data tables.
 
-* Offers default modules for the breakpoints support and generic
+* Offers default modules for the breakpoint support and generic
   memory.
 
 * Supports multiple independently customized emulator instances.
