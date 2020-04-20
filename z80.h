@@ -2367,6 +2367,9 @@ public:
             a = t;
             break; }
         case alu::adc: {
+            // TODO: The cf evaluation can be simplified by
+            // comparing the sum before truncation. +Revisit the
+            // other cases in this switch.
             fast_u8 cfv = (f & cf_mask) ? 1 : 0;
             fast_u8 t = mask8(a + n + cfv);
             fast_u8 hf = (a & 0xf) + (n & 0xf) + cfv > 0xf ? hf_mask : 0;
