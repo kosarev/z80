@@ -3010,11 +3010,11 @@ public:
         f = (f & (sf_mask | zf_mask | cf_mask)) |
                 ((t << 4) & yf_mask) | (t & xf_mask) | (bc != 0 ? pf_mask : 0);
         if(static_cast<unsigned>(k) & 1) {
-            // LDI, LDIR
+            // LDD, LDDR
             hl = dec16(hl);
             de = dec16(de);
         } else {
-            // LDD, LDDR
+            // LDI, LDIR
             hl = inc16(hl);
             de = inc16(de);
         }
