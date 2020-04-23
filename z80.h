@@ -3036,6 +3036,7 @@ public:
         fast_u8 v = self().on_get_reg(r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = self().on_get_f();
         fast_u8 m = v & (1u << b);
+        // TODO: Is it always (m & sf_mask)? Regardless of whether m is zero or not?
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
         if(!is_hl_iregp() || r == reg::at_hl)
             v = get_high8(self().on_get_wz());
