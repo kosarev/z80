@@ -2970,11 +2970,11 @@ public:
                 (bc != 0 ? pf_mask : 0) | nf_mask | (f & cf_mask);
 
         if(static_cast<unsigned>(k) & 1) {
-            // CPI, CPIR
+            // CPD, CPDR
             hl = dec16(hl);
             wz = dec16(wz);
         } else {
-            // CPD, CPDR
+            // CPI, CPIR
             hl = inc16(hl);
             wz = inc16(wz);
         }
