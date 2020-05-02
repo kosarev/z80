@@ -40,6 +40,11 @@ setup(name='z80',
       ext_modules=[z80_emulator_module],
       packages=['z80'],
       install_requires=[],
+      entry_points={
+          'console_scripts': [
+              'z80 = z80:main',
+          ],
+      },
       # TODO: test_suite='test',
       classifiers=[
           'Development Status :: 3 - Alpha',

@@ -8,6 +8,7 @@
 #   Published under the MIT license.
 
 import struct
+from ._main import main
 from ._z80 import _I8080Machine, _Z80Machine
 
 
