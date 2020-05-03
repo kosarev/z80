@@ -11,15 +11,34 @@
 
 import sys
 
+from ._disassembler import _Disassembler
+
 
 class _Error(Exception):
     def __init__(self, reason):
         super().__init__(reason)
 
 
+def _pop_argument(args, error):
+    if not args:
+        raise _Error(error)
+
+    return args.pop(0)
+
+
+def _handle_extra_arguments(args):
+    if args:
+        raise _Error('Extra argument %r.' % args[0])
+
+
 def _disasm(args):
-    # TODO
-    assert 0, args
+    file_to_disasm = _pop_argument(args, 'The file to disassemble not '
+                                         'specified.')
+    _handle_extra_arguments(args)
+
+    with open(file_to_disasm, 'rb') as f:
+        d = _Disassembler(f.read())
+        assert 0, d  # TODO
 
 
 def _handle_command_line(args):
