@@ -10,6 +10,11 @@
 #   Published under the MIT license.
 
 
+class _Profile:
+    def load(self, filename):
+        assert 0  # TODO
+
+
 class _Disassembler(object):
     def __init__(self, image):
         self._image = image

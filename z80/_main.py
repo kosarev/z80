@@ -11,7 +11,7 @@
 
 import sys
 
-from ._disassembler import _Disassembler
+from ._disassembler import _Profile, _Disassembler
 
 
 class _Error(Exception):
@@ -32,13 +32,24 @@ def _handle_extra_arguments(args):
 
 
 def _disasm(args):
-    file_to_disasm = _pop_argument(args, 'The file to disassemble not '
-                                         'specified.')
+    image_filename = _pop_argument(args, 'The image file to disassemble is '
+                                         'not specified.')
+    profile_filename = _pop_argument(args, 'The profile is not specified.')
     _handle_extra_arguments(args)
 
-    with open(file_to_disasm, 'rb') as f:
-        d = _Disassembler(f.read())
-        assert 0, d  # TODO
+    with open(image_filename, 'rb') as f:
+        image = f.read()
+
+    IMAGE_SIZE = 0x10000
+    if len(image) != IMAGE_SIZE:
+        raise _Error('The image file shall be of exactly %d bytes in size.' %
+                     IMAGE_SIZE)
+
+    profile = _Profile()
+    profile.load(profile_filename)
+
+    d = _Disassembler(image)
+    assert 0, d  # TODO
 
 
 def _handle_command_line(args):
