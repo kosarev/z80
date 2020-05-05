@@ -37,6 +37,20 @@ class _ProfileTag(object):
         self._addr = addr
         self._comment = comment
 
+    def get_kind(self):
+        return self._kind
+
+    def get_addr(self):
+        return self._addr
+
+    def get_comment(self):
+        return self._comment
+
+    def __repr__(self):
+        comment = self.get_comment()
+        comment = '' if not comment else ' : %s' % comment
+        return '@@ 0x%04x %s%s' % (self.get_addr(), self.get_kind(), comment)
+
 
 class _InstrTag(_ProfileTag):
     ID = 'instr'
@@ -121,15 +135,20 @@ class _TagParser(object):
         return parser(self, addr, name)
 
 
-class _Profile:
+class _Profile(object):
+    _tags = dict()
+
     def _parse_line(self, tag_parser):
-        assert 0, tag_parser.parse()
+        tag = tag_parser.parse()
+        self._tags.setdefault(tag.get_addr(), []).append(tag)
 
     def load(self, filename):
         input = _InputText(filename)
         for line in input:
             tag_parser = _TagParser(input, line)
             self._parse_line(tag_parser)
+
+        assert 0, self._tags
 
 
 class _Disassembler(object):
