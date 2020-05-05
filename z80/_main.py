@@ -9,14 +9,10 @@
 #
 #   Published under the MIT license.
 
+import z80
 import sys
 
 from ._disassembler import _Profile, _Disassembler
-
-
-class _Error(Exception):
-    def __init__(self, reason):
-        super().__init__(reason)
 
 
 def _pop_argument(args, error):
@@ -67,8 +63,10 @@ def _handle_command_line(args):
 def main():
     try:
         _handle_command_line(sys.argv[1:])
-    except _Error as e:
-        print('z80: %s' % e.args)
+    except z80._Error as e:
+        lines = e.args[0].split('\n')
+        lines[-1] = 'z80: %s' % lines[-1]
+        sys.exit('\n'.join(lines))
 
 
 if __name__ == "__main__":
