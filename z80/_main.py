@@ -30,6 +30,7 @@ def _handle_extra_arguments(args):
 def _disasm(args):
     image_filename = _pop_argument(args, 'The image file to disassemble is '
                                          'not specified.')
+    asm_filename = _pop_argument(args, 'The assembly file is not specified.')
     profile_filename = _pop_argument(args, 'The profile is not specified.')
     _handle_extra_arguments(args)
 
@@ -42,7 +43,8 @@ def _disasm(args):
                          'size.' % IMAGE_SIZE)
 
     profile = _Profile()
-    profile.load(profile_filename)
+    profile.load_if_exists(asm_filename)
+    profile.load_if_exists(profile_filename)
 
     d = _Disassembler(image)
     assert 0, d  # TODO

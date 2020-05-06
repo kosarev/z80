@@ -140,15 +140,17 @@ class _Profile(object):
 
     def _parse_line(self, tag_parser):
         tag = tag_parser.parse()
-        self._tags.setdefault(tag.get_addr(), []).append(tag)
+        if tag:
+            self._tags.setdefault(tag.get_addr(), []).append(tag)
 
-    def load(self, filename):
+    def load_if_exists(self, filename):
         input = _InputText(filename)
-        for line in input:
-            tag_parser = _TagParser(input, line)
-            self._parse_line(tag_parser)
-
-        assert 0, self._tags
+        try:
+            for line in input:
+                tag_parser = _TagParser(input, line)
+                self._parse_line(tag_parser)
+        except FileNotFoundError:
+            pass
 
 
 class _Disassembler(object):
