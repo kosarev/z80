@@ -17,14 +17,14 @@ from ._disassembler import _Profile, _Disassembler
 
 def _pop_argument(args, error):
     if not args:
-        raise _Error(error)
+        raise z80._Error(error)
 
     return args.pop(0)
 
 
 def _handle_extra_arguments(args):
     if args:
-        raise _Error('Extra argument %r.' % args[0])
+        raise z80._Error('Extra argument %r.' % args[0])
 
 
 def _disasm(args):
@@ -38,8 +38,8 @@ def _disasm(args):
 
     IMAGE_SIZE = 0x10000
     if len(image) != IMAGE_SIZE:
-        raise _Error('The image file shall be of exactly %d bytes in size.' %
-                     IMAGE_SIZE)
+        raise z80._Error('The image file shall be of exactly %d bytes in '
+                         'size.' % IMAGE_SIZE)
 
     profile = _Profile()
     profile.load(profile_filename)
@@ -50,14 +50,14 @@ def _disasm(args):
 
 def _handle_command_line(args):
     if not args:
-        raise _Error('Nothing to do.')
+        raise z80._Error('Nothing to do.')
 
     command = args.pop(0)
     if command == 'disasm':
         _disasm(args)
         return
 
-    raise _Error('Unknown command %r.' % command)
+    raise z80._Error('Unknown command %r.' % command)
 
 
 def main():
