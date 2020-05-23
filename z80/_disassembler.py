@@ -10,7 +10,7 @@
 #   Published under the MIT license.
 
 
-class _InputText(object):
+class _SourceFile(object):
     def __init__(self, filename):
         self._filename = filename
 
@@ -141,7 +141,7 @@ class _Profile(object):
             self._tags.setdefault(tag.get_addr(), []).append(tag)
 
     def load_if_exists(self, filename):
-        input = _InputText(filename)
+        input = _SourceFile(filename)
         try:
             for line in input:
                 tag_parser = _TagParser(input, line)
