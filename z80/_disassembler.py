@@ -10,9 +10,6 @@
 #   Published under the MIT license.
 
 
-import z80
-
-
 class _InputText(object):
     def __init__(self, filename):
         self._filename = filename
