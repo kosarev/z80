@@ -156,3 +156,7 @@ class _Profile(object):
 class _Disassembler(object):
     def __init__(self, image):
         self._image = image
+
+    def disassemble(self, profile):
+        self._tags_to_process = []
+        assert 0

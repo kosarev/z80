@@ -47,6 +47,7 @@ def _disasm(args):
     profile.load_if_exists(profile_filename)
 
     d = _Disassembler(image)
+    d.disassemble(profile)
     assert 0, d  # TODO
 
 
