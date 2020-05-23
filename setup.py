@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import distutils.sysconfig, os
+import distutils.sysconfig
+import inspect
+import os
 # from distutils.core import Extension
 from setuptools import Extension, setup
+
+
+here = os.path.abspath(os.path.dirname(inspect.getsource(lambda: 0)))
+
+with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
 
 # Work around the problem with the warning about '-Wstrict-prototypes'.
 # https://bugs.python.org/issue1222585
@@ -22,7 +31,7 @@ z80_emulator_module = Extension(
     extra_compile_args=['-std=c++11', '-Wall', '-fno-exceptions', '-fno-rtti',
                         '-O3',
                         # '-S', '-fverbose-asm',  # TODO
-                       ],
+                        ],
     sources=['z80/_z80module.cpp'],
     language='c++')
 
@@ -32,7 +41,7 @@ z80_emulator_module = Extension(
 setup(name='z80',
       version='0.1a0',
       description='Fast and flexible i8080/Z80 Emulator',
-      # TODO: long_description=...
+      long_description=long_description,
       author='Ivan Kosarev',
       author_email='ivan@kosarev.info',
       url='https://github.com/kosarev/z80',
