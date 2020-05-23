@@ -9,22 +9,21 @@
 #
 #   Published under the MIT license.
 
-import z80
 import sys
-
 from ._disassembler import _Profile, _Disassembler
+from ._error import Error
 
 
 def _pop_argument(args, error):
     if not args:
-        raise z80._Error(error)
+        raise Error(error)
 
     return args.pop(0)
 
 
 def _handle_extra_arguments(args):
     if args:
-        raise z80._Error('Extra argument %r.' % args[0])
+        raise Error('Extra argument %r.' % args[0])
 
 
 def _disasm(args):
@@ -39,8 +38,8 @@ def _disasm(args):
 
     IMAGE_SIZE = 0x10000
     if len(image) != IMAGE_SIZE:
-        raise z80._Error('The image file shall be of exactly %d bytes in '
-                         'size.' % IMAGE_SIZE)
+        raise Error('The image file shall be of exactly %d bytes in '
+                    'size.' % IMAGE_SIZE)
 
     profile = _Profile()
     profile.load_if_exists(asm_filename)
@@ -53,20 +52,20 @@ def _disasm(args):
 
 def _handle_command_line(args):
     if not args:
-        raise z80._Error('Nothing to do.')
+        raise Error('Nothing to do.')
 
     command = args.pop(0)
     if command == 'disasm':
         _disasm(args)
         return
 
-    raise z80._Error('Unknown command %r.' % command)
+    raise Error('Unknown command %r.' % command)
 
 
 def main():
     try:
         _handle_command_line(sys.argv[1:])
-    except z80._Error as e:
+    except Error as e:
         lines = e.args[0].split('\n')
         lines[-1] = 'z80: %s' % lines[-1]
         sys.exit('\n'.join(lines))

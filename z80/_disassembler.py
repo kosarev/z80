@@ -27,7 +27,7 @@ class _InputText(object):
                 self._line_no += 1
 
     def error(self, msg):
-        raise z80._Error('%s\n%s:%d: %s' % (
+        raise Error('%s\n%s:%d: %s' % (
             self._line, self._filename, self._line_no, msg))
 
 

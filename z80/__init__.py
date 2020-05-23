@@ -12,11 +12,6 @@ from ._main import main
 from ._z80 import _I8080Machine, _Z80Machine
 
 
-class _Error(Exception):
-    def __init__(self, reason):
-        super().__init__(reason)
-
-
 class _StateBase(object):
     _STATE_FIELDS = {
         'c': (0, 'B'), 'b': (1, 'B'), 'bc': (0, '<H'),
