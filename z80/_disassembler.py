@@ -49,7 +49,7 @@ class _SourceFile(object):
                     else len(self.__image))
         line = self.__image[line_start:line_end]
 
-        line_no = i
+        line_no = i + 1
         column_no = offset - line_start
 
         return line, line_no, column_no
