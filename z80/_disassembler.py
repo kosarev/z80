@@ -264,8 +264,7 @@ class _Profile(object):
             return
 
         for tag in parser:
-            if tag:
-                self.__tags.setdefault(tag.get_addr(), []).append(tag)
+            self.__tags.setdefault(tag.get_addr(), []).append(tag)
 
 
 class _Disassembler(object):
