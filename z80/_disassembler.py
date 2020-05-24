@@ -259,11 +259,11 @@ class _Profile(object):
 
     def load_if_exists(self, filename):
         try:
-            parser = _TagParser(_SourceFile(filename))
+            file = _SourceFile(filename)
         except FileNotFoundError:
             return
 
-        for tag in parser:
+        for tag in _TagParser(file):
             self.__tags.setdefault(tag.get_addr(), []).append(tag)
 
 
