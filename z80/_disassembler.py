@@ -55,92 +55,90 @@ class _SourceFile(object):
         return line, line_no, column_no
 
 
-class _Literal(object):
-    def __init__(self, text, source_pos):
-        self.__text = text
-        self.__source_pos = source_pos
-
-    def __repr__(self):
-        return '%r: %r' % (self.__source_pos, self.__text)
-
-    def get_text(self):
-        return self.__text
-
-    def get_source_pos(self):
-        return self.__source_pos
-
-
 class _SourceError(Error):
     def __init__(self, subject, message):
         super().__init__('%r: %s' % (subject, message))
 
 
-class _SourceParser(object):
+class _Tokenizer(object):
     def __init__(self, source_file):
         self.__source_file = source_file
-        self.__image = source_file.get_image()
+        self.__image = self.__source_file.get_image()
         self.__offset = 0
+        self.__token_offset = self.__offset
 
-    def get_current_pos(self):
-        return _SourcePos(self.__offset, self.__source_file)
+    def __get_end_offset(self):
+        return len(self.__image)
 
-    def __get_front(self):
-        return self.__image[self.__offset:]
+    def __find_all(self, *anchors):
+        # Remember the offset to not depend on its changes.
+        start_offset = self.__offset
+        for a in anchors:
+            i = self.__image.find(a, start_offset)
+            if i >= 0:
+                yield a, i
 
-    def __peek_char(self):
-        return self.__get_front()[:1]
+    def __find_next(self, *anchors):
+        anchor, offset = None, None
+        for a, i in self.__find_all(*anchors):
+            if offset is None or offset > i:
+                anchor, offset = a, i
+        return anchor, offset
 
-    def __follows_with(self, s):
-        return self.__get_front().startswith(s)
-
-    def __skip(self, n):
-        if n == 0:
-            return None
-
-        lit = _Literal(self.__get_front()[:n], self.get_current_pos())
-        self.__offset += n
-        return lit
-
-    def __skip_to_offset(self, offset):
-        assert self.__offset <= offset
-        return self.__skip(offset - self.__offset)
-
-    def __skip_to_end(self):
-        return self.__skip_to_offset(len(self.__image))
-
-    def skip_to(self, delims):
-        pos = len(self.__image)
-        for delim in delims:
-            i = self.__image.find(delim, self.__offset)
-            if i >= 0 and pos > i:
-                pos = i
-
-        if pos is None:
-            return self.__skip_to_end()
-
-        return self.__skip_to_offset(pos)
-
-    def __skip_while(self, allowed):
-        end = self.__offset
-        while self.__image[end:].startswith(allowed):
-            end += len(allowed)
-        return self.__skip_to_offset(end)
-
-    def skip_spaces(self):
-        return self.__skip_while(' ')
-
-    def eat(self, s):
-        if not self.__follows_with(s):
-            return None
-
-        return self.__skip(len(s))
-
-    def skip_to_and_eat(self, s):
-        self.skip_to((s,))
-        return self.eat(s)
+    def skip_to(self, *anchors):
+        anchor, offset = self.__find_next(*anchors)
+        if offset is None:
+            self.__offset = self.__get_end_offset()
+        else:
+            self.__offset = offset
+        return anchor
 
     def skip_rest_of_line(self):
-        return self.skip_to('\n')
+        self.skip_to('\n')
+
+    def skip_next(self, *anchors):
+        anchor = self.skip_to(*anchors)
+        if anchor is not None:
+            self.__offset += len(anchor)
+        return anchor
+
+    def __get_front(self, size=None):
+        end = self.__offset + size if size is not None else None
+        return self.__image[self.__offset:end]
+
+    def __follows_with(self, *fillers):
+        for filler in fillers:
+            if self.__get_front().startswith(filler):
+                return filler
+        return None
+
+    def __skip(self, *fillers):
+        while True:
+            filler = self.__follows_with(*fillers)
+            if filler is None:
+                break
+
+            self.__offset += len(filler)
+
+    def skip_whitespace(self):
+        self.__skip(' ', '\t')
+
+    def skip_char(self):
+        c = self.__get_front(1)
+        self.__offset += 1
+        return c
+
+    def start_token(self):
+        self.__token_offset = self.__offset
+
+    def end_token(self):
+        pos = _SourcePos(self.__token_offset, self.__source_file)
+
+        literal = None
+        if self.__token_offset < self.__offset:
+            literal = self.__image[self.__token_offset:self.__offset]
+
+        return literal, pos
 
 
 class _ProfileTag(object):
@@ -171,41 +169,67 @@ class _InstrTag(_ProfileTag):
         super().__init__(self.ID, addr, comment)
 
 
-class _TagParser(_SourceParser):
-    _DELIMITERS = ' :'
+class _Token(object):
+    def __init__(self, literal, source_pos):
+        self.__literal = literal
+        self.__source_pos = source_pos
+
+    def __repr__(self):
+        return '%r: %r' % (self.__source_pos, self.__literal)
+
+    def get_literal(self):
+        return self.__literal
+
+    def get_source_pos(self):
+        return self.__source_pos
+
+
+class _TagParser(object):
+    __DELIMITERS = '\n :,()[]'
 
     def __init__(self, source_file):
-        super().__init__(source_file)
+        self.__toks = _Tokenizer(source_file)
 
-    def __parse_token(self):
-        return self.skip_to(self._DELIMITERS)
+    def __fetch_token(self, error=None):
+        self.__toks.skip_whitespace()
 
-    def __parse_address(self):
-        tok = self.__parse_token()
-        if not tok:
-            raise _SourceError(self.get_current_pos(),
-                               'Tag address expected.')
+        self.__toks.start_token()
+        if self.__toks.skip_char() not in self.__DELIMITERS:
+            self.__toks.skip_to(*self.__DELIMITERS)
+        literal, pos = self.__toks.end_token()
 
+        if literal == '\n':
+            literal = None
+
+        if literal is not None:
+            return _Token(literal, pos)
+
+        if error is not None:
+            raise _SourceError(pos, error)
+
+        return None
+
+    def __parse_tag_address(self):
+        tok = self.__fetch_token('Tag address expected.')
         try:
-            return int(tok.get_text(), base=0)
+            return int(tok.get_literal(), base=0)
         except ValueError:
             raise _SourceError(tok, 'Malformed tag address.')
 
-    def __parse_name(self):
-        tok = self.__parse_token()
-        if not tok:
-            raise _SourceError(self.get_current_pos(),
-                               'Tag name expected.')
-        return tok
+    def __parse_tag_name(self):
+        return self.__fetch_token('Tag name expected.')
 
     def __parse_optional_comment(self):
-        if self.eat(':'):
-            self.skip_spaces()
-            return self.skip_rest_of_line().get_text()
-
-        tok = self.skip_rest_of_line()
-        if not tok:
+        tok = self.__fetch_token()
+        if tok is None:
             return None
+
+        if tok.get_literal() == ':':
+            self.__toks.skip_whitespace()
+            self.__toks.start_token()
+            self.__toks.skip_rest_of_line()
+            literal, pos = self.__toks.end_token()
+            return literal
 
         raise _SourceError(tok, 'End of line or a comment expected.')
 
@@ -213,21 +237,17 @@ class _TagParser(_SourceParser):
         comment = self.__parse_optional_comment()
         return _InstrTag(addr, comment)
 
-    _TAG_PARSERS = {
+    __TAG_PARSERS = {
         _InstrTag.ID: __parse_instr_tag,
     }
 
     # Parses and returns a subsequent tag.
     def __iter__(self):
-        if self.skip_to_and_eat('@@'):
-            self.skip_spaces()
-            addr = self.__parse_address()
+        while self.__toks.skip_next('@@'):
+            addr = self.__parse_tag_address()
+            name = self.__parse_tag_name()
 
-            self.skip_spaces()
-            name = self.__parse_name()
-
-            self.skip_spaces()
-            parser = self._TAG_PARSERS.get(name.get_text(), None)
+            parser = self.__TAG_PARSERS.get(name.get_literal(), None)
             if not parser:
                 raise _SourceError(name, 'Unknown tag.')
 
@@ -240,11 +260,12 @@ class _Profile(object):
     def load_if_exists(self, filename):
         try:
             parser = _TagParser(_SourceFile(filename))
-            for tag in parser:
-                if tag:
-                    self.__tags.setdefault(tag.get_addr(), []).append(tag)
         except FileNotFoundError:
-            pass
+            return
+
+        for tag in parser:
+            if tag:
+                self.__tags.setdefault(tag.get_addr(), []).append(tag)
 
 
 class _Disassembler(object):
