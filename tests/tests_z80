@@ -1454,6 +1454,44 @@ ed79 out (c), a
  8 output 00 at 0000
 12 done
 
+# Block output.
+edb3 otir
+ 0 m1_fetch
+ 0   fetch ed at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 m1_fetch
+ 4   fetch b3 at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 get_c 00
+ 8 get_b 00
+ 8 get_l 00
+ 8 get_h 00
+ 8 get_f 00
+ 8 fetch_cycle_extra_1t
+ 9 read ed at 0000
+ 9   set_addr_bus 0001 -> 0000
+12 output ed at 0000
+16 set_c 00 -> 00
+16 set_b 00 -> ff
+16 set_wz 0000 -> ff01
+16 set_l 00 -> 01
+16 set_h 00 -> 00
+16 set_f 00 -> ae
+16 5t_exec
+21 get_pc_on_block_instr 0002
+21 set_pc_on_block_instr 0002 -> 0000
+21 done
+
 # OUT (n), r
 d3ab out (0xab), a
  0 m1_fetch

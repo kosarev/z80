@@ -131,6 +131,7 @@ enum class alu { add, adc, sub, sbc, and_a, xor_a, or_a, cp };
 enum class rot { rlc, rrc, rl, rr, sla, sra, sll, srl };
 enum class block_ld { ldi, ldd, ldir, lddr };
 enum class block_cp { cpi, cpd, cpir, cpdr };
+enum class block_out { outi, outd, otir, otdr };
 
 enum class condition { nz, z, nc, c, po, pe, p, m };
 
@@ -947,9 +948,10 @@ public:
             case 2:
                 assert(0);  // TODO
                 return;
-            case 3:
-                assert(0);  // TODO
-                return;
+            case 3: {
+                // OUTI, OUTD, OTIR, OTDR  f(4) f(5) r(3) o(4) + e(5)
+                auto k = static_cast<block_out>(n);
+                return self().on_block_out(k); }
             }
         }
 
@@ -1415,6 +1417,10 @@ public:
             auto k = get_arg<block_cp>(args);
             out.append(get_mnemonic(k));
             break; }
+        case 'T': {  // A block out instruction.
+            auto k = get_arg<block_out>(args);
+            out.append(get_mnemonic(k));
+            break; }
         default:
             base::on_format_char(c, args, out);
         }
@@ -1434,6 +1440,8 @@ public:
         self().on_format("M", k); }
     void on_block_ld(block_ld k) {
         self().on_format("L", k); }
+    void on_block_out(block_out k) {
+        self().on_format("T", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("bit U, R", b, r, irp, d); }
@@ -1706,6 +1714,16 @@ public:
         case block_cp::cpdr: return "cpdr";
         }
         unreachable("Unknown block compare operation.");
+    }
+
+    static const char *get_mnemonic(block_out k) {
+        switch(k) {
+        case block_out::outi: return "outi";
+        case block_out::outd: return "outd";
+        case block_out::otir: return "otir";
+        case block_out::otdr: return "otdr";
+        }
+        unreachable("Unknown block output operation.");
     }
 
 protected:
@@ -3029,6 +3047,45 @@ public:
             self().on_5t_exec_cycle();
             fast_u16 pc = self().get_pc_on_block_instr();
             self().on_set_wz(dec16(pc));
+            self().set_pc_on_block_instr(sub16(pc, 2));
+        } }
+    void on_block_out(block_out k) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u16 wz = self().on_get_wz();
+        fast_u16 hl = self().on_get_hl();
+        fast_u8 f = self().on_get_f();
+
+        self().on_fetch_cycle_extra_1t();
+        fast_u8 r = self().on_read_cycle(hl);
+        self().on_output_cycle(bc, r);
+        bc = sub16(bc, 0x0100);
+        fast_u8 s = get_high8(bc);
+
+        if(static_cast<unsigned>(k) & 1) {
+            // OUTD, OTDR
+            hl = dec16(hl);
+            wz = dec16(bc);
+        } else {
+            // OUTI, OTIR
+            hl = inc16(hl);
+            wz = inc16(bc);
+        }
+
+        fast_u16 cf = get_low8(hl) + r;
+        fast_u8 pf = (get_low8(cf) & 7) ^ s;
+        f = (s & (sf_mask | yf_mask | xf_mask)) | zf_ari(s) |
+            ((r & 0x80) >> (7 - nf_bit)) | pf_log(pf) |
+            ((cf < 0x100) ? 0 : (hf_mask | cf_mask));
+
+        self().on_set_bc(bc);
+        self().on_set_wz(wz);
+        self().on_set_hl(hl);
+        self().on_set_f(f);
+
+        // OTIR, OTDR
+        if((static_cast<unsigned>(k) & 2) && s) {
+            self().on_5t_exec_cycle();
+            fast_u16 pc = self().get_pc_on_block_instr();
             self().set_pc_on_block_instr(sub16(pc, 2));
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {
