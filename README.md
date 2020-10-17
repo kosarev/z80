@@ -502,5 +502,7 @@ struct my_state : public B {
 ## Feedback
 
 Any notes on overall design, improving performance and testing
-approaches are highly appreciated. Please use the email given at
-<https://github.com/kosarev>. Thanks!
+approaches are highly appreciated.
+Please file an issue or use the email given at
+<https://github.com/kosarev>.
+Thanks!
