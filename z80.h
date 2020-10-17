@@ -3514,7 +3514,7 @@ public:
             isr_addr = make16(hi, lo); }
             break;
         default:
-            unreachable("Unknown interrupts mode.");
+            unreachable("Unknown interrupt mode.");
         }
 
         self().on_jump(isr_addr);
