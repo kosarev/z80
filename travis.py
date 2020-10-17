@@ -43,6 +43,9 @@ PYTHON_VERSIONS = [
     '3.4',
     '3.5', '3.5-dev',
     '3.6', '3.6-dev',
+    '3.7', '3.7-dev',
+    '3.8', '3.8-dev',
+    '3.9-dev',
 ]
 
 for version in PYTHON_VERSIONS:

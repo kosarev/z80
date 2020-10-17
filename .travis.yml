@@ -74,3 +74,38 @@ matrix:
       script:
         - cd examples
         - ./exercisers.py
+    - language: python
+      python: 3.7
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py
+    - language: python
+      python: 3.7-dev
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py
+    - language: python
+      python: 3.8
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py
+    - language: python
+      python: 3.8-dev
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py
+    - language: python
+      python: 3.9-dev
+      install:
+        - python setup.py install
+      script:
+        - cd examples
+        - ./exercisers.py
