@@ -120,7 +120,7 @@ public:
         va_end(args);
 
         char buff2[max_line_size];
-        std::snprintf(buff2, max_line_size, "%2u %*s%s",
+        std::snprintf(buff2, max_line_size, "%2u %*s%.800s",
                       static_cast<unsigned>(ticks),
                       static_cast<int>(level * 2), "", buff);
 

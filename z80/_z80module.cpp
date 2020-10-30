@@ -100,6 +100,23 @@ public:
         return old_callback;
     }
 
+    void on_step() {
+        base::on_step();
+
+        PyObject *result = PyObject_CallObject(on_step_callback, nullptr);
+        decref_guard result_guard(result);
+
+        if(!result) {
+            assert(0);  // TODO: stop();
+        }
+    }
+
+    PyObject *set_step_callback(PyObject *callback) {
+        PyObject *old_callback = on_step_callback;
+        on_step_callback = callback;
+        return old_callback;
+    }
+
     fast_u8 on_get_b() const { return state.b; }
     void on_set_b(fast_u8 n) { state.b = n; }
 
@@ -218,6 +235,7 @@ public:
         std::swap(state.l, state.alt_l);
     }
 
+
 #if 0  // TODO
     void on_step() {
         fprintf(stderr, "PC=%04x SP=%04x BC=%04x DE=%04x HL=%04x AF=%04x %02x%02x%02x%02x\n",
@@ -241,6 +259,7 @@ protected:
 private:
     machine_state state;
     PyObject *on_input_callback = nullptr;
+    PyObject *on_step_callback = nullptr;
 };
 
 namespace i8080_machine {

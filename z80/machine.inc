@@ -124,6 +124,23 @@ static PyObject *set_input_callback(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *set_step_callback(PyObject *self, PyObject *args) {
+    PyObject *new_callback;
+    if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
+        return nullptr;
+
+    if(!PyCallable_Check(new_callback)) {
+        PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+        return nullptr;
+    }
+
+    auto &machine = cast_machine(self);
+    PyObject *old_callback = machine.set_step_callback(new_callback);
+    Py_XINCREF(new_callback);
+    Py_XDECREF(old_callback);
+    Py_RETURN_NONE;
+}
+
 static PyObject *run(PyObject *self, PyObject *args) {
     auto &machine = cast_machine(self);
     z80::events_mask::type events = machine.on_run();
@@ -148,6 +165,10 @@ static PyMethodDef methods[] = {
      "processing on reading, writing or executing them."},
     {"set_input_callback", set_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
+    {"set_step_callback", set_step_callback, METH_VARARGS,
+     "Set a callback function handling stepping of the processor. "
+     "The callback will be invoked after the side-effects of the "
+     "current instruction have taken place"},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
 #if defined(Z80_MACHINE)
