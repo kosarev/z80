@@ -2410,6 +2410,8 @@ public:
         return (res >> (8 - base::cf_bit)) & cf_mask; }
     fast_u8 hf1(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return (op1 & 0xf) + (op2 & 0xf) + cfv > 0xf ? hf_mask : 0; }
+    fast_u8 hf2(fast_u8 op1, fast_u8 op2) {
+        return (op1 & 0xf) >= (op2 & 0xf) ? hf_mask : 0; }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -2426,10 +2428,10 @@ public:
             break; }
         case alu::sub:
         case alu::cp: {
-            fast_u8 t = sub8(a, n);
-            fast_u8 hf = (a & 0xf) >= (n & 0xf) ? hf_mask : 0;
-            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(t) | hf | pf_log(t) | cf_ari(t > a);
+            fast_u16 t16 = a - n;
+            fast_u8 t = mask8(t16);
+            f = sf(t) | yf(f) | xf(f) | nf(f) |
+                zf1(t) | hf2(a, n) | pf1(t) | cf1(t16);
             a = t;
             break; }
         case alu::sbc: {
