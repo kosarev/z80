@@ -2391,15 +2391,30 @@ public:
         self().on_tick(3);
         self().on_output(port, n); }
 
+    fast_u8 sf(fast_u8 f) {
+        return f & sf_mask; }
+    fast_u8 yf(fast_u8 f) {
+        return f & yf_mask; }
+    fast_u8 xf(fast_u8 f) {
+        return f & xf_mask; }
+    fast_u8 nf(fast_u8 f) {
+        return f & nf_mask; }
+    fast_u8 zf1(fast_u8 n) {
+        return zf_ari(n); }
+    fast_u8 pf1(fast_u8 n) {
+        return pf_log(n); }
+    fast_u8 cf1(fast_u8 op1, fast_u8 op2) {
+        return cf_ari(op1 < op2); }
+    fast_u8 hf1(fast_u8 op1, fast_u8 op2) {
+        return (op1 & 0xf) + (op2 & 0xf) > 0xf ? hf_mask : 0; }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         switch(k) {
         case alu::add: {
             fast_u8 t = add8(a, n);
-            fast_u8 hf = (a & 0xf) + (n & 0xf) > 0xf ? hf_mask : 0;
-            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(t) | hf | pf_log(t) | cf_ari(t < a);
+            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | hf1(a, n) | pf1(t) | cf1(t, a);
             a = t;
             break; }
         case alu::adc: {
