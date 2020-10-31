@@ -2443,9 +2443,7 @@ public:
             // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
             // TODO: AMD chips do not set the flag. Support them
             // as a variant of the original Intel chip.
-            // TODO: Evalution of 'hv' can be rewritten in a
-            // condition-less manner.
-            fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;
+            fast_u8 hf = ((a | n) << (base::hf_bit - 3)) & hf_mask;
             a &= n;
             f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a) | hf;
             break; }
