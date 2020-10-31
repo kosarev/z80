@@ -2415,15 +2415,9 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         switch(k) {
-        case alu::add: {
-            fast_u16 t16 = a + n;
-            fast_u8 t = mask8(t16);
-            f = sf(t) | yf(f) | xf(f) | nf(f) |
-                zf1(t) | hf1(a, n, 0) | pf1(t) | cf1(t16);
-            a = t;
-            break; }
+        case alu::add:
         case alu::adc: {
-            fast_u8 cfv = cf(f);
+            fast_u8 cfv = (k == alu::adc) ? cf(f) : 0;
             fast_u16 t16 = a + n + cfv;
             fast_u8 t = mask8(t16);
             f = sf(t) | yf(f) | xf(f) | nf(f) |
