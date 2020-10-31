@@ -2409,9 +2409,9 @@ public:
     fast_u8 cf1(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
     fast_u8 hf1(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
-        return (op1 & 0xf) + (op2 & 0xf) + cfv > 0xf ? hf_mask : 0; }
+        return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
     fast_u8 hf2(fast_u8 op1, fast_u8 op2) {
-        return (op1 & 0xf) >= (op2 & 0xf) ? hf_mask : 0; }
+        return ((op1 & 0xf) - (op2 & 0xf) + hf_mask) & hf_mask; }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
