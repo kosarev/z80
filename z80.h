@@ -2410,8 +2410,8 @@ public:
         return (res >> (8 - base::cf_bit)) & cf_mask; }
     fast_u8 hf1(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
-    fast_u8 hf2(fast_u8 op1, fast_u8 op2) {
-        return ((op1 & 0xf) - (op2 & 0xf) + hf_mask) & hf_mask; }
+    fast_u8 hf2(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
+        return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -2431,19 +2431,15 @@ public:
             fast_u16 t16 = a - n;
             fast_u8 t = mask8(t16);
             f = sf(t) | yf(f) | xf(f) | nf(f) |
-                zf1(t) | hf2(a, n) | pf1(t) | cf1(t16);
+                zf1(t) | hf2(a, n, 0) | pf1(t) | cf1(t16);
             a = t;
             break; }
         case alu::sbc: {
-            // TODO: The cf evaluation can be simplified by
-            // comparing the sum before truncation. +Revisit the
-            // other cases in this switch.
-            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
-            fast_u8 t = mask8(a - n - cfv);
-            fast_u8 hf = (a & 0xf) >= (n & 0xf) + cfv ? hf_mask : 0;
-            f = (t & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(t) | hf | pf_log(t) |
-                    cf_ari(t > a || (cfv && n == 0xff));
+            fast_u8 cfv = cf(f);
+            fast_u16 t16 = a - n - cfv;
+            fast_u8 t = mask8(t16);
+            f = sf(t) | yf(f) | xf(f) | nf(f) |
+                zf1(t) | hf2(a, n, cfv) | pf1(t) | cf1(t16);
             a = t;
             break; }
         case alu::and_a: {
