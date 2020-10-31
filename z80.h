@@ -2427,15 +2427,9 @@ public:
             a = t;
             break; }
         case alu::sub:
-        case alu::cp: {
-            fast_u16 t16 = a - n;
-            fast_u8 t = mask8(t16);
-            f = sf(t) | yf(f) | xf(f) | nf(f) |
-                zf1(t) | hf2(a, n, 0) | pf1(t) | cf1(t16);
-            a = t;
-            break; }
+        case alu::cp:
         case alu::sbc: {
-            fast_u8 cfv = cf(f);
+            fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
             fast_u16 t16 = a - n - cfv;
             fast_u8 t = mask8(t16);
             f = sf(t) | yf(f) | xf(f) | nf(f) |
