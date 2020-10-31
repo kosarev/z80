@@ -2447,18 +2447,15 @@ public:
             // condition-less manner.
             fast_u8 hf = ((a | n) & 0x8) != 0 ? hf_mask : 0;
             a &= n;
-            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(a) | pf_log(a) | hf;
+            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a) | hf;
             break; }
         case alu::xor_a:
             a ^= n;
-            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(a) | pf_log(a);
+            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a);
             break;
         case alu::or_a:
             a |= n;
-            f = (a & sf_mask) | (f & (yf_mask | xf_mask | nf_mask)) |
-                    zf_ari(a) | pf_log(a);
+            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a);
             break;
         }
         if(k != alu::cp)
