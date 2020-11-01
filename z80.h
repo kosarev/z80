@@ -2629,7 +2629,8 @@ public:
         self().on_set_a(a);
         self().on_set_f(f); }
     void on_scf() {
-        self().on_set_f(self().on_get_f() | base::cf_mask); }
+        fast_u8 f = self().on_get_f();
+        self().on_set_f(flags(f, flag_set::f4, 0, cf_mask)); }
 
 protected:
     using base::self;
