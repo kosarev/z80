@@ -2417,7 +2417,7 @@ private:
     fast_u8 hf3(fast_u8 op1, fast_u8 op2) {
         return ((op1 | op2) << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_set { f1 };
+    enum class flag_set { f1, f2 };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
@@ -2425,23 +2425,22 @@ private:
     // only those operations that can be performed very fast.
     fast_u8 flags(fast_u8 f, flag_set fs, fast_u8 b, fast_u16 w) {
         switch(fs) {
-        case flag_set::f1: {
+        case flag_set::f1:
+        case flag_set::f2: {
             fast_u16 res9 = w >> 1;
             fast_u8 res8 = mask8(res9);
             fast_u8 cfv = mask8(w & 0x1);
             fast_u8 op1 = (b >> 0) & 0xf;
             fast_u8 op2 = (b >> 4) & 0xf;
-            return sf(res8) | yf(f) | xf(f) | nf(f) |
-                   zf1(res8) | hf1(op1, op2, cfv) | pf1(res8) | cf1(res9); }
+            fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
+                                                hf2(op1, op2, cfv);
+            f = sf(res8) | yf(f) | xf(f) | nf(f) |
+                zf1(res8) | hf | pf1(res8) | cf1(res9);
+            return f; }
         }
         unreachable("Unknown flag set!");
     }
 
-    fast_u8 f2(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2,
-               fast_u8 cfv) {
-        fast_u8 res8 = mask8(res16);
-        return sf(res8) | yf(f) | xf(f) | nf(f) |
-               zf1(res8) | hf2(op1, op2, cfv) | pf1(res8) | cf1(res16); }
     fast_u8 f3(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2) {
         fast_u8 res = mask8(res16);
         return sf(res) | yf(f) | xf(f) | nf(f) |
@@ -2465,7 +2464,8 @@ public:
         case alu::sbc: {
             fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
             t = a - n - cfv;
-            f = f2(t, f, a, n, cfv);
+            f = flags(f, flag_set::f2, ((n & 0xf) << 4) | (a & 0xf),
+                      (t << 1) | cfv);
             break; }
         case alu::and_a:
             // Alexander Demin notes that the half-carry flag has
