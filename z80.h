@@ -2451,22 +2451,26 @@ public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
-        fast_u16 t;
+        flag_set fs;
+        fast_u16 t, w;
+        fast_u8 b;
         switch(k) {
         case alu::add:
         case alu::adc: {
             fast_u8 cfv = (k == alu::adc) ? cf(f) : 0;
             t = a + n + cfv;
-            f = flags(f, flag_set::f1, ((n & 0xf) << 4) | (a & 0xf),
-                      (t << 1) | cfv);
+            fs = flag_set::f1;
+            b = ((n & 0xf) << 4) | (a & 0xf);
+            w = (t << 1) | cfv;
             break; }
         case alu::sub:
         case alu::cp:
         case alu::sbc: {
             fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
             t = a - n - cfv;
-            f = flags(f, flag_set::f2, ((n & 0xf) << 4) | (a & 0xf),
-                      (t << 1) | cfv);
+            fs = flag_set::f2;
+            b = ((n & 0xf) << 4) | (a & 0xf);
+            w = (t << 1) | cfv;
             break; }
         case alu::and_a:
             // Alexander Demin notes that the half-carry flag has
@@ -2476,20 +2480,26 @@ public:
             // TODO: AMD chips do not set the flag. Support them
             // as a variant of the original Intel chip.
             t = a & n;
-            f = flags(f, flag_set::f3, a | n, t);
+            fs = flag_set::f3;
+            b = a | n;
+            w = t;
             break;
         case alu::xor_a:
             t = a ^ n;
-            f = flags(f, flag_set::f3, 0, t);
+            fs = flag_set::f3;
+            b = 0;
+            w = t;
             break;
         case alu::or_a:
             t = a | n;
-            f = flags(f, flag_set::f3, 0, t);
+            fs = flag_set::f3;
+            b = 0;
+            w = t;
             break;
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_set_f(f);
+        self().on_set_f(flags(f, fs, b, w));
     }
 
     void on_add_irp_rp(regp rp) {
