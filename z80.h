@@ -2454,47 +2454,35 @@ public:
         flag_set fs;
         fast_u16 t, w;
         fast_u8 b;
-        switch(k) {
-        case alu::add:
-        case alu::adc:
-        case alu::sub:
-        case alu::cp:
-        case alu::sbc: {
+        if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
+            // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ? cf(f) : 0;
-            if(k < alu::sub) {
+            if(k <= alu::adc) {
                 t = a + n + cfv;
                 fs = flag_set::f1;
             } else {
                 t = a - n - cfv;
                 fs = flag_set::f2;
             }
-            b = ((n & 0xf) << 4) | (a & 0xf);
+            b = ((n & 0xf) << 4) | (a & 0xf);  // TODO: The first '&' not needed?
             w = (t << 1) | cfv;
-            break; }
-        case alu::and_a:
-            // Alexander Demin notes that the half-carry flag has
-            // its own special logic for the ANA and ANI
-            // instructions.
-            // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
-            // TODO: AMD chips do not set the flag. Support them
-            // as a variant of the original Intel chip.
-            t = a & n;
+        } else {
+            // AND, XOR, OR
             fs = flag_set::f3;
-            b = a | n;
+            if(k == alu::and_a) {
+                // Alexander Demin notes that the half-carry flag has
+                // its own special logic for the ANA and ANI
+                // instructions.
+                // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
+                // TODO: AMD chips do not set the flag. Support them
+                // as a variant of the original Intel chip.
+                t = a & n;
+                b = a | n;
+            } else {
+                t = (k == alu::xor_a) ? a ^ n : a | n;
+                b = 0;
+            }
             w = t;
-            break;
-        case alu::xor_a:
-            t = a ^ n;
-            fs = flag_set::f3;
-            b = 0;
-            w = t;
-            break;
-        case alu::or_a:
-            t = a | n;
-            fs = flag_set::f3;
-            b = 0;
-            w = t;
-            break;
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
