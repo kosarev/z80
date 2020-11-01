@@ -2603,10 +2603,9 @@ public:
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
-        fast_u8 r = mask8(a << 1) | ((f & base::cf_mask) ? 1 : 0);
-        f = (f & (0xff & ~base::cf_mask)) | base::cf_ari(a & 0x80);
+        fast_u8 r = mask8(a << 1) | (f & cf_mask);
         self().on_set_a(r);
-        self().on_set_f(f); }
+        self().on_set_f(flags(f, flag_set::f4, 0, a >> 7)); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
