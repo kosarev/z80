@@ -2402,6 +2402,7 @@ public:
         return f & xf_mask; }
     fast_u8 nf(fast_u8 f) {
         return f & nf_mask; }
+
     fast_u8 zf1(fast_u8 n) {
         return zf_ari(n); }
     fast_u8 pf1(fast_u8 n) {
@@ -2415,28 +2416,41 @@ public:
     fast_u8 hf3(fast_u8 op1, fast_u8 op2) {
         return ((op1 | op2) << (base::hf_bit - 3)) & hf_mask; }
 
+    fast_u8 f1(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2,
+               fast_u8 cfv) {
+        fast_u8 res8 = mask8(res16);
+        return sf(res8) | yf(f) | xf(f) | nf(f) |
+               zf1(res8) | hf1(op1, op2, cfv) | pf1(res8) | cf1(res16); }
+    fast_u8 f2(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2,
+               fast_u8 cfv) {
+        fast_u8 res8 = mask8(res16);
+        return sf(res8) | yf(f) | xf(f) | nf(f) |
+               zf1(res8) | hf2(op1, op2, cfv) | pf1(res8) | cf1(res16); }
+    fast_u8 f3(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2) {
+        fast_u8 res = mask8(res16);
+        return sf(res) | yf(f) | xf(f) | nf(f) |
+               zf1(res) | pf1(res) | hf3(op1, op2); }
+    fast_u8 f4(fast_u16 res16, fast_u8 f) {
+        fast_u8 res = mask8(res16);
+        return sf(res) | yf(f) | xf(f) | nf(f) | zf1(res) | pf1(res); }
+
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
-        fast_u8 t;
+        fast_u16 t;
         switch(k) {
         case alu::add:
         case alu::adc: {
             fast_u8 cfv = (k == alu::adc) ? cf(f) : 0;
-            fast_u16 t16 = a + n + cfv;
-            t = mask8(t16);
-            f = sf(t) | yf(f) | xf(f) | nf(f) |
-                zf1(t) | hf1(a, n, cfv) | pf1(t) | cf1(t16);
+            t = a + n + cfv;
+            f = f1(t, f, a, n, cfv);
             break; }
         case alu::sub:
         case alu::cp:
         case alu::sbc: {
             fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
-            fast_u16 t16 = a - n - cfv;
-            t = mask8(t16);
-            f = sf(t) | yf(f) | xf(f) | nf(f) |
-                zf1(t) | hf2(a, n, cfv) | pf1(t) | cf1(t16);
-            a = t;
+            t = a - n - cfv;
+            f = f2(t, f, a, n, cfv);
             break; }
         case alu::and_a:
             // Alexander Demin notes that the half-carry flag has
@@ -2446,19 +2460,19 @@ public:
             // TODO: AMD chips do not set the flag. Support them
             // as a variant of the original Intel chip.
             t = a & n;
-            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t) | hf3(a, n);
+            f = f3(t, f, a, n);
             break;
         case alu::xor_a:
             t = a ^ n;
-            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t);
+            f = f4(t, f);
             break;
         case alu::or_a:
             t = a | n;
-            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t);
+            f = f4(t, f);
             break;
         }
         if(k != alu::cp)
-            self().on_set_a(t);
+            self().on_set_a(mask8(t));
         self().on_set_f(f);
     }
 
