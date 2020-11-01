@@ -2097,6 +2097,7 @@ public:
     void disable_int_on_ei() { self().on_set_is_int_disabled(true); }
 
     bool check_condition(condition cc) {
+        // TODO: Would it make sense to store flags in a different order?
         auto n = static_cast<unsigned>(cc);
         unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
                              (cf_bit << 8) | (cf_bit << 12) |
