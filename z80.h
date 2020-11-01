@@ -2623,9 +2623,8 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         a = ror8(a);
-        f = (f & ~base::cf_mask) | base::cf_ari(a & 0x80);
         self().on_set_a(a);
-        self().on_set_f(f); }
+        self().on_set_f(flags(f, flag_set::f4, 0, a >> 7)); }
     void on_scf() {
         fast_u8 f = self().on_get_f();
         self().on_set_f(flags(f, flag_set::f4, 0, cf_mask)); }
