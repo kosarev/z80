@@ -2456,19 +2456,18 @@ public:
         fast_u8 b;
         switch(k) {
         case alu::add:
-        case alu::adc: {
-            fast_u8 cfv = (k == alu::adc) ? cf(f) : 0;
-            t = a + n + cfv;
-            fs = flag_set::f1;
-            b = ((n & 0xf) << 4) | (a & 0xf);
-            w = (t << 1) | cfv;
-            break; }
+        case alu::adc:
         case alu::sub:
         case alu::cp:
         case alu::sbc: {
-            fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
-            t = a - n - cfv;
-            fs = flag_set::f2;
+            fast_u8 cfv = (k == alu::adc || k == alu::sbc) ? cf(f) : 0;
+            if(k < alu::sub) {
+                t = a + n + cfv;
+                fs = flag_set::f1;
+            } else {
+                t = a - n - cfv;
+                fs = flag_set::f2;
+            }
             b = ((n & 0xf) << 4) | (a & 0xf);
             w = (t << 1) | cfv;
             break; }
