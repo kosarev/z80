@@ -2412,52 +2412,53 @@ public:
         return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
     fast_u8 hf2(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
+    fast_u8 hf3(fast_u8 op1, fast_u8 op2) {
+        return ((op1 | op2) << (base::hf_bit - 3)) & hf_mask; }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
+        fast_u8 t;
         switch(k) {
         case alu::add:
         case alu::adc: {
             fast_u8 cfv = (k == alu::adc) ? cf(f) : 0;
             fast_u16 t16 = a + n + cfv;
-            fast_u8 t = mask8(t16);
+            t = mask8(t16);
             f = sf(t) | yf(f) | xf(f) | nf(f) |
                 zf1(t) | hf1(a, n, cfv) | pf1(t) | cf1(t16);
-            a = t;
             break; }
         case alu::sub:
         case alu::cp:
         case alu::sbc: {
             fast_u8 cfv = (k == alu::sbc) ? cf(f) : 0;
             fast_u16 t16 = a - n - cfv;
-            fast_u8 t = mask8(t16);
+            t = mask8(t16);
             f = sf(t) | yf(f) | xf(f) | nf(f) |
                 zf1(t) | hf2(a, n, cfv) | pf1(t) | cf1(t16);
             a = t;
             break; }
-        case alu::and_a: {
+        case alu::and_a:
             // Alexander Demin notes that the half-carry flag has
             // its own special logic for the ANA and ANI
             // instructions.
             // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
             // TODO: AMD chips do not set the flag. Support them
             // as a variant of the original Intel chip.
-            fast_u8 hf = ((a | n) << (base::hf_bit - 3)) & hf_mask;
-            a &= n;
-            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a) | hf;
-            break; }
+            t = a & n;
+            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t) | hf3(a, n);
+            break;
         case alu::xor_a:
-            a ^= n;
-            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a);
+            t = a ^ n;
+            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t);
             break;
         case alu::or_a:
-            a |= n;
-            f = sf(a) | yf(f) | xf(f) | nf(f) | zf1(a) | pf1(a);
+            t = a | n;
+            f = sf(t) | yf(f) | xf(f) | nf(f) | zf1(t) | pf1(t);
             break;
         }
         if(k != alu::cp)
-            self().on_set_a(a);
+            self().on_set_a(t);
         self().on_set_f(f);
     }
 
