@@ -2430,8 +2430,8 @@ private:
             fast_u16 res9 = w >> 1;
             fast_u8 res8 = mask8(res9);
             fast_u8 cfv = mask8(w & 0x1);
-            fast_u8 op1 = (b >> 0) & 0xf;
-            fast_u8 op2 = (b >> 4) & 0xf;  // TODO: '&' not needed?
+            fast_u8 op1 = b & 0xf;
+            fast_u8 op2 = b >> 4;
             fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
                                                 hf2(op1, op2, cfv);
             f = sf(res8) | yf(f) | xf(f) | nf(f) |
@@ -2464,7 +2464,7 @@ public:
                 t = a - n - cfv;
                 fs = flag_set::f2;
             }
-            b = ((n & 0xf) << 4) | (a & 0xf);  // TODO: The first '&' not needed?
+            b = (n << 4) | (a & 0xf);
             w = (t << 1) | cfv;
         } else {
             // AND, XOR, OR
