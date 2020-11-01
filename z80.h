@@ -2096,20 +2096,15 @@ public:
 
     void disable_int_on_ei() { self().on_set_is_int_disabled(true); }
 
-    fast_u8 get_flag_mask(condition cc) {
-        switch(static_cast<unsigned>(cc) / 2) {
-        case 0: return zf_mask;
-        case 1: return cf_mask;
-        case 2: return pf_mask;
-        case 3: return sf_mask;
-        }
-        unreachable("Unknown condition code.");
-    }
-
     bool check_condition(condition cc) {
-        bool actual = self().on_get_f() & get_flag_mask(cc);
-        bool expected = static_cast<unsigned>(cc) & 1;
-        return actual == expected;
+        auto n = static_cast<unsigned>(cc);
+        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
+                             (cf_bit << 8) | (cf_bit << 12) |
+                             (pf_bit << 16) | (pf_bit << 20) |
+                             (sf_bit << 24) | (sf_bit << 28);
+        fast_u8 f = self().on_get_f();
+        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
+        return !(((f >> pos) ^ n) & 0x1);
     }
 
     fast_u8 on_imm8_read() {
