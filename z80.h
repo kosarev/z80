@@ -2506,7 +2506,8 @@ public:
             self().on_set_wz(nn);
         }
     void on_ccf() {
-        self().on_set_f(self().on_get_f() ^ base::cf_mask); }
+        fast_u8 f = self().on_get_f();
+        self().on_set_f(flags(f, flag_set::f4, 0, f ^ cf_mask)); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
