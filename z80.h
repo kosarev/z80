@@ -2412,7 +2412,7 @@ private:
     fast_u8 hf3(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_set { f1, f2, f3 };
+    enum class flag_set { f1, f2, f3, f4 };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
@@ -2423,8 +2423,8 @@ private:
         case flag_set::f1:
         case flag_set::f2: {
             fast_u16 res9 = w >> 1;
-            fast_u8 res8 = mask8(res9);
-            fast_u8 cfv = mask8(w & 0x1);
+            fast_u8 res8 = mask8(res9);  // TODO: Can be just a cast?
+            fast_u8 cfv = mask8(w & 0x1);  // TODO: Can be just a cast?
             fast_u8 op1 = b & 0xf;
             fast_u8 op2 = b >> 4;
             fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
@@ -2433,11 +2433,13 @@ private:
                 zf1(res8) | hf | pf1(res8) | cf1(res9);
             return f; }
         case flag_set::f3: {
-            fast_u8 res = mask8(w);
+            fast_u8 res = mask8(w);  // TODO: Can be just a cast?
             fast_u8 ops12 = b;
             return sf(res) | yf(f) | xf(f) | nf(f) |
                    zf1(res) | pf1(res) | hf3(ops12);
             return f; }
+        case flag_set::f4:
+            return static_cast<fast_u8>((f & ~cf_mask) | w);
         }
         unreachable("Unknown flag set!");
     }
@@ -2491,11 +2493,10 @@ public:
         fast_u16 i = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp);
         fast_u8 f = self().on_get_f();
-        fast_u16 r = add16(i, n);
-        f = (f & ~base::cf_mask) | base::cf_ari(r < i);
+        fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
-        self().on_set_hl(r);
-        self().on_set_f(f); }
+        self().on_set_hl(mask16(r32));
+        self().on_set_f(flags(f, flag_set::f4, 0, r32 >> 16)); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
