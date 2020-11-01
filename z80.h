@@ -2414,10 +2414,10 @@ private:
         return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
     fast_u8 hf2(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
-    fast_u8 hf3(fast_u8 op1, fast_u8 op2) {
-        return ((op1 | op2) << (base::hf_bit - 3)) & hf_mask; }
+    fast_u8 hf3(fast_u8 ops12) {
+        return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_set { f1, f2 };
+    enum class flag_set { f1, f2, f3 };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
@@ -2431,20 +2431,21 @@ private:
             fast_u8 res8 = mask8(res9);
             fast_u8 cfv = mask8(w & 0x1);
             fast_u8 op1 = (b >> 0) & 0xf;
-            fast_u8 op2 = (b >> 4) & 0xf;
+            fast_u8 op2 = (b >> 4) & 0xf;  // TODO: '&' not needed?
             fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
                                                 hf2(op1, op2, cfv);
             f = sf(res8) | yf(f) | xf(f) | nf(f) |
                 zf1(res8) | hf | pf1(res8) | cf1(res9);
             return f; }
+        case flag_set::f3: {
+            fast_u8 res = mask8(w);
+            fast_u8 ops12 = b;
+            return sf(res) | yf(f) | xf(f) | nf(f) |
+                   zf1(res) | pf1(res) | hf3(ops12);
+            return f; }
         }
         unreachable("Unknown flag set!");
     }
-
-    fast_u8 f3(fast_u16 res16, fast_u8 f, fast_u8 op1, fast_u8 op2) {
-        fast_u8 res = mask8(res16);
-        return sf(res) | yf(f) | xf(f) | nf(f) |
-               zf1(res) | pf1(res) | hf3(op1, op2); }
 
 public:
     void do_alu(alu k, fast_u8 n) {
@@ -2475,15 +2476,15 @@ public:
             // TODO: AMD chips do not set the flag. Support them
             // as a variant of the original Intel chip.
             t = a & n;
-            f = f3(t, f, a, n);
+            f = flags(f, flag_set::f3, a | n, t);
             break;
         case alu::xor_a:
             t = a ^ n;
-            f = f3(t, f, 0, 0);
+            f = flags(f, flag_set::f3, 0, t);
             break;
         case alu::or_a:
             t = a | n;
-            f = f3(t, f, 0, 0);
+            f = flags(f, flag_set::f3, 0, t);
             break;
         }
         if(k != alu::cp)
