@@ -2430,9 +2430,6 @@ public:
         fast_u8 res = mask8(res16);
         return sf(res) | yf(f) | xf(f) | nf(f) |
                zf1(res) | pf1(res) | hf3(op1, op2); }
-    fast_u8 f4(fast_u16 res16, fast_u8 f) {
-        fast_u8 res = mask8(res16);
-        return sf(res) | yf(f) | xf(f) | nf(f) | zf1(res) | pf1(res); }
 
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -2464,11 +2461,11 @@ public:
             break;
         case alu::xor_a:
             t = a ^ n;
-            f = f4(t, f);
+            f = f3(t, f, 0, 0);
             break;
         case alu::or_a:
             t = a | n;
-            f = f4(t, f);
+            f = f3(t, f, 0, 0);
             break;
         }
         if(k != alu::cp)
