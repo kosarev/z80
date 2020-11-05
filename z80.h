@@ -2412,8 +2412,10 @@ private:
         return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
     fast_u8 hf3(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
+    fast_u8 hf4(fast_u8 op) {
+        return (op & 0xf) > 0 ? hf_mask : 0; }
 
-    enum class flag_set { f1, f2, f3, f4 };
+    enum class flag_set { f1, f2, f3, f4, f5 };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
@@ -2430,17 +2432,20 @@ private:
             fast_u8 op2 = b >> 4;
             fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
                                                 hf2(op1, op2, cfv);
-            f = sf(res8) | yf(f) | xf(f) | nf(f) |
-                zf1(res8) | hf | pf1(res8) | cf1(res9);
-            return f; }
+            return sf(res8) | yf(f) | xf(f) | nf(f) |
+                   zf1(res8) | hf | pf1(res8) | cf1(res9); }
         case flag_set::f3: {
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
             fast_u8 ops12 = b;
             return sf(res) | yf(f) | xf(f) | nf(f) |
-                   zf1(res) | pf1(res) | hf3(ops12);
-            return f; }
+                   zf1(res) | pf1(res) | hf3(ops12); }
         case flag_set::f4:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
+        case flag_set::f5: {
+            fast_u8 t = mask8(w);  // TODO: Can be just a cast?
+            fast_u8 n = b;
+            return cf(f) | yf(f) | xf(f) | nf(f) |
+                   sf(t) | zf1(t) | hf4(n) | pf1(t); }
         }
         unreachable("Unknown flag set!");
     }
@@ -2535,12 +2540,9 @@ public:
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        fast_u8 hf = (n & 0xf) > 0 ? hf_mask : 0;
-        n = dec8(n);
-        f = (f & (cf_mask | yf_mask | xf_mask | nf_mask)) |
-                (n & sf_mask) | zf_ari(n) | hf | pf_log(n);
-        self().on_set_reg(r, n);
-        self().on_set_f(f); }
+        fast_u8 t = n - 1;
+        self().on_set_reg(r, mask8(t));
+        self().on_set_f(flags(f, flag_set::f5, n, t)); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
