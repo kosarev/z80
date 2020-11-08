@@ -2527,21 +2527,21 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
 
-        fast_u8 t = a + 6;
         fast_u8 r = a;
-        fast_u8 hfm = (a ^ t) & hf_mask;
-        if((hfm | f) & hf_mask)
+        fast_u8 t = r + 6;
+        fast_u8 hfv = a ^ t;
+        if((hfv | f) & hf_mask)
             r = t;
 
         fast_u16 t2 = r + 0x60;
-        fast_u8 cfm = ((t2 >> 8) | f) & cf_mask;
-        if(cfm)
+        fast_u8 cfv = ((t2 >> 8) | f) & cf_mask;
+        if(cfv)
             r = mask8(t2);
 
-        fast_u8 n = r;
-        f = (f & (xf_mask | yf_mask | nf_mask)) | cfm |
-                (n & sf_mask) | zf_ari(n) | hfm | pf_log(n);
-        self().on_set_a(n);
+        f = (f & (xf_mask | yf_mask | nf_mask)) |
+                (r & sf_mask) | zf_ari(r) | pf_log(r) |
+                (hfv & hf_mask) | cfv;
+        self().on_set_a(r);
         self().on_set_f(f); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
