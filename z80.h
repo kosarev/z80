@@ -2413,9 +2413,9 @@ private:
     fast_u8 hf3(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
     fast_u8 hf4(fast_u8 op) {
-        return (op & 0xf) > 0 ? hf_mask : 0; }
+        return ((op & 0xf) + 0xf) & hf_mask; }
     fast_u8 hf5(fast_u8 op) {
-        return (op & 0xf) > 0xe ? hf_mask : 0; }
+        return ((op & 0xf) + 1) & hf_mask; }
 
     enum class flag_set { f1, f2, f3, f4, f5, f6, f7 };
 
