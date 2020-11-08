@@ -2450,6 +2450,11 @@ private:
         unreachable("Unknown flag set!");
     }
 
+    // TODO: Make this public once lazy flags are fully supported.
+    void on_flags_update(fast_u8 f, flag_set fs, fast_u8 b, fast_u16 w) {
+        self().on_set_f(flags(f, fs, b, w));
+    }
+
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -2489,7 +2494,7 @@ public:
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_set_f(flags(f, fs, b, w));
+        self().on_flags_update(f, fs, b, w);
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2502,7 +2507,7 @@ public:
         fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
         self().on_set_hl(mask16(r32));
-        self().on_set_f(flags(f, flag_set::f4, 0, r32 >> 16)); }
+        self().on_flags_update(f, flag_set::f4, 0, r32 >> 16); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2513,7 +2518,7 @@ public:
         }
     void on_ccf() {
         fast_u8 f = self().on_get_f();
-        self().on_set_f(flags(f, flag_set::f4, 0, f ^ cf_mask)); }
+        self().on_flags_update(f, flag_set::f4, 0, f ^ cf_mask); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
@@ -2532,12 +2537,12 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().on_set_f(flags(f, flag_set::f7, r, (hfv & hf_mask) | cfv)); }
+        self().on_flags_update(f, flag_set::f7, r, (hfv & hf_mask) | cfv); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
         self().on_set_reg(r, mask8(n - 1));
-        self().on_set_f(flags(f, flag_set::f5, n, 0)); }
+        self().on_flags_update(f, flag_set::f5, n, 0); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2565,7 +2570,7 @@ public:
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
         self().on_set_reg(r, mask8(n + 1));
-        self().on_set_f(flags(f, flag_set::f6, n, 0)); }
+        self().on_flags_update(f, flag_set::f6, n, 0); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -2606,28 +2611,28 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u8 r = mask8(a << 1) | (f & cf_mask);
         self().on_set_a(r);
-        self().on_set_f(flags(f, flag_set::f4, 0, a >> 7)); }
+        self().on_flags_update(f, flag_set::f4, 0, a >> 7); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         fast_u8 r = (a >> 1) | ((f & cf_mask) << 7);
         self().on_set_a(r);
-        self().on_set_f(flags(f, flag_set::f4, 0, a & 0x1)); }
+        self().on_flags_update(f, flag_set::f4, 0, a & 0x1); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         a = rol8(a);
         self().on_set_a(a);
-        self().on_set_f(flags(f, flag_set::f4, 0, a & 0x1)); }
+        self().on_flags_update(f, flag_set::f4, 0, a & 0x1); }
     void on_rrca() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         a = ror8(a);
         self().on_set_a(a);
-        self().on_set_f(flags(f, flag_set::f4, 0, a >> 7)); }
+        self().on_flags_update(f, flag_set::f4, 0, a >> 7); }
     void on_scf() {
         fast_u8 f = self().on_get_f();
-        self().on_set_f(flags(f, flag_set::f4, 0, cf_mask)); }
+        self().on_flags_update(f, flag_set::f4, 0, cf_mask); }
 
 protected:
     using base::self;
