@@ -2439,16 +2439,20 @@ private:
                    zf1(res) | pf1(res) | hf3(ops12); }
         case flag_set::f4:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
-        case flag_set::f5: {
-            fast_u8 t = mask8(w);  // TODO: Can be just a cast?
-            fast_u8 n = b;
-            return cf(f) | yf(f) | xf(f) | nf(f) |
-                   sf(t) | zf1(t) | hf2(n, 1, 0) | pf1(t); }
+        case flag_set::f5:
         case flag_set::f6: {
-            fast_u8 t = mask8(w);  // TODO: Can be just a cast?
             fast_u8 n = b;
+            fast_u8 hf;
+            fast_u8 t;
+            if(fs == flag_set::f6) {
+                hf = hf1(n, 1, 0);
+                t = mask8(n + 1);
+            } else {
+                hf = hf2(n, 1, 0);
+                t = mask8(n - 1);
+            }
             return cf(f) | yf(f) | xf(f) | nf(f) |
-                   sf(t) | zf1(t) | hf1(n, 1, 0) | pf1(t); }
+                   sf(t) | zf1(t) | hf | pf1(t); }
         case flag_set::f7: {
             fast_u8 t = b;
             fast_u8 flags = static_cast<fast_u8>(w);
@@ -2546,7 +2550,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u8 t = n - 1;
         self().on_set_reg(r, mask8(t));
-        self().on_set_f(flags(f, flag_set::f5, n, t)); }
+        self().on_set_f(flags(f, flag_set::f5, n, 0)); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2575,7 +2579,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u8 t = n + 1;
         self().on_set_reg(r, mask8(t));  // TODO: Should we mask on getting?
-        self().on_set_f(flags(f, flag_set::f6, n, t)); }
+        self().on_set_f(flags(f, flag_set::f6, n, 0)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
