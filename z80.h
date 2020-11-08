@@ -2194,8 +2194,6 @@ public:
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         self().on_set_regp(rp, nn); }
     void on_nop() {}
-    void on_push_rp(regp2 rp) {
-        self().on_push(self().on_get_regp2(rp)); }
     void on_ret() {
         self().on_return(); }
     void on_ret_cc(condition cc) {
@@ -2393,8 +2391,6 @@ private:
         return f & cf_mask; }
     fast_u8 sf(fast_u8 f) {
         return f & sf_mask; }
-    fast_u8 nf(fast_u8 f) {
-        return f & nf_mask; }
 
     fast_u8 zf1(fast_u8 n) {
         return zf_ari(n); }
@@ -2426,11 +2422,11 @@ private:
             fast_u8 op2 = b >> 4;
             fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
                                                 hf2(op1, op2, cfv);
-            return sf(res8) | nf(f) | zf1(res8) | hf | pf1(res8) | cf1(res9); }
+            return sf(res8) | zf1(res8) | hf | pf1(res8) | cf1(res9); }
         case flag_set::f3: {
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
             fast_u8 ops12 = b;
-            return sf(res) | nf(f) | zf1(res) | pf1(res) | hf3(ops12); }
+            return sf(res) | zf1(res) | pf1(res) | hf3(ops12); }
         case flag_set::f4:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
         case flag_set::f5:
@@ -2445,11 +2441,11 @@ private:
                 hf = hf2(n, 1, 0);
                 t = mask8(n - 1);
             }
-            return cf(f) | nf(f) | sf(t) | zf1(t) | hf | pf1(t); }
+            return cf(f) | sf(t) | zf1(t) | hf | pf1(t); }
         case flag_set::f7: {
             fast_u8 t = b;
             fast_u8 flags = static_cast<fast_u8>(w);
-            return nf(f) | sf(t) | zf1(t) | pf1(t) | flags; }
+            return sf(t) | zf1(t) | pf1(t) | flags; }
         }
         unreachable("Unknown flag set!");
     }
@@ -2591,13 +2587,20 @@ public:
         self().on_write_cycle(nn, get_high8(irp)); }
     void on_out_n_a(fast_u8 n) {
         self().on_output_cycle(n, self().on_get_a()); }
+    void on_push_rp(regp2 rp) {
+        fast_u16 nn = self().on_get_regp2(rp);
+        if(rp == regp2::af) {
+            // NF is always raised on i8080.
+            nn |= nf_mask;
+        }
+        self().on_push(nn); }
     void on_pop_rp(regp2 rp) {
-        fast_u16 n = self().on_pop();
+        fast_u16 nn = self().on_pop();
         if(rp == regp2::af) {
             // Not all flags are updated on pop psw.
-            n = (n & ~(xf_mask | yf_mask)) | nf_mask;
+            nn = (nn & ~(xf_mask | yf_mask | nf_mask));
         }
-        self().on_set_regp2(rp, n); }
+        self().on_set_regp2(rp, nn); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -3375,6 +3378,8 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_output_cycle(make16(a, n), a);
         self().on_set_wz(make16(a, inc8(n))); }
+    void on_push_rp(regp2 rp) {
+        self().on_push(self().on_get_regp2(rp)); }
     void on_pop_rp(regp2 rp) {
         self().on_set_regp2(rp, self().on_pop()); }
     void on_res(unsigned b, reg r, fast_u8 d) {
