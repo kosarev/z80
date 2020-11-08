@@ -2548,8 +2548,7 @@ public:
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        fast_u8 t = n - 1;
-        self().on_set_reg(r, mask8(t));
+        self().on_set_reg(r, mask8(n - 1));
         self().on_set_f(flags(f, flag_set::f5, n, 0)); }
     void on_di() {
         self().set_iff_on_di(false); }
@@ -2577,8 +2576,7 @@ public:
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        fast_u8 t = n + 1;
-        self().on_set_reg(r, mask8(t));  // TODO: Should we mask on getting?
+        self().on_set_reg(r, mask8(n + 1));
         self().on_set_f(flags(f, flag_set::f6, n, 0)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
