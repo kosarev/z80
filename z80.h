@@ -2417,7 +2417,7 @@ private:
     fast_u8 hf5(fast_u8 op) {
         return (op & 0xf) > 0xe ? hf_mask : 0; }
 
-    enum class flag_set { f1, f2, f3, f4, f5, f6 };
+    enum class flag_set { f1, f2, f3, f4, f5, f6, f7 };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
@@ -2453,6 +2453,11 @@ private:
             fast_u8 n = b;
             return cf(f) | yf(f) | xf(f) | nf(f) |
                    sf(t) | zf1(t) | hf5(n) | pf1(t); }
+        case flag_set::f7: {
+            fast_u8 t = b;
+            fast_u8 flags = static_cast<fast_u8>(w);
+            return xf(f) | yf(f) | nf(f) |
+                   sf(t) | zf1(t) | pf1(t) | flags; }
         }
         unreachable("Unknown flag set!");
     }
@@ -2538,11 +2543,8 @@ public:
         if(cfv)
             r = mask8(t2);
 
-        f = (f & (xf_mask | yf_mask | nf_mask)) |
-                (r & sf_mask) | zf_ari(r) | pf_log(r) |
-                (hfv & hf_mask) | cfv;
         self().on_set_a(r);
-        self().on_set_f(f); }
+        self().on_set_f(flags(f, flag_set::f7, r, (hfv & hf_mask) | cfv)); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
