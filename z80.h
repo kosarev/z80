@@ -2412,10 +2412,6 @@ private:
         return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
     fast_u8 hf3(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
-    fast_u8 hf4(fast_u8 op) {
-        return ((op & 0xf) + 0xf) & hf_mask; }
-    fast_u8 hf5(fast_u8 op) {
-        return ((op & 0xf) + 1) & hf_mask; }
 
     enum class flag_set { f1, f2, f3, f4, f5, f6, f7 };
 
@@ -2447,12 +2443,12 @@ private:
             fast_u8 t = mask8(w);  // TODO: Can be just a cast?
             fast_u8 n = b;
             return cf(f) | yf(f) | xf(f) | nf(f) |
-                   sf(t) | zf1(t) | hf4(n) | pf1(t); }
+                   sf(t) | zf1(t) | hf2(n, 1, 0) | pf1(t); }
         case flag_set::f6: {
             fast_u8 t = mask8(w);  // TODO: Can be just a cast?
             fast_u8 n = b;
             return cf(f) | yf(f) | xf(f) | nf(f) |
-                   sf(t) | zf1(t) | hf5(n) | pf1(t); }
+                   sf(t) | zf1(t) | hf1(n, 1, 0) | pf1(t); }
         case flag_set::f7: {
             fast_u8 t = b;
             fast_u8 flags = static_cast<fast_u8>(w);
