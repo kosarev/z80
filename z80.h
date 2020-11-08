@@ -2527,16 +2527,18 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
 
-        fast_u8 d = 0x00;
-        fast_u8 hfm = ((a & 0xf) + 6) & hf_mask;
-        if((f | hfm) & hf_mask)
-            d |= 0x06;
+        fast_u8 t = a + 6;
+        fast_u8 r = a;
+        fast_u8 hfm = (a ^ t) & hf_mask;
+        if((hfm | f) & hf_mask)
+            r = t;
 
-        fast_u8 cfm = (((a + 0x66) >> 8) | f) & cf_mask;
+        fast_u16 t2 = r + 0x60;
+        fast_u8 cfm = ((t2 >> 8) | f) & cf_mask;
         if(cfm)
-            d |= 0x60;
+            r = mask8(t2);
 
-        fast_u8 n = add8(a, d);
+        fast_u8 n = r;
         f = (f & (xf_mask | yf_mask | nf_mask)) | cfm |
                 (n & sf_mask) | zf_ari(n) | hfm | pf_log(n);
         self().on_set_a(n);
