@@ -2526,21 +2526,18 @@ public:
     void on_daa() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
-        bool cf = f & cf_mask;
-        bool hf = f & hf_mask;
 
         fast_u8 d = 0x00;
-        if(cf || a > 0x99) {
-            d |= 0x60;
-            f |= cf_mask;
-        }
-        if(hf || (a & 0x0f) > 0x09) {
+        fast_u8 hfm = ((a & 0xf) + 6) & hf_mask;
+        if((f | hfm) & hf_mask)
             d |= 0x06;
-        }
+
+        fast_u8 cfm = (((a + 0x66) >> 8) | f) & cf_mask;
+        if(cfm)
+            d |= 0x60;
 
         fast_u8 n = add8(a, d);
-        fast_u8 hfm = (a & 0x0f) > 0x09 ? hf_mask : 0;  // TODO
-        f = (f & (cf_mask | xf_mask | yf_mask | nf_mask)) |
+        f = (f & (xf_mask | yf_mask | nf_mask)) | cfm |
                 (n & sf_mask) | zf_ari(n) | hfm | pf_log(n);
         self().on_set_a(n);
         self().on_set_f(f); }
