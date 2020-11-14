@@ -36,6 +36,7 @@ typedef uint_fast32_t fast_u32;
 
 typedef uint_least8_t least_u8;
 typedef uint_least16_t least_u16;
+typedef uint_least32_t least_u32;
 
 static inline void unused(...) {}
 
@@ -3677,7 +3678,8 @@ public:
 
     static const type end_of_frame = 1u << 0;
     static const type breakpoint_hit = 1u << 1;
-    static const type end = 1u << 2;
+    static const type ticks_limit_hit = 1u << 2;
+    static const type end = 1u << 3;
 };
 
 template<typename B>
@@ -3718,6 +3720,8 @@ public:
     }
 
     void on_tick(unsigned t) {
+        base::on_tick(t);
+
         frame_tick += t;
         if(frame_tick >= ticks_per_frame) {
             frame_tick %= ticks_per_frame;
@@ -3729,6 +3733,10 @@ public:
         if(is_breakpoint_addr(n))
             events |= events_mask::breakpoint_hit;
         base::on_set_pc(n);
+    }
+
+    void on_raise_events(events_mask::type new_events) {
+        events |= new_events;
     }
 
     events_mask::type on_run() {

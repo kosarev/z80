@@ -24,6 +24,8 @@ struct __attribute__((packed)) object_state {
     least_u16 wz = 0;
     least_u16 last_read_addr = 0;
 
+    least_u32 ticks_to_stop = 0;  // Null means no limit.
+
 #if defined(I8080_MACHINE)
     least_u8 iff = 0;
     least_u8 int_disabled = 0;

@@ -13,7 +13,7 @@ from ._z80 import _I8080Machine, _Z80Machine
 class _ByteState(object):
     def __init__(self, image):
         assert len(image) >= 1
-        self.__image = image
+        self.__image = image[0:1]
 
     def get(self):
         return self.__image[0]
@@ -28,7 +28,7 @@ class _ByteState(object):
 class _WordState(object):
     def __init__(self, image):
         assert len(image) >= 2
-        self.__image = image
+        self.__image = image[0:2]
         self.lo = _ByteState(image[0:1])
         self.hi = _ByteState(image[1:2])
 
@@ -38,6 +38,24 @@ class _WordState(object):
     def set(self, value):
         self.__image[0] = value % 0x100
         self.__image[1] = value // 0x100
+
+    value = property(get, set)
+
+
+class _U32State(object):
+    def __init__(self, image):
+        assert len(image) >= 4
+        self.__image = image[0:4]
+
+    def get(self):
+        return (self.__image[0] + self.__image[1] * 0x100 +
+                self.__image[2] * 0x10000 + self.__image[2] * 0x1000000)
+
+    def set(self, value):
+        self.__image[0] = value % 0x100
+        self.__image[1] = (value // 0x100) % 0x100
+        self.__image[2] = (value // 0x10000) % 0x100
+        self.__image[3] = value // 0x1000000
 
     value = property(get, set)
 
@@ -61,6 +79,9 @@ class _ImageParser(object):
     def parse_word(self):
         return _WordState(self.parse_block(2))
 
+    def parse_u32(self):
+        return _U32State(self.parse_block(4))
+
 
 class _StateBase(object):
     def __init__(self, image):
@@ -75,6 +96,7 @@ class _StateBase(object):
         self.__sp = parser.parse_word()
         self.__wz = parser.parse_word()
         self.__last_read_addr = parser.parse_word()
+        self.__ticks_to_stop = parser.parse_u32()
 
         self.__a = self.__af.hi
         self.__b = self.__bc.hi
@@ -144,6 +166,12 @@ class _StateBase(object):
     def set_sp(self, value):
         self.__sp.value = value
 
+    def get_ticks_to_stop(self):
+        return self.__tick_to_stop.value
+
+    def set_ticks_to_stop(self, value):
+        self.__ticks_to_stop.value = value
+
     b = property(get_b, set_b)
     c = property(get_c, set_c)
     d = property(get_d, set_d)
@@ -154,6 +182,8 @@ class _StateBase(object):
     hl = property(get_hl, set_hl)
     pc = property(get_pc, set_pc)
     sp = property(get_sp, set_sp)
+
+    ticks_to_stop = property(get_ticks_to_stop, set_ticks_to_stop)
 
     def get_memory_byte(self, addr):
         return self.memory[addr]

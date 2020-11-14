@@ -21,6 +21,7 @@ using z80::fast_u16;
 using z80::fast_u32;
 using z80::least_u8;
 using z80::least_u16;
+using z80::least_u32;
 
 using z80::unused;
 using z80::get_low8;
@@ -216,6 +217,20 @@ public:
 
         std::swap(state.h, state.alt_h);
         std::swap(state.l, state.alt_l);
+    }
+
+    void on_tick(unsigned t) {
+        base::on_tick(t);
+
+        // Handle stopping by hitting a specified number of ticks.
+        if(state.ticks_to_stop) {
+            if(state.ticks_to_stop > t) {
+                state.ticks_to_stop -= t;
+            } else {
+                state.ticks_to_stop = 0;
+                self().on_raise_events(z80::events_mask::ticks_limit_hit);
+            }
+        }
     }
 
 #if 0  // TODO
