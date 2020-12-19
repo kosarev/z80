@@ -10,7 +10,7 @@
 #   Published under the MIT license.
 
 import sys
-from ._disassembler import _Profile, _Disassembler
+from ._disassembler import _Profile, _Disasm
 from ._error import Error
 
 
@@ -45,7 +45,7 @@ def _disasm(args):
     profile.load_if_exists(asm_filename)
     profile.load_if_exists(profile_filename)
 
-    d = _Disassembler(image)
+    d = _Disasm(image)
     d.disassemble(profile)
     assert 0, d  # TODO
 

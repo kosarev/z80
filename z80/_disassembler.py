@@ -267,7 +267,7 @@ class _Profile(object):
             self.__tags.setdefault(tag.get_addr(), []).append(tag)
 
 
-class _Disassembler(object):
+class _Disasm(object):
     def __init__(self, image):
         self.__image = image
 
