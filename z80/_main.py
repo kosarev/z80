@@ -10,7 +10,7 @@
 #   Published under the MIT license.
 
 import sys
-from ._disassembler import _Profile, _Disasm
+from ._disasm import _Profile, _Disasm
 from ._error import Error
 
 
