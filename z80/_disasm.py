@@ -194,6 +194,14 @@ class _Tag(object):
         return f'({self.addr:#06x}, {self.ID}, {self.comment!r})'
 
 
+class _CommentTag(_Tag):
+    ID = 'comment'
+
+    def __init__(self, addr, comment):
+        super().__init__(addr, size=0)
+        self.comment = comment
+
+
 class _ByteTag(_Tag):
     ID = 'byte'
 
@@ -336,12 +344,33 @@ class _TagParser(object):
 
 
 class _AsmOutput(object):
+    __COMMAND_INDENT = 4
+    __COMMENT_INDENT = 40
+
     def __init__(self, stream):
         self.__stream = stream
-        self.__indent = ' ' * 4
+        self.__needs_empty_line = True
 
-    def write_line(self, line):
-        self.__stream.write('%s%s\n' % (self.__indent, line))
+    def __write_empty_line_if_needed(self):
+        if self.__needs_empty_line:
+            self.__stream.write('\n')
+            self.__needs_empty_line = False
+
+    def write_line(self, line, tag=None):
+        self.__write_empty_line_if_needed()
+
+        line = ' ' * self.__COMMAND_INDENT + line
+
+        comment = None
+        if tag is not None:
+            comment = '@@ %#06x %s' % tag
+
+        if comment is not None:
+            line = line.ljust(self.__COMMENT_INDENT) + '; %s' % comment
+
+        line += '\n'
+
+        self.__stream.write(line)
 
     def write_space_directive(self, size):
         self.write_line('.space %d' % size)
@@ -375,10 +404,14 @@ class _Disasm(object):
         pass
 
     def __process_include_binary_tag(self, tag):
+        comment = 'Included from binary file %r.' % tag.filename.value
+        self.__new_tag(_CommentTag(tag.addr, comment))
+
         for i, b in enumerate(tag.image):
             self.__new_tag(_ByteTag(tag.addr + i, b))
 
     __TAG_PROCESSORS = {
+        _CommentTag: lambda self, tag: None,
         _ByteTag: __process_byte_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
     }
@@ -392,10 +425,15 @@ class _Disasm(object):
         while self.__worklist:
             self.__process_tag(self.__worklist.popleft())
 
+    def __write_comment_tag(self, tag, out):
+        out.write_line('; @@: %s' % tag.comment)
+
     def __write_byte_tag(self, tag, out):
-        out.write_line('db %#04x' % tag.value)
+        out.write_line('db %#04x' % tag.value,
+                       tag=(tag.addr, '%#04x' % tag.value))
 
     __TAG_WRITERS = {
+        _CommentTag: __write_comment_tag,
         _ByteTag: __write_byte_tag,
         _IncludeBinaryTag: lambda self, tag, out: None,
     }
