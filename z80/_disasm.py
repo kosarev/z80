@@ -335,6 +335,18 @@ class _TagParser(object):
             yield tag
 
 
+class _AsmOutput(object):
+    def __init__(self, stream):
+        self.__stream = stream
+        self.__indent = ' ' * 4
+
+    def write_line(self, line):
+        self.__stream.write('%s%s\n' % (self.__indent, line))
+
+    def write_space_directive(self, size):
+        self.write_line('.space %d' % size)
+
+
 class _Disasm(object):
     def __init__(self):
         self.__tags = dict()
@@ -380,4 +392,28 @@ class _Disasm(object):
         while self.__worklist:
             self.__process_tag(self.__worklist.popleft())
 
-        assert 0  # TODO
+    def __write_byte_tag(self, tag, out):
+        out.write_line('db %#04x' % tag.value)
+
+    __TAG_WRITERS = {
+        _ByteTag: __write_byte_tag,
+        _IncludeBinaryTag: lambda self, tag, out: None,
+    }
+
+    def __write_tag(self, tag, out):
+        write = self.__TAG_WRITERS[type(tag)]
+        write(self, tag, out)
+
+    def save(self, filename):
+        with open(filename, 'w') as f:
+            out = _AsmOutput(f)
+
+            addr = 0
+            for a in sorted(self.__tags):
+                for tag in self.__tags[a]:
+                    if addr < tag.addr:
+                        out.write_space_directive(tag.addr - addr)
+                        addr = tag.addr
+
+                    self.__write_tag(tag, out)
+                    addr += tag.size

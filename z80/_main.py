@@ -33,7 +33,7 @@ def _disasm(args):
     d = _Disasm()
     d.read_tags(filename)
     d.disassemble()
-    assert 0, d  # TODO
+    d.save(filename + '.disasm')
 
 
 def _handle_command_line(args):
