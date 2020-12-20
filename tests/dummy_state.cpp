@@ -1,5 +1,5 @@
 
-// Test that all i8080 state handlers have their dummy
+// Test that all the standard state handlers have their dummy
 // implementations.
 
 #include "z80.h"
