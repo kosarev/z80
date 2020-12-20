@@ -254,23 +254,13 @@ class _TagParser(object):
             yield parser(self, addr, name)
 
 
-class _Profile(object):
-    __tags = dict()
+class _Disasm(object):
+    def __init__(self):
+        self.__tags = dict()
 
-    def load_if_exists(self, filename):
-        try:
-            file = _SourceFile(filename)
-        except FileNotFoundError:
-            return
-
-        for tag in _TagParser(file):
+    def load_source(self, filename):
+        for tag in _TagParser(_SourceFile(filename)):
             self.__tags.setdefault(tag.get_addr(), []).append(tag)
 
-
-class _Disasm(object):
-    def __init__(self, image):
-        self.__image = image
-
-    def disassemble(self, profile):
-        self._tags_to_process = []
-        assert 0, profile._Profile__tags
+    def disassemble(self):
+        assert 0, self.__tags

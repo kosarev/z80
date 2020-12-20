@@ -10,7 +10,7 @@
 #   Published under the MIT license.
 
 import sys
-from ._disasm import _Profile, _Disasm
+from ._disasm import _Disasm
 from ._error import Error
 
 
@@ -27,26 +27,12 @@ def _handle_extra_arguments(args):
 
 
 def _disasm(args):
-    image_filename = _pop_argument(args, 'The image file to disassemble is '
-                                         'not specified.')
-    asm_filename = _pop_argument(args, 'The assembly file is not specified.')
-    profile_filename = _pop_argument(args, 'The profile is not specified.')
+    filename = _pop_argument(args, 'The assembly file is not specified.')
     _handle_extra_arguments(args)
 
-    with open(image_filename, 'rb') as f:
-        image = f.read()
-
-    IMAGE_SIZE = 0x10000
-    if len(image) != IMAGE_SIZE:
-        raise Error('The image file shall be of exactly %d bytes in '
-                    'size.' % IMAGE_SIZE)
-
-    profile = _Profile()
-    profile.load_if_exists(asm_filename)
-    profile.load_if_exists(profile_filename)
-
-    d = _Disasm(image)
-    d.disassemble(profile)
+    d = _Disasm()
+    d.load_source(filename)
+    d.disassemble()
     assert 0, d  # TODO
 
 
