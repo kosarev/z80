@@ -140,6 +140,25 @@ class _Tokenizer(object):
 
         return literal, pos
 
+    class _Lookahead(object):
+        def __init__(self, tokenizer):
+            self.__tokenizer = tokenizer
+            self.__offset = tokenizer._Tokenizer__offset
+            self.__consumed = False
+
+        def consume(self):
+            self.__consumed = True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            if not self.__consumed:
+                self.__tokenizer._Tokenizer__offset = self.__offset
+
+    def lookahead(self):
+        return _Tokenizer._Lookahead(self)
+
 
 class _Tag(object):
     def __init__(self, kind, addr, comment):
@@ -190,6 +209,25 @@ class _TagParser(object):
     def __init__(self, source_file):
         self.__toks = _Tokenizer(source_file)
 
+    def __get_token(self):
+        self.__toks.skip_whitespace()
+
+        self.__toks.start_token()
+        if self.__toks.skip_char() not in self.__DELIMITERS:
+            self.__toks.skip_to(*self.__DELIMITERS)
+        literal, pos = self.__toks.end_token()
+
+        if literal == '\n':
+            literal = None
+
+        if literal is not None:
+            return _Token(literal, pos)
+
+        if error is not None:
+            raise _SourceError(pos, error)
+
+        return None
+
     def __fetch_token(self, error=None):
         self.__toks.skip_whitespace()
 
@@ -209,12 +247,24 @@ class _TagParser(object):
 
         return None
 
-    def __parse_tag_address(self):
-        tok = self.__fetch_token('Tag address expected.')
+    def __evaluate_numeric_literal(self, literal):
         try:
-            return int(tok.get_literal(), base=0)
+            return int(literal, base=0)
         except ValueError:
-            raise _SourceError(tok, 'Malformed tag address.')
+            return None
+
+    def __parse_optional_tag_address(self):
+        with self.__toks.lookahead() as la:
+            tok = self.__fetch_token()
+            if tok is None:
+                return None
+
+            n = self.__evaluate_numeric_literal(tok.get_literal())
+            if n is None:
+                return None
+
+            la.consume()
+            return n
 
     def __parse_tag_name(self):
         return self.__fetch_token('Tag name expected.')
@@ -224,14 +274,14 @@ class _TagParser(object):
         if tok is None:
             return None
 
-        if tok.get_literal() == ':':
-            self.__toks.skip_whitespace()
-            self.__toks.start_token()
-            self.__toks.skip_rest_of_line()
-            literal, pos = self.__toks.end_token()
-            return literal
+        if tok.get_literal() != ':':
+            raise _SourceError(tok, 'End of line or a comment expected.')
 
-        raise _SourceError(tok, 'End of line or a comment expected.')
+        self.__toks.skip_whitespace()
+        self.__toks.start_token()
+        self.__toks.skip_rest_of_line()
+        literal, pos = self.__toks.end_token()
+        return literal
 
     def __parse_instr_tag(self, addr, name):
         comment = self.__parse_optional_comment()
@@ -244,7 +294,7 @@ class _TagParser(object):
     # Parses and returns a subsequent tag.
     def __iter__(self):
         while self.__toks.skip_next('@@'):
-            addr = self.__parse_tag_address()
+            addr = self.__parse_optional_tag_address()
             name = self.__parse_tag_name()
 
             parser = self.__TAG_PARSERS.get(name.get_literal(), None)
