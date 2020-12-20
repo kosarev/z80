@@ -185,8 +185,9 @@ class _Tokenizer(object):
 
 
 class _Tag(object):
-    def __init__(self, addr):
+    def __init__(self, addr, size):
         self.addr = addr
+        self.size = size
         self.comment = None
 
     def __repr__(self):
@@ -197,7 +198,7 @@ class _ByteTag(_Tag):
     ID = 'byte'
 
     def __init__(self, addr, value):
-        super().__init__(addr)
+        super().__init__(addr, size=1)
         self.value = value
 
     def __repr__(self):
@@ -208,9 +209,10 @@ class _ByteTag(_Tag):
 class _IncludeBinaryTag(_Tag):
     ID = 'include_binary'
 
-    def __init__(self, addr, filename):
-        super().__init__(addr)
+    def __init__(self, addr, filename, image):
+        super().__init__(addr, size=len(image))
         self.filename = filename
+        self.image = image
 
     def __repr__(self):
         return (f'({self.addr:#06x}, {self.ID}, '
@@ -302,7 +304,12 @@ class _TagParser(object):
         return tok
 
     def __parse_include_binary_tag(self, addr, name):
-        return _IncludeBinaryTag(addr, self.__parse_string())
+        filename = self.__parse_string()
+
+        with open(filename.value, 'rb') as f:
+            image = f.read()
+
+        return _IncludeBinaryTag(addr, filename, image)
 
     def __parse_instr_tag(self, addr, name):
         return _InstrTag(addr)
@@ -350,17 +357,14 @@ class _Disasm(object):
 
             self.__new_tag(tag)
 
+            addr += tag.size
+
     def __process_byte_tag(self, tag):
         pass
 
     def __process_include_binary_tag(self, tag):
-        with open(tag.filename.value, 'rb') as f:
-            image = f.read()
-
-        addr = tag.addr
-        for b in image:
-            self.__new_tag(_ByteTag(addr, b))
-            addr += 1
+        for i, b in enumerate(tag.image):
+            self.__new_tag(_ByteTag(tag.addr + i, b))
 
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
@@ -368,6 +372,7 @@ class _Disasm(object):
     }
 
     def __process_tag(self, tag):
+        assert tag.addr is not None
         process = self.__TAG_PROCESSORS[type(tag)]
         process(self, tag)
 
