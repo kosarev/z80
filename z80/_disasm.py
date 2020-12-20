@@ -141,7 +141,7 @@ class _Tokenizer(object):
         return literal, pos
 
 
-class _ProfileTag(object):
+class _Tag(object):
     def __init__(self, kind, addr, comment):
         self._kind = kind
         self._addr = addr
@@ -162,7 +162,7 @@ class _ProfileTag(object):
         return '@@ 0x%04x %s%s' % (self.get_addr(), self.get_kind(), comment)
 
 
-class _InstrTag(_ProfileTag):
+class _InstrTag(_Tag):
     ID = 'instr'
 
     def __init__(self, addr, comment):
