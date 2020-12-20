@@ -60,6 +60,19 @@ class _SourceError(Error):
         super().__init__('%r: %s' % (subject, message))
 
 
+class _Token(object):
+    def __init__(self, literal, pos):
+        self.literal = literal
+        self.pos = pos
+
+    def __eq__(self, other):
+        literal = other.literal if isinstance(other, _Token) else other
+        return self.literal == literal
+
+    def __repr__(self):
+        return '%r: %r' % (self.pos, self.literal)
+
+
 class _Tokenizer(object):
     def __init__(self, source_file):
         self.__source_file = source_file
@@ -145,7 +158,7 @@ class _Tokenizer(object):
         if self.__token_offset < self.__offset:
             literal = self.__image[self.__token_offset:self.__offset]
 
-        return literal, pos
+        return _Token(literal, pos)
 
     class _Lookahead(object):
         def __init__(self, tokenizer):
@@ -173,7 +186,7 @@ class _Tag(object):
         self.comment = None
 
     def __repr__(self):
-        return repr((self.addr, self.ID, self.comment))
+        return f'({self.addr:#06x}, {self.ID}, {self.comment!r})'
 
 
 class _IncludeBinaryTag(_Tag):
@@ -183,22 +196,13 @@ class _IncludeBinaryTag(_Tag):
         super().__init__(addr)
         self.filename = filename
 
+    def __repr__(self):
+        return (f'({self.addr:#06x}, {self.ID}, '
+                f'{self.filename.literal}, {self.comment.literal!r})')
+
 
 class _InstrTag(_Tag):
     ID = 'instr'
-
-
-class _Token(object):
-    def __init__(self, literal, pos):
-        self.literal = literal
-        self.pos = pos
-
-    def __eq__(self, other):
-        literal = other.literal if isinstance(other, _Token) else other
-        return self.literal == literal
-
-    def __repr__(self):
-        return '%r: %r' % (self.pos, self.literal)
 
 
 class _TagParser(object):
@@ -207,41 +211,22 @@ class _TagParser(object):
     def __init__(self, source_file):
         self.__toks = _Tokenizer(source_file)
 
-    def __get_token(self):
-        self.__toks.skip_whitespace()
-
-        self.__toks.start_token()
-        if self.__toks.skip_char() not in self.__DELIMITERS:
-            self.__toks.skip_to(*self.__DELIMITERS)
-        literal, pos = self.__toks.end_token()
-
-        if literal == '\n':
-            literal = None
-
-        if literal is not None:
-            return _Token(literal, pos)
-
-        if error is not None:
-            raise _SourceError(pos, error)
-
-        return None
-
     def __fetch_token(self, error=None):
         self.__toks.skip_whitespace()
 
         self.__toks.start_token()
         if self.__toks.skip_char() not in self.__DELIMITERS:
             self.__toks.skip_to(*self.__DELIMITERS)
-        literal, pos = self.__toks.end_token()
+        tok = self.__toks.end_token()
 
-        if literal == '\n':
-            literal = None
+        if tok.literal == '\n':
+            tok.literal = None
 
-        if literal is not None:
-            return _Token(literal, pos)
+        if tok.literal is not None:
+            return tok
 
         if error is not None:
-            raise _SourceError(pos, error)
+            raise _SourceError(tok.pos, error)
 
         return None
 
@@ -278,8 +263,7 @@ class _TagParser(object):
         self.__toks.skip_whitespace()
         self.__toks.start_token()
         self.__toks.skip_rest_of_line()
-        literal, pos = self.__toks.end_token()
-        return literal
+        return self.__toks.end_token()
 
     def __parse_string(self):
         toks = self.__toks
@@ -293,9 +277,10 @@ class _TagParser(object):
         toks.skip_to(quote, '\n')
 
         if toks.skip(quote) is None:
-            raise _SourceError(toks.pos, f'Missed closing quote {repr(quote)}.')
+            raise _SourceError(toks.pos,
+                               f'Missed closing quote {repr(quote)}.')
 
-        return self.__toks.end_token()
+        return toks.end_token()
 
     def __parse_include_binary_tag(self, addr, name):
         return _IncludeBinaryTag(addr, self.__parse_string())
@@ -329,14 +314,14 @@ class _Disasm(object):
         self.__tags = dict()
 
     def load_source(self, filename):
-        tags = list(_TagParser(_SourceFile(filename)))
+        addr = 0
+        for tag in _TagParser(_SourceFile(filename)):
+            if tag.addr is None:
+                tag.addr = addr
+            else:
+                addr = tag.addr
 
-        assert 0, tags
-
-        '''
-        for tag in :
-            self.__tags.setdefault(tag.addr, []).append(tag)
-        '''
+            self.__tags.setdefault(addr, []).append(tag)
 
     def disassemble(self):
         assert 0, self.__tags
