@@ -10,6 +10,7 @@
 #   Published under the MIT license.
 
 import bisect
+import collections
 from ._error import Error
 
 
@@ -70,7 +71,10 @@ class _Token(object):
         return self.literal == literal
 
     def __repr__(self):
-        return '%r: %r' % (self.pos, self.literal)
+        return f'{self.pos}: {self.literal}'
+
+    def __str__(self):
+        return self.literal
 
 
 class _Tokenizer(object):
@@ -189,6 +193,18 @@ class _Tag(object):
         return f'({self.addr:#06x}, {self.ID}, {self.comment!r})'
 
 
+class _ByteTag(_Tag):
+    ID = 'byte'
+
+    def __init__(self, addr, value):
+        super().__init__(addr)
+        self.value = value
+
+    def __repr__(self):
+        return (f'({self.addr:#06x}, {self.ID}, '
+                f'{self.value:#04x}, {self.comment!r})')
+
+
 class _IncludeBinaryTag(_Tag):
     ID = 'include_binary'
 
@@ -198,7 +214,7 @@ class _IncludeBinaryTag(_Tag):
 
     def __repr__(self):
         return (f'({self.addr:#06x}, {self.ID}, '
-                f'{self.filename.literal}, {self.comment.literal!r})')
+                f'{self.filename}, {self.comment})')
 
 
 class _InstrTag(_Tag):
@@ -280,7 +296,10 @@ class _TagParser(object):
             raise _SourceError(toks.pos,
                                f'Missed closing quote {repr(quote)}.')
 
-        return toks.end_token()
+        tok = toks.end_token()
+        tok.value = tok.literal[1:-1]
+
+        return tok
 
     def __parse_include_binary_tag(self, addr, name):
         return _IncludeBinaryTag(addr, self.__parse_string())
@@ -313,7 +332,15 @@ class _Disasm(object):
     def __init__(self):
         self.__tags = dict()
 
-    def load_source(self, filename):
+        # Use deque because of its popleft() is much faster than
+        # list's pop(0).
+        self.__worklist = collections.deque()
+
+    def __new_tag(self, tag):
+        self.__tags.setdefault(tag.addr, []).append(tag)
+        self.__worklist.append(tag)
+
+    def read_tags(self, filename):
         addr = 0
         for tag in _TagParser(_SourceFile(filename)):
             if tag.addr is None:
@@ -321,7 +348,31 @@ class _Disasm(object):
             else:
                 addr = tag.addr
 
-            self.__tags.setdefault(addr, []).append(tag)
+            self.__new_tag(tag)
+
+    def __process_byte_tag(self, tag):
+        pass
+
+    def __process_include_binary_tag(self, tag):
+        with open(tag.filename.value, 'rb') as f:
+            image = f.read()
+
+        addr = tag.addr
+        for b in image:
+            self.__new_tag(_ByteTag(addr, b))
+            addr += 1
+
+    __TAG_PROCESSORS = {
+        _ByteTag: __process_byte_tag,
+        _IncludeBinaryTag: __process_include_binary_tag,
+    }
+
+    def __process_tag(self, tag):
+        process = self.__TAG_PROCESSORS[type(tag)]
+        process(self, tag)
 
     def disassemble(self):
-        assert 0, self.__tags
+        while self.__worklist:
+            self.__process_tag(self.__worklist.popleft())
+
+        assert 0  # TODO

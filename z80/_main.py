@@ -31,7 +31,7 @@ def _disasm(args):
     _handle_extra_arguments(args)
 
     d = _Disasm()
-    d.load_source(filename)
+    d.read_tags(filename)
     d.disassemble()
     assert 0, d  # TODO
 
