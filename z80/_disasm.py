@@ -112,16 +112,19 @@ class _Tokenizer(object):
                 return filler
         return None
 
-    def __skip(self, *fillers):
-        while True:
-            filler = self.__follows_with(*fillers)
-            if filler is None:
-                break
+    def skip(self, *fillers):
+        follower = self.__follows_with(*fillers)
+        if follower is not None:
+            self.__offset += len(follower)
 
-            self.__offset += len(filler)
+        return follower
+
+    def skip_all(self, *fillers):
+        while self.skip(*fillers):
+            pass
 
     def skip_whitespace(self):
-        self.__skip(' ', '\t')
+        self.skip_all(' ', '\t')
 
     def skip_char(self):
         c = self.__get_front(1)
@@ -130,6 +133,10 @@ class _Tokenizer(object):
 
     def start_token(self):
         self.__token_offset = self.__offset
+
+    @property
+    def pos(self):
+        return _SourcePos(self.__offset, self.__source_file)
 
     def end_token(self):
         pos = _SourcePos(self.__token_offset, self.__source_file)
@@ -161,46 +168,37 @@ class _Tokenizer(object):
 
 
 class _Tag(object):
-    def __init__(self, kind, addr, comment):
-        self._kind = kind
-        self._addr = addr
-        self._comment = comment
-
-    def get_kind(self):
-        return self._kind
-
-    def get_addr(self):
-        return self._addr
-
-    def get_comment(self):
-        return self._comment
+    def __init__(self, addr):
+        self.addr = addr
+        self.comment = None
 
     def __repr__(self):
-        comment = self.get_comment()
-        comment = '' if not comment else ' : %s' % comment
-        return '@@ 0x%04x %s%s' % (self.get_addr(), self.get_kind(), comment)
+        return repr((self.addr, self.ID, self.comment))
+
+
+class _IncludeBinaryTag(_Tag):
+    ID = 'include_binary'
+
+    def __init__(self, addr, filename):
+        super().__init__(addr)
+        self.filename = filename
 
 
 class _InstrTag(_Tag):
     ID = 'instr'
 
-    def __init__(self, addr, comment):
-        super().__init__(self.ID, addr, comment)
-
 
 class _Token(object):
-    def __init__(self, literal, source_pos):
-        self.__literal = literal
-        self.__source_pos = source_pos
+    def __init__(self, literal, pos):
+        self.literal = literal
+        self.pos = pos
+
+    def __eq__(self, other):
+        literal = other.literal if isinstance(other, _Token) else other
+        return self.literal == literal
 
     def __repr__(self):
-        return '%r: %r' % (self.__source_pos, self.__literal)
-
-    def get_literal(self):
-        return self.__literal
-
-    def get_source_pos(self):
-        return self.__source_pos
+        return '%r: %r' % (self.pos, self.literal)
 
 
 class _TagParser(object):
@@ -259,7 +257,7 @@ class _TagParser(object):
             if tok is None:
                 return None
 
-            n = self.__evaluate_numeric_literal(tok.get_literal())
+            n = self.__evaluate_numeric_literal(tok.literal)
             if n is None:
                 return None
 
@@ -274,7 +272,7 @@ class _TagParser(object):
         if tok is None:
             return None
 
-        if tok.get_literal() != ':':
+        if tok != ':':
             raise _SourceError(tok, 'End of line or a comment expected.')
 
         self.__toks.skip_whitespace()
@@ -283,11 +281,30 @@ class _TagParser(object):
         literal, pos = self.__toks.end_token()
         return literal
 
+    def __parse_string(self):
+        toks = self.__toks
+        toks.skip_whitespace()
+
+        toks.start_token()
+        quote = toks.skip('\'', '"')
+        if quote is None:
+            raise _SourceError(toks.pos, 'A quoted string expected.')
+
+        toks.skip_to(quote, '\n')
+
+        if toks.skip(quote) is None:
+            raise _SourceError(toks.pos, f'Missed closing quote {repr(quote)}.')
+
+        return self.__toks.end_token()
+
+    def __parse_include_binary_tag(self, addr, name):
+        return _IncludeBinaryTag(addr, self.__parse_string())
+
     def __parse_instr_tag(self, addr, name):
-        comment = self.__parse_optional_comment()
-        return _InstrTag(addr, comment)
+        return _InstrTag(addr)
 
     __TAG_PARSERS = {
+        _IncludeBinaryTag.ID: __parse_include_binary_tag,
         _InstrTag.ID: __parse_instr_tag,
     }
 
@@ -297,11 +314,14 @@ class _TagParser(object):
             addr = self.__parse_optional_tag_address()
             name = self.__parse_tag_name()
 
-            parser = self.__TAG_PARSERS.get(name.get_literal(), None)
+            parser = self.__TAG_PARSERS.get(name.literal, None)
             if not parser:
                 raise _SourceError(name, 'Unknown tag.')
 
-            yield parser(self, addr, name)
+            tag = parser(self, addr, name)
+            tag.comment = self.__parse_optional_comment()
+
+            yield tag
 
 
 class _Disasm(object):
@@ -309,8 +329,14 @@ class _Disasm(object):
         self.__tags = dict()
 
     def load_source(self, filename):
-        for tag in _TagParser(_SourceFile(filename)):
-            self.__tags.setdefault(tag.get_addr(), []).append(tag)
+        tags = list(_TagParser(_SourceFile(filename)))
+
+        assert 0, tags
+
+        '''
+        for tag in :
+            self.__tags.setdefault(tag.addr, []).append(tag)
+        '''
 
     def disassemble(self):
         assert 0, self.__tags
