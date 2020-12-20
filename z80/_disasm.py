@@ -71,7 +71,7 @@ class _Token(object):
         return self.literal == literal
 
     def __repr__(self):
-        return f'{self.pos}: {self.literal}'
+        return '%s: %s' % (self.pos, self.literal)
 
     def __str__(self):
         return self.literal
@@ -191,7 +191,7 @@ class _Tag(object):
         self.comment = None
 
     def __repr__(self):
-        return f'({self.addr:#06x}, {self.ID}, {self.comment!r})'
+        return '(%#06x, %s, %r)' % (self.addr, self.ID, self.comment)
 
 
 class _CommentTag(_Tag):
@@ -210,8 +210,8 @@ class _ByteTag(_Tag):
         self.value = value
 
     def __repr__(self):
-        return (f'({self.addr:#06x}, {self.ID}, '
-                f'{self.value:#04x}, {self.comment!r})')
+        return '(%#06x, %s, %#04x, %r)' % (
+            self.addr, self.ID, self.value, self.comment)
 
 
 class _IncludeBinaryTag(_Tag):
@@ -223,8 +223,8 @@ class _IncludeBinaryTag(_Tag):
         self.image = image
 
     def __repr__(self):
-        return (f'({self.addr:#06x}, {self.ID}, '
-                f'{self.filename}, {self.comment})')
+        return '(%#06x, %s, %s, %s)' % (
+            self.addr, self.ID, self.filename, self.comment)
 
 
 class _InstrTag(_Tag):
@@ -304,7 +304,7 @@ class _TagParser(object):
 
         if toks.skip(quote) is None:
             raise _SourceError(toks.pos,
-                               f'Missed closing quote {repr(quote)}.')
+                               'Missed closing quote %r.' % quote)
 
         tok = toks.end_token()
         tok.value = tok.literal[1:-1]
