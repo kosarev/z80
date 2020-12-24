@@ -36,6 +36,7 @@ def language_python(**kwargs):
       install:
         - python setup.py install
       script:
+        - python setup.py test
         - cd examples
         - ./exercisers.py'''.format(**kwargs))
 
