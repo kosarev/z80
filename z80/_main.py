@@ -31,9 +31,9 @@ def _disasm(args):
     _handle_extra_arguments(args)
 
     d = _Disasm()
-    d.read_tags(filename)
+    d.parse_tags(filename)
     d.disassemble()
-    d.save(filename + '.disasm')
+    d.save_output(filename + '.disasm')
 
 
 def _handle_command_line(args):

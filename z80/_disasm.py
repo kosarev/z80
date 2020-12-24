@@ -27,11 +27,14 @@ class _SourcePos(object):
 
 
 class _SourceFile(object):
-    def __init__(self, filename):
+    def __init__(self, filename, image=None):
         self.__filename = filename
 
-        with open(self.__filename) as f:
-            self.__image = f.read()
+        if image is None:
+            with open(self.__filename) as f:
+                image = f.read()
+
+        self.__image = image
 
         self.__line_breaks = tuple(
             i for i, c in enumerate(self.__image) if c == '\n')
@@ -347,17 +350,16 @@ class _AsmOutput(object):
     __COMMAND_INDENT = 4
     __COMMENT_INDENT = 40
 
-    def __init__(self, stream):
-        self.__stream = stream
+    def __init__(self):
         self.__needs_empty_line = True
 
     def __write_empty_line_if_needed(self):
         if self.__needs_empty_line:
-            self.__stream.write('\n')
+            yield '\n'
             self.__needs_empty_line = False
 
     def write_line(self, line, tag=None):
-        self.__write_empty_line_if_needed()
+        yield from self.__write_empty_line_if_needed()
 
         line = ' ' * self.__COMMAND_INDENT + line
 
@@ -370,10 +372,10 @@ class _AsmOutput(object):
 
         line += '\n'
 
-        self.__stream.write(line)
+        yield line
 
     def write_space_directive(self, size):
-        self.write_line('.space %d' % size)
+        yield from self.write_line('.space %d' % size)
 
 
 class _Disasm(object):
@@ -388,9 +390,9 @@ class _Disasm(object):
         self.__tags.setdefault(tag.addr, []).append(tag)
         self.__worklist.append(tag)
 
-    def read_tags(self, filename):
+    def parse_tags(self, filename, image=None):
         addr = 0
-        for tag in _TagParser(_SourceFile(filename)):
+        for tag in _TagParser(_SourceFile(filename, image)):
             if tag.addr is None:
                 tag.addr = addr
             else:
@@ -426,32 +428,36 @@ class _Disasm(object):
             self.__process_tag(self.__worklist.popleft())
 
     def __write_comment_tag(self, tag, out):
-        out.write_line('; @@: %s' % tag.comment)
+        yield from out.write_line('; @@: %s' % tag.comment)
 
     def __write_byte_tag(self, tag, out):
-        out.write_line('db %#04x' % tag.value,
-                       tag=(tag.addr, '%#04x' % tag.value))
+        yield from out.write_line('db %#04x' % tag.value,
+                                  tag=(tag.addr, '%#04x' % tag.value))
 
     __TAG_WRITERS = {
         _CommentTag: __write_comment_tag,
         _ByteTag: __write_byte_tag,
-        _IncludeBinaryTag: lambda self, tag, out: None,
+        _IncludeBinaryTag: lambda self, tag, out: iter(()),
     }
 
     def __write_tag(self, tag, out):
         write = self.__TAG_WRITERS[type(tag)]
-        write(self, tag, out)
+        yield from write(self, tag, out)
 
-    def save(self, filename):
+    def _get_output(self):
+        out = _AsmOutput()
+
+        addr = 0
+        for a in sorted(self.__tags):
+            for tag in self.__tags[a]:
+                if addr < tag.addr:
+                    yield from out.write_space_directive(tag.addr - addr)
+                    addr = tag.addr
+
+                yield from self.__write_tag(tag, out)
+                addr += tag.size
+
+    def save_output(self, filename):
         with open(filename, 'w') as f:
-            out = _AsmOutput(f)
-
-            addr = 0
-            for a in sorted(self.__tags):
-                for tag in self.__tags[a]:
-                    if addr < tag.addr:
-                        out.write_space_directive(tag.addr - addr)
-                        addr = tag.addr
-
-                    self.__write_tag(tag, out)
-                    addr += tag.size
+            for chunk in self._get_output():
+                f.write(chunk)

@@ -55,7 +55,7 @@ setup(name='z80',
               'z80 = z80:main',
           ],
       },
-      # TODO: test_suite='test',
+      test_suite='tests.testsuite.suite',
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Intended Audience :: Developers',
