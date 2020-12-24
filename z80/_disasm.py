@@ -281,6 +281,12 @@ class _TagParser(object):
     def __parse_tag_name(self):
         return self.__fetch_token('Tag name expected.')
 
+    def __parse_comment_body(self):
+        self.__toks.skip_whitespace()
+        self.__toks.start_token()
+        self.__toks.skip_rest_of_line()
+        return self.__toks.end_token()
+
     def __parse_optional_comment(self):
         tok = self.__fetch_token()
         if tok is None:
@@ -289,10 +295,7 @@ class _TagParser(object):
         if tok != ':':
             raise _SourceError(tok, 'End of line or a comment expected.')
 
-        self.__toks.skip_whitespace()
-        self.__toks.start_token()
-        self.__toks.skip_rest_of_line()
-        return self.__toks.end_token()
+        return self.__parse_comment_body()
 
     def __parse_string(self):
         toks = self.__toks
@@ -334,13 +337,11 @@ class _TagParser(object):
     def __iter__(self):
         while self.__toks.skip_next('@@'):
             addr = self.__parse_optional_tag_address()
-
-            self.__toks.skip_whitespace()
-            if self.__toks.get_front(1) == ':':
-                yield _CommentTag(addr, self.__parse_optional_comment())
-                continue
-
             name = self.__parse_tag_name()
+
+            if name == ':':
+                yield _CommentTag(addr, self.__parse_comment_body())
+                continue
 
             parser = self.__TAG_PARSERS.get(name.literal, None)
             if not parser:
