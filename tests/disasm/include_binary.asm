@@ -3,6 +3,7 @@
 
 ---
     ; @@: Included from binary file 'input.bin'.
+    ; @@: The source binary.
     db 0xf3                             ; @@ 0x0000 0xf3
     db 0xaf                             ; @@ 0x0001 0xaf
     db 0x11                             ; @@ 0x0002 0x11
