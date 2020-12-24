@@ -6,6 +6,8 @@ import unittest
 
 
 class DisasmTestCase(unittest.TestCase):
+    maxDiff = None
+
     def __init__(self, id, path):
         super().__init__()
         self.__id = id

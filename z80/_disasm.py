@@ -429,7 +429,7 @@ class _Disasm(object):
             self.__process_tag(self.__worklist.popleft())
 
     def __write_comment_tag(self, tag, out):
-        yield from out.write_line('; @@: %s' % tag.comment)
+        yield from out.write_line('; @@ {:#06x} : {}'.format(tag.addr, tag.comment))
 
     def __write_byte_tag(self, tag, out):
         yield from out.write_line('db %#04x' % tag.value,
