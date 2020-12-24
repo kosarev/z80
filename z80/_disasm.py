@@ -122,13 +122,13 @@ class _Tokenizer(object):
             self.__offset += len(anchor)
         return anchor
 
-    def __get_front(self, size=None):
+    def get_front(self, size=None):
         end = self.__offset + size if size is not None else None
         return self.__image[self.__offset:end]
 
     def __follows_with(self, *fillers):
         for filler in fillers:
-            if self.__get_front().startswith(filler):
+            if self.get_front().startswith(filler):
                 return filler
         return None
 
@@ -147,7 +147,7 @@ class _Tokenizer(object):
         self.skip_all(' ', '\t')
 
     def skip_char(self):
-        c = self.__get_front(1)
+        c = self.get_front(1)
         self.__offset += 1
         return c
 
@@ -334,6 +334,12 @@ class _TagParser(object):
     def __iter__(self):
         while self.__toks.skip_next('@@'):
             addr = self.__parse_optional_tag_address()
+
+            self.__toks.skip_whitespace()
+            if self.__toks.get_front(1) == ':':
+                yield _CommentTag(addr, self.__parse_optional_comment())
+                continue
+
             name = self.__parse_tag_name()
 
             parser = self.__TAG_PARSERS.get(name.literal, None)
