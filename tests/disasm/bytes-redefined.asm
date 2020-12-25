@@ -3,4 +3,4 @@
 ===
     db 0xaf                             ; @@ 0x0001 0xaf
                                                     ^
-disasm/bytes-redefined.asm:2:52: Byte redefined.
+disasm/bytes-redefined.asm:2:52: byte tag: Byte redefined.

@@ -52,9 +52,7 @@ def main():
     try:
         _handle_command_line(sys.argv[1:])
     except Error as e:
-        lines = e.args[0].split('\n')
-        lines[-1] = 'z80: %s' % lines[-1]
-        sys.exit('\n'.join(lines))
+        sys.exit(e.verbalize(program_name='z80'))
 
 
 if __name__ == "__main__":

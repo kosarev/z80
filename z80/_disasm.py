@@ -16,15 +16,26 @@ from ._error import Error
 
 
 class _SourcePos(object):
-    def __init__(self, offset, source_file):
+    def __init__(self, offset, file):
         self.__offset = offset
-        self.__source_file = source_file
+        self.__file = file
 
-    def __repr__(self):
-        file = self.__source_file
-        line, line_no, column_no = file.get_coordinates(self.__offset)
-        return '%s\n%s^\n%s:%s:%s' % (line, ' ' * column_no, file,
-                                      line_no, column_no)
+    @property
+    def __coordinates(self):
+        return self.__file.get_coordinates(self.__offset)
+
+    @property
+    def inline_text(self):
+        line, line_no, column_no = self.__coordinates
+        return '%s:%s:%s' % (self.__file, line_no, column_no)
+
+    def __str__(self):
+        return self.inline_text
+
+    @property
+    def context_text(self):
+        line, line_no, column_no = self.__coordinates
+        return '%s\n%s^\n' % (line, ' ' * column_no)
 
 
 class _SourceFile(object):
@@ -60,9 +71,23 @@ class _SourceFile(object):
         return line, line_no, column_no
 
 
-class _SourceError(Error):
+class _DisasmError(Error):
     def __init__(self, subject, message):
-        super().__init__('%r: %s' % (subject, message))
+        super().__init__('%s: %s: %s' % (subject.origin.inline_text,
+                                         subject, message))
+        self.subject = subject
+        self.message = message
+
+    def verbalize(self, program_name=None):
+        def g():
+            yield self.subject.origin.context_text
+
+            if program_name is not None:
+                yield '%s: ' % program_name
+
+            yield self.reason
+
+        return ''.join(g())
 
 
 class _Token(object):
@@ -79,6 +104,10 @@ class _Token(object):
 
     def __str__(self):
         return self.literal
+
+    @property
+    def origin(self):
+        return self.pos
 
 
 class _Tokenizer(object):
@@ -136,11 +165,14 @@ class _Tokenizer(object):
 
 
 class _Tag(object):
-    def __init__(self, pos, addr, size):
-        self.pos = pos
+    def __init__(self, origin, addr, size):
+        self.origin = origin
         self.addr = addr
         self.size = size
         self.comment = None
+
+    def __str__(self):
+        return '%s tag' % self.ID
 
     def __repr__(self):
         return '(%#06x, %s, %r)' % (self.addr, self.ID, self.comment)
@@ -149,16 +181,16 @@ class _Tag(object):
 class _CommentTag(_Tag):
     ID = 'comment'
 
-    def __init__(self, pos, addr, comment):
-        super().__init__(pos, addr, size=0)
+    def __init__(self, origin, addr, comment):
+        super().__init__(origin, addr, size=0)
         self.comment = comment
 
 
 class _ByteTag(_Tag):
     ID = 'byte'
 
-    def __init__(self, pos, addr, value):
-        super().__init__(pos, addr, size=1)
+    def __init__(self, origin, addr, value):
+        super().__init__(origin, addr, size=1)
         self.value = value
 
     def __repr__(self):
@@ -169,8 +201,8 @@ class _ByteTag(_Tag):
 class _IncludeBinaryTag(_Tag):
     ID = 'include_binary'
 
-    def __init__(self, pos, addr, filename, image):
-        super().__init__(pos, addr, size=len(image))
+    def __init__(self, origin, addr, filename, image):
+        super().__init__(origin, addr, size=len(image))
         self.filename = filename
         self.image = image
 
@@ -283,7 +315,7 @@ class _TagParser(object):
             if tok is not None and tok != ':':
                 parser = self.__TAG_PARSERS.get(tok.literal, None)
                 if not parser:
-                    raise _SourceError(tok, 'Unknown tag.')
+                    raise _DisasmError(tok, 'Unknown tag.')
 
                 tags.append(parser(self, addr, tok))
                 tok = self.__tok
@@ -375,19 +407,19 @@ class _Disasm(object):
 
     def __process_byte_tag(self, tag):
         if self.__image[tag.addr] is not None:
-            raise _SourceError(tag.pos, 'Byte redefined.')
+            raise _DisasmError(tag, 'Byte redefined.')
 
         self.__image[tag.addr] = tag.value
 
     def __process_include_binary_tag(self, tag):
         comment = 'Included from binary file %r.' % tag.filename.literal
-        self.__new_tag(_CommentTag(tag.pos, tag.addr, comment))
+        self.__new_tag(_CommentTag(tag.origin, tag.addr, comment))
 
         if tag.comment is not None:
-            self.__new_tag(_CommentTag(tag.pos, tag.addr, tag.comment))
+            self.__new_tag(_CommentTag(tag.origin, tag.addr, tag.comment))
 
         for i, b in enumerate(tag.image):
-            self.__new_tag(_ByteTag(tag.pos, tag.addr + i, b))
+            self.__new_tag(_ByteTag(tag.origin, tag.addr + i, b))
 
     __TAG_PROCESSORS = {
         _CommentTag: lambda self, tag: None,

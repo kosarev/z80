@@ -44,7 +44,7 @@ class DisasmTestCase(unittest.TestCase):
                 output = ''.join(d._get_output())
                 self.assertEqual(expected_output, output)
             except z80.Error as e:
-                error = '\n%s\n' % e.args[0]
+                error = '\n%s\n' % e.verbalize()
 
             self.assertEqual(expected_error, error)
         finally:
