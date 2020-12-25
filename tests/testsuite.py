@@ -32,7 +32,7 @@ class DisasmTestCase(unittest.TestCase):
             d.disassemble()
 
             output = ''.join(d._get_output())
-            self.assertEqual(output, expected_output)
+            self.assertEqual(expected_output, output)
         finally:
             os.chdir(old_wd)
 

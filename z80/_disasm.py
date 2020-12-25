@@ -134,25 +134,6 @@ class _Tokenizer(object):
 
         return _Token(literal, pos)
 
-    class _Lookahead(object):
-        def __init__(self, tokenizer):
-            self.__tokenizer = tokenizer
-            self.__offset = tokenizer._Tokenizer__offset
-            self.__consumed = False
-
-        def consume(self):
-            self.__consumed = True
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            if not self.__consumed:
-                self.__tokenizer._Tokenizer__offset = self.__offset
-
-    def lookahead(self):
-        return _Tokenizer._Lookahead(self)
-
 
 class _Tag(object):
     def __init__(self, addr, size):
@@ -212,6 +193,7 @@ class _TagParser(object):
 
     def __init__(self, source_file):
         self.__toks = _Tokenizer(source_file)
+        self.__tok = None
 
     def __fetch_token(self, error=None):
         self.__toks.skip_whitespace()
@@ -227,18 +209,20 @@ class _TagParser(object):
             if error is not None:
                 raise _SourceError(tok.pos, error)
 
-            return None
+            tok = None
+        else:
+            # Translate escape sequences.
+            if tok.literal.startswith("'"):
+                if tok.literal == "'":
+                    raise _SourceError(tok.pos, 'Unterminated string.')
 
-        # Translate escape sequences.
-        if tok.literal.startswith("'"):
-            if tok.literal == "'":
-                raise _SourceError(tok.pos, 'Unterminated string.')
+                tok.literal = (tok.literal[1:-1].
+                               replace('\\\\', '\\').
+                               replace("\\'", "'"))
 
-            tok.literal = (tok.literal[1:-1].
-                           replace('\\\\', '\\').
-                           replace("\\'", "'"))
+        self.__tok = tok
 
-        return tok
+        return self.__tok
 
     def __evaluate_numeric_literal(self, literal):
         try:
@@ -246,37 +230,16 @@ class _TagParser(object):
         except ValueError:
             return None
 
-    def __parse_optional_tag_address(self):
-        with self.__toks.lookahead() as la:
-            tok = self.__fetch_token()
-            if tok is None:
-                return None
-
-            n = self.__evaluate_numeric_literal(tok.literal)
-            if n is None:
-                return None
-
-            la.consume()
-            return n
-
-    def __parse_comment_body(self):
+    def __parse_comment(self):
         self.__toks.skip_whitespace()
         self.__toks.start_token()
         self.__toks.skip_rest_of_line()
-        return self.__toks.end_token()
-
-    def __parse_optional_comment(self):
-        tok = self.__fetch_token()
-        if tok is None:
-            return None
-
-        if tok != ':':
-            raise _SourceError(tok, 'End of line or a comment expected.')
-
-        return self.__parse_comment_body()
+        self.__tok = self.__toks.end_token()
+        return self.__tok
 
     def __parse_include_binary_tag(self, addr, name):
         filename = self.__fetch_token('A filename expected.')
+        self.__fetch_token()
 
         with open(filename.literal, 'rb') as f:
             image = f.read()
@@ -294,23 +257,51 @@ class _TagParser(object):
     # Parses and returns a subsequent tag.
     def __iter__(self):
         while self.__toks.skip_next(self.__TAG_LEADER):
-            addr = self.__parse_optional_tag_address()
-            name = self.__fetch_token('Tag name or comment expected.')
+            tok = self.__fetch_token()
 
-            # Handle comment tags.
-            if name == ':':
-                yield _CommentTag(addr, self.__parse_comment_body())
-                continue
+            # Parse optional tag address.
+            addr = self.__evaluate_numeric_literal(tok.literal)
+            if addr is not None:
+                tok = self.__fetch_token()
 
-            # Handle other tags.
-            parser = self.__TAG_PARSERS.get(name.literal, None)
-            if not parser:
-                raise _SourceError(name, 'Unknown tag.')
+            tags = []
 
-            tag = parser(self, addr, name)
-            tag.comment = self.__parse_optional_comment()
+            # Collect bytes, if any specified.
+            byte_offset = 0
+            while tok is not None:
+                value = self.__evaluate_numeric_literal(tok.literal)
+                if value is None:
+                    break
 
-            yield tag
+                tags.append(_ByteTag(addr + byte_offset, value))
+                byte_offset += 1
+
+                tok = self.__fetch_token()
+
+            # Parse regular tags.
+            if tok is not None and tok != ':':
+                parser = self.__TAG_PARSERS.get(tok.literal, None)
+                if not parser:
+                    raise _SourceError(tok, 'Unknown tag.')
+
+                tags.append(parser(self, addr, tok))
+                tok = self.__tok
+
+            # Parse comments.
+            if tok is not None:
+                if tok != ':':
+                    raise _SourceError(tok,
+                                       'End of line or a comment expected.')
+
+                comment = self.__parse_comment()
+
+                if len(tags) == 0:
+                    tags.append(_CommentTag(addr, comment))
+                else:
+                    assert tags[0].comment is None
+                    tags[0].comment = comment
+
+            yield from tags
 
 
 class _AsmOutput(object):
@@ -396,7 +387,8 @@ class _Disasm(object):
             self.__process_tag(self.__worklist.popleft())
 
     def __write_comment_tag(self, tag, out):
-        yield from out.write_line('; @@ {:#06x} : {}'.format(tag.addr, tag.comment))
+        yield from out.write_line(
+            '; @@ {:#06x} : {}'.format(tag.addr, tag.comment))
 
     def __write_byte_tag(self, tag, out):
         yield from out.write_line('db %#04x' % tag.value,
