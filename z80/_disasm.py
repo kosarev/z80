@@ -11,6 +11,7 @@
 
 import bisect
 import collections
+import re
 from ._error import Error
 
 
@@ -81,75 +82,41 @@ class _Token(object):
 
 
 class _Tokenizer(object):
+    __WHITESPACE = re.compile(r'(\ |\t)+')
+    __END_OF_LINE = re.compile(r'(\n|$)')
+
     def __init__(self, source_file):
         self.__source_file = source_file
         self.__image = self.__source_file.get_image()
         self.__offset = 0
         self.__token_offset = self.__offset
 
-    def __get_end_offset(self):
-        return len(self.__image)
+    def skip(self, pat):
+        match = pat.match(self.__image, self.__offset)
+        if match is None:
+            return None
 
-    def __find_all(self, *anchors):
-        # Remember the offset to not depend on its changes.
-        start_offset = self.__offset
-        for a in anchors:
-            i = self.__image.find(a, start_offset)
-            if i >= 0:
-                yield a, i
-
-    def __find_next(self, *anchors):
-        anchor, offset = None, None
-        for a, i in self.__find_all(*anchors):
-            if offset is None or offset > i:
-                anchor, offset = a, i
-        return anchor, offset
-
-    def skip_to(self, *anchors):
-        anchor, offset = self.__find_next(*anchors)
-        if offset is None:
-            self.__offset = self.__get_end_offset()
-        else:
-            self.__offset = offset
-        return anchor
-
-    def skip_rest_of_line(self):
-        self.skip_to('\n')
-
-    def skip_next(self, *anchors):
-        anchor = self.skip_to(*anchors)
-        if anchor is not None:
-            self.__offset += len(anchor)
-        return anchor
-
-    def get_front(self, size=None):
-        end = self.__offset + size if size is not None else None
-        return self.__image[self.__offset:end]
-
-    def __follows_with(self, *fillers):
-        for filler in fillers:
-            if self.get_front().startswith(filler):
-                return filler
-        return None
-
-    def skip(self, *fillers):
-        follower = self.__follows_with(*fillers)
-        if follower is not None:
-            self.__offset += len(follower)
-
-        return follower
-
-    def skip_all(self, *fillers):
-        while self.skip(*fillers):
-            pass
+        self.__offset = match.end()
+        return match.group(0)
 
     def skip_whitespace(self):
-        self.skip_all(' ', '\t')
+        self.skip(self.__WHITESPACE)
 
-    def skip_char(self):
-        c = self.get_front(1)
-        self.__offset += 1
-        return c
+    def skip_to(self, pat):
+        match = pat.search(self.__image, self.__offset)
+        if match is not None:
+            self.__offset = match.start()
+
+    def skip_rest_of_line(self):
+        self.skip_to(self.__END_OF_LINE)
+
+    def skip_next(self, pat):
+        match = pat.search(self.__image, self.__offset)
+        if match is None:
+            return None
+
+        self.__offset = match.end()
+        return match.group(0)
 
     def start_token(self):
         self.__token_offset = self.__offset
@@ -235,7 +202,13 @@ class _InstrTag(_Tag):
 
 
 class _TagParser(object):
-    __DELIMITERS = '\n :,()[]'
+    __TAG_LEADER = re.compile('@@')
+
+    __TOKENS = re.compile(
+        r'([_a-z][_0-9a-z]*)|'      # An identifier.
+        r'([0-9][0-9a-z]*)|'        # A number.
+        r"'(\\'|\\\\|[^'\\\n])*'|"  # A string.
+        r'.')                       # Or any other single character.
 
     def __init__(self, source_file):
         self.__toks = _Tokenizer(source_file)
@@ -244,20 +217,28 @@ class _TagParser(object):
         self.__toks.skip_whitespace()
 
         self.__toks.start_token()
-        if self.__toks.skip_char() not in self.__DELIMITERS:
-            self.__toks.skip_to(*self.__DELIMITERS)
+        self.__toks.skip(self.__TOKENS)
         tok = self.__toks.end_token()
 
         if tok.literal == '\n':
             tok.literal = None
 
-        if tok.literal is not None:
-            return tok
+        if tok.literal is None:
+            if error is not None:
+                raise _SourceError(tok.pos, error)
 
-        if error is not None:
-            raise _SourceError(tok.pos, error)
+            return None
 
-        return None
+        # Translate escape sequences.
+        if tok.literal.startswith("'"):
+            if tok.literal == "'":
+                raise _SourceError(tok.pos, 'Unterminated string.')
+
+            tok.literal = (tok.literal[1:-1].
+                           replace('\\\\', '\\').
+                           replace("\\'", "'"))
+
+        return tok
 
     def __evaluate_numeric_literal(self, literal):
         try:
@@ -278,9 +259,6 @@ class _TagParser(object):
             la.consume()
             return n
 
-    def __parse_tag_name(self):
-        return self.__fetch_token('Tag name expected.')
-
     def __parse_comment_body(self):
         self.__toks.skip_whitespace()
         self.__toks.start_token()
@@ -297,30 +275,10 @@ class _TagParser(object):
 
         return self.__parse_comment_body()
 
-    def __parse_string(self):
-        toks = self.__toks
-        toks.skip_whitespace()
-
-        toks.start_token()
-        quote = toks.skip('\'', '"')
-        if quote is None:
-            raise _SourceError(toks.pos, 'A quoted string expected.')
-
-        toks.skip_to(quote, '\n')
-
-        if toks.skip(quote) is None:
-            raise _SourceError(toks.pos,
-                               'Missed closing quote %r.' % quote)
-
-        tok = toks.end_token()
-        tok.value = tok.literal[1:-1]
-
-        return tok
-
     def __parse_include_binary_tag(self, addr, name):
-        filename = self.__parse_string()
+        filename = self.__fetch_token('A filename expected.')
 
-        with open(filename.value, 'rb') as f:
+        with open(filename.literal, 'rb') as f:
             image = f.read()
 
         return _IncludeBinaryTag(addr, filename, image)
@@ -335,14 +293,16 @@ class _TagParser(object):
 
     # Parses and returns a subsequent tag.
     def __iter__(self):
-        while self.__toks.skip_next('@@'):
+        while self.__toks.skip_next(self.__TAG_LEADER):
             addr = self.__parse_optional_tag_address()
-            name = self.__parse_tag_name()
+            name = self.__fetch_token('Tag name or comment expected.')
 
+            # Handle comment tags.
             if name == ':':
                 yield _CommentTag(addr, self.__parse_comment_body())
                 continue
 
+            # Handle other tags.
             parser = self.__TAG_PARSERS.get(name.literal, None)
             if not parser:
                 raise _SourceError(name, 'Unknown tag.')
@@ -413,7 +373,7 @@ class _Disasm(object):
         pass
 
     def __process_include_binary_tag(self, tag):
-        comment = 'Included from binary file %r.' % tag.filename.value
+        comment = 'Included from binary file %r.' % tag.filename.literal
         self.__new_tag(_CommentTag(tag.addr, comment))
         self.__new_tag(_CommentTag(tag.addr, tag.comment))
 
