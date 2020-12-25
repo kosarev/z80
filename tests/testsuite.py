@@ -24,15 +24,29 @@ class DisasmTestCase(unittest.TestCase):
             with open(self.__path) as f:
                 text = f.read()
 
-            input, expected_output = tuple(text.split('---', maxsplit=1))
+            expected_output = ''
+            expected_error = ''
+
+            split = tuple(text.split('---', maxsplit=1))
+            if len(split) == 2:
+                input, expected_output = split
+            else:
+                split = tuple(text.split('===', maxsplit=1))
+                input, expected_error = split
 
             os.chdir(os.path.dirname(self.__path))
-            d.parse_tags(self.__path, input)
+            d.parse_tags(self.__id, input)
 
-            d.disassemble()
+            error = ''
+            try:
+                d.disassemble()
 
-            output = ''.join(d._get_output())
-            self.assertEqual(expected_output, output)
+                output = ''.join(d._get_output())
+                self.assertEqual(expected_output, output)
+            except z80.Error as e:
+                error = '\n%s\n' % e.args[0]
+
+            self.assertEqual(expected_error, error)
         finally:
             os.chdir(old_wd)
 

@@ -136,7 +136,8 @@ class _Tokenizer(object):
 
 
 class _Tag(object):
-    def __init__(self, addr, size):
+    def __init__(self, pos, addr, size):
+        self.pos = pos
         self.addr = addr
         self.size = size
         self.comment = None
@@ -148,16 +149,16 @@ class _Tag(object):
 class _CommentTag(_Tag):
     ID = 'comment'
 
-    def __init__(self, addr, comment):
-        super().__init__(addr, size=0)
+    def __init__(self, pos, addr, comment):
+        super().__init__(pos, addr, size=0)
         self.comment = comment
 
 
 class _ByteTag(_Tag):
     ID = 'byte'
 
-    def __init__(self, addr, value):
-        super().__init__(addr, size=1)
+    def __init__(self, pos, addr, value):
+        super().__init__(pos, addr, size=1)
         self.value = value
 
     def __repr__(self):
@@ -168,8 +169,8 @@ class _ByteTag(_Tag):
 class _IncludeBinaryTag(_Tag):
     ID = 'include_binary'
 
-    def __init__(self, addr, filename, image):
-        super().__init__(addr, size=len(image))
+    def __init__(self, pos, addr, filename, image):
+        super().__init__(pos, addr, size=len(image))
         self.filename = filename
         self.image = image
 
@@ -244,7 +245,7 @@ class _TagParser(object):
         with open(filename.literal, 'rb') as f:
             image = f.read()
 
-        return _IncludeBinaryTag(addr, filename, image)
+        return _IncludeBinaryTag(name.pos, addr, filename, image)
 
     def __parse_instr_tag(self, addr, name):
         return _InstrTag(addr)
@@ -273,7 +274,7 @@ class _TagParser(object):
                 if value is None:
                     break
 
-                tags.append(_ByteTag(addr + byte_offset, value))
+                tags.append(_ByteTag(tok.pos, addr + byte_offset, value))
                 byte_offset += 1
 
                 tok = self.__fetch_token()
@@ -296,7 +297,7 @@ class _TagParser(object):
                 comment = self.__parse_comment()
 
                 if len(tags) == 0:
-                    tags.append(_CommentTag(addr, comment))
+                    tags.append(_CommentTag(tok.pos, addr, comment))
                 else:
                     assert tags[0].comment is None
                     tags[0].comment = comment
@@ -345,12 +346,16 @@ class _AsmOutput(object):
 
 
 class _Disasm(object):
+    __MEMORY_SIZE = 0x10000
+
     def __init__(self):
         self.__tags = dict()
 
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
         self.__worklist = collections.deque()
+
+        self.__image = [None] * self.__MEMORY_SIZE
 
     def __new_tag(self, tag):
         self.__tags.setdefault(tag.addr, []).append(tag)
@@ -369,17 +374,20 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        pass
+        if self.__image[tag.addr] is not None:
+            raise _SourceError(tag.pos, 'Byte redefined.')
+
+        self.__image[tag.addr] = tag.value
 
     def __process_include_binary_tag(self, tag):
         comment = 'Included from binary file %r.' % tag.filename.literal
-        self.__new_tag(_CommentTag(tag.addr, comment))
+        self.__new_tag(_CommentTag(tag.pos, tag.addr, comment))
 
         if tag.comment is not None:
-            self.__new_tag(_CommentTag(tag.addr, tag.comment))
+            self.__new_tag(_CommentTag(tag.pos, tag.addr, tag.comment))
 
         for i, b in enumerate(tag.image):
-            self.__new_tag(_ByteTag(tag.addr + i, b))
+            self.__new_tag(_ByteTag(tag.pos, tag.addr + i, b))
 
     __TAG_PROCESSORS = {
         _CommentTag: lambda self, tag: None,

@@ -8,6 +8,7 @@
 #   Published under the MIT license.
 
 from ._disasm import _Disasm
+from ._error import Error
 from ._machine import I8080Machine
 from ._machine import Z80Machine
 from ._main import main
