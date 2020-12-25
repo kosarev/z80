@@ -316,18 +316,26 @@ class _AsmOutput(object):
             yield '\n'
             self.__needs_empty_line = False
 
-    def write_line(self, line, tag=None):
+    def write_line(self, command, tag_addr, tag_body, tag_comment):
         yield from self.__write_empty_line_if_needed()
 
-        line = ' ' * self.__COMMAND_INDENT + line
+        line = ' ' * self.__COMMAND_INDENT
 
-        comment = None
-        if tag is not None:
-            comment = '@@ %#06x %s' % tag
+        if command is not None:
+            line += command
 
-        if comment is not None:
-            line = line.ljust(self.__COMMENT_INDENT) + '; %s' % comment
+        comment = '@@ %#06x' % tag_addr
 
+        if tag_body is not None:
+            comment += ' %s' % tag_body
+
+        if tag_comment is not None:
+            comment += ' : %s' % tag_comment
+
+        if command is not None:
+            line = line.ljust(self.__COMMENT_INDENT)
+
+        line += '; %s' % comment
         line += '\n'
 
         yield line
@@ -387,12 +395,11 @@ class _Disasm(object):
             self.__process_tag(self.__worklist.popleft())
 
     def __write_comment_tag(self, tag, out):
-        yield from out.write_line(
-            '; @@ {:#06x} : {}'.format(tag.addr, tag.comment))
+        yield from out.write_line(None, tag.addr, None, tag.comment)
 
     def __write_byte_tag(self, tag, out):
         yield from out.write_line('db %#04x' % tag.value,
-                                  tag=(tag.addr, '%#04x' % tag.value))
+                                  tag.addr, '%#04x' % tag.value, tag.comment)
 
     __TAG_WRITERS = {
         _CommentTag: __write_comment_tag,
