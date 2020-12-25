@@ -374,7 +374,9 @@ class _Disasm(object):
     def __process_include_binary_tag(self, tag):
         comment = 'Included from binary file %r.' % tag.filename.literal
         self.__new_tag(_CommentTag(tag.addr, comment))
-        self.__new_tag(_CommentTag(tag.addr, tag.comment))
+
+        if tag.comment is not None:
+            self.__new_tag(_CommentTag(tag.addr, tag.comment))
 
         for i, b in enumerate(tag.image):
             self.__new_tag(_ByteTag(tag.addr + i, b))
