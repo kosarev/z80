@@ -72,11 +72,12 @@ class _SourceFile(object):
 
 
 class _DisasmError(Error):
-    def __init__(self, subject, message):
+    def __init__(self, subject, message, *notes):
         super().__init__('%s: %s: %s' % (subject.origin.inline_text,
                                          subject, message))
         self.subject = subject
         self.message = message
+        self.notes = notes
 
     def verbalize(self, program_name=None):
         def g():
@@ -85,7 +86,11 @@ class _DisasmError(Error):
             if program_name is not None:
                 yield '%s: ' % program_name
 
-            yield self.reason
+            yield '%s' % self.reason
+
+            for n in self.notes:
+                yield '\n'
+                yield n.verbalize()
 
         return ''.join(g())
 
@@ -387,8 +392,6 @@ class _Disasm(object):
         # list's pop(0).
         self.__worklist = collections.deque()
 
-        self.__image = [None] * self.__MEMORY_SIZE
-
     def __new_tag(self, tag):
         self.__tags.setdefault(tag.addr, []).append(tag)
         self.__worklist.append(tag)
@@ -406,10 +409,11 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        if self.__image[tag.addr] is not None:
-            raise _DisasmError(tag, 'Byte redefined.')
-
-        self.__image[tag.addr] = tag.value
+        for t in self.__tags.get(tag.addr, []):
+            if t is not tag and isinstance(t, _ByteTag):
+                raise _DisasmError(
+                    t, 'Byte redefined.',
+                    _DisasmError(tag, 'Previously defined here.'))
 
     def __process_include_binary_tag(self, tag):
         comment = 'Included from binary file %r.' % tag.filename.literal
