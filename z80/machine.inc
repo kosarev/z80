@@ -70,12 +70,18 @@ class machine_object
             z80::i8080_decoder<z80::root<machine_object>>>,
         object_state>>
 {};
+
+class disasm : public disasm_base<z80::i8080_disasm<disasm>>
+{};
 #elif defined(Z80_MACHINE)
 class machine_object
     : public z80::machine_state<
         machine<z80::z80_executor<
             z80::z80_decoder<z80::root<machine_object>>>,
         object_state>>
+{};
+
+class disasm : public disasm_base<z80::z80_disasm<disasm>>
 {};
 #else
 #error Unknown machine!
@@ -141,6 +147,31 @@ static PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
 }
 #endif  // defined(Z80_MACHINE)
 
+static PyObject *disasm_func(PyObject *self, PyObject *args) {
+    PyObject *image;
+    if(!PyArg_ParseTuple(args, "S:image", &image))
+        return nullptr;
+
+    auto image_size = std::min<Py_ssize_t>(PyBytes_GET_SIZE(image),
+                                           max_instr_size);
+    const char *image_bytes = PyBytes_AS_STRING(image);
+
+    disasm dis;
+    dis.set_instr_code(reinterpret_cast<const least_u8*>(image_bytes),
+                       image_size);
+    dis.on_disassemble();
+
+    decref_guard output(PyUnicode_FromString(dis.get_output()));
+    if(!output)
+        return nullptr;
+
+    decref_guard size(PyLong_FromSsize_t(dis.get_num_of_consumed_bytes()));
+    if(!size)
+        return nullptr;
+
+    return Py_BuildValue("OO", output.get(), size.get());
+}
+
 static PyMethodDef methods[] = {
     {"get_state_view", get_state_view, METH_NOARGS,
      "Return a MemoryView object that exposes the internal state of the "
@@ -156,6 +187,8 @@ static PyMethodDef methods[] = {
     {"on_handle_active_int", on_handle_active_int, METH_NOARGS,
      "Attempts to initiate a masked interrupt."},
 #endif  // defined(Z80_MACHINE)
+    {"__disasm", disasm_func, METH_VARARGS | METH_STATIC,
+     "Disassembles passed string of bytes."},
     { nullptr }  // Sentinel.
 };
 

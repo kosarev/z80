@@ -10,6 +10,8 @@
 
 #include <Python.h>
 
+#include <algorithm>
+#include <cstring>
 #include <new>
 
 #include "../z80.h"
@@ -41,7 +43,16 @@ public:
     {}
 
     ~decref_guard() {
-        Py_XDECREF(object);
+        if(object)
+            Py_XDECREF(object);
+    }
+
+    explicit operator bool () const {
+        return object != nullptr;
+    }
+
+    PyObject *get() const {
+        return object;
     }
 
 private:
@@ -256,6 +267,48 @@ protected:
 private:
     machine_state state;
     PyObject *on_input_callback = nullptr;
+};
+
+static const unsigned max_instr_size = 4;
+
+template<typename B>
+class disasm_base : public B {
+public:
+    typedef B base;
+
+    disasm_base() {}
+
+    const char *get_output() const {
+        return output_buff;
+    }
+
+    void on_emit(const char *out) {
+        std::snprintf(output_buff, max_output_buff_size, "%s", out);
+    }
+
+    fast_u8 on_read_next_byte() {
+        assert(index < instr_size);
+        return instr_code[index++];
+    }
+
+    void set_instr_code(const least_u8 *code, unsigned size) {
+        assert(size <= max_instr_size);
+        std::memset(instr_code, 0, max_instr_size);
+        std::memcpy(instr_code, code, size);
+        index = 0;
+        output_buff[0] = '\0';
+    }
+
+    unsigned get_num_of_consumed_bytes() const {
+        return index;
+    }
+
+private:
+    unsigned index = 0;
+    least_u8 instr_code[max_instr_size];
+
+    static const std::size_t max_output_buff_size = 32;
+    char output_buff[max_output_buff_size];
 };
 
 namespace i8080_machine {

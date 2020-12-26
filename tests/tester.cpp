@@ -209,11 +209,6 @@ public:
         return instr_code[index++];
     }
 
-    fast_u16 on_get_last_read_addr() const {
-        assert(index != 0);
-        return index - 1;
-    }
-
     void set_instr_code(const least_u8 *code, unsigned size) {
         assert(size <= max_instr_size);
         std::memcpy(instr_code, code, size);
