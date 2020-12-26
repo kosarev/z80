@@ -219,6 +219,9 @@ class _IncludeBinaryTag(_Tag):
 class _InstrTag(_Tag):
     ID = 'instr'
 
+    def __init__(self, origin, addr):
+        super().__init__(origin, addr, size=0)
+
 
 class _TagParser(object):
     __TAG_LEADER = re.compile('@@')
@@ -245,14 +248,14 @@ class _TagParser(object):
 
         if tok.literal is None:
             if error is not None:
-                raise _SourceError(tok.pos, error)
+                raise _DisasmError(tok.pos, error)
 
             tok = None
         else:
             # Translate escape sequences.
             if tok.literal.startswith("'"):
                 if tok.literal == "'":
-                    raise _SourceError(tok.pos, 'Unterminated string.')
+                    raise _DisasmError(tok.pos, 'Unterminated string.')
 
                 tok.literal = (tok.literal[1:-1].
                                replace('\\\\', '\\').
@@ -285,7 +288,8 @@ class _TagParser(object):
         return _IncludeBinaryTag(name.pos, addr, filename, image)
 
     def __parse_instr_tag(self, addr, name):
-        return _InstrTag(addr)
+        self.__fetch_token()
+        return _InstrTag(name.pos, addr)
 
     __TAG_PARSERS = {
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
@@ -328,7 +332,7 @@ class _TagParser(object):
             # Parse comments.
             if tok is not None:
                 if tok != ':':
-                    raise _SourceError(tok,
+                    raise _DisasmError(tok,
                                        'End of line or a comment expected.')
 
                 comment = self.__parse_comment()
@@ -362,7 +366,10 @@ class _AsmOutput(object):
         if command is not None:
             line += command
 
-        comment = '@@ %#06x' % tag_addr
+        comment = ''
+
+        if tag_addr is not None:
+            comment += '@@ %#06x' % tag_addr
 
         if tag_body is not None:
             comment += ' %s' % tag_body
@@ -370,21 +377,21 @@ class _AsmOutput(object):
         if tag_comment is not None:
             comment += ' : %s' % tag_comment
 
-        if command is not None:
+        if command is not None and comment != '':
             line = line.ljust(self.__COMMENT_INDENT)
 
-        line += '; %s' % comment
+        if comment != '':
+            line += '; %s' % comment
+
         line += '\n'
 
         yield line
 
     def write_space_directive(self, size):
-        yield from self.write_line('.space %d' % size)
+        yield from self.write_line('.space %d' % size, None, None, None)
 
 
 class _Disasm(object):
-    __MEMORY_SIZE = 0x10000
-
     def __init__(self):
         self.__tags = dict()
 
@@ -425,10 +432,15 @@ class _Disasm(object):
         for i, b in enumerate(tag.image):
             self.__new_tag(_ByteTag(tag.origin, tag.addr + i, b))
 
+    def __process_instr_tag(self, tag):
+        # TODO: Disassemble the instruction at the tag's address.
+        pass
+
     __TAG_PROCESSORS = {
-        _CommentTag: lambda self, tag: None,
         _ByteTag: __process_byte_tag,
+        _CommentTag: lambda self, tag: None,
         _IncludeBinaryTag: __process_include_binary_tag,
+        _InstrTag: __process_instr_tag,
     }
 
     def __process_tag(self, tag):
@@ -443,32 +455,70 @@ class _Disasm(object):
     def __write_comment_tag(self, tag, out):
         yield from out.write_line(None, tag.addr, None, tag.comment)
 
-    def __write_byte_tag(self, tag, out):
+    def __write_byte_tag(self, tag, instr, out):
+        tag_body = '%#04x' % tag.value
+
+        if instr is not None:
+            tag_body += ' instr'
+
         yield from out.write_line('db %#04x' % tag.value,
-                                  tag.addr, '%#04x' % tag.value, tag.comment)
+                                  tag.addr, tag_body, tag.comment)
 
-    __TAG_WRITERS = {
-        _CommentTag: __write_comment_tag,
-        _ByteTag: __write_byte_tag,
-        _IncludeBinaryTag: lambda self, tag, out: iter(()),
-    }
+    def __write_tags(self, addr, out):
+        comments = []
+        instr = []
+        xbyte = []
+        ignored = []
 
-    def __write_tag(self, tag, out):
-        write = self.__TAG_WRITERS[type(tag)]
-        yield from write(self, tag, out)
+        KINDS = {
+            _ByteTag: xbyte,
+            _CommentTag: comments,
+            _IncludeBinaryTag: ignored,
+            _InstrTag: instr,
+        }
+
+        # Sort tags out by categories.
+        for t in self.__tags[addr]:
+            KINDS[type(t)].append(t)
+
+        if len(xbyte) == 0:
+            xbyte.append(None)
+        xbyte, = tuple(xbyte)
+
+        if len(instr) == 0:
+            instr.append(None)
+        instr, = tuple(instr)
+
+        def g():
+            # Emit tags in order.
+            for t in comments:
+                yield from self.__write_comment_tag(t, out)
+
+            if xbyte is not None:
+                yield from self.__write_byte_tag(xbyte, instr, out)
+
+        if xbyte is not None:
+            addr += 1
+
+        return addr, g()
 
     def _get_output(self):
         out = _AsmOutput()
 
-        addr = 0
-        for a in sorted(self.__tags):
-            for tag in self.__tags[a]:
-                if addr < tag.addr:
-                    yield from out.write_space_directive(tag.addr - addr)
-                    addr = tag.addr
+        addrs = sorted(self.__tags)
+        if len(addrs) == 0:
+            return
 
-                yield from self.__write_tag(tag, out)
-                addr += tag.size
+        addr = addrs[0]
+        for a in addrs:
+            if addr < a:
+                yield from out.write_space_directive(a - addr)
+                addr = a
+
+            assert addr == a
+            addr, g = self.__write_tags(a, out)
+
+            yield from g
 
     def save_output(self, filename):
         with open(filename, 'w') as f:
