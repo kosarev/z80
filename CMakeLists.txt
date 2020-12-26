@@ -29,6 +29,7 @@ check_cxx_compiler_flag("-Wno-c++98-compat-pedantic"
                         WNO_CXX98_COMPAT_PEDANTIC_FLAG)
 check_cxx_compiler_flag("-Wno-shadow-field-in-constructor"
                         WNO_SHADOW_FIELD_IN_CONSTRUCTOR_FLAG)
+check_cxx_compiler_flag("-Wno-shadow-field" WNO_SHADOW_FIELD)
 check_cxx_compiler_flag("-Wno-padded" WNO_PADDED_FLAG)
 check_cxx_compiler_flag("-Werror" WERROR_FLAG)
 check_cxx_compiler_flag("-ferror-limit=1" ERROR_LIMIT_FLAG)
@@ -49,6 +50,7 @@ append_if(WNO_CXX98_COMPAT_PEDANTIC_FLAG "-Wno-c++98-compat-pedantic"
           CMAKE_CXX_FLAGS)
 append_if(WNO_SHADOW_FIELD_IN_CONSTRUCTOR_FLAG
           "-Wno-shadow-field-in-constructor" CMAKE_CXX_FLAGS)
+append_if(WNO_SHADOW_FIELD "-Wno-shadow-field" CMAKE_CXX_FLAGS)
 append_if(WNO_PADDED_FLAG "-Wno-padded" CMAKE_CXX_FLAGS)
 append_if(WERROR_FLAG "-Werror" CMAKE_CXX_FLAGS)
 append_if(ERROR_LIMIT_FLAG "-ferror-limit=1" CMAKE_CXX_FLAGS)
