@@ -129,24 +129,24 @@ class _Tokenizer(object):
     def pos(self):
         return _SourcePos(self.__offset, self.__source_file)
 
-    def skip(self, pat):
-        match = pat.match(self.__image, self.__offset)
+    def skip(self, pattern):
+        match = pattern.match(self.__image, self.__offset)
         if match is not None:
             self.__offset = match.end()
 
     def skip_whitespace(self):
         self.skip(self.__WHITESPACE)
 
-    def skip_to(self, pat):
-        match = pat.search(self.__image, self.__offset)
+    def skip_to(self, pattern):
+        match = pattern.search(self.__image, self.__offset)
         if match is not None:
             self.__offset = match.start()
 
     def skip_rest_of_line(self):
         self.skip_to(self.__END_OF_LINE)
 
-    def skip_next(self, pat):
-        match = pat.search(self.__image, self.__offset)
+    def skip_next(self, pattern):
+        match = pattern.search(self.__image, self.__offset)
         if match is not None:
             self.__offset = match.end()
         return match
