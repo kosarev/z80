@@ -125,13 +125,14 @@ class _Tokenizer(object):
         self.__offset = 0
         self.__token_offset = self.__offset
 
+    @property
+    def pos(self):
+        return _SourcePos(self.__offset, self.__source_file)
+
     def skip(self, pat):
         match = pat.match(self.__image, self.__offset)
-        if match is None:
-            return None
-
-        self.__offset = match.end()
-        return match.group(0)
+        if match is not None:
+            self.__offset = match.end()
 
     def skip_whitespace(self):
         self.skip(self.__WHITESPACE)
@@ -146,18 +147,12 @@ class _Tokenizer(object):
 
     def skip_next(self, pat):
         match = pat.search(self.__image, self.__offset)
-        if match is None:
-            return None
-
-        self.__offset = match.end()
-        return match.group(0)
+        if match is not None:
+            self.__offset = match.end()
+        return match
 
     def start_token(self):
         self.__token_offset = self.__offset
-
-    @property
-    def pos(self):
-        return _SourcePos(self.__offset, self.__source_file)
 
     def end_token(self):
         pos = _SourcePos(self.__token_offset, self.__source_file)
@@ -165,6 +160,9 @@ class _Tokenizer(object):
         literal = None
         if self.__token_offset < self.__offset:
             literal = self.__image[self.__token_offset:self.__offset]
+
+        # Ending a token implicitly starts another one.
+        self.start_token()
 
         return _Token(literal, pos)
 
