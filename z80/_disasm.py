@@ -235,8 +235,51 @@ class A(metaclass=Reg):
     pass
 
 
+class B(metaclass=Reg):
+    pass
+
+
+class D(metaclass=Reg):
+    pass
+
+
+class E(metaclass=Reg):
+    pass
+
+
+class H(metaclass=Reg):
+    pass
+
+
+class L(metaclass=Reg):
+    pass
+
+
+class I(metaclass=Reg):
+    pass
+
+
 class DE(metaclass=Reg):
     pass
+
+
+def _str_op(op):
+    if isinstance(op, int):
+        return '%#x' % op
+
+    return str(op)
+
+
+class AT(object):
+    def __init__(self, op):
+        self.ops = [op]
+
+    def __repr__(self):
+        return 'AT(%r)' % tuple(self.ops)
+
+    def __str__(self):
+        op, = tuple(self.ops)
+        return '(%s)' % _str_op(op)
 
 
 # Base class for all instructions.
@@ -250,23 +293,22 @@ class Instr(object):
         return (type(self).__name__ +
                 '(' + ', '.join(repr(op) for op in self.ops) + ')')
 
-    def __str_op(self, op):
-        if isinstance(op, int):
-            return '%#x' % op
-
-        return str(op)
-
     def __str__(self):
         s = type(self).__name__.lower()
         if self.ops:
-            s += ' ' + ', '.join(self.__str_op(op) for op in self.ops)
+            s += ' ' + ', '.join(_str_op(op) for op in self.ops)
         return s
 
 
 class UnknownInstr(Instr):
-    def __init__(self):
+    def __init__(self, opcode):
         super().__init__()
+        self.opcode = opcode
         self.size = 1
+        self.text = None
+
+    def __str__(self):
+        return 'db %#04x' % self.opcode
 
 
 # Instructions that may affect control flow.
@@ -292,6 +334,14 @@ class LD(Instr):
     pass
 
 
+class NOP(Instr):
+    pass
+
+
+class OUT(Instr):
+    pass
+
+
 class XOR(Instr):
     pass
 
@@ -302,31 +352,49 @@ class _Z80InstrBuilder(object):
         'di': DI,
         'jp': JP,
         'ld': LD,
+        'nop': NOP,
+        'out': OUT,
     }
 
     __OPS = {
+        'a': A,
+        'i': I,
         'Pde': DE,
         'Ra': A,
+        'Rb': B,
+        'Rd': D,
+        'Re': E,
+        'Rh': H,
+        'Rl': L,
     }
 
     def __build_op(self, text):
-        if text.startswith('W'):
+        if text.startswith('('):
+            assert text[-1] == ')'
+            return AT(self.__build_op(text[1:-1]))
+
+        if text.startswith(('W', 'N')):
             return int(text[1:], base=0)
 
         if text not in self.__OPS:
-            return None
+            return '<unknown>'
 
         return self.__OPS[text]
 
     def build_instr(self, addr, image):
-        text, size = Z80Machine._disasm(image)
+        original_text, size = Z80Machine._disasm(image)
         if size > len(image):
             # TODO: Too few bytes to disassemble this instruction.
             assert 0, image
 
-        text = text.split(maxsplit=1)
+        text = original_text.split(maxsplit=1)
 
         name = text.pop(0)
+
+        if name not in self.__INSTRS:
+            instr = UnknownInstr(image[0])
+            instr.text = original_text
+            return instr
 
         instr = self.__INSTRS[name]()
         instr.addr = addr
@@ -339,10 +407,13 @@ class _Z80InstrBuilder(object):
                 op_text = text.pop(0).strip()
                 op = self.__build_op(op_text)
 
-                if op is None:
-                    return UnknownInstr()
+                if op == '<unknown>':
+                    instr = UnknownInstr(image[0])
+                    instr.text = original_text
+                    return instr
 
-                instr.ops.append(op)
+                if op is not None:
+                    instr.ops.append(op)
 
         return instr
 
@@ -488,7 +559,7 @@ class _AsmOutput(object):
             yield '\n'
             self.__needs_empty_line = False
 
-    def write_line(self, command, tag_addr, tag_body, tag_comment):
+    def write_line(self, command, tag_addr, tag_body, tag_comment, comment=None):
         yield from self.__write_empty_line_if_needed()
 
         line = ' ' * self.__COMMAND_INDENT
@@ -496,22 +567,25 @@ class _AsmOutput(object):
         if command is not None:
             line += command
 
-        comment = ''
+        if comment is None:
+            comment = []
+        else:
+            comment = [comment]
 
         if tag_addr is not None:
-            comment += '@@ %#06x' % tag_addr
+            comment.append('@@ %#06x' % tag_addr)
 
         if tag_body is not None:
-            comment += ' %s' % tag_body
+            comment.append('%s' % tag_body)
 
         if tag_comment is not None:
-            comment += ' : %s' % tag_comment
+            comment.append(': %s' % tag_comment)
 
-        if command is not None and comment != '':
+        if command is not None and comment:
             line = line.ljust(self.__COMMENT_INDENT)
 
-        if comment != '':
-            line += '; %s' % comment
+        if comment:
+            line += '; %s' % ' '.join(comment)
 
         line += '\n'
 
@@ -682,8 +756,13 @@ class _Disasm(object):
 
         tag_body = ' '.join(tag_body)
 
+        comment = None
+        if isinstance(tag.instr, UnknownInstr):
+            comment = 'unknown_instr %r' % tag.instr.text
+
         yield from out.write_line(command,
-                                  tag.addr, tag_body, tag.comment)
+                                  tag.addr, tag_body, tag.comment,
+                                  comment)
 
     def __write_tags(self, addr, out):
         tags = self.__tags.get(addr, [])
