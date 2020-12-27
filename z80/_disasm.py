@@ -230,6 +230,9 @@ class Instr(object):
     def __repr__(self):
         return self.ID + '()'
 
+    def __str__(self):
+        return self.ID.lower()
+
 
 class DI(Instr):
     ID = 'DI'
@@ -344,6 +347,7 @@ class _TagParser(object):
                 tok = self.__fetch_token()
 
             tags = []
+            subject_tag = None
 
             # Collect bytes, if any specified.
             byte_offset = 0
@@ -352,7 +356,11 @@ class _TagParser(object):
                 if value is None:
                     break
 
-                tags.append(_ByteTag(tok.pos, addr + byte_offset, value))
+                tag = _ByteTag(tok.pos, addr + byte_offset, value)
+                if subject_tag is None:
+                    subject_tag = tag
+
+                tags.append(tag)
                 byte_offset += 1
 
                 tok = self.__fetch_token()
@@ -363,7 +371,8 @@ class _TagParser(object):
                 if not parser:
                     raise _DisasmError(tok, 'Unknown tag.')
 
-                tags.append(parser(self, addr, tok))
+                subject_tag = parser(self, addr, tok)
+                tags.append(subject_tag)
                 tok = self.__tok
 
             # Parse comments.
@@ -374,11 +383,11 @@ class _TagParser(object):
 
                 comment = self.__parse_comment()
 
-                if len(tags) == 0:
+                if subject_tag is None:
                     tags.append(_CommentTag(tok.pos, addr, comment))
                 else:
-                    assert tags[0].comment is None
-                    tags[0].comment = comment
+                    assert subject_tag.comment is None
+                    subject_tag.comment = comment
 
             yield from tags
 
@@ -453,6 +462,9 @@ class _Disasm(object):
         # Byte image.
         self.__bytes = dict()
 
+        # Instructions.
+        self.__instrs = dict()
+
     def __get_worklist(self, tag):
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
@@ -510,6 +522,9 @@ class _Disasm(object):
         self.__add_tags(*new_tags)
 
     def __process_instr_tag(self, tag):
+        if tag.addr in self.__instrs:
+            return
+
         MAX_INSTR_SIZE = 4
 
         instr_image = []
@@ -521,6 +536,7 @@ class _Disasm(object):
 
         tag.instr = self.__instr_builder.disasm_instr(tag.addr,
                                                       bytes(instr_image))
+        self.__instrs[tag.addr] = tag
 
     def __skip_processing_tag(self, tag):
         pass
@@ -551,49 +567,47 @@ class _Disasm(object):
     def __write_comment_tag(self, tag, out):
         yield from out.write_line(None, tag.addr, None, tag.comment)
 
-    def __write_byte_tag(self, tag, instr, out):
+    def __write_byte_tag(self, tag, out):
         tag_body = '%#04x' % tag.value
-
-        if instr is not None:
-            tag_body += ' instr'
-
         yield from out.write_line('db %#04x' % tag.value,
                                   tag.addr, tag_body, tag.comment)
 
+    def __write_instr_tag(self, tag, out):
+        command = '%s' % tag.instr
+
+        addrs = range(tag.addr, tag.addr + tag.instr.size)
+        tag_body = ['%#04x' % self.__bytes[i].value for i in addrs]
+        tag_body.append('instr')
+        tag_body = ' '.join(tag_body)
+
+        yield from out.write_line(command,
+                                  tag.addr, tag_body, tag.comment)
+
     def __write_tags(self, addr, out):
-        comments = []
-        instr = []
-        xbyte = []
-        ignored = []
-
-        KINDS = {
-            _ByteTag: xbyte,
-            _CommentTag: comments,
-            _IncludeBinaryTag: ignored,
-            _InstrTag: instr,
-        }
-
-        # Sort tags out by categories.
-        for t in self.__tags.get(addr, []):
-            KINDS[type(t)].append(t)
-
-        if len(xbyte) == 0:
-            xbyte.append(None)
-        xbyte, = tuple(xbyte)
-
-        if len(instr) == 0:
-            instr.append(None)
-        instr, = tuple(instr)
+        tags = self.__tags.get(addr, [])
+        instr_tag = self.__instrs.get(addr, None)
+        byte_tag = self.__bytes.get(addr, None)
 
         def g():
             # Emit tags in order.
-            for t in comments:
-                yield from self.__write_comment_tag(t, out)
+            for tag in tags:
+                if isinstance(tag, (_IncludeBinaryTag, _ByteTag, _InstrTag)):
+                    pass
+                elif isinstance(tag, _CommentTag):
+                    yield from self.__write_comment_tag(tag, out)
+                else:
+                    # TODO
+                    assert 0, tag
 
-            if xbyte is not None:
-                yield from self.__write_byte_tag(xbyte, instr, out)
+            if instr_tag is not None:
+                yield from self.__write_instr_tag(instr_tag, out)
+            elif byte_tag is not None:
+                yield from self.__write_byte_tag(byte_tag, out)
 
-        if xbyte is not None:
+
+        if instr_tag is not None:
+            addr += instr_tag.instr.size
+        elif byte_tag is not None:
             addr += 1
 
         return addr, g()
