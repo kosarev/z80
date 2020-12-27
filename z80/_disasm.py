@@ -394,7 +394,7 @@ class _Disasm(object):
         # Translate addresses to tags associated with those
         # addresses.
         self.__byte_tags = dict()
-        self.__other_tags = dict()
+        self.__common_tags = dict()
 
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
@@ -414,7 +414,7 @@ class _Disasm(object):
                                      'Previously defined here.'))
                 self.__byte_tags[tag.addr] = tag
             else:
-                self.__other_tags.setdefault(tag.addr, []).append(tag)
+                self.__common_tags.setdefault(tag.addr, []).append(tag)
 
         def get_worklist(tag):
             if isinstance(tag, (_ByteTag, _IncludeBinaryTag)):
@@ -513,7 +513,7 @@ class _Disasm(object):
         t = self.__byte_tags.get(addr, None)
         if t is not None:
             KINDS[type(t)].append(t)
-        for t in self.__other_tags.get(addr, []):
+        for t in self.__common_tags.get(addr, []):
             KINDS[type(t)].append(t)
 
         if len(xbyte) == 0:
@@ -540,7 +540,7 @@ class _Disasm(object):
     def _get_output(self):
         out = _AsmOutput()
 
-        addrs = sorted(set(self.__byte_tags) | set(self.__other_tags))
+        addrs = sorted(set(self.__byte_tags) | set(self.__common_tags))
         if len(addrs) == 0:
             return
 
