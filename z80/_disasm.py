@@ -390,19 +390,35 @@ class _AsmOutput(object):
 
 
 class _Disasm(object):
+    __TAG_PRIORITIES = {
+        # These form the binary image so they have to be
+        # processed first.
+        _ByteTag: 0,
+        _IncludeBinaryTag: 0,
+
+        _InstrTag: 1,
+        _CommentTag: 2,
+    }
+
+
     def __init__(self):
         # Translate addresses to tags associated with those
         # addresses.
         self.__byte_tags = dict()
         self.__common_tags = dict()
 
+        # Tags to process stored in order.
+        self.__worklists = dict()
+
+    def __get_worklist(self, tag):
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
         Worklist = collections.deque
 
-        # Tags to process stored in order.
-        self.__bytes_worklist = Worklist()
-        self.__others_worklist = Worklist()
+        priority = self.__TAG_PRIORITIES[type(tag)]
+        if priority not in self.__worklists:
+            self.__worklists[priority] = Worklist()
+        return self.__worklists[priority]
 
     def __add_tags(self, *tags, to_end_of_queue=False):
         for tag in tags:
@@ -416,17 +432,12 @@ class _Disasm(object):
             else:
                 self.__common_tags.setdefault(tag.addr, []).append(tag)
 
-        def get_worklist(tag):
-            if isinstance(tag, (_ByteTag, _IncludeBinaryTag)):
-                return self.__bytes_worklist
-            return self.__others_worklist
-
         if to_end_of_queue:
             for tag in tags:
-                get_worklist(tag).append(tag)
+                self.__get_worklist(tag).append(tag)
         else:
             for tag in reversed(tags):
-                get_worklist(tag).appendleft(tag)
+                self.__get_worklist(tag).appendleft(tag)
 
     def parse_tags(self, filename, image=None):
         addr = 0
@@ -473,14 +484,13 @@ class _Disasm(object):
         process(self, tag)
 
     def disassemble(self):
-        while True:
-            # Process byte-related tags first.
-            if self.__bytes_worklist:
-                tag = self.__bytes_worklist.popleft()
-            elif self.__others_worklist:
-                tag = self.__others_worklist.popleft()
-            else:
-                break
+        while self.__worklists:
+            priority = min(self.__worklists)
+            worklist = self.__worklists[priority]
+            tag = worklist.popleft()
+
+            if len(worklist) == 0:
+                del self.__worklists[priority]
 
             self.__process_tag(tag)
 
