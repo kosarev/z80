@@ -263,8 +263,20 @@ class Instr(object):
         return s
 
 
+class UnknownInstr(Instr):
+    def __init__(self):
+        super().__init__()
+        self.size = 1
+
+
 # Instructions that may affect control flow.
 class JumpInstr(Instr):
+    @property
+    def target(self):
+        return self.ops[self._TARGET_OP]
+
+
+class UncondJumpInstr(JumpInstr):
     pass
 
 
@@ -272,8 +284,8 @@ class DI(Instr):
     pass
 
 
-class JP(JumpInstr):
-    pass
+class JP(UncondJumpInstr):
+    _TARGET_OP = 0
 
 
 class LD(Instr):
@@ -301,6 +313,9 @@ class _Z80InstrBuilder(object):
         if text.startswith('W'):
             return int(text[1:], base=0)
 
+        if text not in self.__OPS:
+            return None
+
         return self.__OPS[text]
 
     def build_instr(self, addr, image):
@@ -322,7 +337,12 @@ class _Z80InstrBuilder(object):
             text = text[0].split(',')
             while text:
                 op_text = text.pop(0).strip()
-                instr.ops.append(self.__build_op(op_text))
+                op = self.__build_op(op_text)
+
+                if op is None:
+                    return UnknownInstr()
+
+                instr.ops.append(op)
 
         return instr
 
@@ -606,10 +626,16 @@ class _Disasm(object):
         tag.instr = instr
         self.__instrs[tag.addr] = tag
 
-        # Disassemble the following instruction.
-        if not isinstance(instr, JumpInstr):
-            self.__add_tags(_InstrTag(None, instr.addr + instr.size,
-                                      implicit=True))
+        if not isinstance(instr, UnknownInstr):
+            # Disassemble the following instruction.
+            if not isinstance(instr, UncondJumpInstr):
+                self.__add_tags(_InstrTag(None, instr.addr + instr.size,
+                                          implicit=True))
+
+            # Disassemble jump targets.
+            if isinstance(instr, JumpInstr):
+                self.__add_tags(_InstrTag(None, instr.target,
+                                          implicit=True))
 
     def __skip_processing_tag(self, tag):
         pass
