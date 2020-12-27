@@ -270,6 +270,10 @@ class B(metaclass=Reg):
     pass
 
 
+class C(metaclass=Reg):
+    pass
+
+
 class D(metaclass=Reg):
     pass
 
@@ -290,6 +294,10 @@ class IReg(metaclass=Reg):
     pass
 
 
+class AF(metaclass=Reg):
+    pass
+
+
 class BC(metaclass=Reg):
     pass
 
@@ -299,6 +307,10 @@ class DE(metaclass=Reg):
 
 
 class HL(metaclass=Reg):
+    pass
+
+
+class IX(metaclass=IndexReg):
     pass
 
 
@@ -411,7 +423,15 @@ class CALL(CallInstr):
     pass
 
 
+class CCF(Instr):
+    pass
+
+
 class CP(Instr):
+    pass
+
+
+class CPL(Instr):
     pass
 
 
@@ -467,6 +487,10 @@ class NOP(Instr):
     pass
 
 
+class OR(Instr):
+    pass
+
+
 class OUT(Instr):
     pass
 
@@ -483,11 +507,31 @@ class RET(RetInstr):
     pass
 
 
+class RRCA(Instr):
+    pass
+
+
+class RST(CallInstr):
+    pass
+
+
 class SBC(Instr):
     pass
 
 
+class SCF(Instr):
+    pass
+
+
 class SET(Instr):
+    pass
+
+
+class SRL(Instr):
+    pass
+
+
+class SUB(Instr):
     pass
 
 
@@ -501,9 +545,13 @@ class _Z80InstrBuilder(object):
         'Aand': AND,
         'Acp': CP,
         'add': ADD,
+        'Aor': OR,
+        'Asub': SUB,
         'Axor': XOR,
         'bit': BIT,
         'call': CALL,
+        'ccf': CCF,
+        'cpl': CPL,
         'dec': DEC,
         'di': DI,
         'ei': EI,
@@ -517,11 +565,15 @@ class _Z80InstrBuilder(object):
         'Llddr': LDDR,
         'Lldir': LDIR,
         'nop': NOP,
+        'Osrl': SRL,
         'out': OUT,
         'pop': POP,
         'push': PUSH,
         'ret': RET,
+        'rrca': RRCA,
+        'rst': RST,
         'sbc': SBC,
+        'scf': SCF,
         'set': SET,
     }
 
@@ -532,6 +584,7 @@ class _Z80InstrBuilder(object):
         'Cnz': NZF,
         'Cz': ZF,
         'de': DE,
+        'Gaf': AF,
         'Gde': DE,
         'Ghl': HL,
         'hl': HL,
@@ -540,9 +593,12 @@ class _Z80InstrBuilder(object):
         'Pbc': BC,
         'Pde': DE,
         'Phl': HL,
+        'Pix': IX,
         'Piy': IY,
+        'Psp': SP,
         'Ra': A,
         'Rb': B,
+        'Rc': C,
         'Rd': D,
         'Re': E,
         'Rh': H,
@@ -905,6 +961,7 @@ class _Disasm(object):
         MAX_INSTR_SIZE = 4
 
         instr_image = []
+        assert isinstance(tag.addr, int), tag.addr
         for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
             if i not in self.__bytes:
                 break
@@ -930,8 +987,10 @@ class _Disasm(object):
             # Disassemble jump targets.
             if (isinstance(instr, JumpInstr) and
                     not isinstance(instr, RetInstr)):
-                self.__add_tags(_InstrTag(None, instr.target,
-                                          implicit=True))
+                target = instr.target
+                if not isinstance(target, At):
+                    assert isinstance(target, int)
+                    self.__add_tags(_InstrTag(None, target, implicit=True))
 
     def __skip_processing_tag(self, tag):
         pass
