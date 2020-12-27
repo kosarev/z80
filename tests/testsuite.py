@@ -27,12 +27,16 @@ class DisasmTestCase(unittest.TestCase):
             expected_output = ''
             expected_error = ''
 
-            split = tuple(text.split('---', maxsplit=1))
+            split = tuple(text.split('===', maxsplit=1))
             if len(split) == 2:
-                input, expected_output = split
-            else:
-                split = tuple(text.split('===', maxsplit=1))
                 input, expected_error = split
+            else:
+                split = tuple(text.split('---', maxsplit=1))
+                if len(split) == 2:
+                    input, expected_output = split
+                else:
+                    input, = split
+                    expected_output = '\n' + input
 
             os.chdir(os.path.dirname(self.__path))
 

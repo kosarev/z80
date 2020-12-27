@@ -223,6 +223,22 @@ class _InstrTag(_Tag):
         super().__init__(origin, addr, size=0, implicit=implicit)
 
 
+class CondFlag(type):
+    def __repr__(cls):
+        return cls.__name__
+
+    def __str__(cls):
+        return cls.__name__.lower()[:-1]
+
+
+class ZF(metaclass=CondFlag):
+    pass
+
+
+class NZF(metaclass=CondFlag):
+    pass
+
+
 class Reg(type):
     def __repr__(cls):
         return cls.__name__
@@ -260,6 +276,10 @@ class I(metaclass=Reg):
 
 
 class DE(metaclass=Reg):
+    pass
+
+
+class HL(metaclass=Reg):
     pass
 
 
@@ -315,10 +335,18 @@ class UnknownInstr(Instr):
 class JumpInstr(Instr):
     @property
     def target(self):
-        return self.ops[self._TARGET_OP]
+        return self.ops[-1]
+
+    @property
+    def conditional(self):
+        return isinstance(self.ops[0], CondFlag)
 
 
-class UncondJumpInstr(JumpInstr):
+class CP(Instr):
+    pass
+
+
+class DEC(Instr):
     pass
 
 
@@ -326,8 +354,12 @@ class DI(Instr):
     pass
 
 
-class JP(UncondJumpInstr):
-    _TARGET_OP = 0
+class JP(JumpInstr):
+    pass
+
+
+class JR(JumpInstr):
+    pass
 
 
 class LD(Instr):
@@ -348,9 +380,12 @@ class XOR(Instr):
 
 class _Z80InstrBuilder(object):
     __INSTRS = {
+        'Acp': CP,
         'Axor': XOR,
+        'dec': DEC,
         'di': DI,
         'jp': JP,
+        'jr': JR,
         'ld': LD,
         'nop': NOP,
         'out': OUT,
@@ -358,28 +393,48 @@ class _Z80InstrBuilder(object):
 
     __OPS = {
         'a': A,
+        'Cnz': NZF,
         'i': I,
         'Pde': DE,
+        'Phl': HL,
         'Ra': A,
         'Rb': B,
         'Rd': D,
         'Re': E,
         'Rh': H,
+        'R(hl)': lambda: AT(HL),
         'Rl': L,
     }
 
-    def __build_op(self, text):
+    def __build_op(self, addr, text):
         if text.startswith('('):
             assert text[-1] == ')'
-            return AT(self.__build_op(text[1:-1]))
+            return AT(self.__build_op(addr, text[1:-1]))
 
         if text.startswith(('W', 'N')):
             return int(text[1:], base=0)
 
+        if text.startswith('D'):
+            dollar_sign, sign, offset = tuple(text[1:].split())
+            assert dollar_sign == '$'
+
+            offset = int(offset, base=0)
+
+            assert sign in ('+', '-')
+            if sign == '-':
+                offset = -offset
+
+            return addr + offset
+
         if text not in self.__OPS:
             return '<unknown>'
 
-        return self.__OPS[text]
+        op = self.__OPS[text]
+
+        if not isinstance(op, (CondFlag, Reg)):
+            op = op()
+
+        return op
 
     def build_instr(self, addr, image):
         original_text, size = Z80Machine._disasm(image)
@@ -405,7 +460,7 @@ class _Z80InstrBuilder(object):
             text = text[0].split(',')
             while text:
                 op_text = text.pop(0).strip()
-                op = self.__build_op(op_text)
+                op = self.__build_op(addr, op_text)
 
                 if op == '<unknown>':
                     instr = UnknownInstr(image[0])
@@ -702,7 +757,7 @@ class _Disasm(object):
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
-            if not isinstance(instr, UncondJumpInstr):
+            if not isinstance(instr, JumpInstr) or instr.conditional:
                 self.__add_tags(_InstrTag(None, instr.addr + instr.size,
                                           implicit=True))
 
