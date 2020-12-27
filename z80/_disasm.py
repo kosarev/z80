@@ -295,6 +295,14 @@ class HL(metaclass=Reg):
     pass
 
 
+class IY(metaclass=Reg):
+    pass
+
+
+class SP(metaclass=Reg):
+    pass
+
+
 def _str_op(op):
     if isinstance(op, int):
         return '%#x' % op
@@ -382,6 +390,10 @@ class EXX(Instr):
     pass
 
 
+class IM(Instr):
+    pass
+
+
 class INC(Instr):
     pass
 
@@ -428,6 +440,7 @@ class _Z80InstrBuilder(object):
         'di': DI,
         'ex': EX,
         'exx': EXX,
+        'im': IM,
         'inc': INC,
         'jp': JP,
         'jr': JR,
@@ -449,6 +462,7 @@ class _Z80InstrBuilder(object):
         'Pbc': BC,
         'Pde': DE,
         'Phl': HL,
+        'Piy': IY,
         'Ra': A,
         'Rb': B,
         'Rd': D,
@@ -456,6 +470,7 @@ class _Z80InstrBuilder(object):
         'Rh': H,
         'R(hl)': lambda: AT(HL),
         'Rl': L,
+        'sp': SP,
     }
 
     def __build_op(self, addr, text):
@@ -463,7 +478,7 @@ class _Z80InstrBuilder(object):
             assert text[-1] == ')'
             return AT(self.__build_op(addr, text[1:-1]))
 
-        if text.startswith(('W', 'N')):
+        if text.startswith(('W', 'N', 'U')):
             return int(text[1:], base=0)
 
         if text.startswith('D'):
@@ -496,6 +511,7 @@ class _Z80InstrBuilder(object):
 
         text = original_text.split(maxsplit=1)
 
+        assert len(text) > 0, (original_text, image)
         name = text.pop(0)
 
         if name not in self.__INSTRS:

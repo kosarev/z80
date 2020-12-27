@@ -81,8 +81,14 @@ class machine_object
         object_state>>
 {};
 
-class disasm : public disasm_base<z80::z80_disasm<disasm>>
-{};
+class disasm : public disasm_base<z80::z80_disasm<disasm>> {
+public:
+    void on_disassemble() {
+        base::on_disassemble();
+        if(base::get_iregp_kind() != z80::iregp::hl)
+            base::on_disassemble();
+    }
+};
 #else
 #error Unknown machine!
 #endif
