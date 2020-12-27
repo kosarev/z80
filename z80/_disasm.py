@@ -252,7 +252,10 @@ class Reg(type):
         return cls.__name__
 
     def __str__(cls):
-        return cls.__name__.lower()
+        s = cls.__name__.lower()
+        if s.endswith('reg'):
+            s = s[:-3]
+        return s
 
 
 class IndexReg(Reg):
@@ -283,7 +286,7 @@ class L(metaclass=Reg):
     pass
 
 
-class I(metaclass=Reg):
+class IReg(metaclass=Reg):
     pass
 
 
@@ -384,11 +387,19 @@ class JumpInstr(Instr):
         return isinstance(self.ops[0], CondFlag)
 
 
+class CallInstr(JumpInstr):
+    pass
+
+
 class ADD(Instr):
     pass
 
 
 class AND(Instr):
+    pass
+
+
+class CALL(CallInstr):
     pass
 
 
@@ -456,6 +467,10 @@ class SBC(Instr):
     pass
 
 
+class SET(Instr):
+    pass
+
+
 class XOR(Instr):
     pass
 
@@ -466,6 +481,7 @@ class _Z80InstrBuilder(object):
         'Acp': CP,
         'add': ADD,
         'Axor': XOR,
+        'call': CALL,
         'dec': DEC,
         'di': DI,
         'ei': EI,
@@ -481,6 +497,7 @@ class _Z80InstrBuilder(object):
         'nop': NOP,
         'out': OUT,
         'sbc': SBC,
+        'set': SET,
     }
 
     __OPS = {
@@ -490,7 +507,7 @@ class _Z80InstrBuilder(object):
         'Cz': ZF,
         'de': DE,
         'hl': HL,
-        'i': I,
+        'i': IReg,
         'iy': IY,
         'Pbc': BC,
         'Pde': DE,
@@ -732,7 +749,8 @@ class _AsmOutput(object):
             yield '\n'
             self.__needs_empty_line = False
 
-    def write_line(self, command, tag_addr, tag_body, tag_comment, comment=None):
+    def write_line(self, command, tag_addr, tag_body, tag_comment,
+                   comment=None):
         yield from self.__write_empty_line_if_needed()
 
         line = ' ' * self.__COMMAND_INDENT
@@ -875,7 +893,9 @@ class _Disasm(object):
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
-            if not isinstance(instr, JumpInstr) or instr.conditional:
+            if (not isinstance(instr, JumpInstr) or
+                    isinstance(instr, CallInstr) or
+                    instr.conditional):
                 self.__add_tags(_InstrTag(None, instr.addr + instr.size,
                                           implicit=True))
 
