@@ -445,14 +445,13 @@ class _Disasm(object):
 
         # Translate addresses to tags associated with those
         # addresses.
-        self.__byte_tags = dict()
-        self.__common_tags = dict()
+        self.__tags = dict()
 
         # Tags to process stored in order.
         self.__worklists = dict()
 
         # Byte image.
-        self.__image = dict()
+        self.__bytes = dict()
 
     def __get_worklist(self, tag):
         # Use deque because of its popleft() is much faster than
@@ -466,15 +465,7 @@ class _Disasm(object):
 
     def __add_tags(self, *tags, to_end_of_queue=False):
         for tag in tags:
-            if isinstance(tag, _ByteTag):
-                if tag.addr in self.__byte_tags:
-                    raise _DisasmError(
-                        tag, 'Byte redefined.',
-                        _DisasmError(self.__byte_tags[tag.addr],
-                                     'Previously defined here.'))
-                self.__byte_tags[tag.addr] = tag
-            else:
-                self.__common_tags.setdefault(tag.addr, []).append(tag)
+            self.__tags.setdefault(tag.addr, []).append(tag)
 
         if to_end_of_queue:
             for tag in tags:
@@ -496,8 +487,13 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        assert tag.addr not in self.__image
-        self.__image[tag.addr] = tag.value
+        if tag.addr in self.__bytes:
+            raise _DisasmError(
+                tag, 'Byte redefined.',
+                _DisasmError(self.__bytes[tag.addr],
+                             'Previously defined here.'))
+
+        self.__bytes[tag.addr] = tag
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
@@ -518,10 +514,10 @@ class _Disasm(object):
 
         instr_image = []
         for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
-            if i not in self.__image:
+            if i not in self.__bytes:
                 break
 
-            instr_image.append(self.__image[i])
+            instr_image.append(self.__bytes[i].value)
 
         tag.instr = self.__instr_builder.disasm_instr(tag.addr,
                                                       bytes(instr_image))
@@ -578,10 +574,7 @@ class _Disasm(object):
         }
 
         # Sort tags out by categories.
-        t = self.__byte_tags.get(addr, None)
-        if t is not None:
-            KINDS[type(t)].append(t)
-        for t in self.__common_tags.get(addr, []):
+        for t in self.__tags.get(addr, []):
             KINDS[type(t)].append(t)
 
         if len(xbyte) == 0:
@@ -608,7 +601,7 @@ class _Disasm(object):
     def _get_output(self):
         out = _AsmOutput()
 
-        addrs = sorted(set(self.__byte_tags) | set(self.__common_tags))
+        addrs = sorted(self.__tags)
         if len(addrs) == 0:
             return
 
