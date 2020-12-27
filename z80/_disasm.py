@@ -391,24 +391,42 @@ class _AsmOutput(object):
 
 class _Disasm(object):
     def __init__(self):
-        self.__tags = dict()
+        # Translate addresses to tags associated with those
+        # addresses.
         self.__byte_tags = dict()
+        self.__other_tags = dict()
 
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
-        self.__worklist = collections.deque()
+        Worklist = collections.deque
 
-    def __new_tags(self, tags):
-        for t in tags:
-            self.__tags.setdefault(t.addr, []).append(t)
+        # Tags to process stored in order.
+        self.__bytes_worklist = Worklist()
+        self.__others_worklist = Worklist()
 
-    def __append_tags(self, *tags):
-        self.__new_tags(tags)
-        self.__worklist.extend(tags)
+    def __add_tags(self, *tags, to_end_of_queue=False):
+        for tag in tags:
+            if isinstance(tag, _ByteTag):
+                if tag.addr in self.__byte_tags:
+                    raise _DisasmError(
+                        tag, 'Byte redefined.',
+                        _DisasmError(self.__byte_tags[tag.addr],
+                                     'Previously defined here.'))
+                self.__byte_tags[tag.addr] = tag
+            else:
+                self.__other_tags.setdefault(tag.addr, []).append(tag)
 
-    def __insert_tags(self, *tags):
-        self.__new_tags(tags)
-        self.__worklist.extendleft(tags)
+        def get_worklist(tag):
+            if isinstance(tag, (_ByteTag, _IncludeBinaryTag)):
+                return self.__bytes_worklist
+            return self.__others_worklist
+
+        if to_end_of_queue:
+            for tag in tags:
+                get_worklist(tag).append(tag)
+        else:
+            for tag in reversed(tags):
+                get_worklist(tag).appendleft(tag)
 
     def parse_tags(self, filename, image=None):
         addr = 0
@@ -418,18 +436,12 @@ class _Disasm(object):
             else:
                 addr = tag.addr
 
-            self.__append_tags(tag)
+            self.__add_tags(tag, to_end_of_queue=True)
 
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        if tag.addr in self.__byte_tags:
-            raise _DisasmError(
-                tag, 'Byte redefined.',
-                _DisasmError(self.__byte_tags[tag.addr],
-                             'Previously defined here.'))
-
-        self.__byte_tags[tag.addr] = tag
+        pass
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
@@ -443,7 +455,7 @@ class _Disasm(object):
         for i, b in enumerate(tag.image):
             new_tags.append(_ByteTag(tag.origin, tag.addr + i, b))
 
-        self.__insert_tags(*new_tags)
+        self.__add_tags(*new_tags)
 
     def __skip_processing_tag(self, tag):
         pass
@@ -460,13 +472,17 @@ class _Disasm(object):
         process = self.__TAG_PROCESSORS[type(tag)]
         process(self, tag)
 
-    def __process_tags(self):
-        while self.__worklist:
-            self.__process_tag(self.__worklist.popleft())
-
     def disassemble(self):
-        # Process all tags added so far, e.g., by the parser.
-        self.__process_tags()
+        while True:
+            # Process byte-related tags first.
+            if self.__bytes_worklist:
+                tag = self.__bytes_worklist.popleft()
+            elif self.__others_worklist:
+                tag = self.__others_worklist.popleft()
+            else:
+                break
+
+            self.__process_tag(tag)
 
     def __write_comment_tag(self, tag, out):
         yield from out.write_line(None, tag.addr, None, tag.comment)
@@ -494,7 +510,10 @@ class _Disasm(object):
         }
 
         # Sort tags out by categories.
-        for t in self.__tags[addr]:
+        t = self.__byte_tags.get(addr, None)
+        if t is not None:
+            KINDS[type(t)].append(t)
+        for t in self.__other_tags.get(addr, []):
             KINDS[type(t)].append(t)
 
         if len(xbyte) == 0:
@@ -521,7 +540,7 @@ class _Disasm(object):
     def _get_output(self):
         out = _AsmOutput()
 
-        addrs = sorted(self.__tags)
+        addrs = sorted(set(self.__byte_tags) | set(self.__other_tags))
         if len(addrs) == 0:
             return
 

@@ -35,10 +35,10 @@ class DisasmTestCase(unittest.TestCase):
                 input, expected_error = split
 
             os.chdir(os.path.dirname(self.__path))
-            d.parse_tags(self.__id, input)
 
             error = ''
             try:
+                d.parse_tags(self.__id, input)
                 d.disassemble()
 
                 output = ''.join(d._get_output())
