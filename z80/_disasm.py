@@ -384,10 +384,14 @@ class JumpInstr(Instr):
 
     @property
     def conditional(self):
-        return isinstance(self.ops[0], CondFlag)
+        return len(self.ops) > 0 and isinstance(self.ops[0], CondFlag)
 
 
 class CallInstr(JumpInstr):
+    pass
+
+
+class RetInstr(JumpInstr):
     pass
 
 
@@ -396,6 +400,10 @@ class ADD(Instr):
 
 
 class AND(Instr):
+    pass
+
+
+class BIT(Instr):
     pass
 
 
@@ -463,6 +471,18 @@ class OUT(Instr):
     pass
 
 
+class POP(Instr):
+    pass
+
+
+class PUSH(Instr):
+    pass
+
+
+class RET(RetInstr):
+    pass
+
+
 class SBC(Instr):
     pass
 
@@ -477,10 +497,12 @@ class XOR(Instr):
 
 class _Z80InstrBuilder(object):
     __INSTRS = {
+        'Aadd': ADD,
         'Aand': AND,
         'Acp': CP,
         'add': ADD,
         'Axor': XOR,
+        'bit': BIT,
         'call': CALL,
         'dec': DEC,
         'di': DI,
@@ -496,16 +518,22 @@ class _Z80InstrBuilder(object):
         'Lldir': LDIR,
         'nop': NOP,
         'out': OUT,
+        'pop': POP,
+        'push': PUSH,
+        'ret': RET,
         'sbc': SBC,
         'set': SET,
     }
 
     __OPS = {
         'a': A,
+        'Cc': CF,
         'Cnc': NCF,
         'Cnz': NZF,
         'Cz': ZF,
         'de': DE,
+        'Gde': DE,
+        'Ghl': HL,
         'hl': HL,
         'i': IReg,
         'iy': IY,
@@ -900,7 +928,8 @@ class _Disasm(object):
                                           implicit=True))
 
             # Disassemble jump targets.
-            if isinstance(instr, JumpInstr):
+            if (isinstance(instr, JumpInstr) and
+                    not isinstance(instr, RetInstr)):
                 self.__add_tags(_InstrTag(None, instr.target,
                                           implicit=True))
 
