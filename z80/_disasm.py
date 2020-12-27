@@ -255,6 +255,10 @@ class Reg(type):
         return cls.__name__.lower()
 
 
+class IndexReg(Reg):
+    pass
+
+
 class A(metaclass=Reg):
     pass
 
@@ -295,7 +299,7 @@ class HL(metaclass=Reg):
     pass
 
 
-class IY(metaclass=Reg):
+class IY(metaclass=IndexReg):
     pass
 
 
@@ -310,16 +314,34 @@ def _str_op(op):
     return str(op)
 
 
-class AT(object):
+class At(object):
     def __init__(self, op):
         self.ops = [op]
 
     def __repr__(self):
-        return 'AT(%r)' % tuple(self.ops)
+        return 'At(%r)' % tuple(self.ops)
 
     def __str__(self):
         op, = tuple(self.ops)
         return '(%s)' % _str_op(op)
+
+
+class Add(object):
+    def __init__(self, a, b):
+        self.ops = [a, b]
+
+    def __repr__(self):
+        return 'Add(%r, %r)' % tuple(self.ops)
+
+    def __str__(self):
+        a, b = tuple(self.ops)
+
+        sign = '+'
+        if isinstance(b, int) and b < 0:
+            sign = '-'
+            b = -b
+
+        return '%s %c %s' % (_str_op(a), sign, _str_op(b))
 
 
 # Base class for all instructions.
@@ -382,6 +404,10 @@ class DI(Instr):
     pass
 
 
+class EI(Instr):
+    pass
+
+
 class EX(Instr):
     pass
 
@@ -414,6 +440,10 @@ class LDDR(Instr):
     pass
 
 
+class LDIR(Instr):
+    pass
+
+
 class NOP(Instr):
     pass
 
@@ -438,6 +468,7 @@ class _Z80InstrBuilder(object):
         'Axor': XOR,
         'dec': DEC,
         'di': DI,
+        'ei': EI,
         'ex': EX,
         'exx': EXX,
         'im': IM,
@@ -446,6 +477,7 @@ class _Z80InstrBuilder(object):
         'jr': JR,
         'ld': LD,
         'Llddr': LDDR,
+        'Lldir': LDIR,
         'nop': NOP,
         'out': OUT,
         'sbc': SBC,
@@ -459,6 +491,7 @@ class _Z80InstrBuilder(object):
         'de': DE,
         'hl': HL,
         'i': I,
+        'iy': IY,
         'Pbc': BC,
         'Pde': DE,
         'Phl': HL,
@@ -468,38 +501,57 @@ class _Z80InstrBuilder(object):
         'Rd': D,
         'Re': E,
         'Rh': H,
-        'R(hl)': lambda: AT(HL),
         'Rl': L,
         'sp': SP,
     }
 
+    class __UnknownInstrError(Exception):
+        pass
+
     def __build_op(self, addr, text):
+        if text.startswith('R('):
+            text = text[1:]
+
         if text.startswith('('):
             assert text[-1] == ')'
-            return AT(self.__build_op(addr, text[1:-1]))
+            return At(self.__build_op(addr, text[1:-1]))
 
-        if text.startswith(('W', 'N', 'U')):
-            return int(text[1:], base=0)
+        # Base operand.
+        if text in self.__OPS:
+            op = self.__OPS[text]
+            text = ''
+        elif text.startswith(('W', 'N', 'U')):
+            text = text.split()
+            op = int(text[0][1:], base=0)
+            text = ' '.join(text[1:])
+        elif text.startswith('D$'):
+            op = addr
+            text = text[2:].strip()
+        elif text.startswith(('ix', 'iy')):
+            op = self.__OPS[text[:2]]
+            text = text[2:].strip()
+        else:
+            raise self.__UnknownInstrError()
 
-        if text.startswith('D'):
-            dollar_sign, sign, offset = tuple(text[1:].split())
-            assert dollar_sign == '$'
+        # Offset.
+        if text != '' and text[0] in ('+', '-'):
+            sign = text[0]
+            text = text[1:].strip()
 
-            offset = int(offset, base=0)
+            offset = int(text, base=0)
+            text = ''
 
-            assert sign in ('+', '-')
             if sign == '-':
                 offset = -offset
 
-            return addr + offset
+            if isinstance(op, int):
+                op += offset
+            elif isinstance(op, IndexReg):
+                op = Add(op, offset)
+            else:
+                raise self.__UnknownInstrError()
 
-        if text not in self.__OPS:
-            return '<unknown>'
-
-        op = self.__OPS[text]
-
-        if not isinstance(op, (CondFlag, Reg)):
-            op = op()
+        assert text == '', text
 
         return op
 
@@ -509,34 +561,32 @@ class _Z80InstrBuilder(object):
             # TODO: Too few bytes to disassemble this instruction.
             assert 0, image
 
-        text = original_text.split(maxsplit=1)
+        try:
+            text = original_text.split(maxsplit=1)
 
-        assert len(text) > 0, (original_text, image)
-        name = text.pop(0)
+            assert len(text) > 0, (original_text, image)
+            name = text.pop(0)
 
-        if name not in self.__INSTRS:
+            if name not in self.__INSTRS:
+                raise self.__UnknownInstrError()
+
+            instr = self.__INSTRS[name]()
+            instr.addr = addr
+            instr.size = size
+
+            # Parse operands.
+            if text:
+                text = text[0].split(',')
+                while text:
+                    op_text = text.pop(0).strip()
+                    op = self.__build_op(addr, op_text)
+
+                    if op is not None:
+                        instr.ops.append(op)
+        except self.__UnknownInstrError:
             instr = UnknownInstr(image[0])
             instr.text = original_text
             return instr
-
-        instr = self.__INSTRS[name]()
-        instr.addr = addr
-        instr.size = size
-
-        # Parse operands.
-        if text:
-            text = text[0].split(',')
-            while text:
-                op_text = text.pop(0).strip()
-                op = self.__build_op(addr, op_text)
-
-                if op == '<unknown>':
-                    instr = UnknownInstr(image[0])
-                    instr.text = original_text
-                    return instr
-
-                if op is not None:
-                    instr.ops.append(op)
 
         return instr
 
