@@ -272,6 +272,10 @@ class DI(Instr):
     pass
 
 
+class JP(JumpInstr):
+    pass
+
+
 class LD(Instr):
     pass
 
@@ -284,6 +288,7 @@ class _Z80InstrBuilder(object):
     __INSTRS = {
         'Axor': XOR,
         'di': DI,
+        'jp': JP,
         'ld': LD,
     }
 
@@ -581,10 +586,6 @@ class _Disasm(object):
         self.__add_tags(*new_tags)
 
     def __process_instr_tag(self, tag):
-        # TODO
-        if tag.addr > 0x0002:
-            return
-
         if tag.addr in self.__instrs:
             return
 
