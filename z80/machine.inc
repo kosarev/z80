@@ -187,7 +187,7 @@ static PyMethodDef methods[] = {
     {"on_handle_active_int", on_handle_active_int, METH_NOARGS,
      "Attempts to initiate a masked interrupt."},
 #endif  // defined(Z80_MACHINE)
-    {"__disasm", disasm_func, METH_VARARGS | METH_STATIC,
+    {"_disasm", disasm_func, METH_VARARGS | METH_STATIC,
      "Disassembles passed string of bytes."},
     { nullptr }  // Sentinel.
 };

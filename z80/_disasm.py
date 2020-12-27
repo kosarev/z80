@@ -13,6 +13,7 @@ import bisect
 import collections
 import re
 from ._error import Error
+from ._machine import Z80Machine
 
 
 class _SourcePos(object):
@@ -221,6 +222,44 @@ class _InstrTag(_Tag):
         super().__init__(origin, addr, size=0)
 
 
+class Instr(object):
+    def __init__(self):
+        self.addr = None
+        self.size = None
+
+    def __repr__(self):
+        return self.ID + '()'
+
+
+class DI(Instr):
+    ID = 'DI'
+
+
+class _Z80InstrBuilder(object):
+    __INSTRS = {
+        'di': DI,
+    }
+
+    def disasm_instr(self, addr, image):
+        text, size = Z80Machine._disasm(image)
+        if size > len(image):
+            # TODO: Too few bytes to disassemble this instruction.
+            assert 0
+
+        text = text.split(maxsplit=1)
+
+        name = text.pop(0)
+
+        instr = self.__INSTRS[name]()
+        instr.addr = addr
+        instr.size = size
+
+        # TODO: Parse operands.
+        assert len(text) == 0
+
+        return instr
+
+
 class _TagParser(object):
     __TAG_LEADER = re.compile('@@')
 
@@ -401,6 +440,9 @@ class _Disasm(object):
     }
 
     def __init__(self):
+        # TODO: Let user choose the CPU type.
+        self.__instr_builder = _Z80InstrBuilder()
+
         # Translate addresses to tags associated with those
         # addresses.
         self.__byte_tags = dict()
@@ -477,6 +519,22 @@ class _Disasm(object):
 
         self.__add_tags(*new_tags)
 
+    def __process_instr_tag(self, tag):
+        MAX_INSTR_SIZE = 4
+
+        instr_image = []
+        for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
+            if i < len(self.__image):
+                b = self.__image[i]
+                if b is not None:
+                    instr_image.append(b)
+                    continue
+
+            break
+
+        tag.instr = self.__instr_builder.disasm_instr(tag.addr,
+                                                      bytes(instr_image))
+
     def __skip_processing_tag(self, tag):
         pass
 
@@ -484,7 +542,7 @@ class _Disasm(object):
         _ByteTag: __process_byte_tag,
         _CommentTag: __skip_processing_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
-        _InstrTag: __skip_processing_tag,
+        _InstrTag: __process_instr_tag,
     }
 
     def __process_tag(self, tag):
