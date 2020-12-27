@@ -397,9 +397,17 @@ class _Disasm(object):
         # list's pop(0).
         self.__worklist = collections.deque()
 
-    def __new_tag(self, tag):
-        self.__tags.setdefault(tag.addr, []).append(tag)
-        self.__worklist.append(tag)
+    def __new_tags(self, tags):
+        for t in tags:
+            self.__tags.setdefault(t.addr, []).append(t)
+
+    def __append_tags(self, *tags):
+        self.__new_tags(tags)
+        self.__worklist.extend(tags)
+
+    def __insert_tags(self, *tags):
+        self.__new_tags(tags)
+        self.__worklist.extendleft(tags)
 
     def parse_tags(self, filename, image=None):
         addr = 0
@@ -409,7 +417,7 @@ class _Disasm(object):
             else:
                 addr = tag.addr
 
-            self.__new_tag(tag)
+            self.__append_tags(tag)
 
             addr += tag.size
 
@@ -421,14 +429,18 @@ class _Disasm(object):
                     _DisasmError(tag, 'Previously defined here.'))
 
     def __process_include_binary_tag(self, tag):
+        new_tags = []
+
         comment = 'Included from binary file %r.' % tag.filename.literal
-        self.__new_tag(_CommentTag(tag.origin, tag.addr, comment))
+        new_tags.append(_CommentTag(tag.origin, tag.addr, comment))
 
         if tag.comment is not None:
-            self.__new_tag(_CommentTag(tag.origin, tag.addr, tag.comment))
+            new_tags.append(_CommentTag(tag.origin, tag.addr, tag.comment))
 
         for i, b in enumerate(tag.image):
-            self.__new_tag(_ByteTag(tag.origin, tag.addr + i, b))
+            new_tags.append(_ByteTag(tag.origin, tag.addr + i, b))
+
+        self.__insert_tags(*new_tags)
 
     def __process_instr_tag(self, tag):
         # TODO: Disassemble the instruction at the tag's address.
