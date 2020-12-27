@@ -271,6 +271,10 @@ private:
 
 static const unsigned max_instr_size = 4;
 
+static constexpr inline unsigned get_char_code(char c) {
+    return static_cast<unsigned char>(c);
+}
+
 template<typename B>
 class disasm_base : public B {
 public:
@@ -284,6 +288,14 @@ public:
 
     void on_emit(const char *out) {
         std::snprintf(output_buff, max_output_buff_size, "%s", out);
+    }
+
+    void on_format_char(char c, const void **&args,
+                        typename base::output_buff &out) {
+        unsigned n = get_char_code(c);
+        if(get_char_code('A') <= n && n <= get_char_code('Z'))
+            out.append(c);
+        base::on_format_char(c, args, out);
     }
 
     fast_u8 on_read_next_byte() {
