@@ -235,6 +235,10 @@ class A(metaclass=Reg):
     pass
 
 
+class DE(metaclass=Reg):
+    pass
+
+
 # Base class for all instructions.
 class Instr(object):
     def __init__(self):
@@ -243,12 +247,19 @@ class Instr(object):
         self.ops = []
 
     def __repr__(self):
-        return self.ID + '(' + ', '.join(repr(op) for op in self.ops) + ')'
+        return (type(self).__name__ +
+                '(' + ', '.join(repr(op) for op in self.ops) + ')')
+
+    def __str_op(self, op):
+        if isinstance(op, int):
+            return '%#x' % op
+
+        return str(op)
 
     def __str__(self):
-        s = self.ID.lower()
+        s = type(self).__name__.lower()
         if self.ops:
-            s += ' ' + ', '.join(str(op) for op in self.ops)
+            s += ' ' + ', '.join(self.__str_op(op) for op in self.ops)
         return s
 
 
@@ -258,24 +269,33 @@ class JumpInstr(Instr):
 
 
 class DI(Instr):
-    ID = 'DI'
+    pass
+
+
+class LD(Instr):
+    pass
 
 
 class XOR(Instr):
-    ID = 'XOR'
+    pass
 
 
 class _Z80InstrBuilder(object):
     __INSTRS = {
         'Axor': XOR,
         'di': DI,
+        'ld': LD,
     }
 
     __OPS = {
+        'Pde': DE,
         'Ra': A,
     }
 
     def __build_op(self, text):
+        if text.startswith('W'):
+            return int(text[1:], base=0)
+
         return self.__OPS[text]
 
     def build_instr(self, addr, image):
@@ -293,8 +313,11 @@ class _Z80InstrBuilder(object):
         instr.size = size
 
         # Parse operands.
-        while text:
-            instr.ops.append(self.__build_op(text.pop(0)))
+        if text:
+            text = text[0].split(',')
+            while text:
+                op_text = text.pop(0).strip()
+                instr.ops.append(self.__build_op(op_text))
 
         return instr
 
@@ -559,7 +582,7 @@ class _Disasm(object):
 
     def __process_instr_tag(self, tag):
         # TODO
-        if tag.addr > 0x0001:
+        if tag.addr > 0x0002:
             return
 
         if tag.addr in self.__instrs:
@@ -672,11 +695,18 @@ class _Disasm(object):
 
         addr = addrs[0]
         for a in addrs:
+            if a < addr:
+                # TODO: Handle cases when there are tags in the
+                # middle of an instruction.
+                assert len(self.__tags[a]) == 1
+                assert isinstance(self.__tags[a][0], _ByteTag)
+                continue
+
             if addr < a:
                 yield from out.write_space_directive(a - addr)
                 addr = a
 
-            assert addr == a
+            assert addr == a, (addr, a)
             addr, g = self.__write_tags(a, out)
 
             yield from g
