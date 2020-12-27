@@ -231,6 +231,14 @@ class CondFlag(type):
         return cls.__name__.lower()[:-1]
 
 
+class CF(metaclass=CondFlag):
+    pass
+
+
+class NCF(metaclass=CondFlag):
+    pass
+
+
 class ZF(metaclass=CondFlag):
     pass
 
@@ -272,6 +280,10 @@ class L(metaclass=Reg):
 
 
 class I(metaclass=Reg):
+    pass
+
+
+class BC(metaclass=Reg):
     pass
 
 
@@ -342,6 +354,14 @@ class JumpInstr(Instr):
         return isinstance(self.ops[0], CondFlag)
 
 
+class ADD(Instr):
+    pass
+
+
+class AND(Instr):
+    pass
+
+
 class CP(Instr):
     pass
 
@@ -351,6 +371,18 @@ class DEC(Instr):
 
 
 class DI(Instr):
+    pass
+
+
+class EX(Instr):
+    pass
+
+
+class EXX(Instr):
+    pass
+
+
+class INC(Instr):
     pass
 
 
@@ -366,11 +398,19 @@ class LD(Instr):
     pass
 
 
+class LDDR(Instr):
+    pass
+
+
 class NOP(Instr):
     pass
 
 
 class OUT(Instr):
+    pass
+
+
+class SBC(Instr):
     pass
 
 
@@ -380,21 +420,33 @@ class XOR(Instr):
 
 class _Z80InstrBuilder(object):
     __INSTRS = {
+        'Aand': AND,
         'Acp': CP,
+        'add': ADD,
         'Axor': XOR,
         'dec': DEC,
         'di': DI,
+        'ex': EX,
+        'exx': EXX,
+        'inc': INC,
         'jp': JP,
         'jr': JR,
         'ld': LD,
+        'Llddr': LDDR,
         'nop': NOP,
         'out': OUT,
+        'sbc': SBC,
     }
 
     __OPS = {
         'a': A,
+        'Cnc': NCF,
         'Cnz': NZF,
+        'Cz': ZF,
+        'de': DE,
+        'hl': HL,
         'i': I,
+        'Pbc': BC,
         'Pde': DE,
         'Phl': HL,
         'Ra': A,
