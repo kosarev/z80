@@ -169,11 +169,12 @@ class _Tokenizer(object):
 
 
 class _Tag(object):
-    def __init__(self, origin, addr, size):
+    def __init__(self, origin, addr, size, implicit=False):
         self.origin = origin
         self.addr = addr
         self.size = size
         self.comment = None
+        self.implicit = implicit
 
     def __str__(self):
         return '%s tag' % self.ID
@@ -218,36 +219,70 @@ class _IncludeBinaryTag(_Tag):
 class _InstrTag(_Tag):
     ID = 'instr'
 
-    def __init__(self, origin, addr):
-        super().__init__(origin, addr, size=0)
+    def __init__(self, origin, addr, implicit=False):
+        super().__init__(origin, addr, size=0, implicit=implicit)
 
 
+class Reg(type):
+    def __repr__(cls):
+        return cls.__name__
+
+    def __str__(cls):
+        return cls.__name__.lower()
+
+
+class A(metaclass=Reg):
+    pass
+
+
+# Base class for all instructions.
 class Instr(object):
     def __init__(self):
         self.addr = None
         self.size = None
+        self.ops = []
 
     def __repr__(self):
-        return self.ID + '()'
+        return self.ID + '(' + ', '.join(repr(op) for op in self.ops) + ')'
 
     def __str__(self):
-        return self.ID.lower()
+        s = self.ID.lower()
+        if self.ops:
+            s += ' ' + ', '.join(str(op) for op in self.ops)
+        return s
+
+
+# Instructions that may affect control flow.
+class JumpInstr(Instr):
+    pass
 
 
 class DI(Instr):
     ID = 'DI'
 
 
+class XOR(Instr):
+    ID = 'XOR'
+
+
 class _Z80InstrBuilder(object):
     __INSTRS = {
+        'Axor': XOR,
         'di': DI,
     }
 
-    def disasm_instr(self, addr, image):
+    __OPS = {
+        'Ra': A,
+    }
+
+    def __build_op(self, text):
+        return self.__OPS[text]
+
+    def build_instr(self, addr, image):
         text, size = Z80Machine._disasm(image)
         if size > len(image):
             # TODO: Too few bytes to disassemble this instruction.
-            assert 0
+            assert 0, image
 
         text = text.split(maxsplit=1)
 
@@ -257,8 +292,9 @@ class _Z80InstrBuilder(object):
         instr.addr = addr
         instr.size = size
 
-        # TODO: Parse operands.
-        assert len(text) == 0
+        # Parse operands.
+        while text:
+            instr.ops.append(self.__build_op(text.pop(0)))
 
         return instr
 
@@ -522,6 +558,10 @@ class _Disasm(object):
         self.__add_tags(*new_tags)
 
     def __process_instr_tag(self, tag):
+        # TODO
+        if tag.addr > 0x0001:
+            return
+
         if tag.addr in self.__instrs:
             return
 
@@ -534,9 +574,18 @@ class _Disasm(object):
 
             instr_image.append(self.__bytes[i].value)
 
-        tag.instr = self.__instr_builder.disasm_instr(tag.addr,
-                                                      bytes(instr_image))
+        if len(instr_image) == 0:
+            return
+
+        instr = self.__instr_builder.build_instr(tag.addr,
+                                                 bytes(instr_image))
+        tag.instr = instr
         self.__instrs[tag.addr] = tag
+
+        # Disassemble the following instruction.
+        if not isinstance(instr, JumpInstr):
+            self.__add_tags(_InstrTag(None, instr.addr + instr.size,
+                                      implicit=True))
 
     def __skip_processing_tag(self, tag):
         pass
@@ -577,7 +626,10 @@ class _Disasm(object):
 
         addrs = range(tag.addr, tag.addr + tag.instr.size)
         tag_body = ['%#04x' % self.__bytes[i].value for i in addrs]
-        tag_body.append('instr')
+
+        if not tag.implicit:
+            tag_body.append('instr')
+
         tag_body = ' '.join(tag_body)
 
         yield from out.write_line(command,
@@ -603,7 +655,6 @@ class _Disasm(object):
                 yield from self.__write_instr_tag(instr_tag, out)
             elif byte_tag is not None:
                 yield from self.__write_byte_tag(byte_tag, out)
-
 
         if instr_tag is not None:
             addr += instr_tag.instr.size
