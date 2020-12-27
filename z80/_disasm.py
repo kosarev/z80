@@ -400,7 +400,6 @@ class _Disasm(object):
         _CommentTag: 2,
     }
 
-
     def __init__(self):
         # Translate addresses to tags associated with those
         # addresses.
@@ -409,6 +408,9 @@ class _Disasm(object):
 
         # Tags to process stored in order.
         self.__worklists = dict()
+
+        # Byte image.
+        self.__image = []
 
     def __get_worklist(self, tag):
         # Use deque because of its popleft() is much faster than
@@ -452,7 +454,14 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        pass
+        required_size = tag.addr + 1
+
+        if len(self.__image) < required_size:
+            additional_size = required_size - len(self.__image)
+            self.__image.extend([None] * additional_size)
+
+        assert self.__image[tag.addr] is None
+        self.__image[tag.addr] = tag.value
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
