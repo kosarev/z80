@@ -452,7 +452,7 @@ class _Disasm(object):
         self.__worklists = dict()
 
         # Byte image.
-        self.__image = []
+        self.__image = dict()
 
     def __get_worklist(self, tag):
         # Use deque because of its popleft() is much faster than
@@ -496,13 +496,7 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        required_size = tag.addr + 1
-
-        if len(self.__image) < required_size:
-            additional_size = required_size - len(self.__image)
-            self.__image.extend([None] * additional_size)
-
-        assert self.__image[tag.addr] is None
+        assert tag.addr not in self.__image
         self.__image[tag.addr] = tag.value
 
     def __process_include_binary_tag(self, tag):
@@ -524,13 +518,10 @@ class _Disasm(object):
 
         instr_image = []
         for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
-            if i < len(self.__image):
-                b = self.__image[i]
-                if b is not None:
-                    instr_image.append(b)
-                    continue
+            if i not in self.__image:
+                break
 
-            break
+            instr_image.append(self.__image[i])
 
         tag.instr = self.__instr_builder.disasm_instr(tag.addr,
                                                       bytes(instr_image))
