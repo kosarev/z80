@@ -392,6 +392,7 @@ class _AsmOutput(object):
 class _Disasm(object):
     def __init__(self):
         self.__tags = dict()
+        self.__byte_tags = dict()
 
         # Use deque because of its popleft() is much faster than
         # list's pop(0).
@@ -422,11 +423,13 @@ class _Disasm(object):
             addr += tag.size
 
     def __process_byte_tag(self, tag):
-        for t in self.__tags.get(tag.addr, []):
-            if t is not tag and isinstance(t, _ByteTag):
-                raise _DisasmError(
-                    t, 'Byte redefined.',
-                    _DisasmError(tag, 'Previously defined here.'))
+        if tag.addr in self.__byte_tags:
+            raise _DisasmError(
+                tag, 'Byte redefined.',
+                _DisasmError(self.__byte_tags[tag.addr],
+                             'Previously defined here.'))
+
+        self.__byte_tags[tag.addr] = tag
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
@@ -442,15 +445,14 @@ class _Disasm(object):
 
         self.__insert_tags(*new_tags)
 
-    def __process_instr_tag(self, tag):
-        # TODO: Disassemble the instruction at the tag's address.
+    def __skip_processing_tag(self, tag):
         pass
 
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
-        _CommentTag: lambda self, tag: None,
+        _CommentTag: __skip_processing_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
-        _InstrTag: __process_instr_tag,
+        _InstrTag: __skip_processing_tag,
     }
 
     def __process_tag(self, tag):
@@ -458,9 +460,13 @@ class _Disasm(object):
         process = self.__TAG_PROCESSORS[type(tag)]
         process(self, tag)
 
-    def disassemble(self):
+    def __process_tags(self):
         while self.__worklist:
             self.__process_tag(self.__worklist.popleft())
+
+    def disassemble(self):
+        # Process all tags added so far, e.g., by the parser.
+        self.__process_tags()
 
     def __write_comment_tag(self, tag, out):
         yield from out.write_line(None, tag.addr, None, tag.comment)
