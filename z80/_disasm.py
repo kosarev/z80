@@ -11,7 +11,9 @@
 
 import bisect
 import collections
+import os
 import re
+import tempfile
 from ._error import Error
 from ._machine import Z80Machine
 
@@ -378,10 +380,11 @@ class Instr(object):
 
 
 class UnknownInstr(Instr):
-    def __init__(self, opcode):
+    def __init__(self, addr, opcode):
         super().__init__()
-        self.opcode = opcode
+        self.addr = addr
         self.size = 1
+        self.opcode = opcode
         self.text = None
 
     def __str__(self):
@@ -440,6 +443,10 @@ class DEC(Instr):
 
 
 class DI(Instr):
+    pass
+
+
+class DJNZ(JumpInstr):
     pass
 
 
@@ -503,6 +510,10 @@ class PUSH(Instr):
     pass
 
 
+class RES(Instr):
+    pass
+
+
 class RET(RetInstr):
     pass
 
@@ -554,6 +565,7 @@ class _Z80InstrBuilder(object):
         'cpl': CPL,
         'dec': DEC,
         'di': DI,
+        'djnz': DJNZ,
         'ei': EI,
         'ex': EX,
         'exx': EXX,
@@ -569,6 +581,7 @@ class _Z80InstrBuilder(object):
         'out': OUT,
         'pop': POP,
         'push': PUSH,
+        'res': RES,
         'ret': RET,
         'rrca': RRCA,
         'rst': RST,
@@ -585,6 +598,7 @@ class _Z80InstrBuilder(object):
         'Cz': ZF,
         'de': DE,
         'Gaf': AF,
+        'Gbc': BC,
         'Gde': DE,
         'Ghl': HL,
         'hl': HL,
@@ -685,7 +699,7 @@ class _Z80InstrBuilder(object):
                     if op is not None:
                         instr.ops.append(op)
         except self.__UnknownInstrError:
-            instr = UnknownInstr(image[0])
+            instr = UnknownInstr(addr, image[0])
             instr.text = original_text
             return instr
 
@@ -954,6 +968,13 @@ class _Disasm(object):
 
         self.__add_tags(*new_tags)
 
+    def __mark_addr_to_disassemble(self, addr):
+        # See if the addressed is already marked.
+        tags = self.__tags.get(addr, [])
+        if (all(not isinstance(t, _InstrTag) for t in tags) and
+                any(isinstance(t, _ByteTag) for t in tags)):
+            self.__add_tags(_InstrTag(None, addr, implicit=True))
+
     def __process_instr_tag(self, tag):
         if tag.addr in self.__instrs:
             return
@@ -981,8 +1002,7 @@ class _Disasm(object):
             if (not isinstance(instr, JumpInstr) or
                     isinstance(instr, CallInstr) or
                     instr.conditional):
-                self.__add_tags(_InstrTag(None, instr.addr + instr.size,
-                                          implicit=True))
+                self.__mark_addr_to_disassemble(instr.addr + instr.size)
 
             # Disassemble jump targets.
             if (isinstance(instr, JumpInstr) and
@@ -990,7 +1010,7 @@ class _Disasm(object):
                 target = instr.target
                 if not isinstance(target, At):
                     assert isinstance(target, int)
-                    self.__add_tags(_InstrTag(None, target, implicit=True))
+                    self.__mark_addr_to_disassemble(target)
 
     def __skip_processing_tag(self, tag):
         pass
@@ -1026,11 +1046,14 @@ class _Disasm(object):
         yield from out.write_line('db %#04x' % tag.value,
                                   tag.addr, tag_body, tag.comment)
 
+    def __verbalize_instr_bytes(self, instr):
+        assert instr.addr is not None, instr
+        addrs = range(instr.addr, instr.addr + instr.size)
+        return ' '.join('%#04x' % self.__bytes[i].value for i in addrs)
+
     def __write_instr_tag(self, tag, out):
         command = '%s' % tag.instr
-
-        addrs = range(tag.addr, tag.addr + tag.instr.size)
-        tag_body = ['%#04x' % self.__bytes[i].value for i in addrs]
+        tag_body = [self.__verbalize_instr_bytes(tag.instr)]
 
         if not tag.implicit:
             tag_body.append('instr')
@@ -1039,11 +1062,35 @@ class _Disasm(object):
 
         comment = None
         if isinstance(tag.instr, UnknownInstr):
-            comment = 'unknown_instr %r' % tag.instr.text
+            comment = 'warning: unknown instruction: %r' % tag.instr.text
 
         yield from out.write_line(command,
                                   tag.addr, tag_body, tag.comment,
                                   comment)
+
+        # Handle tags in the middle of the instruction.
+        for i in range(tag.instr.size):
+            for t in self.__tags.get(tag.addr + i, []):
+                if isinstance(t, _ByteTag):
+                    continue
+
+                if isinstance(t, (_InstrTag, _CommentTag)) and i == 0:
+                    continue
+
+                if isinstance(t, _InstrTag):
+                    bytes = self.__verbalize_instr_bytes(t.instr)
+                    comment = ('   %#06x %s'
+                               ' warning: overlapping instruction: %r' % (
+                                   t.addr, bytes, str(t.instr)))
+
+                    if not t.implicit:
+                        comment += ' @@ %#06x instr' % t.addr
+
+                    yield from out.write_line('', None, None, None,
+                                              comment)
+                    continue
+
+                assert 0, t
 
     def __write_tags(self, addr, out):
         tags = self.__tags.get(addr, [])
@@ -1083,13 +1130,9 @@ class _Disasm(object):
         addr = addrs[0]
         for a in addrs:
             if a < addr:
-                # TODO: Handle cases when there are tags in the
-                # middle of an instruction.
-                assert len(self.__tags[a]) == 1
-                assert isinstance(self.__tags[a][0], _ByteTag)
                 continue
 
-            if addr < a:
+            if a > addr:
                 yield from out.write_space_directive(a - addr)
                 addr = a
 
@@ -1099,6 +1142,13 @@ class _Disasm(object):
             yield from g
 
     def save_output(self, filename):
-        with open(filename, 'w') as f:
-            for chunk in self._get_output():
-                f.write(chunk)
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                for chunk in self._get_output():
+                    f.write(chunk)
+
+            os.rename(f.name, filename)
+            f = None
+        finally:
+            if f is not None:
+                os.remove(f.name)
