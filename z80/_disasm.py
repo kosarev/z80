@@ -230,34 +230,52 @@ class CondFlag(type):
         return cls.__name__
 
     def __str__(cls):
-        return cls.__name__.lower()[:-1]
+        s = cls.__name__
+        if s == 'CF':
+            s = 'C'
+        return s.lower()
 
 
 class CF(metaclass=CondFlag):
     pass
 
 
-class NCF(metaclass=CondFlag):
+class NC(metaclass=CondFlag):
     pass
 
 
-class ZF(metaclass=CondFlag):
+class M(metaclass=CondFlag):
     pass
 
 
-class NZF(metaclass=CondFlag):
+class P(metaclass=CondFlag):
+    pass
+
+
+class PO(metaclass=CondFlag):
+    pass
+
+
+class Z(metaclass=CondFlag):
+    pass
+
+
+class NZ(metaclass=CondFlag):
     pass
 
 
 class Reg(type):
+    __STR_NAMES = {
+        'AF2': "af'",
+        'IReg': 'I',
+    }
+
     def __repr__(cls):
         return cls.__name__
 
     def __str__(cls):
-        s = cls.__name__.lower()
-        if s.endswith('reg'):
-            s = s[:-3]
-        return s
+        n = cls.__name__
+        return cls.__STR_NAMES.get(n, n).lower()
 
 
 class IndexReg(Reg):
@@ -297,6 +315,10 @@ class IReg(metaclass=Reg):
 
 
 class AF(metaclass=Reg):
+    pass
+
+
+class AF2(metaclass=Reg):
     pass
 
 
@@ -399,6 +421,9 @@ class JumpInstr(Instr):
 
     @property
     def conditional(self):
+        if isinstance(self, DJNZ):
+            return True
+
         return len(self.ops) > 0 and isinstance(self.ops[0], CondFlag)
 
 
@@ -411,6 +436,10 @@ class RetInstr(JumpInstr):
 
 
 class ADD(Instr):
+    pass
+
+
+class ADC(Instr):
     pass
 
 
@@ -438,6 +467,10 @@ class CPL(Instr):
     pass
 
 
+class DAA(Instr):
+    pass
+
+
 class DEC(Instr):
     pass
 
@@ -462,7 +495,15 @@ class EXX(Instr):
     pass
 
 
+class HALT(Instr):
+    pass
+
+
 class IM(Instr):
+    pass
+
+
+class IN(Instr):
     pass
 
 
@@ -487,6 +528,10 @@ class LDDR(Instr):
 
 
 class LDIR(Instr):
+    pass
+
+
+class NEG(Instr):
     pass
 
 
@@ -518,6 +563,38 @@ class RET(RetInstr):
     pass
 
 
+class RL(Instr):
+    pass
+
+
+class RLA(Instr):
+    pass
+
+
+class RLC(Instr):
+    pass
+
+
+class RLCA(Instr):
+    pass
+
+
+class RLD(Instr):
+    pass
+
+
+class RR(Instr):
+    pass
+
+
+class RRA(Instr):
+    pass
+
+
+class RRC(Instr):
+    pass
+
+
 class RRCA(Instr):
     pass
 
@@ -538,6 +615,14 @@ class SET(Instr):
     pass
 
 
+class SLA(Instr):
+    pass
+
+
+class SRA(Instr):
+    pass
+
+
 class SRL(Instr):
     pass
 
@@ -553,36 +638,53 @@ class XOR(Instr):
 class _Z80InstrBuilder(object):
     __INSTRS = {
         'Aadd': ADD,
+        'Aadc': ADC,
         'Aand': AND,
         'Acp': CP,
         'add': ADD,
+        'adc': ADC,
         'Aor': OR,
+        'Asbc': SBC,
         'Asub': SUB,
         'Axor': XOR,
         'bit': BIT,
         'call': CALL,
         'ccf': CCF,
         'cpl': CPL,
+        'daa': DAA,
         'dec': DEC,
         'di': DI,
         'djnz': DJNZ,
         'ei': EI,
         'ex': EX,
         'exx': EXX,
+        'halt': HALT,
         'im': IM,
         'inc': INC,
+        'in': IN,
         'jp': JP,
         'jr': JR,
         'ld': LD,
         'Llddr': LDDR,
         'Lldir': LDIR,
+        'neg': NEG,
         'nop': NOP,
+        'Orlc': RLC,
+        'Orl': RL,
+        'Orr': RR,
+        'Orrc': RRC,
+        'Osla': SLA,
+        'Osra': SRA,
         'Osrl': SRL,
         'out': OUT,
         'pop': POP,
         'push': PUSH,
         'res': RES,
         'ret': RET,
+        'rla': RLA,
+        'rlca': RLCA,
+        'rld': RLD,
+        'rra': RRA,
         'rrca': RRCA,
         'rst': RST,
         'sbc': SBC,
@@ -592,10 +694,15 @@ class _Z80InstrBuilder(object):
 
     __OPS = {
         'a': A,
+        'af': AF,
+        'af\'': AF2,
         'Cc': CF,
-        'Cnc': NCF,
-        'Cnz': NZF,
-        'Cz': ZF,
+        'Cm': M,
+        'Cnc': NC,
+        'Cnz': NZ,
+        'Cpo': PO,
+        'Cp': P,
+        'Cz': Z,
         'de': DE,
         'Gaf': AF,
         'Gbc': BC,
