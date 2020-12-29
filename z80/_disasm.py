@@ -1029,18 +1029,15 @@ class _Disasm(object):
             self.__worklists[priority] = Worklist()
         return self.__worklists[priority]
 
-    def __add_tags(self, *tags, to_end_of_queue=False):
+    def __add_tags(self, *tags):
         for tag in tags:
             self.__tags.setdefault(tag.addr, []).append(tag)
 
-        if to_end_of_queue:
-            for tag in tags:
-                self.__get_worklist(tag).append(tag)
-        else:
-            for tag in reversed(tags):
-                self.__get_worklist(tag).appendleft(tag)
+        for tag in tags:
+            self.__get_worklist(tag).append(tag)
 
     def parse_tags(self, filename, image=None):
+        tags = []
         addr = 0
         for tag in _TagParser(_SourceFile(filename, image)):
             if tag.addr is None:
@@ -1048,9 +1045,14 @@ class _Disasm(object):
             else:
                 addr = tag.addr
 
-            self.__add_tags(tag, to_end_of_queue=True)
-
+            tags.append(tag)
             addr += tag.size
+
+        self.__add_tags(*tags)
+
+    def __queue_tags(self, *tags):
+        for tag in reversed(tags):
+            self.__get_worklist(tag).appendleft(tag)
 
     def __process_byte_tag(self, tag):
         if tag.addr in self.__bytes:
@@ -1073,6 +1075,7 @@ class _Disasm(object):
         for i, b in enumerate(tag.image):
             new_tags.append(_ByteTag(tag.origin, tag.addr + i, b))
 
+        # TODO: Not really adding tags.
         self.__add_tags(*new_tags)
 
     def __mark_addr_to_disassemble(self, addr):
@@ -1080,7 +1083,8 @@ class _Disasm(object):
         tags = self.__tags.get(addr, [])
         if (all(not isinstance(t, _InstrTag) for t in tags) and
                 any(isinstance(t, _ByteTag) for t in tags)):
-            self.__add_tags(_InstrTag(None, addr, implicit=True))
+            # TODO: No need for implicit tags?
+            self.__queue_tags(_InstrTag(None, addr, implicit=True))
 
     def __process_instr_tag(self, tag):
         if tag.addr in self.__instrs:
@@ -1176,28 +1180,20 @@ class _Disasm(object):
                                   comment)
 
         # Handle tags in the middle of the instruction.
-        for i in range(tag.instr.size):
-            for t in self.__tags.get(tag.addr + i, []):
-                if isinstance(t, _ByteTag):
-                    continue
+        # TODO: Handle non-instr tags as well.
+        for i in range(1, tag.instr.size):
+            t = self.__instrs.get(tag.addr + i, None)
+            if t is not None:
+                bytes = self.__verbalize_instr_bytes(t.instr)
+                comment = ('   %#06x %s'
+                           ' warning: overlapping instruction: %r' % (
+                               t.addr, bytes, str(t.instr)))
 
-                if isinstance(t, (_InstrTag, _CommentTag)) and i == 0:
-                    continue
+                if not t.implicit:
+                    comment += ' @@ %#06x instr' % t.addr
 
-                if isinstance(t, _InstrTag):
-                    bytes = self.__verbalize_instr_bytes(t.instr)
-                    comment = ('   %#06x %s'
-                               ' warning: overlapping instruction: %r' % (
-                                   t.addr, bytes, str(t.instr)))
-
-                    if not t.implicit:
-                        comment += ' @@ %#06x instr' % t.addr
-
-                    yield from out.write_line('', None, None, None,
-                                              comment)
-                    continue
-
-                assert 0, t
+                yield from out.write_line('', None, None, None,
+                                          comment)
 
     def __write_tags(self, addr, out):
         tags = self.__tags.get(addr, [])
