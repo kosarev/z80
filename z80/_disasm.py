@@ -385,10 +385,10 @@ class Add(object):
 
 # Base class for all instructions.
 class Instr(object):
-    def __init__(self):
+    def __init__(self, *ops):
         self.addr = None
         self.size = None
-        self.ops = []
+        self.ops = ops
 
     def __repr__(self):
         return (type(self).__name__ +
@@ -792,11 +792,9 @@ class _Z80InstrBuilder(object):
             if name not in self.__INSTRS:
                 raise self.__UnknownInstrError()
 
-            instr = self.__INSTRS[name]()
-            instr.addr = addr
-            instr.size = size
 
             # Parse operands.
+            ops = []
             if text:
                 text = text[0].split(',')
                 while text:
@@ -804,7 +802,11 @@ class _Z80InstrBuilder(object):
                     op = self.__build_op(addr, op_text)
 
                     if op is not None:
-                        instr.ops.append(op)
+                        ops.append(op)
+
+            instr = self.__INSTRS[name](*ops)
+            instr.addr = addr
+            instr.size = size
         except self.__UnknownInstrError:
             instr = UnknownInstr(addr, image[0])
             instr.text = original_text
