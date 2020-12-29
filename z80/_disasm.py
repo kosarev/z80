@@ -857,9 +857,9 @@ class _TagParser(object):
 
         return self.__tok
 
-    def __evaluate_numeric_literal(self, literal):
+    def __evaluate_numeric_literal(self, literal, base=0):
         try:
-            return int(literal, base=0)
+            return int(literal, base)
         except ValueError:
             return None
 
@@ -904,7 +904,7 @@ class _TagParser(object):
             # Collect bytes, if any specified.
             byte_offset = 0
             while tok is not None:
-                value = self.__evaluate_numeric_literal(tok.literal)
+                value = self.__evaluate_numeric_literal(tok.literal, base=16)
                 if value is None:
                     break
 
@@ -1155,14 +1155,14 @@ class _Disasm(object):
         yield from out.write_line(None, tag.addr, None, tag.comment)
 
     def __write_byte_tag(self, tag, out):
-        tag_body = '%#04x' % tag.value
+        tag_body = '%02x' % tag.value
         yield from out.write_line('db %#04x' % tag.value,
                                   tag.addr, tag_body, tag.comment)
 
     def __verbalize_instr_bytes(self, instr):
         assert instr.addr is not None, instr
         addrs = range(instr.addr, instr.addr + instr.size)
-        return ' '.join('%#04x' % self.__bytes[i].value for i in addrs)
+        return ' '.join('%02x' % self.__bytes[i].value for i in addrs)
 
     def __write_instr_tag(self, tag, out):
         command = '%s' % tag.instr
