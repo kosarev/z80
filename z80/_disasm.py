@@ -1020,8 +1020,8 @@ class _Disasm(object):
         self.__instrs = dict()
 
     def __get_worklist(self, tag):
-        # Use deque because of its popleft() is much faster than
-        # list's pop(0).
+        # Use deque because of its popleft() being much faster
+        # than list's pop(0).
         Worklist = collections.deque
 
         priority = self.__TAG_PRIORITIES[type(tag)]
