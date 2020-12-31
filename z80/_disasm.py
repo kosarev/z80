@@ -1260,8 +1260,7 @@ class _Disasm(object):
         if len(inline_comments) == 0:
             byte_addr = addr + 1
 
-            # TODO: self._AsmLine._MAX_NUM_OF_BYTES_PER_LINE
-            while len(xbytes) < 1:
+            while len(xbytes) < self._AsmLine._MAX_NUM_OF_BYTES_PER_LINE:
                 if byte_addr in self.__instrs:
                     break
 
