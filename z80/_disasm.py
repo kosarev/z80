@@ -28,6 +28,11 @@ class _SourcePos(object):
         return self.__file.get_coordinates(self.__offset)
 
     @property
+    def column_no(self):
+        line, line_no, column_no = self.__coordinates
+        return column_no
+
+    @property
     def inline_text(self):
         line, line_no, column_no = self.__coordinates
         return '%s:%s:%s' % (self.__file, line_no, column_no)
@@ -164,9 +169,6 @@ class _Tokenizer(object):
         if self.__token_offset < self.__offset:
             literal = self.__image[self.__token_offset:self.__offset]
 
-        # Ending a token implicitly starts another one.
-        self.start_token()
-
         return _Token(literal, pos)
 
 
@@ -187,6 +189,14 @@ class _Tag(object):
 
 class _CommentTag(_Tag):
     ID = 'comment'
+
+    def __init__(self, origin, addr, comment):
+        super().__init__(origin, addr, size=0)
+        self.comment = comment
+
+
+class _InlineCommentTag(_Tag):
+    ID = 'inline_comment'
 
     def __init__(self, origin, addr, comment):
         super().__init__(origin, addr, size=0)
@@ -792,7 +802,6 @@ class _Z80InstrBuilder(object):
             if name not in self.__INSTRS:
                 raise self.__UnknownInstrError()
 
-
             # Parse operands.
             ops = []
             if text:
@@ -819,10 +828,10 @@ class _TagParser(object):
     __TAG_LEADER = re.compile('@@')
 
     __TOKENS = re.compile(
-        r'([_a-z][_0-9a-z]*)|'      # An identifier.
-        r'([0-9][0-9a-z]*)|'        # A number.
-        r"'(\\'|\\\\|[^'\\\n])*'|"  # A string.
-        r'.')                       # Or any other single character.
+        r'([_0-9a-zA-Z]+)|'           # A number or identifier.
+        r"'(\\'|\\\\|[^'\\\n])*'|"    # A string.
+        r'(--)|'                      # The tag comment leader.
+        r'.')                         # Or any other single character.
 
     def __init__(self, source_file):
         self.__toks = _Tokenizer(source_file)
@@ -863,13 +872,6 @@ class _TagParser(object):
         except ValueError:
             return None
 
-    def __parse_comment(self):
-        self.__toks.skip_whitespace()
-        self.__toks.start_token()
-        self.__toks.skip_rest_of_line()
-        self.__tok = self.__toks.end_token()
-        return self.__tok
-
     def __parse_include_binary_tag(self, addr, name):
         filename = self.__fetch_token('A filename expected.')
         self.__fetch_token()
@@ -899,7 +901,6 @@ class _TagParser(object):
                 tok = self.__fetch_token()
 
             tags = []
-            subject_tag = None
 
             # Collect bytes, if any specified.
             byte_offset = 0
@@ -908,17 +909,15 @@ class _TagParser(object):
                 if value is None:
                     break
 
-                tag = _ByteTag(tok.pos, addr + byte_offset, value)
-                if subject_tag is None:
-                    subject_tag = tag
-
-                tags.append(tag)
+                tags.append(_ByteTag(tok.pos, addr + byte_offset, value))
                 byte_offset += 1
 
                 tok = self.__fetch_token()
 
-            # Parse regular tags.
-            if tok is not None and tok != ':':
+            # Parse regular tag.
+            subject_tag = None
+            if tok == '.':
+                tok = self.__fetch_token()
                 parser = self.__TAG_PARSERS.get(tok.literal, None)
                 if not parser:
                     raise _DisasmError(tok, 'Unknown tag.')
@@ -927,70 +926,30 @@ class _TagParser(object):
                 tags.append(subject_tag)
                 tok = self.__tok
 
-            # Parse comments.
-            if tok is not None:
-                if tok != ':':
+                if tok is not None and tok != '--':
                     raise _DisasmError(tok,
                                        'End of line or a comment expected.')
 
-                comment = self.__parse_comment()
+            # Parse comment, if specified.
+            if tok == '--':
+                tok = self.__fetch_token()
+
+            if tok is not None:
+                self.__toks.skip_rest_of_line()
+                comment = self.__toks.end_token()
 
                 if subject_tag is None:
-                    tags.append(_CommentTag(tok.pos, addr, comment))
+                    if comment.pos.column_no < _Disasm._AsmLine._BYTES_INDENT:
+                        tags.append(_CommentTag(tok.pos, addr,
+                                                comment.literal))
+                    else:
+                        tags.append(_InlineCommentTag(tok.pos, addr,
+                                                      comment.literal))
                 else:
                     assert subject_tag.comment is None
                     subject_tag.comment = comment
 
             yield from tags
-
-
-class _AsmOutput(object):
-    __COMMAND_INDENT = 4
-    __COMMENT_INDENT = 40
-
-    def __init__(self):
-        self.__needs_empty_line = True
-
-    def __write_empty_line_if_needed(self):
-        if self.__needs_empty_line:
-            yield '\n'
-            self.__needs_empty_line = False
-
-    def write_line(self, command, tag_addr, tag_body, tag_comment,
-                   comment=None):
-        yield from self.__write_empty_line_if_needed()
-
-        line = ' ' * self.__COMMAND_INDENT
-
-        if command is not None:
-            line += command
-
-        if comment is None:
-            comment = []
-        else:
-            comment = [comment]
-
-        if tag_addr is not None:
-            comment.append('@@ %#06x' % tag_addr)
-
-        if tag_body is not None:
-            comment.append('%s' % tag_body)
-
-        if tag_comment is not None:
-            comment.append(': %s' % tag_comment)
-
-        if command is not None and comment:
-            line = line.ljust(self.__COMMENT_INDENT)
-
-        if comment:
-            line += '; %s' % ' '.join(comment)
-
-        line += '\n'
-
-        yield line
-
-    def write_space_directive(self, size):
-        yield from self.write_line('.space %d' % size, None, None, None)
 
 
 class _Disasm(object):
@@ -1002,6 +961,7 @@ class _Disasm(object):
 
         _InstrTag: 1,
         _CommentTag: 2,
+        _InlineCommentTag: 2,
     }
 
     def __init__(self):
@@ -1072,7 +1032,8 @@ class _Disasm(object):
         new_tags.append(_CommentTag(tag.origin, tag.addr, comment))
 
         if tag.comment is not None:
-            new_tags.append(_CommentTag(tag.origin, tag.addr, tag.comment))
+            new_tags.append(_CommentTag(tag.origin, tag.addr,
+                                        tag.comment.literal))
 
         for i, b in enumerate(tag.image):
             new_tags.append(_ByteTag(tag.origin, tag.addr + i, b))
@@ -1132,6 +1093,7 @@ class _Disasm(object):
         _ByteTag: __process_byte_tag,
         _CommentTag: __skip_processing_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
+        _InlineCommentTag: __skip_processing_tag,
         _InstrTag: __process_instr_tag,
     }
 
@@ -1151,100 +1113,211 @@ class _Disasm(object):
 
             self.__process_tag(tag)
 
-    def __write_comment_tag(self, tag, out):
-        yield from out.write_line(None, tag.addr, None, tag.comment)
+    def __verbalize_comment(self, comment, force_leader=True):
+        if comment.startswith('.'):
+            force_leader = True
+        if force_leader:
+            comment = '-- %s' % comment
+        return comment
 
-    def __write_byte_tag(self, tag, out):
-        tag_body = '%02x' % tag.value
-        yield from out.write_line('db %#04x' % tag.value,
-                                  tag.addr, tag_body, tag.comment)
+    class _Hint(str):
+        pass
 
-    def __verbalize_instr_bytes(self, instr):
-        assert instr.addr is not None, instr
-        addrs = range(instr.addr, instr.addr + instr.size)
-        return ' '.join('%02x' % self.__bytes[i].value for i in addrs)
+    def __get_inline_comments(self, addr, first_instr_byte=False):
+        for tag in self.__tags.get(addr, []):
+            if isinstance(tag, (_ByteTag, _CommentTag, _IncludeBinaryTag)):
+                pass
+            elif isinstance(tag, _InstrTag):
+                comment = '.instr'
+                if tag.comment is not None:
+                    comment += ' %s' % (
+                        self.__verbalize_comment(tag.comment.literal))
+                yield comment
+            elif isinstance(tag, _InlineCommentTag):
+                yield self.__verbalize_comment(tag.comment, force_leader=False)
+            else:
+                assert 0, tag
 
-    def __write_instr_tag(self, tag, out):
-        command = '%s' % tag.instr
-        tag_body = [self.__verbalize_instr_bytes(tag.instr)]
-
-        if not tag.implicit:
-            tag_body.append('instr')
-
-        tag_body = ' '.join(tag_body)
-
-        comment = None
-        if isinstance(tag.instr, UnknownInstr):
-            comment = 'warning: unknown instruction: %r' % tag.instr.text
-
-        yield from out.write_line(command,
-                                  tag.addr, tag_body, tag.comment,
-                                  comment)
-
-        # Handle tags in the middle of the instruction.
-        # TODO: Handle non-instr tags as well.
-        for i in range(1, tag.instr.size):
-            t = self.__instrs.get(tag.addr + i, None)
-            if t is not None:
-                bytes = self.__verbalize_instr_bytes(t.instr)
-                comment = ('   %#06x %s'
-                           ' warning: overlapping instruction: %r' % (
-                               t.addr, bytes, str(t.instr)))
-
-                if not t.implicit:
-                    comment += ' @@ %#06x instr' % t.addr
-
-                yield from out.write_line('', None, None, None,
-                                          comment)
-
-    def __write_tags(self, addr, out):
-        tags = self.__tags.get(addr, [])
         instr_tag = self.__instrs.get(addr, None)
-        byte_tag = self.__bytes.get(addr, None)
-
-        def g():
-            # Emit tags in order.
-            for tag in tags:
-                if isinstance(tag, (_IncludeBinaryTag, _ByteTag, _InstrTag)):
-                    pass
-                elif isinstance(tag, _CommentTag):
-                    yield from self.__write_comment_tag(tag, out)
-                else:
-                    # TODO
-                    assert 0, tag
-
-            if instr_tag is not None:
-                yield from self.__write_instr_tag(instr_tag, out)
-            elif byte_tag is not None:
-                yield from self.__write_byte_tag(byte_tag, out)
-
         if instr_tag is not None:
-            addr += instr_tag.instr.size
-        elif byte_tag is not None:
-            addr += 1
+            if not first_instr_byte:
+                yield self._Hint('warning: overlapping instruction: '
+                                 '%r' % str(instr_tag.instr))
 
-        return addr, g()
+            if isinstance(instr_tag.instr, UnknownInstr):
+                yield self._Hint('warning: unknown instruction: '
+                                 '%r' % instr_tag.instr.text)
 
-    def _get_output(self):
-        out = _AsmOutput()
+    class _AsmLine(object):
+        _MAX_NUM_OF_BYTES_PER_LINE = 4
+        _BYTES_INDENT = 40
+        __COMMENT_INDENT = (_BYTES_INDENT + len('; @@ 0x0000') +
+                            len(' ff') * _MAX_NUM_OF_BYTES_PER_LINE +
+                            len('  '))
 
-        addrs = sorted(self.__tags)
-        if len(addrs) == 0:
+        def __init__(self, command=None, addr=None, xbytes=[], comment=None,
+                     size=0):
+            self.command = command
+            self.addr = addr
+            self.xbytes = xbytes
+            self.comment = comment
+            self.size = size
+
+        def __str__(self):
+            line = ' ' * 4
+            if self.command is not None:
+                line += str(self.command)
+            if (self.addr is not None or
+                    len(self.xbytes) > 0 or
+                    self.comment is not None):
+                line = line.ljust(self._BYTES_INDENT) + ';'
+            if self.addr is not None:
+                if not isinstance(self.comment, _Disasm._Hint):
+                    line += ' @@'
+                else:
+                    line += '   '
+                line += ' %#06x' % self.addr
+            if len(self.xbytes) > 0:
+                assert self.addr is not None
+                line += ' %s' % ' '.join('%02x' % b for b in self.xbytes)
+            if self.comment is not None:
+                line = line.ljust(self.__COMMENT_INDENT) + str(self.comment)
+            return line.rstrip()
+
+    def __get_infront_lines(self, addr):
+        for tag in self.__tags.get(addr, []):
+            if isinstance(tag, (_ByteTag, _InstrTag, _IncludeBinaryTag,
+                                _InlineCommentTag)):
+                pass
+            elif isinstance(tag, _CommentTag):
+                comment = self.__verbalize_comment(tag.comment,
+                                                   force_leader=False)
+                command = '; @@ %#06x %s' % (addr, comment)
+                yield self._AsmLine(command=command)
+            else:
+                assert 0, tag
+
+    def __get_instr_lines(self, instr_tag):
+        instr = instr_tag.instr
+        command = str(instr)
+        addr = instr_tag.addr
+        xbytes = [self.__bytes[addr].value]
+        infront_lines = {addr: list(
+            self.__get_infront_lines(addr))}
+        inline_comments = {addr: list(
+            self.__get_inline_comments(addr, first_instr_byte=True))}
+
+        end_addr = addr + instr.size
+        byte_addr = addr + 1
+
+        while addr < end_addr:
+            if byte_addr < end_addr:
+                if byte_addr not in infront_lines:
+                    infront_lines[byte_addr] = list(
+                        self.__get_infront_lines(byte_addr))
+
+                if byte_addr not in inline_comments:
+                    inline_comments[byte_addr] = list(
+                        self.__get_inline_comments(byte_addr))
+
+                AsmLine = self._AsmLine
+                if (((len(infront_lines[byte_addr]) == 0 and
+                        len(inline_comments[byte_addr]) == 0) or
+                    len(xbytes) == 0) and
+                        len(xbytes) < AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
+                    xbytes.append(self.__bytes[byte_addr].value)
+                    byte_addr += 1
+                    continue
+
+            while len(infront_lines[addr]) > 0:
+                yield infront_lines[addr].pop(0)
+
+            while len(xbytes) > 0 or len(inline_comments[addr]) > 0:
+                comment = None
+                if (len(inline_comments[addr]) > 0 and
+                    (len(xbytes) == 0 or
+                        not isinstance(inline_comments[addr][0], self._Hint))):
+                    comment = inline_comments[addr].pop(0)
+
+                yield self._AsmLine(command=command, addr=addr, xbytes=xbytes,
+                                    comment=comment, size=len(xbytes))
+
+                command = None
+                xbytes = []
+
+            addr = byte_addr
+
+    def __get_data_lines(self, addr):
+        yield from self.__get_infront_lines(addr)
+
+        inline_comments = list(self.__get_inline_comments(addr))
+
+        if addr not in self.__bytes:
             return
 
-        addr = addrs[0]
-        for a in addrs:
-            if a < addr:
-                continue
+        xbytes = [self.__bytes[addr].value]
 
-            if a > addr:
-                yield from out.write_space_directive(a - addr)
+        if len(inline_comments) == 0:
+            byte_addr = addr + 1
+
+            # TODO: self._AsmLine._MAX_NUM_OF_BYTES_PER_LINE
+            while len(xbytes) < 1:
+                if byte_addr in self.__instrs:
+                    break
+
+                byte_tag = self.__bytes.get(byte_addr, None)
+                if byte_tag is None:
+                    break
+
+                if any(True for _ in self.__get_infront_lines(byte_addr)):
+                    break
+
+                if any(True for _ in self.__get_inline_comments(byte_addr)):
+                    break
+
+                xbytes.append(byte_tag.value)
+                byte_addr += 1
+
+        while len(xbytes) > 0 or len(inline_comments) > 0:
+            comment = None
+            if len(inline_comments) > 0:
+                comment = inline_comments.pop(0)
+
+            command = 'db %s' % ', '.join('%#04x' % b for b in xbytes)
+
+            yield self._AsmLine(command=command, addr=addr, xbytes=xbytes,
+                                comment=comment, size=len(xbytes))
+            xbytes = []
+
+    def __get_lines_for_addr(self, addr):
+        instr_tag = self.__instrs.get(addr, None)
+        if instr_tag is not None:
+            yield from self.__get_instr_lines(instr_tag)
+        else:
+            yield from self.__get_data_lines(addr)
+
+    def __get_asm_lines(self):
+        yield self._AsmLine()
+
+        addr = None
+        for a in sorted(self.__tags):
+            if addr is None:
+                addr = a
+            elif a < addr:
+                continue
+            elif a > addr:
+                yield self._AsmLine(command='.space %d' % (a - addr))
                 addr = a
 
-            assert addr == a, (addr, a)
-            addr, g = self.__write_tags(a, out)
+            assert a == addr
 
-            yield from g
+            for line in self.__get_lines_for_addr(addr):
+                yield line
+                addr += line.size
+
+    def _get_output(self):
+        for line in self.__get_asm_lines():
+            yield '%s\n' % line
 
     def save_output(self, filename):
         try:

@@ -1,9 +1,9 @@
 
-@@ 0x0000 include_binary 'input.bin' : The source binary.
+@@ 0x0000 .include_binary 'input.bin' -- The source binary.
 
 ---
-    ; @@ 0x0000 : Included from binary file 'input.bin'.
-    ; @@ 0x0000 : The source binary.
+    ; @@ 0x0000 Included from binary file 'input.bin'.
+    ; @@ 0x0000 The source binary.
     db 0xf3                             ; @@ 0x0000 f3
     db 0xaf                             ; @@ 0x0001 af
     db 0x11                             ; @@ 0x0002 11
