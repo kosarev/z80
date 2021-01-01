@@ -9,6 +9,7 @@
 
 from ._disasm import _Disasm
 from ._error import Error
-from ._machine import I8080Machine
-from ._machine import Z80Machine
+from ._machine import I8080Machine, Z80Machine
 from ._main import main
+from ._source import _SourceFile
+from ._disasm_parser import _DisasmTagParser

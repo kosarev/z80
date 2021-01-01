@@ -42,7 +42,8 @@ class DisasmTestCase(unittest.TestCase):
 
             error = ''
             try:
-                d.parse_tags(self.__id, input)
+                source = z80._SourceFile(self.__id, input)
+                d.add_tags(*z80._DisasmTagParser(source).parse())
                 d.disassemble()
 
                 output = ''.join(d._get_output())

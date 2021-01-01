@@ -11,7 +11,9 @@
 
 import sys
 from ._disasm import _Disasm
+from ._disasm_parser import _DisasmTagParser
 from ._error import Error
+from ._source import _SourceFile
 
 
 def _pop_argument(args, error):
@@ -31,7 +33,7 @@ def _disasm(args):
     _handle_extra_arguments(args)
 
     d = _Disasm()
-    d.parse_tags(filename)
+    d.add_tags(*_DisasmTagParser(_SourceFile(filename)).parse())
     d.disassemble()
     d.save_output(filename)
 
