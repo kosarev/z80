@@ -361,7 +361,7 @@ class _Disasm(object):
 
         # Translates addresses to tags associated with those
         # addresses.
-        self.__xtags = collections.defaultdict(_TagSet)
+        self.__tags = collections.defaultdict(_TagSet)
 
         # Tags to process stored in order.
         self.__worklists = dict()
@@ -381,13 +381,13 @@ class _Disasm(object):
             self.__get_worklist(tag).appendleft(tag)
 
     def __process_byte_tag(self, tag):
-        prev_tag = self.__xtags[tag.addr].byte_tag
+        prev_tag = self.__tags[tag.addr].byte_tag
         if prev_tag is not None:
             raise _DisasmError(
                 tag, 'Byte redefined.',
                 _DisasmError(prev_tag, 'Previously defined here.'))
 
-        self.__xtags[tag.addr].byte_tag = tag
+        self.__tags[tag.addr].byte_tag = tag
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
@@ -406,16 +406,16 @@ class _Disasm(object):
         self.add_tags(*new_tags)
 
     def __mark_addr_to_disassemble(self, addr):
-        tag_set = self.__xtags[addr]
+        tag_set = self.__tags[addr]
         if tag_set.instr_tag is None and tag_set.byte_tag is not None:
             tag_set.instr_tag = _InstrTag(None, addr, implicit=True)
             self.add_tags(tag_set.instr_tag)
 
     def __process_comment_tag(self, tag):
-        self.__xtags[tag.addr].infront_tags.append(tag)
+        self.__tags[tag.addr].infront_tags.append(tag)
 
     def __process_inline_comment_tag(self, tag):
-        self.__xtags[tag.addr].inline_tags.append(tag)
+        self.__tags[tag.addr].inline_tags.append(tag)
 
     def __process_instr_tag(self, tag):
         MAX_INSTR_SIZE = 4
@@ -423,10 +423,10 @@ class _Disasm(object):
         instr_image = []
         assert isinstance(tag.addr, int), tag.addr
         for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
-            if self.__xtags[i].byte_tag is None:
+            if self.__tags[i].byte_tag is None:
                 break
 
-            instr_image.append(self.__xtags[i].byte_tag.value)
+            instr_image.append(self.__tags[i].byte_tag.value)
 
         if len(instr_image) == 0:
             return
@@ -435,10 +435,10 @@ class _Disasm(object):
                                                  bytes(instr_image))
         assert tag.instr is None
         tag.instr = instr
-        self.__xtags[tag.addr].instr_tag = tag
+        self.__tags[tag.addr].instr_tag = tag
 
         if not tag.implicit:
-            self.__xtags[tag.addr].inline_tags.append(tag)
+            self.__tags[tag.addr].inline_tags.append(tag)
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
@@ -490,7 +490,7 @@ class _Disasm(object):
         pass
 
     def __get_inline_comments(self, addr, first_instr_byte=False):
-        for tag in self.__xtags[addr].inline_tags:
+        for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, _InstrTag):
                 comment = '.instr'
                 if tag.comment is not None:
@@ -502,7 +502,7 @@ class _Disasm(object):
             else:
                 assert 0, tag
 
-        instr_tag = self.__xtags[addr].instr_tag
+        instr_tag = self.__tags[addr].instr_tag
         if instr_tag is not None:
             if not first_instr_byte:
                 yield self._Hint('warning: overlapping instruction: '
@@ -513,7 +513,7 @@ class _Disasm(object):
                                  '%r' % instr_tag.instr.text)
 
     def __get_infront_lines(self, addr):
-        for tag in self.__xtags[addr].infront_tags:
+        for tag in self.__tags[addr].infront_tags:
             if isinstance(tag, _CommentTag):
                 comment = self.__verbalize_comment(tag.comment,
                                                    force_leader=False)
@@ -526,7 +526,7 @@ class _Disasm(object):
         instr = instr_tag.instr
         command = str(instr)
         addr = instr_tag.addr
-        xbytes = [self.__xtags[addr].byte_tag.value]
+        xbytes = [self.__tags[addr].byte_tag.value]
         infront_lines = {addr: list(
             self.__get_infront_lines(addr))}
         inline_comments = {addr: list(
@@ -549,7 +549,7 @@ class _Disasm(object):
                         len(inline_comments[byte_addr]) == 0) or
                     len(xbytes) == 0) and
                         len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
-                    xbytes.append(self.__xtags[byte_addr].byte_tag.value)
+                    xbytes.append(self.__tags[byte_addr].byte_tag.value)
                     byte_addr += 1
                     continue
 
@@ -576,19 +576,19 @@ class _Disasm(object):
 
         inline_comments = list(self.__get_inline_comments(addr))
 
-        if self.__xtags[addr].byte_tag is None:
+        if self.__tags[addr].byte_tag is None:
             return
 
-        xbytes = [self.__xtags[addr].byte_tag.value]
+        xbytes = [self.__tags[addr].byte_tag.value]
 
         if len(inline_comments) == 0:
             byte_addr = addr + 1
 
             while len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE:
-                if self.__xtags[byte_addr].instr_tag is not None:
+                if self.__tags[byte_addr].instr_tag is not None:
                     break
 
-                byte_tag = self.__xtags[byte_addr].byte_tag
+                byte_tag = self.__tags[byte_addr].byte_tag
                 if byte_tag is None:
                     break
 
@@ -613,7 +613,7 @@ class _Disasm(object):
             xbytes = []
 
     def __get_lines_for_addr(self, addr):
-        instr_tag = self.__xtags[addr].instr_tag
+        instr_tag = self.__tags[addr].instr_tag
         if instr_tag is not None:
             yield from self.__get_instr_lines(instr_tag)
         else:
@@ -623,7 +623,7 @@ class _Disasm(object):
         yield _AsmLine()
 
         addr = None
-        for a in sorted(a for a, t in self.__xtags.items() if not t.empty):
+        for a in sorted(a for a, t in self.__tags.items() if not t.empty):
             if addr is None:
                 addr = a
             elif a < addr:
