@@ -339,13 +339,9 @@ class _Disasm(object):
             self.__worklists[priority] = Worklist()
         return self.__worklists[priority]
 
-    # TODO: Do we need this function?
-    def __queue_tags(self, *tags):
+    def add_tags(self, *tags):
         for tag in reversed(tags):
             self.__get_worklist(tag).appendleft(tag)
-
-    def add_tags(self, *tags):
-        self.__queue_tags(*tags)
 
     def __process_byte_tag(self, tag):
         prev_tag = self.__xtags[tag.addr].byte_tag
@@ -376,7 +372,7 @@ class _Disasm(object):
         tag_set = self.__xtags[addr]
         if tag_set.instr_tag is None and tag_set.byte_tag is not None:
             tag_set.instr_tag = _InstrTag(None, addr, implicit=True)
-            self.__queue_tags(tag_set.instr_tag)
+            self.add_tags(tag_set.instr_tag)
 
     def __process_comment_tag(self, tag):
         self.__xtags[tag.addr].infront_tags.append(tag)
