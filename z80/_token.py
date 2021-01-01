@@ -33,7 +33,7 @@ class _Token(object):
         return self.pos
 
 
-class _Tokenizer(object):
+class _Tokeniser(object):
     __WHITESPACE = re.compile(r'(\ |\t)+')
     __END_OF_LINE = re.compile(r'(\n|$)')
 

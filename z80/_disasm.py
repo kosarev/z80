@@ -16,7 +16,7 @@ import tempfile
 from ._error import Error
 from ._machine import Z80Machine
 from ._source import _SourceFile, _SourcePos
-from ._token import _Tokenizer
+from ._token import _Tokeniser
 
 
 class _DisasmError(Error):
@@ -705,7 +705,7 @@ class _TagParser(object):
         r'.')                         # Or any other single character.
 
     def __init__(self, source_file):
-        self.__toks = _Tokenizer(source_file)
+        self.__toks = _Tokeniser(source_file)
         self.__tok = None
 
     def __fetch_token(self, error=None):
