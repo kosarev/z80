@@ -108,6 +108,11 @@ class _InstrTag(_Tag):
 
     def __init__(self, origin, addr, implicit=False):
         super().__init__(origin, addr, size=0, implicit=implicit)
+        self.instr = None
+
+
+class _UnknownInstrError(Exception):
+    pass
 
 
 class _Z80InstrBuilder(object):
@@ -202,9 +207,6 @@ class _Z80InstrBuilder(object):
         'sp': SP,
     }
 
-    class __UnknownInstrError(Exception):
-        pass
-
     def __build_op(self, addr, text):
         if text.startswith('R('):
             text = text[1:]
@@ -228,7 +230,7 @@ class _Z80InstrBuilder(object):
             op = self.__OPS[text[:2]]
             text = text[2:].strip()
         else:
-            raise self.__UnknownInstrError()
+            raise _UnknownInstrError()
 
         # Offset.
         if text != '' and text[0] in ('+', '-'):
@@ -246,7 +248,7 @@ class _Z80InstrBuilder(object):
             elif isinstance(op, IndexReg):
                 op = Add(op, offset)
             else:
-                raise self.__UnknownInstrError()
+                raise _UnknownInstrError()
 
         assert text == '', text
 
@@ -265,7 +267,7 @@ class _Z80InstrBuilder(object):
             name = text.pop(0)
 
             if name not in self.__INSTRS:
-                raise self.__UnknownInstrError()
+                raise _UnknownInstrError()
 
             # Parse operands.
             ops = []
@@ -281,12 +283,27 @@ class _Z80InstrBuilder(object):
             instr = self.__INSTRS[name](*ops)
             instr.addr = addr
             instr.size = size
-        except self.__UnknownInstrError:
+        except _UnknownInstrError:
             instr = UnknownInstr(addr, image[0])
             instr.text = original_text
             return instr
 
         return instr
+
+
+class _TagSet(object):
+    def __init__(self):
+        self.infront_tags = []
+        self.inline_tags = []
+        self.byte_tag = None
+        self.instr_tag = None
+
+    @property
+    def empty(self):
+        return (len(self.infront_tags) == 0 and
+                len(self.inline_tags) == 0 and
+                self.byte_tag is None and
+                self.instr_tag is None)
 
 
 class _Disasm(object):
@@ -305,18 +322,12 @@ class _Disasm(object):
         # TODO: Let user choose the CPU type.
         self.__instr_builder = _Z80InstrBuilder()
 
-        # Translate addresses to tags associated with those
+        # Translates addresses to tags associated with those
         # addresses.
-        self.__tags = dict()
+        self.__xtags = collections.defaultdict(_TagSet)
 
         # Tags to process stored in order.
         self.__worklists = dict()
-
-        # Byte image.
-        self.__bytes = dict()
-
-        # Instructions.
-        self.__instrs = dict()
 
     def __get_worklist(self, tag):
         # Use deque because of its popleft() being much faster
@@ -328,25 +339,22 @@ class _Disasm(object):
             self.__worklists[priority] = Worklist()
         return self.__worklists[priority]
 
-    def add_tags(self, *tags):
-        for tag in tags:
-            self.__tags.setdefault(tag.addr, []).append(tag)
-
-        for tag in tags:
-            self.__get_worklist(tag).append(tag)
-
+    # TODO: Do we need this function?
     def __queue_tags(self, *tags):
         for tag in reversed(tags):
             self.__get_worklist(tag).appendleft(tag)
 
+    def add_tags(self, *tags):
+        self.__queue_tags(*tags)
+
     def __process_byte_tag(self, tag):
-        if tag.addr in self.__bytes:
+        prev_tag = self.__xtags[tag.addr].byte_tag
+        if prev_tag is not None:
             raise _DisasmError(
                 tag, 'Byte redefined.',
-                _DisasmError(self.__bytes[tag.addr],
-                             'Previously defined here.'))
+                _DisasmError(prev_tag, 'Previously defined here.'))
 
-        self.__bytes[tag.addr] = tag
+        self.__xtags[tag.addr].byte_tag = tag
 
     def __process_include_binary_tag(self, tag):
         new_tags = []
@@ -365,34 +373,39 @@ class _Disasm(object):
         self.add_tags(*new_tags)
 
     def __mark_addr_to_disassemble(self, addr):
-        # See if the addressed is already marked.
-        tags = self.__tags.get(addr, [])
-        if (all(not isinstance(t, _InstrTag) for t in tags) and
-                any(isinstance(t, _ByteTag) for t in tags)):
-            # TODO: No need for implicit tags?
-            self.__queue_tags(_InstrTag(None, addr, implicit=True))
+        tag_set = self.__xtags[addr]
+        if tag_set.instr_tag is None and tag_set.byte_tag is not None:
+            tag_set.instr_tag = _InstrTag(None, addr, implicit=True)
+            self.__queue_tags(tag_set.instr_tag)
+
+    def __process_comment_tag(self, tag):
+        self.__xtags[tag.addr].infront_tags.append(tag)
+
+    def __process_inline_comment_tag(self, tag):
+        self.__xtags[tag.addr].inline_tags.append(tag)
 
     def __process_instr_tag(self, tag):
-        if tag.addr in self.__instrs:
-            return
-
         MAX_INSTR_SIZE = 4
 
         instr_image = []
         assert isinstance(tag.addr, int), tag.addr
         for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
-            if i not in self.__bytes:
+            if self.__xtags[i].byte_tag is None:
                 break
 
-            instr_image.append(self.__bytes[i].value)
+            instr_image.append(self.__xtags[i].byte_tag.value)
 
         if len(instr_image) == 0:
             return
 
         instr = self.__instr_builder.build_instr(tag.addr,
                                                  bytes(instr_image))
+        assert tag.instr is None
         tag.instr = instr
-        self.__instrs[tag.addr] = tag
+        self.__xtags[tag.addr].instr_tag = tag
+
+        if not tag.implicit:
+            self.__xtags[tag.addr].inline_tags.append(tag)
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
@@ -409,14 +422,11 @@ class _Disasm(object):
                     assert isinstance(target, int)
                     self.__mark_addr_to_disassemble(target)
 
-    def __skip_processing_tag(self, tag):
-        pass
-
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
-        _CommentTag: __skip_processing_tag,
+        _CommentTag: __process_comment_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
-        _InlineCommentTag: __skip_processing_tag,
+        _InlineCommentTag: __process_inline_comment_tag,
         _InstrTag: __process_instr_tag,
     }
 
@@ -447,7 +457,7 @@ class _Disasm(object):
         pass
 
     def __get_inline_comments(self, addr, first_instr_byte=False):
-        for tag in self.__tags.get(addr, []):
+        for tag in self.__xtags[addr].inline_tags:
             if isinstance(tag, (_ByteTag, _CommentTag, _IncludeBinaryTag)):
                 pass
             elif isinstance(tag, _InstrTag):
@@ -461,7 +471,7 @@ class _Disasm(object):
             else:
                 assert 0, tag
 
-        instr_tag = self.__instrs.get(addr, None)
+        instr_tag = self.__xtags[addr].instr_tag
         if instr_tag is not None:
             if not first_instr_byte:
                 yield self._Hint('warning: overlapping instruction: '
@@ -508,7 +518,7 @@ class _Disasm(object):
             return line.rstrip()
 
     def __get_infront_lines(self, addr):
-        for tag in self.__tags.get(addr, []):
+        for tag in self.__xtags[addr].infront_tags:
             if isinstance(tag, (_ByteTag, _InstrTag, _IncludeBinaryTag,
                                 _InlineCommentTag)):
                 pass
@@ -524,7 +534,7 @@ class _Disasm(object):
         instr = instr_tag.instr
         command = str(instr)
         addr = instr_tag.addr
-        xbytes = [self.__bytes[addr].value]
+        xbytes = [self.__xtags[addr].byte_tag.value]
         infront_lines = {addr: list(
             self.__get_infront_lines(addr))}
         inline_comments = {addr: list(
@@ -548,7 +558,7 @@ class _Disasm(object):
                         len(inline_comments[byte_addr]) == 0) or
                     len(xbytes) == 0) and
                         len(xbytes) < AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
-                    xbytes.append(self.__bytes[byte_addr].value)
+                    xbytes.append(self.__xtags[byte_addr].byte_tag.value)
                     byte_addr += 1
                     continue
 
@@ -575,19 +585,19 @@ class _Disasm(object):
 
         inline_comments = list(self.__get_inline_comments(addr))
 
-        if addr not in self.__bytes:
+        if self.__xtags[addr].byte_tag is None:
             return
 
-        xbytes = [self.__bytes[addr].value]
+        xbytes = [self.__xtags[addr].byte_tag.value]
 
         if len(inline_comments) == 0:
             byte_addr = addr + 1
 
             while len(xbytes) < self._AsmLine._MAX_NUM_OF_BYTES_PER_LINE:
-                if byte_addr in self.__instrs:
+                if self.__xtags[byte_addr].instr_tag is not None:
                     break
 
-                byte_tag = self.__bytes.get(byte_addr, None)
+                byte_tag = self.__xtags[byte_addr].byte_tag
                 if byte_tag is None:
                     break
 
@@ -612,7 +622,7 @@ class _Disasm(object):
             xbytes = []
 
     def __get_lines_for_addr(self, addr):
-        instr_tag = self.__instrs.get(addr, None)
+        instr_tag = self.__xtags[addr].instr_tag
         if instr_tag is not None:
             yield from self.__get_instr_lines(instr_tag)
         else:
@@ -622,7 +632,7 @@ class _Disasm(object):
         yield self._AsmLine()
 
         addr = None
-        for a in sorted(self.__tags):
+        for a in sorted(a for a, t in self.__xtags.items() if not t.empty):
             if addr is None:
                 addr = a
             elif a < addr:
