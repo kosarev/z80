@@ -8,7 +8,7 @@
 
 import re
 from ._disasm import (_Disasm, _IncludeBinaryTag, _InstrTag, _CommentTag,
-                      _ByteTag, _InlineCommentTag)
+                      _ByteTag, _InlineCommentTag, _AsmLine)
 from ._token import _Tokeniser
 
 
@@ -127,7 +127,7 @@ class _DisasmTagParser(object):
                 comment = self.__toks.end_token()
 
                 if subject_tag is None:
-                    if comment.pos.column_no < _Disasm._AsmLine._BYTES_INDENT:
+                    if comment.pos.column_no < _AsmLine._BYTES_INDENT:
                         tags.append(_CommentTag(tok.pos, addr,
                                                 comment.literal))
                     else:
