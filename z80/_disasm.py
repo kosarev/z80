@@ -78,6 +78,14 @@ class _InlineCommentTag(_Tag):
         self.comment = comment
 
 
+class _HintTag(_Tag):
+    ID = 'hint'
+
+    def __init__(self, origin, addr, hint):
+        super().__init__(origin, addr, size=0)
+        self.comment = hint
+
+
 class _ByteTag(_Tag):
     ID = 'byte'
 
@@ -341,7 +349,7 @@ class _AsmLine(object):
                 line = line.ljust(self._BYTES_INDENT)
             line += ';'
         if self.addr is not None:
-            if not isinstance(self.comment, _Disasm._Hint):
+            if not isinstance(self.comment, _HintTag):
                 line += ' @@'
             else:
                 line += '   '
@@ -354,7 +362,11 @@ class _AsmLine(object):
             line += ' %s' % self._verbalize_comment(self.command.comment,
                                                     force_leader=False)
         if self.comment is not None:
-            line = line.ljust(self.__COMMENT_INDENT) + str(self.comment)
+            line = line.ljust(self.__COMMENT_INDENT)
+            if isinstance(self.comment, _HintTag):
+                line += str(self.comment.comment)
+            else:
+                line += str(self.comment)
         return line.rstrip()
 
 
@@ -494,9 +506,6 @@ class _Disasm(object):
 
             self.__process_tag(tag)
 
-    class _Hint(str):
-        pass
-
     def __get_inline_comments(self, addr, first_instr_byte=False):
         for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, _InstrTag):
@@ -514,12 +523,14 @@ class _Disasm(object):
         instr_tag = self.__tags[addr].instr_tag
         if instr_tag is not None:
             if not first_instr_byte:
-                yield self._Hint('warning: overlapping instruction: '
-                                 '%r' % str(instr_tag.instr))
+                yield _HintTag(instr_tag.origin, addr,
+                               'warning: overlapping instruction: '
+                               '%r' % str(instr_tag.instr))
 
             if isinstance(instr_tag.instr, UnknownInstr):
-                yield self._Hint('warning: unknown instruction: '
-                                 '%r' % instr_tag.instr.text)
+                yield _HintTag(instr_tag.origin, addr,
+                               'warning: unknown instruction: '
+                               '%r' % instr_tag.instr.text)
 
     def __get_instr_lines(self, instr_tag):
         instr = instr_tag.instr
@@ -553,7 +564,7 @@ class _Disasm(object):
                 comment = None
                 if (len(inline_comments[addr]) > 0 and
                     (len(xbytes) == 0 or
-                        not isinstance(inline_comments[addr][0], self._Hint))):
+                        not isinstance(inline_comments[addr][0], _HintTag))):
                     comment = inline_comments[addr].pop(0)
 
                 yield _AsmLine(command=command, addr=addr, xbytes=xbytes,
