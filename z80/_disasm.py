@@ -321,14 +321,25 @@ class _AsmLine(object):
         self.comment = comment
         self.size = size
 
+    @staticmethod
+    def _verbalize_comment(comment, force_leader=True):
+        if comment.startswith('.'):
+            force_leader = True
+        if force_leader:
+            comment = '-- %s' % comment
+        return comment
+
     def __str__(self):
         line = ' ' * 4
-        if self.command is not None:
+        out_of_line = isinstance(self.command, _Tag)
+        if self.command is not None and not out_of_line:
             line += str(self.command)
         if (self.addr is not None or
                 len(self.xbytes) > 0 or
                 self.comment is not None):
-            line = line.ljust(self._BYTES_INDENT) + ';'
+            if not out_of_line:
+                line = line.ljust(self._BYTES_INDENT)
+            line += ';'
         if self.addr is not None:
             if not isinstance(self.comment, _Disasm._Hint):
                 line += ' @@'
@@ -338,6 +349,10 @@ class _AsmLine(object):
         if len(self.xbytes) > 0:
             assert self.addr is not None
             line += ' %s' % ' '.join('%02x' % b for b in self.xbytes)
+        if out_of_line:
+            assert isinstance(self.command, _Tag)
+            line += ' %s' % self._verbalize_comment(self.command.comment,
+                                                    force_leader=False)
         if self.comment is not None:
             line = line.ljust(self.__COMMENT_INDENT) + str(self.comment)
         return line.rstrip()
@@ -479,13 +494,6 @@ class _Disasm(object):
 
             self.__process_tag(tag)
 
-    def __verbalize_comment(self, comment, force_leader=True):
-        if comment.startswith('.'):
-            force_leader = True
-        if force_leader:
-            comment = '-- %s' % comment
-        return comment
-
     class _Hint(str):
         pass
 
@@ -495,10 +503,11 @@ class _Disasm(object):
                 comment = '.instr'
                 if tag.comment is not None:
                     comment += ' %s' % (
-                        self.__verbalize_comment(tag.comment.literal))
+                        _AsmLine._verbalize_comment(tag.comment.literal))
                 yield comment
             elif isinstance(tag, _InlineCommentTag):
-                yield self.__verbalize_comment(tag.comment, force_leader=False)
+                yield _AsmLine._verbalize_comment(tag.comment,
+                                                  force_leader=False)
             else:
                 assert 0, tag
 
@@ -512,23 +521,11 @@ class _Disasm(object):
                 yield self._Hint('warning: unknown instruction: '
                                  '%r' % instr_tag.instr.text)
 
-    def __get_infront_lines(self, addr):
-        for tag in self.__tags[addr].infront_tags:
-            if isinstance(tag, _CommentTag):
-                comment = self.__verbalize_comment(tag.comment,
-                                                   force_leader=False)
-                command = '; @@ %#06x %s' % (addr, comment)
-                yield _AsmLine(command=command)
-            else:
-                assert 0, tag
-
     def __get_instr_lines(self, instr_tag):
         instr = instr_tag.instr
         command = str(instr)
         addr = instr_tag.addr
         xbytes = [self.__tags[addr].byte_tag.value]
-        infront_lines = {addr: list(
-            self.__get_infront_lines(addr))}
         inline_comments = {addr: list(
             self.__get_inline_comments(addr, first_instr_byte=True))}
 
@@ -537,15 +534,11 @@ class _Disasm(object):
 
         while addr < end_addr:
             if byte_addr < end_addr:
-                if byte_addr not in infront_lines:
-                    infront_lines[byte_addr] = list(
-                        self.__get_infront_lines(byte_addr))
-
                 if byte_addr not in inline_comments:
                     inline_comments[byte_addr] = list(
                         self.__get_inline_comments(byte_addr))
 
-                if (((len(infront_lines[byte_addr]) == 0 and
+                if (((len(self.__tags[byte_addr].infront_tags) == 0 and
                         len(inline_comments[byte_addr]) == 0) or
                     len(xbytes) == 0) and
                         len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
@@ -553,8 +546,8 @@ class _Disasm(object):
                     byte_addr += 1
                     continue
 
-            while len(infront_lines[addr]) > 0:
-                yield infront_lines[addr].pop(0)
+            for tag in self.__tags[addr].infront_tags:
+                yield _AsmLine(addr=addr, command=tag)
 
             while len(xbytes) > 0 or len(inline_comments[addr]) > 0:
                 comment = None
@@ -572,7 +565,8 @@ class _Disasm(object):
             addr = byte_addr
 
     def __get_data_lines(self, addr):
-        yield from self.__get_infront_lines(addr)
+        for tag in self.__tags[addr].infront_tags:
+            yield _AsmLine(addr=addr, command=tag)
 
         inline_comments = list(self.__get_inline_comments(addr))
 
@@ -592,7 +586,7 @@ class _Disasm(object):
                 if byte_tag is None:
                     break
 
-                if any(True for _ in self.__get_infront_lines(byte_addr)):
+                if len(self.__tags[byte_addr].infront_tags) > 0:
                     break
 
                 if any(True for _ in self.__get_inline_comments(byte_addr)):
