@@ -170,10 +170,11 @@ class Add(object):
 
 # Base class for all instructions.
 class Instr(object):
-    def __init__(self, *ops):
+    def __init__(self, *ops, origin=None):
         self.addr = None
         self.size = None
         self.ops = ops
+        self.origin = None
 
     def __repr__(self):
         return (type(self).__name__ +

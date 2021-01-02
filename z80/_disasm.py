@@ -304,14 +304,14 @@ class _TagSet(object):
         self.infront_tags = []
         self.inline_tags = []
         self.byte_tag = None
-        self.instr_tag = None
+        self.instr = None
 
     @property
     def empty(self):
         return (len(self.infront_tags) == 0 and
                 len(self.inline_tags) == 0 and
                 self.byte_tag is None and
-                self.instr_tag is None)
+                self.instr is None)
 
 
 class _AsmLine(object):
@@ -444,7 +444,7 @@ class _Disasm(object):
 
     def __process_instr_tag(self, tag):
         tags = self.__tags[tag.addr]
-        if tags.instr_tag is not None and tags.instr_tag.instr is not None:
+        if tags.instr is not None:
             return
 
         MAX_INSTR_SIZE = 4
@@ -462,9 +462,7 @@ class _Disasm(object):
 
         instr = self.__instr_builder.build_instr(tag.addr,
                                                  bytes(instr_image))
-        assert tag.instr is None
-        tag.instr = instr
-        self.__tags[tag.addr].instr_tag = tag
+        self.__tags[tag.addr].instr = instr
 
         if not tag.implicit:
             self.__tags[tag.addr].inline_tags.append(tag)
@@ -522,22 +520,21 @@ class _Disasm(object):
             else:
                 assert 0, tag
 
-        instr_tag = self.__tags[addr].instr_tag
-        if instr_tag is not None:
+        instr = self.__tags[addr].instr
+        if instr is not None:
             if not first_instr_byte:
-                yield _HintTag(instr_tag.origin, addr,
+                yield _HintTag(instr.origin, addr,
                                'warning: overlapping instruction: '
-                               '%r' % str(instr_tag.instr))
+                               '%r' % str(instr))
 
-            if isinstance(instr_tag.instr, UnknownInstr):
-                yield _HintTag(instr_tag.origin, addr,
+            if isinstance(instr, UnknownInstr):
+                yield _HintTag(instr.origin, addr,
                                'warning: unknown instruction: '
-                               '%r' % instr_tag.instr.text)
+                               '%r' % instr.text)
 
-    def __get_instr_lines(self, instr_tag):
-        instr = instr_tag.instr
+    def __get_instr_lines(self, instr):
         command = str(instr)
-        addr = instr_tag.addr
+        addr = instr.addr
         xbytes = [self.__tags[addr].byte_tag.value]
         inline_comments = {addr: list(
             self.__get_inline_comments(addr, first_instr_byte=True))}
@@ -592,7 +589,7 @@ class _Disasm(object):
             byte_addr = addr + 1
 
             while len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE:
-                if self.__tags[byte_addr].instr_tag is not None:
+                if self.__tags[byte_addr].instr is not None:
                     break
 
                 byte_tag = self.__tags[byte_addr].byte_tag
@@ -620,9 +617,9 @@ class _Disasm(object):
             xbytes = []
 
     def __get_lines_for_addr(self, addr):
-        instr_tag = self.__tags[addr].instr_tag
-        if instr_tag is not None:
-            yield from self.__get_instr_lines(instr_tag)
+        instr = self.__tags[addr].instr
+        if instr is not None:
+            yield from self.__get_instr_lines(instr)
         else:
             yield from self.__get_data_lines(addr)
 
