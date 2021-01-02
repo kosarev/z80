@@ -432,11 +432,9 @@ class _Disasm(object):
         # TODO: Not really adding tags.
         self.add_tags(*new_tags)
 
+    # TODO: Remove?
     def __mark_addr_to_disassemble(self, addr):
-        tag_set = self.__tags[addr]
-        if tag_set.instr_tag is None and tag_set.byte_tag is not None:
-            tag_set.instr_tag = _InstrTag(None, addr, implicit=True)
-            self.add_tags(tag_set.instr_tag)
+        self.add_tags(_InstrTag(None, addr, implicit=True))
 
     def __process_comment_tag(self, tag):
         self.__tags[tag.addr].infront_tags.append(tag)
@@ -445,6 +443,10 @@ class _Disasm(object):
         self.__tags[tag.addr].inline_tags.append(tag)
 
     def __process_instr_tag(self, tag):
+        tags = self.__tags[tag.addr]
+        if tags.instr_tag is not None and tags.instr_tag.instr is not None:
+            return
+
         MAX_INSTR_SIZE = 4
 
         instr_image = []
