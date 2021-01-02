@@ -48,12 +48,11 @@ class _DisasmError(Error):
 
 
 class _Tag(object):
-    def __init__(self, origin, addr, size, implicit=False):
+    def __init__(self, origin, addr, size):
         self.origin = origin
         self.addr = addr
         self.size = size
         self.comment = None
-        self.implicit = implicit
 
     def __str__(self):
         return '%s tag' % self.ID
@@ -114,9 +113,15 @@ class _IncludeBinaryTag(_Tag):
 class _InstrTag(_Tag):
     ID = 'instr'
 
-    def __init__(self, origin, addr, implicit=False):
-        super().__init__(origin, addr, size=0, implicit=implicit)
-        self.instr = None
+    def __init__(self, origin, addr):
+        super().__init__(origin, addr, size=0)
+
+
+class _DisasmTag(_Tag):
+    ID = 'disasm'
+
+    def __init__(self, origin, addr):
+        super().__init__(origin, addr, size=0)
 
 
 class _UnknownInstrError(Exception):
@@ -376,8 +381,10 @@ class _Disasm(object):
         # processed first.
         _ByteTag: 0,
         _IncludeBinaryTag: 0,
+        _InstrTag: 0,
 
-        _InstrTag: 1,
+        _DisasmTag: 1,
+
         _CommentTag: 2,
         _InlineCommentTag: 2,
     }
@@ -434,7 +441,7 @@ class _Disasm(object):
 
     # TODO: Remove?
     def __mark_addr_to_disassemble(self, addr):
-        self.add_tags(_InstrTag(None, addr, implicit=True))
+        self.add_tags(_DisasmTag(None, addr))
 
     def __process_comment_tag(self, tag):
         self.__tags[tag.addr].infront_tags.append(tag)
@@ -443,6 +450,10 @@ class _Disasm(object):
         self.__tags[tag.addr].inline_tags.append(tag)
 
     def __process_instr_tag(self, tag):
+        self.__tags[tag.addr].inline_tags.append(tag)
+        self.__mark_addr_to_disassemble(tag.addr)
+
+    def __process_disasm_tag(self, tag):
         tags = self.__tags[tag.addr]
         if tags.instr is not None:
             return
@@ -463,9 +474,6 @@ class _Disasm(object):
         instr = self.__instr_builder.build_instr(tag.addr,
                                                  bytes(instr_image))
         self.__tags[tag.addr].instr = instr
-
-        if not tag.implicit:
-            self.__tags[tag.addr].inline_tags.append(tag)
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
@@ -488,6 +496,7 @@ class _Disasm(object):
         _IncludeBinaryTag: __process_include_binary_tag,
         _InlineCommentTag: __process_inline_comment_tag,
         _InstrTag: __process_instr_tag,
+        _DisasmTag: __process_disasm_tag,
     }
 
     def __process_tag(self, tag):
