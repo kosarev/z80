@@ -552,35 +552,30 @@ class _Disasm(object):
         command = str(instr)
         addr = instr.addr
         xbytes = [self.__tags[addr].byte_tag.value]
-        inline_comments = {addr: list(
-            self.__get_inline_comments(addr, first_instr_byte=True))}
 
         end_addr = addr + instr.size
         byte_addr = addr + 1
 
         while addr < end_addr:
-            if byte_addr < end_addr:
-                if byte_addr not in inline_comments:
-                    inline_comments[byte_addr] = list(
-                        self.__get_inline_comments(byte_addr))
-
-                if (((len(self.__tags[byte_addr].infront_tags) == 0 and
-                        len(inline_comments[byte_addr]) == 0) or
-                    len(xbytes) == 0) and
-                        len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
-                    xbytes.append(self.__tags[byte_addr].byte_tag.value)
-                    byte_addr += 1
-                    continue
+            while (byte_addr < end_addr and
+                   (len(xbytes) == 0 or
+                    self.__is_commentless_addr(byte_addr)) and
+                   len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
+                xbytes.append(self.__tags[byte_addr].byte_tag.value)
+                byte_addr += 1
 
             for tag in self.__tags[addr].infront_tags:
                 yield _AsmLine(addr=addr, command=tag)
 
-            while len(xbytes) > 0 or len(inline_comments[addr]) > 0:
+            first_instr_byte = addr == instr.addr
+            inline_comments = list(
+                self.__get_inline_comments(addr, first_instr_byte))
+            while len(xbytes) > 0 or len(inline_comments) > 0:
                 comment = None
-                if (len(inline_comments[addr]) > 0 and
+                if (len(inline_comments) > 0 and
                     (len(xbytes) == 0 or
-                        not isinstance(inline_comments[addr][0], _HintTag))):
-                    comment = inline_comments[addr].pop(0)
+                        not isinstance(inline_comments[0], _HintTag))):
+                    comment = inline_comments.pop(0)
 
                 yield _AsmLine(command=command, addr=addr, xbytes=xbytes,
                                comment=comment, size=len(xbytes))
