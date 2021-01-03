@@ -609,6 +609,14 @@ class _Disasm(object):
                 if not self.__is_commentless_addr(byte_addr):
                     break
 
+                # Break at aligned addresses to reduce the amount
+                # of changes when adding more addresses to
+                # disassemble. This makes the output more
+                # friendly to source version control systems,
+                # such as git.
+                if byte_addr % _AsmLine._MAX_NUM_OF_BYTES_PER_LINE == 0:
+                    break
+
                 xbytes.append(byte_tag.value)
                 byte_addr += 1
 
