@@ -309,14 +309,14 @@ class _TagSet(object):
         self.infront_tags = []
         self.inline_tags = []
         self.byte_tag = None
-        self.instr = None
+        self.disasm_tag = None
 
     @property
     def empty(self):
         return (len(self.infront_tags) == 0 and
                 len(self.inline_tags) == 0 and
                 self.byte_tag is None and
-                self.instr is None)
+                self.disasm_tag is None)
 
 
 class _AsmLine(object):
@@ -451,7 +451,7 @@ class _Disasm(object):
 
     def __process_disasm_tag(self, tag):
         tags = self.__tags[tag.addr]
-        if tags.instr is not None:
+        if tags.disasm_tag is not None:
             return
 
         MAX_INSTR_SIZE = 4
@@ -469,7 +469,8 @@ class _Disasm(object):
 
         instr = self.__instr_builder.build_instr(tag.addr,
                                                  bytes(instr_image))
-        self.__tags[tag.addr].instr = instr
+        tag.instr = instr
+        self.__tags[tag.addr].disasm_tag = tag
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
@@ -526,8 +527,9 @@ class _Disasm(object):
             else:
                 assert 0, tag
 
-        instr = self.__tags[addr].instr
-        if instr is not None:
+        disasm_tag = self.__tags[addr].disasm_tag
+        if disasm_tag is not None:
+            instr = disasm_tag.instr
             if not first_instr_byte:
                 yield _HintTag(instr.origin, addr,
                                'warning: overlapping instruction: '
@@ -540,7 +542,7 @@ class _Disasm(object):
 
     def __is_commentless_addr(self, addr):
         tags = self.__tags[addr]
-        if tags.instr is not None or len(tags.infront_tags) != 0:
+        if tags.disasm_tag is not None or len(tags.infront_tags) != 0:
             return False
 
         if any(True for _ in self.__get_inline_comments(addr)):
@@ -622,9 +624,9 @@ class _Disasm(object):
             xbytes = []
 
     def __get_lines_for_addr(self, addr):
-        instr = self.__tags[addr].instr
-        if instr is not None:
-            yield from self.__get_instr_lines(instr)
+        disasm_tag = self.__tags[addr].disasm_tag
+        if disasm_tag is not None:
+            yield from self.__get_instr_lines(disasm_tag.instr)
         else:
             yield from self.__get_data_lines(addr)
 
