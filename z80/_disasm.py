@@ -439,10 +439,6 @@ class _Disasm(object):
         # TODO: Not really adding tags.
         self.add_tags(*new_tags)
 
-    # TODO: Remove?
-    def __mark_addr_to_disassemble(self, addr):
-        self.add_tags(_DisasmTag(None, addr))
-
     def __process_comment_tag(self, tag):
         self.__tags[tag.addr].infront_tags.append(tag)
 
@@ -451,7 +447,7 @@ class _Disasm(object):
 
     def __process_instr_tag(self, tag):
         self.__tags[tag.addr].inline_tags.append(tag)
-        self.__mark_addr_to_disassemble(tag.addr)
+        self.add_tags(_DisasmTag(tag.origin, tag.addr))
 
     def __process_disasm_tag(self, tag):
         tags = self.__tags[tag.addr]
@@ -480,7 +476,8 @@ class _Disasm(object):
             if (not isinstance(instr, JumpInstr) or
                     isinstance(instr, CallInstr) or
                     instr.conditional):
-                self.__mark_addr_to_disassemble(instr.addr + instr.size)
+                target = instr.addr + instr.size
+                self.add_tags(_DisasmTag(instr.origin, target))
 
             # Disassemble jump targets.
             if (isinstance(instr, JumpInstr) and
@@ -488,7 +485,7 @@ class _Disasm(object):
                 target = instr.target
                 if not isinstance(target, At):
                     assert isinstance(target, int)
-                    self.__mark_addr_to_disassemble(target)
+                    self.add_tags(_DisasmTag(instr.origin, target))
 
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
