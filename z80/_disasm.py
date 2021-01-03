@@ -538,6 +538,16 @@ class _Disasm(object):
                                'warning: unknown instruction: '
                                '%r' % instr.text)
 
+    def __is_commentless_addr(self, addr):
+        tags = self.__tags[addr]
+        if tags.instr is not None or len(tags.infront_tags) != 0:
+            return False
+
+        if any(True for _ in self.__get_inline_comments(addr)):
+            return False
+
+        return True
+
     def __get_instr_lines(self, instr):
         command = str(instr)
         addr = instr.addr
@@ -581,31 +591,25 @@ class _Disasm(object):
             addr = byte_addr
 
     def __get_data_lines(self, addr):
-        for tag in self.__tags[addr].infront_tags:
+        tags = self.__tags[addr]
+        for tag in tags.infront_tags:
             yield _AsmLine(addr=addr, command=tag)
 
-        inline_comments = list(self.__get_inline_comments(addr))
-
-        if self.__tags[addr].byte_tag is None:
+        if tags.byte_tag is None:
             return
 
-        xbytes = [self.__tags[addr].byte_tag.value]
+        xbytes = [tags.byte_tag.value]
+        inline_comments = list(self.__get_inline_comments(addr))
 
         if len(inline_comments) == 0:
             byte_addr = addr + 1
 
             while len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE:
-                if self.__tags[byte_addr].instr is not None:
-                    break
-
                 byte_tag = self.__tags[byte_addr].byte_tag
                 if byte_tag is None:
                     break
 
-                if len(self.__tags[byte_addr].infront_tags) > 0:
-                    break
-
-                if any(True for _ in self.__get_inline_comments(byte_addr)):
+                if not self.__is_commentless_addr(byte_addr):
                     break
 
                 xbytes.append(byte_tag.value)
