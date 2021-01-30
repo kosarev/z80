@@ -18,7 +18,7 @@ class _CPMLikeMachineMixin(object):
             image = f.read()
 
         self.set_memory_block(self._ENTRY, image)
-        self.set_pc(self._ENTRY)
+        self.pc = self._ENTRY
 
         self.set_breakpoint(self._BDOS_CALL)
         self.set_memory_block(self._BDOS_CALL, b'\xc9')  # ret
@@ -35,12 +35,12 @@ class _CPMLikeMachineMixin(object):
         sys.stdout.write(s)
 
     def _handle_c_write(self):
-        self.output(chr(self.get_e()))
+        self.output(chr(self.e))
 
     def _handle_writestr(self):
-        addr = self.get_de()
+        addr = self.de
         while True:
-            c = self.get_memory_byte(addr)
+            c = self.memory[addr]
             if c == ord('$'):
                 break
 
@@ -48,7 +48,7 @@ class _CPMLikeMachineMixin(object):
             addr = (addr + 1) & 0xffff
 
     def _handle_bdos_call(self):
-        c = self.get_c()
+        c = self.c
         if c == self._C_WRITE:
             self._handle_c_write()
         elif c == self._C_WRITESTR:
@@ -57,7 +57,7 @@ class _CPMLikeMachineMixin(object):
             assert 0, 'BDOS call: c = 0x%02x' % c
 
     def _handle_breakpoint(self):
-        pc = self.get_pc()
+        pc = self.pc
         if pc == 0x0000:
             # Quit program.
             return False

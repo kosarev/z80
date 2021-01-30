@@ -10,54 +10,25 @@
 from ._z80 import _I8080Machine, _Z80Machine
 
 
-class _ByteState(object):
-    def __init__(self, image):
-        assert len(image) >= 1
-        self.__image = image[0:1]
-
-    def get(self):
-        return self.__image[0]
-
-    def set(self, value):
-        assert 0  # TODO
-        self.__image[0] = value
-
-    value = property(get, set)
+def _get_u16(image):
+    return image[0] + image[1] * 0x100
 
 
-class _WordState(object):
-    def __init__(self, image):
-        assert len(image) >= 2
-        self.__image = image[0:2]
-        self.lo = _ByteState(image[0:1])
-        self.hi = _ByteState(image[1:2])
-
-    def get(self):
-        return self.__image[0] + self.__image[1] * 0x100
-
-    def set(self, value):
-        self.__image[0] = value % 0x100
-        self.__image[1] = value // 0x100
-
-    value = property(get, set)
+def _set_u16(image, value):
+    image[0] = value % 0x100
+    image[1] = value // 0x100
 
 
-class _U32State(object):
-    def __init__(self, image):
-        assert len(image) >= 4
-        self.__image = image[0:4]
+def _get_u32(image):
+    return (self.__image[0] + self.__image[1] * 0x100 +
+            self.__image[2] * 0x10000 + self.__image[2] * 0x1000000)
 
-    def get(self):
-        return (self.__image[0] + self.__image[1] * 0x100 +
-                self.__image[2] * 0x10000 + self.__image[2] * 0x1000000)
 
-    def set(self, value):
-        self.__image[0] = value % 0x100
-        self.__image[1] = (value // 0x100) % 0x100
-        self.__image[2] = (value // 0x10000) % 0x100
-        self.__image[3] = value // 0x1000000
-
-    value = property(get, set)
+def _set_u32(image, value):
+    image[0] = value % 0x100
+    image[1] = (value // 0x100) % 0x100
+    image[2] = (value // 0x10000) % 0x100
+    image[3] = value // 0x1000000
 
 
 class _ImageParser(object):
@@ -74,13 +45,13 @@ class _ImageParser(object):
         return self.parse_block(len(self.__image))
 
     def parse_byte(self):
-        return _ByteState(self.parse_block(1))
+        return self.parse_block(1)
 
     def parse_word(self):
-        return _WordState(self.parse_block(2))
+        return self.parse_block(2)
 
     def parse_u32(self):
-        return _U32State(self.parse_block(4))
+        return self.parse_block(4)
 
 
 class _StateBase(object):
@@ -98,95 +69,99 @@ class _StateBase(object):
         self.__last_read_addr = parser.parse_word()
         self.__ticks_to_stop = parser.parse_u32()
 
-        self.__a = self.__af.hi
-        self.__b = self.__bc.hi
-        self.__c = self.__bc.lo
-        self.__d = self.__de.hi
-        self.__e = self.__de.lo
-        self.__f = self.__af.lo
-        self.__h = self.__hl.hi
-        self.__l = self.__hl.lo
+        self.__a = self.__af[0:1]
+        self.__b = self.__bc[1:2]
+        self.__c = self.__bc[0:1]
+        self.__d = self.__de[1:2]
+        self.__e = self.__de[0:1]
+        self.__f = self.__af[0:1]
+        self.__h = self.__hl[1:2]
+        self.__l = self.__hl[0:1]
 
     def __parse_memory(self, parser):
         block = parser.parse_rest()
         assert len(block) == 0x10000, len(block)
         self.memory = block
 
-    def get_b(self):
-        return self.__b.value
+    @property
+    def b(self):
+        return self.__b[0]
 
-    def set_b(self, value):
-        self.__b.value = value
+    @b.setter
+    def b(self, value):
+        self.__b[0] = value
 
-    def get_c(self):
-        return self.__c.value
+    @property
+    def c(self):
+        return self.__c[0]
 
-    def set_c(self, value):
-        self.__c.value = value
+    @c.setter
+    def c(self, value):
+        self.__c[0] = value
 
-    def get_d(self):
-        return self.__d.value
+    @property
+    def d(self):
+        return self.__d[0]
 
-    def set_d(self, value):
-        self.__d.value = value
+    @d.setter
+    def d(self, value):
+        self.__d[0] = value
 
-    def get_e(self):
-        return self.__e.value
+    @property
+    def e(self):
+        return self.__e[0]
 
-    def set_e(self, value):
-        self.__e.value = value
+    @e.setter
+    def e(self, value):
+        self.__e[0] = value
 
-    def get_bc(self):
-        return self.__bc.value
+    @property
+    def bc(self):
+        return _get_u16(self.__bc)
 
-    def set_bc(self, value):
-        self.__bc.value = value
+    @bc.setter
+    def bc(self, value):
+        _set_u16(self.__bc, value)
 
-    def get_de(self):
-        return self.__de.value
+    @property
+    def de(self):
+        return _get_u16(self.__de)
 
-    def set_de(self, value):
-        self.__de.value = value
+    @de.setter
+    def de(self, value):
+        _set_u16(self.__de, value)
 
-    def get_hl(self):
-        return self.__hl.value
+    @property
+    def hl(self):
+        return _get_u16(self.__hl)
 
-    def set_hl(self, value):
-        self.__hl.value = value
+    @hl.setter
+    def hl(self, value):
+        _set_u16(self.__hl, value)
 
-    def get_pc(self):
-        return self.__pc.value
+    @property
+    def pc(self):
+        return _get_u16(self.__pc)
 
-    def set_pc(self, value):
-        self.__pc.value = value
+    @pc.setter
+    def pc(self, value):
+        _set_u16(self.__pc, value)
 
-    def get_sp(self):
-        return self.__sp.value
+    @property
+    def sp(self):
+        return _get_u16(self.__sp)
 
-    def set_sp(self, value):
-        self.__sp.value = value
+    @sp.setter
+    def sp(self, value):
+        _set_u16(self.__sp, value)
 
-    def get_ticks_to_stop(self):
-        return self.__tick_to_stop.value
+    @property
+    def ticks_to_stop(self):
+        return _get_u32(self.__tick_to_stop)
 
-    def set_ticks_to_stop(self, value):
-        self.__ticks_to_stop.value = value
-
-    b = property(get_b, set_b)
-    c = property(get_c, set_c)
-    d = property(get_d, set_d)
-    e = property(get_e, set_e)
-
-    bc = property(get_bc, set_bc)
-    de = property(get_de, set_de)
-    hl = property(get_hl, set_hl)
-    pc = property(get_pc, set_pc)
-    sp = property(get_sp, set_sp)
-
-    ticks_to_stop = property(get_ticks_to_stop, set_ticks_to_stop)
-
-    def get_memory_byte(self, addr):
-        return self.memory[addr]
+    @ticks_to_stop.setter
+    def ticks_to_stop(self, value):
+        _set_u32(self.__ticks_to_stop, value)
 
     def set_memory_block(self, addr, block):
         self.memory[addr:addr + len(block)] = block
