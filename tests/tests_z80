@@ -1518,7 +1518,7 @@ edb3 otir
  8 fetch_cycle_extra_1t
  9 read ed at 0000
  9   set_addr_bus 0001 -> 0000
-12 output ed at 0000
+12 output ed at ff00
 16 set_c 00 -> 00
 16 set_b 00 -> ff
 16 set_wz 0000 -> ff01

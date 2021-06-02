@@ -3145,8 +3145,8 @@ public:
 
         self().on_fetch_cycle_extra_1t();
         fast_u8 r = self().on_read_cycle(hl);
-        self().on_output_cycle(bc, r);
         bc = sub16(bc, 0x0100);
+        self().on_output_cycle(bc, r);
         fast_u8 s = get_high8(bc);
 
         if(static_cast<unsigned>(k) & 1) {
