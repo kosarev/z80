@@ -3566,9 +3566,12 @@ public:
         return op;
     }
 
-    void initiate_int() {
+private:
+    void initiate_interrupt(bool is_nmi) {
         self().on_set_iff1(false);
-        self().on_set_iff2(false);
+
+        if(!is_nmi)
+            self().on_set_iff2(false);
 
         fast_u16 pc = self().on_get_pc();
 
@@ -3583,29 +3586,43 @@ public:
         }
 
         self().on_inc_r_reg();
-        self().on_tick(7);
+        self().on_tick(is_nmi ? 5 : 7);
         self().on_push(pc);
 
         fast_u16 isr_addr;
-        switch(self().on_get_int_mode()) {
-        // TODO: Provide a mean to customise handling of IM 0 interrupts.
-        case 0:
-        case 1:
-            // ack(7) w(3) w(3)
-            isr_addr = 0x0038;
-            break;
-        case 2: {
-            // ack(7) w(3) w(3) r(3) r(3)
-            fast_u16 vector_addr = make16(self().on_get_i(), 0xff);
-            fast_u8 lo = self().on_read_cycle(vector_addr);
-            fast_u8 hi = self().on_read_cycle(inc16(vector_addr));
-            isr_addr = make16(hi, lo); }
-            break;
-        default:
-            unreachable("Unknown interrupt mode.");
+        if(is_nmi) {
+            // f(5) w(3) w(3)
+            isr_addr = 0x0066;
+        } else {
+            switch(self().on_get_int_mode()) {
+            // TODO: Provide a mean to customise handling of IM 0 interrupts.
+            case 0:
+            case 1:
+                // ack(7) w(3) w(3)
+                isr_addr = 0x0038;
+                break;
+            case 2: {
+                // ack(7) w(3) w(3) r(3) r(3)
+                fast_u16 vector_addr = make16(self().on_get_i(), 0xff);
+                fast_u8 lo = self().on_read_cycle(vector_addr);
+                fast_u8 hi = self().on_read_cycle(inc16(vector_addr));
+                isr_addr = make16(hi, lo); }
+                break;
+            default:
+                unreachable("Unknown interrupt mode.");
+            }
         }
 
         self().on_jump(isr_addr);
+    }
+
+public:
+    void initiate_int() {
+        initiate_interrupt(/* is_nmi= */ false);
+    }
+
+    void initiate_nmi() {
+        initiate_interrupt(/* is_nmi= */ true);
     }
 
     bool on_handle_active_int() {
