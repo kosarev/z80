@@ -3588,10 +3588,8 @@ public:
 
         fast_u16 isr_addr;
         switch(self().on_get_int_mode()) {
+        // TODO: Provide a mean to customise handling of IM 0 interrupts.
         case 0:
-            isr_addr = 0;
-            assert(0);  // TODO
-            break;
         case 1:
             // ack(7) w(3) w(3)
             isr_addr = 0x0038;
