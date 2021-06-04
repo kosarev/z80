@@ -2,9 +2,7 @@
 /*  Z80 CPU Emulator.
     https://github.com/kosarev/z80
 
-    Copyright (C) 2017-2020 Ivan Kosarev.
-    ivan@kosarev.info
-
+    Copyright (c) 2017 Ivan Kosarev <ivan@kosarev.info>
     Published under the MIT license.
 */
 
