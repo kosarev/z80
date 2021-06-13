@@ -471,6 +471,18 @@ public:
         addr_bus = addr;
     }
 
+    void on_mreq_wait(fast_u16 addr) {
+        input.read_and_match("mreq_wait %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(addr));
+    }
+
+    void on_iorq_wait(fast_u16 port) {
+        input.read_and_match("iorq_wait %04x",
+                             static_cast<unsigned>(get_ticks()),
+                             static_cast<unsigned>(port));
+    }
+
     fast_u8 on_fetch_cycle() {
         fast_u16 addr = base::get_pc();
         input.read_and_match("fetch %02x at %04x",
