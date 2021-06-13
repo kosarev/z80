@@ -298,7 +298,9 @@ public:
     fast_u8 on_read_cycle(fast_u16 addr) {
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
-        self().on_tick(3);
+        self().on_tick(2);
+        self().on_wait(addr);
+        self().on_tick(1);
         return n; }
     void on_read_cycle_extra_1t() {
         self().on_tick(1); }
@@ -307,9 +309,15 @@ public:
     void on_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_set_addr_bus(addr);
         self().on_write(addr, n);
-        self().on_tick(3); }
+        self().on_tick(2);
+        self().on_wait(addr);
+        self().on_tick(1); }
     void on_write_cycle_extra_2t() {
         self().on_tick(2); }
+
+    // TODO: Test on_wait() calls.
+    void on_wait(fast_u16 addr) {
+        unused(addr); }
 
     void on_ed_xnop(fast_u8 op) {
         unused(op);
@@ -2374,15 +2382,21 @@ public:
         fast_u16 addr = self().get_pc_on_fetch();
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
-        self().on_tick(4);
+        self().on_tick(2);
+        self().on_wait(addr);
+        self().on_tick(2);
         self().set_pc_on_fetch(inc16(addr));
         return n; }
 
     fast_u8 on_input_cycle(fast_u8 port) {
-        self().on_tick(3);
+        self().on_tick(2);
+        self().on_wait(port);
+        self().on_tick(1);
         return self().on_input(port); }
     void on_output_cycle(fast_u8 port, fast_u8 n) {
-        self().on_tick(3);
+        self().on_tick(2);
+        self().on_wait(port);
+        self().on_tick(1);
         self().on_output(port, n); }
 
 private:
@@ -3518,6 +3532,7 @@ public:
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
         self().on_tick(2);
+        self().on_wait(addr);
         self().on_set_addr_bus(self().get_ir_on_refresh());
         self().on_tick(2);
         self().set_pc_on_fetch(inc16(addr));
@@ -3545,15 +3560,19 @@ public:
     fast_u8 on_input_cycle(fast_u16 port) {
         // Z80 samples the value at t4 of the input cycle, see
         // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
-        self().on_tick(4);
-        // TODO: Shall we set the address bus here?
+        self().on_set_addr_bus(port);
+        self().on_tick(3);
+        self().on_wait(port);
+        self().on_tick(1);
         fast_u8 n = self().on_input(port);
         return n;
     }
 
     void on_output_cycle(fast_u16 port, fast_u8 n) {
-        // TODO: Shall we set the address bus here?
-        self().on_tick(4);
+        self().on_set_addr_bus(port);
+        self().on_tick(3);
+        self().on_wait(port);
+        self().on_tick(1);
         self().on_output(port, n);
     }
 

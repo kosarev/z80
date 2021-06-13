@@ -603,6 +603,7 @@ dbfe in a, (0xfe)
  7 get_a 00
  7 set_wz 0000 -> 00ff
  7 input at 00fe
+ 7   set_addr_bus 0001 -> 00fe
 11 set_a 00 -> ff
 11 done
 
@@ -629,6 +630,7 @@ ed78 in a, (c)
  8 get_f 00
  8 set_wz 0000 -> 0001
  8 input at 0000
+ 8   set_addr_bus 0001 -> 0000
 12 set_a 00 -> ff
 12 set_f 00 -> ac
 12 done
@@ -1452,6 +1454,7 @@ ed79 out (c), a
  8 set_wz 0000 -> 0001
  8 get_a 00
  8 output 00 at 0000
+ 8   set_addr_bus 0001 -> 0000
 12 done
 
 # Block input.
@@ -1479,8 +1482,9 @@ edb2 inir
  8 get_f 00
  8 fetch_cycle_extra_1t
  9 input at ff00
+ 9   set_addr_bus 0001 -> ff00
 13 write ed -> ff at 0000
-13   set_addr_bus 0001 -> 0000
+13   set_addr_bus ff00 -> 0000
 16 set_c 00 -> 00
 16 set_b 00 -> ff
 16 set_wz 0000 -> ff01
@@ -1519,6 +1523,7 @@ edb3 otir
  9 read ed at 0000
  9   set_addr_bus 0001 -> 0000
 12 output ed at ff00
+12   set_addr_bus 0000 -> ff00
 16 set_c 00 -> 00
 16 set_b 00 -> ff
 16 set_wz 0000 -> ff01
@@ -1547,6 +1552,7 @@ d3ab out (0xab), a
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
  7 output 00 at 00ab
+ 7   set_addr_bus 0001 -> 00ab
 11 set_wz 0000 -> 00ac
 11 done
 

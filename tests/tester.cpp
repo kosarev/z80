@@ -558,6 +558,7 @@ public:
         input.read_and_match("input at %02x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(n));
+        input_level_guard guard(input);
         return base::on_input_cycle(n);
     }
 
@@ -565,6 +566,7 @@ public:
         input.read_and_match("input at %04x",
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(addr));
+        input_level_guard guard(input);
         return base::on_input_cycle(addr);
     }
 
@@ -573,6 +575,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(b),
                              static_cast<unsigned>(n));
+        input_level_guard guard(input);
         base::on_output_cycle(n, b);
     }
 
@@ -581,6 +584,7 @@ public:
                              static_cast<unsigned>(get_ticks()),
                              static_cast<unsigned>(b),
                              static_cast<unsigned>(addr));
+        input_level_guard guard(input);
         base::on_output_cycle(addr, b);
     }
 
