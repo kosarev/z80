@@ -315,7 +315,6 @@ public:
     void on_write_cycle_extra_2t() {
         self().on_tick(2); }
 
-    // TODO: Test on_mreq_wait() and on_iorq_wait() calls.
     void on_mreq_wait(fast_u16 addr) {
         unused(addr); }
     void on_iorq_wait(fast_u16 port) {
