@@ -2440,7 +2440,7 @@ private:
             fast_u8 ops12 = b;
             return sf(res) | zf(res) | pf(res) | hfb(ops12); }
         case flag_op::set_cf:
-            return static_cast<fast_u8>((b & ~cf_mask) | ((w >> 8) & cf_mask));
+            return (b & ~cf_mask) | cfa(w);
         case flag_op::daa: {
             fast_u8 t = b;
             fast_u8 hf = static_cast<fast_u8>(w & hf_mask);
