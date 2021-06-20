@@ -2418,15 +2418,14 @@ private:
     fast_u8 hfb(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_op { adc, sbc, bitwise, set_cf, inc, dec, daa };
+    enum class flag_op { adc, sbc, bitwise, set_cf, daa };
 
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
     // core code executing instructions as possible, leaving there
     // only those operations that can be performed very fast.
     // TODO: Provide a way to control CF separately and eliminate
-    // the f parameter. And then maybe combine flag_op::inc/dec
-    // with flag_op::adc/sbc.
+    // the f parameter.
     fast_u8 flags(fast_u8 f, flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
         case flag_op::adc:
@@ -2443,19 +2442,6 @@ private:
             return sf(res) | zf(res) | pf(res) | hfb(ops12); }
         case flag_op::set_cf:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
-        case flag_op::inc:
-        case flag_op::dec: {
-            fast_u8 n = b;
-            fast_u8 hf;
-            fast_u8 t;
-            if(fop == flag_op::inc) {
-                t = mask8(n + 1);
-                hf = hfp(n ^ 1, t);
-            } else {
-                t = mask8(n - 1);
-                hf = hfm(n ^ 1, t);
-            }
-            return cf(f) | sf(t) | zf(t) | hf | pf(t); }
         case flag_op::daa: {
             fast_u8 t = b;
             fast_u8 flags = static_cast<fast_u8>(w);
@@ -2553,8 +2539,9 @@ public:
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        self().on_set_reg(r, mask8(n - 1));
-        self().on_flags_update(f, flag_op::dec, n, 0); }
+        fast_u8 t = mask8(n - 1);
+        self().on_set_reg(r, t);
+        self().on_flags_update(/* f= */ 0, flag_op::sbc, n ^ 1, (f << 8) | t); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2581,8 +2568,9 @@ public:
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
-        self().on_set_reg(r, mask8(n + 1));
-        self().on_flags_update(f, flag_op::inc, n, 0); }
+        fast_u8 t = mask8(n + 1);
+        self().on_set_reg(r, t);
+        self().on_flags_update(/* f= */ 0, flag_op::adc, n ^ 1, (f << 8) | t); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
