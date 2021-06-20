@@ -2420,6 +2420,13 @@ private:
 
     enum class flag_op { adc, sbc, bitwise, set_cf, daa };
 
+    enum class flag_set : fast_u8 {
+        cf = cf_mask,
+        hf_cf = hf_mask | cf_mask,
+        sf_zf_hf_pf = sf_mask | zf_mask | hf_mask | pf_mask,
+        all = sf_mask | zf_mask | hf_mask | pf_mask | cf_mask
+    };
+
     // Computes flags by given operands encoded as a 32-bit word.
     // This function is supposed to take as much work from the
     // core code executing instructions as possible, leaving there
@@ -2450,6 +2457,13 @@ private:
     }
 
     // TODO: Make this public once lazy flags are fully supported.
+    // TODO: Test calls to this function.
+    fast_u8 on_flags_read(flag_set fs) {
+        return self().on_get_f() & static_cast<fast_u8>(fs);
+    }
+
+    // TODO: Make this public once lazy flags are fully supported.
+    // TODO: Test calls to this function.
     void on_flags_update(flag_op fop, fast_u8 b, fast_u16 w) {
         self().on_set_f(flags(fop, b, w));
     }
@@ -2463,7 +2477,7 @@ public:
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
-                cf(self().on_get_f()) : 0;
+                self().on_flags_read(flag_set::cf) : 0;
             if(k <= alu::adc) {
                 t = a + n + cfv;
                 fop = flag_op::adc;
@@ -2500,7 +2514,7 @@ public:
 
         fast_u16 i = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp);
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::sf_zf_hf_pf);
         fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
         self().on_set_hl(mask16(r32));
@@ -2515,13 +2529,13 @@ public:
             self().on_set_wz(nn);
         }
     void on_ccf() {
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::all);
         self().on_flags_update(flag_op::set_cf, f, (f ^ cf_mask) << 8); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::hf_cf);
 
         fast_u8 r = a;
         fast_u8 t = r + 6;
@@ -2538,7 +2552,7 @@ public:
         self().on_flags_update(flag_op::daa, r, w | hfv); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::cf);
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
         self().on_flags_update(flag_op::sbc, n ^ 1, (f << 8) | t); }
@@ -2567,7 +2581,7 @@ public:
         self().on_set_a(self().on_input_cycle(n)); }
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::cf);
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
         self().on_flags_update(flag_op::adc, n ^ 1, (f << 8) | t); }
@@ -2608,30 +2622,30 @@ public:
         self().on_set_regp2(rp, nn); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::all);
         fast_u16 t = (a << 1) | (f & cf_mask);
         self().on_set_a(mask8(t));
         self().on_flags_update(flag_op::set_cf, f, t); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::all);
         fast_u8 r = (a >> 1) | ((f & cf_mask) << 7);
         self().on_set_a(r);
         self().on_flags_update(flag_op::set_cf, f, a << 8); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::all);
         a = rol8(a);
         self().on_set_a(a);
         self().on_flags_update(flag_op::set_cf, f, a << 8); }
     void on_rrca() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::all);
         a = ror8(a);
         self().on_set_a(a);
         self().on_flags_update(flag_op::set_cf, f, a << 1); }
     void on_scf() {
-        fast_u8 f = self().on_get_f();
+        fast_u8 f = self().on_flags_read(flag_set::sf_zf_hf_pf);
         self().on_flags_update(flag_op::set_cf, f, 0x100); }
 
 protected:
