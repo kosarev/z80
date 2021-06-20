@@ -2444,8 +2444,8 @@ private:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
         case flag_op::daa: {
             fast_u8 t = b;
-            fast_u8 flags = static_cast<fast_u8>(w);
-            return sf(t) | zf(t) | pf(t) | flags; }
+            fast_u8 hf_cf = static_cast<fast_u8>(w);
+            return sf(t) | zf(t) | pf(t) | hf_cf; }
         }
         unreachable("Unknown flag set!");
     }
