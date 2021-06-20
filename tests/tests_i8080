@@ -35,7 +35,6 @@ ce16 aci 0x16
  4   set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
- 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -68,7 +67,6 @@ c616 adi 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_a 00 -> 16
  7 set_f 00 -> 00
  7 done
@@ -82,7 +80,6 @@ a7 ana a
  4   set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
- 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -101,7 +98,6 @@ e616 ani 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_a 00 -> 00
  7 set_f 00 -> 44
  7 done
@@ -208,7 +204,6 @@ bc cmp h
  4   set_pc_on_fetch 0000 -> 0001
  4 get_h 00
  4 get_a 00
- 4 get_f 00
  4 set_f 00 -> 54
  4 done
 
@@ -226,7 +221,6 @@ fe16 cpi 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_f 00 -> 81
  7 done
 
@@ -538,7 +532,6 @@ b3 ora e
  4   set_pc_on_fetch 0000 -> 0001
  4 get_e 00
  4 get_a 00
- 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -557,7 +550,6 @@ f616 ori 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_a 00 -> 16
  7 set_f 00 -> 00
  7 done
@@ -700,7 +692,6 @@ f9 sphl
  4   set_pc_on_fetch 0000 -> 0001
  4 get_c 00
  4 get_a 00
- 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 54
  4 done
@@ -719,7 +710,6 @@ d616 sui 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_a 00 -> ea
  7 set_f 00 -> 81
  7 done
@@ -988,7 +978,6 @@ af xra a
  4   set_pc_on_fetch 0000 -> 0001
  4 get_a 00
  4 get_a 00
- 4 get_f 00
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
@@ -1007,7 +996,6 @@ ee16 xri 0x16
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 get_f 00
  7 set_a 00 -> 16
  7 set_f 00 -> 00
  7 done

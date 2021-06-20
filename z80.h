@@ -2471,13 +2471,13 @@ private:
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
         flag_op fop;
         fast_u16 t, w;
         fast_u8 b;
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
-            fast_u8 cfv = (k == alu::adc || k == alu::sbc) ? cf(f) : 0;
+            fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
+                cf(self().on_get_f()) : 0;
             if(k <= alu::adc) {
                 t = a + n + cfv;
                 fop = flag_op::adc;
@@ -2507,7 +2507,7 @@ public:
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_flags_update(f, fop, b, w);
+        self().on_flags_update(/* f= */ 0, fop, b, w);
     }
 
     void on_add_irp_rp(regp rp) {
