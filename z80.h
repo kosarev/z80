@@ -2444,8 +2444,8 @@ private:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
         case flag_op::daa: {
             fast_u8 t = b;
-            fast_u8 hf_cf = static_cast<fast_u8>(w);
-            return sf(t) | zf(t) | pf(t) | hf_cf; }
+            fast_u8 hf = static_cast<fast_u8>(w & hf_mask);
+            return sf(t) | zf(t) | pf(t) | hf | cfa(w); }
         }
         unreachable("Unknown flag set!");
     }
@@ -2530,12 +2530,12 @@ public:
             r = t;
 
         fast_u16 t2 = r + 0x60;
-        fast_u8 cfv = ((t2 >> 8) | f) & cf_mask;
-        if(cfv)
+        fast_u16 w = ((t2 >> 8) | f) << 8;
+        if(w & 0x100)
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().on_flags_update(f, flag_op::daa, r, (hfv & hf_mask) | cfv); }
+        self().on_flags_update(f, flag_op::daa, r, w | hfv); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
