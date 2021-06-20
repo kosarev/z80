@@ -2424,9 +2424,8 @@ private:
     // This function is supposed to take as much work from the
     // core code executing instructions as possible, leaving there
     // only those operations that can be performed very fast.
-    // TODO: Provide a way to control CF separately and eliminate
-    // the f parameter.
-    fast_u8 flags(fast_u8 f, flag_op fop, fast_u8 b, fast_u16 w) {
+    // TODO: Provide a way to control CF separately.
+    fast_u8 flags(flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
         case flag_op::adc:
         case flag_op::sbc: {
@@ -2441,7 +2440,7 @@ private:
             fast_u8 ops12 = b;
             return sf(res) | zf(res) | pf(res) | hfb(ops12); }
         case flag_op::set_cf:
-            return static_cast<fast_u8>((f & ~cf_mask) | w);
+            return static_cast<fast_u8>((b & ~cf_mask) | ((w >> 8) & cf_mask));
         case flag_op::daa: {
             fast_u8 t = b;
             fast_u8 hf = static_cast<fast_u8>(w & hf_mask);
@@ -2451,8 +2450,8 @@ private:
     }
 
     // TODO: Make this public once lazy flags are fully supported.
-    void on_flags_update(fast_u8 f, flag_op fop, fast_u8 b, fast_u16 w) {
-        self().on_set_f(flags(f, fop, b, w));
+    void on_flags_update(flag_op fop, fast_u8 b, fast_u16 w) {
+        self().on_set_f(flags(fop, b, w));
     }
 
 public:
@@ -2492,7 +2491,7 @@ public:
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_flags_update(/* f= */ 0, fop, b, t);
+        self().on_flags_update(fop, b, t);
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2505,7 +2504,8 @@ public:
         fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
         self().on_set_hl(mask16(r32));
-        self().on_flags_update(f, flag_op::set_cf, 0, r32 >> 16); }
+        self().on_flags_update(flag_op::set_cf, f,
+                               static_cast<fast_u16>(r32 >> 8)); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2516,7 +2516,7 @@ public:
         }
     void on_ccf() {
         fast_u8 f = self().on_get_f();
-        self().on_flags_update(f, flag_op::set_cf, 0, f ^ cf_mask); }
+        self().on_flags_update(flag_op::set_cf, f, (f ^ cf_mask) << 8); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
@@ -2535,13 +2535,13 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().on_flags_update(f, flag_op::daa, r, w | hfv); }
+        self().on_flags_update(flag_op::daa, r, w | hfv); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u8 f = self().on_get_f();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_flags_update(/* f= */ 0, flag_op::sbc, n ^ 1, (f << 8) | t); }
+        self().on_flags_update(flag_op::sbc, n ^ 1, (f << 8) | t); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2570,7 +2570,7 @@ public:
         fast_u8 f = self().on_get_f();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().on_flags_update(/* f= */ 0, flag_op::adc, n ^ 1, (f << 8) | t); }
+        self().on_flags_update(flag_op::adc, n ^ 1, (f << 8) | t); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -2609,30 +2609,30 @@ public:
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
-        fast_u8 r = mask8(a << 1) | (f & cf_mask);
-        self().on_set_a(r);
-        self().on_flags_update(f, flag_op::set_cf, 0, a >> 7); }
+        fast_u16 t = (a << 1) | (f & cf_mask);
+        self().on_set_a(mask8(t));
+        self().on_flags_update(flag_op::set_cf, f, t); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         fast_u8 r = (a >> 1) | ((f & cf_mask) << 7);
         self().on_set_a(r);
-        self().on_flags_update(f, flag_op::set_cf, 0, a & cf_mask); }
+        self().on_flags_update(flag_op::set_cf, f, a << 8); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         a = rol8(a);
         self().on_set_a(a);
-        self().on_flags_update(f, flag_op::set_cf, 0, a & cf_mask); }
+        self().on_flags_update(flag_op::set_cf, f, a << 8); }
     void on_rrca() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
         a = ror8(a);
         self().on_set_a(a);
-        self().on_flags_update(f, flag_op::set_cf, 0, a >> 7); }
+        self().on_flags_update(flag_op::set_cf, f, a << 1); }
     void on_scf() {
         fast_u8 f = self().on_get_f();
-        self().on_flags_update(f, flag_op::set_cf, 0, cf_mask); }
+        self().on_flags_update(flag_op::set_cf, f, 0x100); }
 
 protected:
     using base::self;
