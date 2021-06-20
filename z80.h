@@ -2424,6 +2424,9 @@ private:
     // This function is supposed to take as much work from the
     // core code executing instructions as possible, leaving there
     // only those operations that can be performed very fast.
+    // TODO: Provide a way to control CF separately and eliminate
+    // the f parameter. And then maybe combine flag_op::inc/dec
+    // with flag_op::adc/sbc.
     fast_u8 flags(fast_u8 f, flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
         case flag_op::adc:
