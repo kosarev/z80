@@ -2431,7 +2431,7 @@ private:
         case flag_op::adc:
         case flag_op::sbc: {
             fast_u16 res9 = w;
-            fast_u8 res8 = mask8(res9);  // TODO: Can be just a cast?
+            fast_u8 res8 = mask8(res9);
             fast_u8 op12 = b;
             fast_u8 hf = (fop == flag_op::adc) ? hfp(op12, res8) :
                                                  hfm(op12, res8);
