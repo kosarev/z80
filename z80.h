@@ -2405,18 +2405,17 @@ private:
         return f & cf_mask; }
     fast_u8 sf(fast_u8 f) {
         return f & sf_mask; }
-
-    fast_u8 zf1(fast_u8 n) {
+    fast_u8 zf(fast_u8 n) {
         return zf_ari(n); }
-    fast_u8 pf1(fast_u8 n) {
+    fast_u8 pf(fast_u8 n) {
         return pf_log(n); }
-    fast_u8 cf1(fast_u16 res) {
+    fast_u8 cfa(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
-    fast_u8 hf1(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
+    fast_u8 hfp(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
-    fast_u8 hf2(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
+    fast_u8 hfm(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
         return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
-    fast_u8 hf3(fast_u8 ops12) {
+    fast_u8 hfb(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
     enum class flag_set { f1, f2, f3, f4, f5, f6, f7 };
@@ -2434,13 +2433,13 @@ private:
             fast_u8 cfv = mask8(w & 0x1);  // TODO: Can be just a cast?
             fast_u8 op1 = b & 0xf;
             fast_u8 op2 = b >> 4;
-            fast_u8 hf = (fs == flag_set::f1) ? hf1(op1, op2, cfv) :
-                                                hf2(op1, op2, cfv);
-            return sf(res8) | zf1(res8) | hf | pf1(res8) | cf1(res9); }
+            fast_u8 hf = (fs == flag_set::f1) ? hfp(op1, op2, cfv) :
+                                                hfm(op1, op2, cfv);
+            return sf(res8) | zf(res8) | hf | pf(res8) | cfa(res9); }
         case flag_set::f3: {
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
             fast_u8 ops12 = b;
-            return sf(res) | zf1(res) | pf1(res) | hf3(ops12); }
+            return sf(res) | zf(res) | pf(res) | hfb(ops12); }
         case flag_set::f4:
             return static_cast<fast_u8>((f & ~cf_mask) | w);
         case flag_set::f5:
@@ -2449,17 +2448,17 @@ private:
             fast_u8 hf;
             fast_u8 t;
             if(fs == flag_set::f6) {
-                hf = hf1(n, 1, 0);
+                hf = hfp(n, 1, 0);
                 t = mask8(n + 1);
             } else {
-                hf = hf2(n, 1, 0);
+                hf = hfm(n, 1, 0);
                 t = mask8(n - 1);
             }
-            return cf(f) | sf(t) | zf1(t) | hf | pf1(t); }
+            return cf(f) | sf(t) | zf(t) | hf | pf(t); }
         case flag_set::f7: {
             fast_u8 t = b;
             fast_u8 flags = static_cast<fast_u8>(w);
-            return sf(t) | zf1(t) | pf1(t) | flags; }
+            return sf(t) | zf(t) | pf(t) | flags; }
         }
         unreachable("Unknown flag set!");
     }
