@@ -2411,10 +2411,10 @@ private:
         return pf_log(n); }
     fast_u8 cfa(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
-    fast_u8 hfp(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
-        return ((op1 & 0xf) + (op2 & 0xf) + cfv) & hf_mask; }
-    fast_u8 hfm(fast_u8 op1, fast_u8 op2, fast_u8 cfv) {
-        return (hf_mask + (op1 & 0xf) - (op2 & 0xf) - cfv) & hf_mask; }
+    fast_u8 hfp(fast_u8 op12, fast_u8 res) {
+        return (op12 ^ res) & hf_mask; }
+    fast_u8 hfm(fast_u8 op12, fast_u8 res) {
+        return (op12 ^ (hf_mask + res)) & hf_mask; }
     fast_u8 hfb(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
@@ -2431,13 +2431,11 @@ private:
         switch(fop) {
         case flag_op::adc:
         case flag_op::sbc: {
-            fast_u16 res9 = w >> 1;
+            fast_u16 res9 = w;
             fast_u8 res8 = mask8(res9);  // TODO: Can be just a cast?
-            fast_u8 cfv = mask8(w & 0x1);  // TODO: Can be just a cast?
-            fast_u8 op1 = b & 0xf;
-            fast_u8 op2 = b >> 4;
-            fast_u8 hf = (fop == flag_op::adc) ? hfp(op1, op2, cfv) :
-                                                 hfm(op1, op2, cfv);
+            fast_u8 op12 = b;
+            fast_u8 hf = (fop == flag_op::adc) ? hfp(op12, res8) :
+                                                 hfm(op12, res8);
             return sf(res8) | zf(res8) | hf | pf(res8) | cfa(res9); }
         case flag_op::bitwise: {
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
@@ -2451,11 +2449,11 @@ private:
             fast_u8 hf;
             fast_u8 t;
             if(fop == flag_op::inc) {
-                hf = hfp(n, 1, 0);
                 t = mask8(n + 1);
+                hf = hfp(n ^ 1, t);
             } else {
-                hf = hfm(n, 1, 0);
                 t = mask8(n - 1);
+                hf = hfm(n ^ 1, t);
             }
             return cf(f) | sf(t) | zf(t) | hf | pf(t); }
         case flag_op::daa: {
@@ -2475,7 +2473,7 @@ public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         flag_op fop;
-        fast_u16 t, w;
+        fast_u16 t;
         fast_u8 b;
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
@@ -2488,8 +2486,7 @@ public:
                 t = a - n - cfv;
                 fop = flag_op::sbc;
             }
-            b = (n << 4) | (a & 0xf);
-            w = (t << 1) | cfv;
+            b = a ^ n;
         } else {
             // AND, XOR, OR
             fop = flag_op::bitwise;
@@ -2506,11 +2503,10 @@ public:
                 t = (k == alu::xor_a) ? a ^ n : a | n;
                 b = 0;
             }
-            w = t;
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_flags_update(/* f= */ 0, fop, b, w);
+        self().on_flags_update(/* f= */ 0, fop, b, t);
     }
 
     void on_add_irp_rp(regp rp) {
