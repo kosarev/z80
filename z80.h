@@ -2411,13 +2411,12 @@ private:
         return pf_log(n); }
     fast_u8 cfa(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
-    fast_u8 hfp(fast_u8 op12, fast_u8 res) {
-        return (op12 ^ res) & hf_mask; }
-    fast_u8 hfb(fast_u8 ops12) {
-        return (ops12 << (base::hf_bit - 3)) & hf_mask; }
+    fast_u8 hf(fast_u8 n) {
+        return n & hf_mask; }
 
-    enum class flag_op { adc, bitwise, daa };
+    enum class flag_op { alu, daa };
 
+    // TODO: Remove?
     enum class flag_set : fast_u8 {
         cf = cf_mask,
         hf_cf = hf_mask | cf_mask,
@@ -2432,26 +2431,20 @@ private:
     // TODO: Provide a way to control CF separately.
     fast_u8 eval_flags(flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
-        case flag_op::adc: {
+        case flag_op::alu: {
             fast_u16 res9 = w;
             fast_u8 res8 = mask8(res9);
             fast_u8 op12 = b;
-            fast_u8 hf = hfp(op12, res8);
-            return sf(res8) | zf(res8) | hf | pf(res8) | cfa(res9); }
-        case flag_op::bitwise: {
-            fast_u8 res = mask8(w);  // TODO: Can be just a cast?
-            fast_u8 ops12 = b;
-            return sf(res) | zf(res) | pf(res) | hfb(ops12); }
+            return sf(res8) | zf(res8) | hf(op12) | pf(res8) | cfa(res9); }
         case flag_op::daa: {
             fast_u8 t = b;
-            fast_u8 hf = static_cast<fast_u8>(w & hf_mask);
-            return sf(t) | zf(t) | pf(t) | hf | cfa(w); }
+            return sf(t) | zf(t) | pf(t) | hf(static_cast<fast_u8>(w)) | cfa(w); }
         }
         unreachable("Unknown flag set!");
     }
 
-    fast_u32 eval_adc_flags(fast_u8 ops12, fast_u16 res) {
-        return eval_flags(flag_op::adc, ops12, res);
+    fast_u32 eval_alu_flags(fast_u8 ops12, fast_u16 res) {
+        return eval_flags(flag_op::alu, ops12, res);
     }
 
     fast_u32 eval_bitwise_flags(fast_u8 ops12, fast_u16 res) {
@@ -2502,19 +2495,17 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u16 t;
         fast_u8 b;
-        fast_u32 flags;
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
                 get_cf(self().on_get_flags()) : 0;
             if(k <= alu::adc) {
                 t = a + n + cfv;
-                b = a ^ n;
+                b = a ^ n ^ static_cast<fast_u8>(t);
             } else {
                 t = a - n - cfv;
-                b = a ^ n ^ hf_mask;
+                b = a ^ n ^ static_cast<fast_u8>(t) ^ hf_mask;
             }
-            flags = eval_adc_flags(b, t);
         } else {
             // AND, XOR, OR
             if(k == alu::and_a) {
@@ -2525,16 +2516,15 @@ public:
                 // TODO: AMD chips do not set the flag. Support them
                 // as a variant of the original Intel chip.
                 t = a & n;
-                b = a | n;
+                b = (a | n) << (base::hf_bit - 3);
             } else {
                 t = (k == alu::xor_a) ? a ^ n : a | n;
                 b = 0;
             }
-            flags = eval_bitwise_flags(b, t);
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_set_flags(flags);
+        self().on_set_flags(eval_alu_flags(b, t));
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2583,7 +2573,7 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_adc_flags(n ^ 1 ^ hf_mask,
+        self().on_set_flags(eval_alu_flags(n ^ 1 ^ t ^ hf_mask,
                                            (get_cf(flags) << 8) | t)); }
     void on_di() {
         self().set_iff_on_di(false); }
@@ -2613,7 +2603,8 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_adc_flags(n ^ 1, (get_cf(flags) << 8) | t)); }
+        self().on_set_flags(eval_alu_flags(n ^ 1 ^ t,
+                                           (get_cf(flags) << 8) | t)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
