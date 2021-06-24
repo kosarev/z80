@@ -2418,7 +2418,7 @@ private:
     fast_u8 hfb(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_op { adc, sbc, bitwise, set_cf, daa };
+    enum class flag_op { adc, sbc, bitwise, daa };
 
     enum class flag_set : fast_u8 {
         cf = cf_mask,
@@ -2432,7 +2432,7 @@ private:
     // core code executing instructions as possible, leaving there
     // only those operations that can be performed very fast.
     // TODO: Provide a way to control CF separately.
-    fast_u8 flags(flag_op fop, fast_u8 b, fast_u16 w) {
+    fast_u8 eval_flags(flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
         case flag_op::adc:
         case flag_op::sbc: {
@@ -2446,8 +2446,6 @@ private:
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
             fast_u8 ops12 = b;
             return sf(res) | zf(res) | pf(res) | hfb(ops12); }
-        case flag_op::set_cf:
-            return (b & ~cf_mask) | cfa(w);
         case flag_op::daa: {
             fast_u8 t = b;
             fast_u8 hf = static_cast<fast_u8>(w & hf_mask);
@@ -2456,39 +2454,77 @@ private:
         unreachable("Unknown flag set!");
     }
 
-    // TODO: Make this public once lazy flags are fully supported.
-    // TODO: Test calls to this function.
-    fast_u8 on_flags_read(flag_set fs) {
-        return self().on_get_f() & static_cast<fast_u8>(fs);
+    fast_u32 eval_adc_flags(fast_u8 ops12, fast_u16 res) {
+        return eval_flags(flag_op::adc, ops12, res);
+    }
+
+    fast_u32 eval_sbc_flags(fast_u8 ops12, fast_u16 res) {
+        return eval_flags(flag_op::sbc, ops12, res);
+    }
+
+    fast_u32 eval_bitwise_flags(fast_u8 ops12, fast_u16 res) {
+        return eval_flags(flag_op::bitwise, ops12, res);
+    }
+
+    fast_u32 eval_daa_flags(fast_u8 b, fast_u16 w) {
+        return eval_flags(flag_op::daa, b, w);
+    }
+
+    void unpack_flags(fast_u32 flags, flag_op &fop, fast_u8 &b, fast_u16 &w) {
+        fop = static_cast<flag_op>(flags >> 24);
+        b = mask8(flags >> 16);
+        w = mask16(flags);
     }
 
     // TODO: Make this public once lazy flags are fully supported.
     // TODO: Test calls to this function.
-    void on_flags_update(flag_op fop, fast_u8 b, fast_u16 w) {
-        self().on_set_f(flags(fop, b, w));
+    fast_u32 on_get_flags() {
+        return self().on_get_f();
+    }
+
+    void on_set_flags(fast_u32 flags) {
+#if 0  // TODO
+        flag_op fop;
+        fast_u8 b;
+        fast_u16 w;
+        unpack_flags(flags, fop, b, w);
+        self().on_set_f(eval_flags(fop, b, w));
+#endif
+        self().on_set_f(static_cast<fast_u8>(flags));
+    }
+
+    static fast_u8 get_cf(fast_u32 flags) {
+        return flags & cf_mask;
+    }
+
+    static fast_u32 set_cf(fast_u32 flags, fast_u32 cf) {
+        return (flags & ~cf_mask) | cf;
+    }
+
+    static fast_u8 get_hf_cf(fast_u32 flags) {
+        return flags & (hf_mask | cf_mask);
     }
 
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
-        flag_op fop;
         fast_u16 t;
         fast_u8 b;
+        fast_u32 flags;
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
-                self().on_flags_read(flag_set::cf) : 0;
+                get_cf(self().on_get_flags()) : 0;
+            b = a ^ n;
             if(k <= alu::adc) {
                 t = a + n + cfv;
-                fop = flag_op::adc;
+                flags = eval_adc_flags(b, t);
             } else {
                 t = a - n - cfv;
-                fop = flag_op::sbc;
+                flags = eval_sbc_flags(b, t);
             }
-            b = a ^ n;
         } else {
             // AND, XOR, OR
-            fop = flag_op::bitwise;
             if(k == alu::and_a) {
                 // Alexander Demin notes that the half-carry flag has
                 // its own special logic for the ANA and ANI
@@ -2502,10 +2538,11 @@ public:
                 t = (k == alu::xor_a) ? a ^ n : a | n;
                 b = 0;
             }
+            flags = eval_bitwise_flags(b, t);
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_flags_update(fop, b, t);
+        self().on_set_flags(flags);
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2514,12 +2551,11 @@ public:
 
         fast_u16 i = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp);
-        fast_u8 f = self().on_flags_read(flag_set::sf_zf_hf_pf);
+        fast_u32 flags = self().on_get_flags();
         fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
         self().on_set_hl(mask16(r32));
-        self().on_flags_update(flag_op::set_cf, f,
-                               static_cast<fast_u16>(r32 >> 8)); }
+        self().on_set_flags(set_cf(flags, r32 >> 16)); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2529,13 +2565,13 @@ public:
             self().on_set_wz(nn);
         }
     void on_ccf() {
-        fast_u8 f = self().on_flags_read(flag_set::all);
-        self().on_flags_update(flag_op::set_cf, f, (f ^ cf_mask) << 8); }
+        fast_u32 flags = self().on_get_flags();
+        self().on_set_flags(set_cf(flags, get_cf(flags) ^ 1)); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_flags_read(flag_set::hf_cf);
+        fast_u8 f = get_hf_cf(self().on_get_flags());
 
         fast_u8 r = a;
         fast_u8 t = r + 6;
@@ -2549,13 +2585,13 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().on_flags_update(flag_op::daa, r, w | hfv); }
+        self().on_set_flags(eval_daa_flags(r, w | hfv)); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u8 f = self().on_flags_read(flag_set::cf);
+        fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_flags_update(flag_op::sbc, n ^ 1, (f << 8) | t); }
+        self().on_set_flags(eval_sbc_flags(n ^ 1, (get_cf(flags) << 8) | t)); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2581,10 +2617,10 @@ public:
         self().on_set_a(self().on_input_cycle(n)); }
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u8 f = self().on_flags_read(flag_set::cf);
+        fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().on_flags_update(flag_op::adc, n ^ 1, (f << 8) | t); }
+        self().on_set_flags(eval_adc_flags(n ^ 1, (get_cf(flags) << 8) | t)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -2622,31 +2658,31 @@ public:
         self().on_set_regp2(rp, nn); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_flags_read(flag_set::all);
-        fast_u16 t = (a << 1) | (f & cf_mask);
+        fast_u32 flags = self().on_get_flags();
+        fast_u16 t = (a << 1) | get_cf(flags);
         self().on_set_a(mask8(t));
-        self().on_flags_update(flag_op::set_cf, f, t); }
+        self().on_set_flags(set_cf(flags, t >> 8)); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_flags_read(flag_set::all);
-        fast_u8 r = (a >> 1) | ((f & cf_mask) << 7);
+        fast_u32 flags = self().on_get_flags();
+        fast_u8 r = (a >> 1) | (get_cf(flags) << 7);
         self().on_set_a(r);
-        self().on_flags_update(flag_op::set_cf, f, a << 8); }
+        self().on_set_flags(set_cf(flags, a & 1)); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_flags_read(flag_set::all);
+        fast_u32 flags = self().on_get_flags();
         a = rol8(a);
         self().on_set_a(a);
-        self().on_flags_update(flag_op::set_cf, f, a << 8); }
+        self().on_set_flags(set_cf(flags, a & 1)); }
     void on_rrca() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_flags_read(flag_set::all);
+        fast_u32 flags = self().on_get_flags();
         a = ror8(a);
         self().on_set_a(a);
-        self().on_flags_update(flag_op::set_cf, f, a << 1); }
+        self().on_set_flags(set_cf(flags, a >> 7)); }
     void on_scf() {
-        fast_u8 f = self().on_flags_read(flag_set::sf_zf_hf_pf);
-        self().on_flags_update(flag_op::set_cf, f, 0x100); }
+        fast_u32 flags = self().on_get_flags();
+        self().on_set_flags(set_cf(flags, 1)); }
 
 protected:
     using base::self;
