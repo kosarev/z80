@@ -2409,12 +2409,10 @@ private:
         return zf_ari(n); }
     fast_u8 pf(fast_u8 n) {
         return pf_log(n); }
-    fast_u8 cfa(fast_u16 res) {
+    fast_u8 cf9(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
     fast_u8 hf(fast_u8 n) {
         return n & hf_mask; }
-
-    enum class flag_op { alu, daa };
 
     // TODO: Remove?
     enum class flag_set : fast_u8 {
@@ -2428,31 +2426,12 @@ private:
     // This function is supposed to take as much work from the
     // core code executing instructions as possible, leaving there
     // only those operations that can be performed very fast.
-    // TODO: Provide a way to control CF separately.
-    fast_u8 eval_flags(flag_op fop, fast_u8 b, fast_u16 w) {
-        switch(fop) {
-        case flag_op::alu: {
-            fast_u16 res9 = w;
-            fast_u8 res8 = mask8(res9);
-            fast_u8 op12 = b;
-            return sf(res8) | zf(res8) | hf(op12) | pf(res8) | cfa(res9); }
-        case flag_op::daa: {
-            fast_u8 t = b;
-            return sf(t) | zf(t) | pf(t) | hf(static_cast<fast_u8>(w)) | cfa(w); }
-        }
-        unreachable("Unknown flag set!");
+    fast_u8 eval_flags(fast_u8 ops, fast_u16 res9) {
+        fast_u8 res8 = mask8(res9);
+        return sf(res8) | zf(res8) | hf(ops) | pf(res8) | cf9(res9);
     }
 
-    fast_u32 eval_alu_flags(fast_u8 ops12, fast_u16 res) {
-        return eval_flags(flag_op::alu, ops12, res);
-    }
-
-    fast_u32 eval_daa_flags(fast_u8 b, fast_u16 w) {
-        return eval_flags(flag_op::daa, b, w);
-    }
-
-    void unpack_flags(fast_u32 flags, flag_op &fop, fast_u8 &b, fast_u16 &w) {
-        fop = static_cast<flag_op>(flags >> 24);
+    void unpack_flags(fast_u32 flags, fast_u8 &b, fast_u16 &w) {
         b = mask8(flags >> 16);
         w = mask16(flags);
     }
@@ -2520,7 +2499,7 @@ public:
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().on_set_flags(eval_alu_flags(b, t));
+        self().on_set_flags(eval_flags(b, t));
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2563,14 +2542,14 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().on_set_flags(eval_daa_flags(r, w | hfv)); }
+        self().on_set_flags(eval_flags(hfv, w | r)); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_alu_flags(n ^ t ^ hf_mask,
-                                           (get_cf(flags) << 8) | t)); }
+        self().on_set_flags(eval_flags(n ^ t ^ hf_mask,
+                                       (get_cf(flags) << 8) | t)); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2599,8 +2578,8 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_alu_flags(n ^ t,
-                                           (get_cf(flags) << 8) | t)); }
+        self().on_set_flags(eval_flags(n ^ t,
+                                       (get_cf(flags) << 8) | t)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
