@@ -2447,10 +2447,6 @@ private:
         return eval_flags(flag_op::alu, ops12, res);
     }
 
-    fast_u32 eval_bitwise_flags(fast_u8 ops12, fast_u16 res) {
-        return eval_flags(flag_op::bitwise, ops12, res);
-    }
-
     fast_u32 eval_daa_flags(fast_u8 b, fast_u16 w) {
         return eval_flags(flag_op::daa, b, w);
     }
@@ -2573,7 +2569,7 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_alu_flags(n ^ 1 ^ t ^ hf_mask,
+        self().on_set_flags(eval_alu_flags(n ^ t ^ hf_mask,
                                            (get_cf(flags) << 8) | t)); }
     void on_di() {
         self().set_iff_on_di(false); }
@@ -2603,7 +2599,7 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_alu_flags(n ^ 1 ^ t,
+        self().on_set_flags(eval_alu_flags(n ^ t,
                                            (get_cf(flags) << 8) | t)); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
