@@ -2413,12 +2413,10 @@ private:
         return (res >> (8 - base::cf_bit)) & cf_mask; }
     fast_u8 hfp(fast_u8 op12, fast_u8 res) {
         return (op12 ^ res) & hf_mask; }
-    fast_u8 hfm(fast_u8 op12, fast_u8 res) {
-        return (op12 ^ (hf_mask + res)) & hf_mask; }
     fast_u8 hfb(fast_u8 ops12) {
         return (ops12 << (base::hf_bit - 3)) & hf_mask; }
 
-    enum class flag_op { adc, sbc, bitwise, daa };
+    enum class flag_op { adc, bitwise, daa };
 
     enum class flag_set : fast_u8 {
         cf = cf_mask,
@@ -2434,13 +2432,11 @@ private:
     // TODO: Provide a way to control CF separately.
     fast_u8 eval_flags(flag_op fop, fast_u8 b, fast_u16 w) {
         switch(fop) {
-        case flag_op::adc:
-        case flag_op::sbc: {
+        case flag_op::adc: {
             fast_u16 res9 = w;
             fast_u8 res8 = mask8(res9);
             fast_u8 op12 = b;
-            fast_u8 hf = (fop == flag_op::adc) ? hfp(op12, res8) :
-                                                 hfm(op12, res8);
+            fast_u8 hf = hfp(op12, res8);
             return sf(res8) | zf(res8) | hf | pf(res8) | cfa(res9); }
         case flag_op::bitwise: {
             fast_u8 res = mask8(w);  // TODO: Can be just a cast?
@@ -2456,10 +2452,6 @@ private:
 
     fast_u32 eval_adc_flags(fast_u8 ops12, fast_u16 res) {
         return eval_flags(flag_op::adc, ops12, res);
-    }
-
-    fast_u32 eval_sbc_flags(fast_u8 ops12, fast_u16 res) {
-        return eval_flags(flag_op::sbc, ops12, res);
     }
 
     fast_u32 eval_bitwise_flags(fast_u8 ops12, fast_u16 res) {
@@ -2515,14 +2507,14 @@ public:
             // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
                 get_cf(self().on_get_flags()) : 0;
-            b = a ^ n;
             if(k <= alu::adc) {
                 t = a + n + cfv;
-                flags = eval_adc_flags(b, t);
+                b = a ^ n;
             } else {
                 t = a - n - cfv;
-                flags = eval_sbc_flags(b, t);
+                b = a ^ n ^ hf_mask;
             }
+            flags = eval_adc_flags(b, t);
         } else {
             // AND, XOR, OR
             if(k == alu::and_a) {
@@ -2591,7 +2583,8 @@ public:
         fast_u32 flags = self().on_get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().on_set_flags(eval_sbc_flags(n ^ 1, (get_cf(flags) << 8) | t)); }
+        self().on_set_flags(eval_adc_flags(n ^ 1 ^ hf_mask,
+                                           (get_cf(flags) << 8) | t)); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
