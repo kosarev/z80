@@ -2260,7 +2260,7 @@ protected:
         return ((x >> 6) ^ (x >> 5)) & pf_mask;
     }
 
-    fast_u8 pf_log(fast_u8 n) {
+    static fast_u8 pf_log(fast_u8 n) {
         // Compute parity. First, half the range of bits to
         // consider by xor'ing nibbles of the passed value. Then,
         // use a bit pattern to determine whether the resulting
@@ -2269,15 +2269,15 @@ protected:
         return ((0x9669 << pf_bit) >> n4) & pf_mask;
     }
 
-    fast_u8 pf_dec(fast_u8 n) {
+    static fast_u8 pf_dec(fast_u8 n) {
         return n == 0x7f ? pf_mask : 0;
     }
 
-    fast_u8 pf_inc(fast_u8 n) {
+    static fast_u8 pf_inc(fast_u8 n) {
         return n == 0x80 ? pf_mask : 0;
     }
 
-    fast_u8 cf_ari(bool c) {
+    static fast_u8 cf_ari(bool c) {
         return c ? cf_mask : 0;
     }
 };
@@ -2401,56 +2401,98 @@ public:
         self().on_output(port, n); }
 
 private:
-    fast_u8 cf(fast_u8 f) {
+    static fast_u8 cf(fast_u8 f) {
         return f & cf_mask; }
-    fast_u8 sf(fast_u8 f) {
+    static fast_u8 sf(fast_u8 f) {
         return f & sf_mask; }
-    fast_u8 zf(fast_u8 n) {
+    static fast_u8 zf(fast_u8 n) {
         return zf_ari(n); }
-    fast_u8 pf(fast_u8 n) {
+    static fast_u8 pf(fast_u8 n) {
         return pf_log(n); }
-    fast_u8 cf9(fast_u16 res) {
+    static fast_u8 cf9(fast_u16 res) {
         return (res >> (8 - base::cf_bit)) & cf_mask; }
-    fast_u8 hf(fast_u8 n) {
+    static fast_u8 hf(fast_u8 n) {
         return n & hf_mask; }
 
-    // TODO: Remove?
-    enum class flag_set : fast_u8 {
-        cf = cf_mask,
-        hf_cf = hf_mask | cf_mask,
-        sf_zf_hf_pf = sf_mask | zf_mask | hf_mask | pf_mask,
-        all = sf_mask | zf_mask | hf_mask | pf_mask | cf_mask
+    struct flag_set {
+        bool is_lazy;
+        fast_u8 raw = 0;
+        fast_u16 lazy = 0;
+
+        flag_set(bool is_lazy) : is_lazy(is_lazy) {}
+
+        // TODO
+        static fast_u8 eval(fast_u8 ops, fast_u16 res9) {
+            fast_u8 res8 = mask8(res9);
+            return sf(res8) | zf(res8) | hf(ops) | pf(res8) | cf9(res9);
+        }
+
+        fast_u8 get_cf() const {
+            return (is_lazy ? (lazy >> 8) : raw) & 0x1;
+        }
+
+        void set_cf(fast_u8 v) {
+            if(is_lazy)
+                lazy = (lazy & ~0x100u) | ((v << 8) & 0x100);
+            else
+                raw = (raw & ~0x1u) | (v & 0x1);
+        }
+
+        fast_u8 get_hf_cf() const {
+            return (is_lazy ? (lazy >> 8) : raw) & (hf_mask | cf_mask);
+        }
+
+        void set(fast_u8 ops, fast_u16 res9) {
+            if(is_lazy)
+                lazy = ((ops & hf_mask) << 8) | res9;
+            else
+                raw = eval(ops, res9);
+        }
     };
 
-    // Computes flags by given operands encoded as a 32-bit word.
-    // This function is supposed to take as much work from the
-    // core code executing instructions as possible, leaving there
-    // only those operations that can be performed very fast.
-    fast_u8 eval_flags(fast_u8 ops, fast_u16 res9) {
-        fast_u8 res8 = mask8(res9);
-        return sf(res8) | zf(res8) | hf(ops) | pf(res8) | cf9(res9);
+    bool on_is_to_use_lazy_flags() {
+        return false;
     }
 
-    // TODO: Make this public once lazy flags are fully supported.
-    // TODO: Test calls to this function.
-    fast_u32 x_on_get_flags() {
-        return self().on_get_f();
+    // TODO: Move to the root module.
+    fast_u16 on_get_flags() {
+#if 0  // TODO
+        return 0;
+#else
+        fast_u8 f = self().on_get_f();
+        return (static_cast<fast_u16>(f) << 8) | 1;
+#endif
     }
 
-    void x_on_set_flags(fast_u32 flags) {
-        self().on_set_f(static_cast<fast_u8>(flags));
+    // TODO: Move to the root module.
+    void on_set_flags(fast_u16 flags) {
+#if 0  // TODO
+        unused(flags);
+#else
+        fast_u8 ops = static_cast<fast_u8>(flags >> 8);
+        fast_u16 res9 = flags;
+        self().on_set_f(flag_set::eval(ops, res9) | ops);
+#endif
     }
 
-    static fast_u8 x_get_cf(fast_u32 flags) {
-        return flags & cf_mask;
+    flag_set get_flags(bool is_lazy) {
+        flag_set flags(is_lazy);
+        if(flags.is_lazy)
+            flags.lazy = self().on_get_flags();
+        else
+            flags.raw = self().on_get_f();
+        return flags;
     }
 
-    static fast_u32 x_set_cf(fast_u32 flags, fast_u32 cf) {
-        return (flags & ~cf_mask) | cf;
+    flag_set get_flags() {
+        return get_flags(self().on_is_to_use_lazy_flags());
     }
 
-    static fast_u8 x_get_hf_cf(fast_u32 flags) {
-        return flags & (hf_mask | cf_mask);
+    void set_flags(flag_set flags) {
+        if(flags.is_lazy)
+            self().on_set_flags(flags.lazy);
+        else
+            self().on_set_f(flags.raw);
     }
 
 public:
@@ -2458,10 +2500,12 @@ public:
         fast_u8 a = self().on_get_a();
         fast_u16 t;
         fast_u8 b;
+        bool is_lazy = self().on_is_to_use_lazy_flags();
         if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
             // ADD, ADC, SUB, SBC, CP
             fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
-                x_get_cf(self().x_on_get_flags()) : 0;
+                get_flags(is_lazy).get_cf() : 0;
+
             if(k <= alu::adc) {
                 t = a + n + cfv;
                 b = a ^ n ^ static_cast<fast_u8>(t);
@@ -2487,7 +2531,9 @@ public:
         }
         if(k != alu::cp)
             self().on_set_a(mask8(t));
-        self().x_on_set_flags(eval_flags(b, t));
+        flag_set flags(is_lazy);
+        flags.set(b, t & 0x1ff);
+        set_flags(flags);
     }
 
     void on_add_irp_rp(regp rp) {
@@ -2496,11 +2542,13 @@ public:
 
         fast_u16 i = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp);
-        fast_u32 flags = self().x_on_get_flags();
+        flag_set flags = get_flags();
         fast_u32 r32 = i + n;
         self().on_set_wz(inc16(i));
         self().on_set_hl(mask16(r32));
-        self().x_on_set_flags(x_set_cf(flags, r32 >> 16)); }
+        // TODO: Should set_cf() take fast_u16?
+        flags.set_cf(static_cast<fast_u8>(r32 >> 16));
+        set_flags(flags); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -2510,13 +2558,16 @@ public:
             self().on_set_wz(nn);
         }
     void on_ccf() {
-        fast_u32 flags = self().x_on_get_flags();
-        self().x_on_set_flags(x_set_cf(flags, x_get_cf(flags) ^ 1)); }
+        flag_set flags = get_flags();
+        // TODO: Make sure this is optimised for lazy flags.
+        flags.set_cf(flags.get_cf() ^ 1);
+        set_flags(flags); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
         fast_u8 a = self().on_get_a();
-        fast_u8 f = x_get_hf_cf(self().x_on_get_flags());
+        flag_set flags = get_flags();
+        fast_u8 f = flags.get_hf_cf();
 
         fast_u8 r = a;
         fast_u8 t = r + 6;
@@ -2530,14 +2581,15 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        self().x_on_set_flags(eval_flags(hfv, w | r)); }
+        flags.set(hfv, (w | r) & 0x1ff);
+        set_flags(flags); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u32 flags = self().x_on_get_flags();
+        flag_set flags = get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        self().x_on_set_flags(eval_flags(n ^ t ^ hf_mask,
-                                         (x_get_cf(flags) << 8) | t)); }
+        flags.set(n ^ t ^ hf_mask, (flags.get_cf() << 8) | t);
+        set_flags(flags); }
     void on_di() {
         self().set_iff_on_di(false); }
     void on_ei() {
@@ -2563,11 +2615,11 @@ public:
         self().on_set_a(self().on_input_cycle(n)); }
     void on_inc_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
-        fast_u32 flags = self().x_on_get_flags();
+        flag_set flags = get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        self().x_on_set_flags(eval_flags(n ^ t,
-                                         (x_get_cf(flags) << 8) | t)); }
+        flags.set(n ^ t, (flags.get_cf() << 8) | t);
+        set_flags(flags); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
@@ -2605,31 +2657,36 @@ public:
         self().on_set_regp2(rp, nn); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
-        fast_u32 flags = self().x_on_get_flags();
-        fast_u16 t = (a << 1) | x_get_cf(flags);
+        flag_set flags = get_flags();
+        fast_u16 t = (a << 1) | flags.get_cf();
         self().on_set_a(mask8(t));
-        self().x_on_set_flags(x_set_cf(flags, t >> 8)); }
+        flags.set_cf(static_cast<unsigned>(t >> 8));
+        set_flags(flags); }
     void on_rra() {
         fast_u8 a = self().on_get_a();
-        fast_u32 flags = self().x_on_get_flags();
-        fast_u8 r = (a >> 1) | (x_get_cf(flags) << 7);
+        flag_set flags = get_flags();
+        fast_u8 r = (a >> 1) | (flags.get_cf() << 7);
         self().on_set_a(r);
-        self().x_on_set_flags(x_set_cf(flags, a & 1)); }
+        flags.set_cf(a);
+        set_flags(flags); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
-        fast_u32 flags = self().x_on_get_flags();
+        flag_set flags = get_flags();
         a = rol8(a);
         self().on_set_a(a);
-        self().x_on_set_flags(x_set_cf(flags, a & 1)); }
+        flags.set_cf(a);
+        set_flags(flags); }
     void on_rrca() {
         fast_u8 a = self().on_get_a();
-        fast_u32 flags = self().x_on_get_flags();
+        flag_set flags = get_flags();
         a = ror8(a);
         self().on_set_a(a);
-        self().x_on_set_flags(x_set_cf(flags, a >> 7)); }
+        flags.set_cf(a >> 7);
+        set_flags(flags); }
     void on_scf() {
-        fast_u32 flags = self().x_on_get_flags();
-        self().x_on_set_flags(x_set_cf(flags, 1)); }
+        flag_set flags = get_flags();
+        flags.set_cf(1);
+        set_flags(flags); }
 
 protected:
     using base::self;
