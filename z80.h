@@ -2442,9 +2442,18 @@ private:
             return (is_lazy ? (lazy >> 8) : raw) & (hf_mask | cf_mask);
         }
 
+        fast_u8 get_f() const {
+            if(!is_lazy)
+                return raw;
+
+            fast_u8 ops = static_cast<fast_u8>(lazy >> 8);
+            fast_u16 res9 = lazy;
+            return eval(ops, res9) | ops;
+        }
+
         void set(fast_u8 ops, fast_u16 res9) {
             if(is_lazy)
-                lazy = ((ops & hf_mask) << 8) | res9;
+                lazy = (ops << 8) | res9;
             else
                 raw = eval(ops, res9);
         }
@@ -2532,7 +2541,7 @@ public:
         if(k != alu::cp)
             self().on_set_a(mask8(t));
         flag_set flags(is_lazy);
-        flags.set(b, t & 0x1ff);
+        flags.set(b & hf_mask, t & 0x1ff);
         set_flags(flags);
     }
 
@@ -2581,14 +2590,14 @@ public:
             r = mask8(t2);
 
         self().on_set_a(r);
-        flags.set(hfv, (w | r) & 0x1ff);
+        flags.set(hfv & hf_mask, (w | r) & 0x1ff);
         set_flags(flags); }
     void on_dec_r(reg r) {
         fast_u8 n = self().on_get_reg(r);
         flag_set flags = get_flags();
         fast_u8 t = mask8(n - 1);
         self().on_set_reg(r, t);
-        flags.set(n ^ t ^ hf_mask, (flags.get_cf() << 8) | t);
+        flags.set((n ^ t ^ hf_mask) & hf_mask, (flags.get_cf() << 8) | t);
         set_flags(flags); }
     void on_di() {
         self().set_iff_on_di(false); }
@@ -2618,7 +2627,7 @@ public:
         flag_set flags = get_flags();
         fast_u8 t = mask8(n + 1);
         self().on_set_reg(r, t);
-        flags.set(n ^ t, (flags.get_cf() << 8) | t);
+        flags.set((n ^ t) & hf_mask, (flags.get_cf() << 8) | t);
         set_flags(flags); }
     void on_ld_r_n(reg r, fast_u8 n) {
         self().on_set_reg(r, n); }
@@ -2642,7 +2651,13 @@ public:
     void on_out_n_a(fast_u8 n) {
         self().on_output_cycle(n, self().on_get_a()); }
     void on_push_rp(regp2 rp) {
-        fast_u16 nn = self().on_get_regp2(rp);
+        fast_u16 nn;
+        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
+            flag_set flags = get_flags();
+            nn = make16(self().on_get_a(), flags.get_f());
+        } else {
+            nn = self().on_get_regp2(rp);
+        }
         if(rp == regp2::af) {
             // NF is always raised on i8080.
             nn |= nf_mask;
@@ -2654,7 +2669,15 @@ public:
             // Not all flags are updated on pop psw.
             nn = (nn & ~(xf_mask | yf_mask | nf_mask));
         }
-        self().on_set_regp2(rp, nn); }
+        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
+            flag_set flags(/* is_lazy= */ true);
+            flags.set(get_low8(nn), 1);
+            set_flags(flags);
+
+            self().on_set_a(get_high8(nn));
+        } else {
+            self().on_set_regp2(rp, nn);
+        } }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         flag_set flags = get_flags();
