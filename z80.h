@@ -2490,8 +2490,29 @@ private:
     }
 
     bool check_condition(condition cc) {
-        // TODO: Would it make sense to store flags in a different order?
         auto n = static_cast<unsigned>(cc);
+        if(self().on_is_to_use_lazy_flags()) {
+            fast_u16 flags = self().on_get_flags();
+            fast_u8 res8 = get_low8(flags);
+            switch(cc) {
+            case condition::nz:
+            case condition::z:
+                return (((res8 == 0) | (flags >> (zf_bit + 8))) ^ n ^ 1) & 0x1;
+            case condition::nc:
+            case condition::c:
+                return ((flags >> (cf_bit + 8)) ^ n ^ 1) & 0x1;
+            case condition::po:
+            case condition::pe:
+                return ((pf_log(res8) | (flags >> (pf_bit + 8))) ^ n ^ 1) & 0x1;
+            case condition::p:
+            case condition::m:
+                return (((flags >> (sf_bit + 8)) |
+                         (flags >> sf_bit)) ^ n ^ 1) & 0x1;
+            }
+            unreachable("Unknown condition code.");
+        }
+
+        // TODO: Would it make sense to store flags in a different order?
         unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
                              (cf_bit << 8) | (cf_bit << 12) |
                              (pf_bit << 16) | (pf_bit << 20) |
