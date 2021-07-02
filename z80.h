@@ -2104,18 +2104,6 @@ public:
 
     void disable_int_on_ei() { self().on_set_is_int_disabled(true); }
 
-    bool check_condition(condition cc) {
-        // TODO: Would it make sense to store flags in a different order?
-        auto n = static_cast<unsigned>(cc);
-        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
-                             (cf_bit << 8) | (cf_bit << 12) |
-                             (pf_bit << 16) | (pf_bit << 20) |
-                             (sf_bit << 24) | (sf_bit << 28);
-        fast_u8 f = self().on_get_f();
-        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
-        return !(((f >> pos) ^ n) & 0x1);
-    }
-
     fast_u8 on_imm8_read() {
         fast_u16 pc = self().get_pc_on_imm8_read();
         fast_u8 op = self().on_read_cycle(pc);
@@ -2176,11 +2164,6 @@ public:
         self().set_pc_on_halt(dec16(self().get_pc_on_halt())); }
     void on_jp_nn(fast_u16 nn) {
         self().on_jump(nn); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_jump(nn);
-        else
-            self().on_set_wz(nn); }
     void on_inc_rp(regp rp) {
         self().on_set_regp(rp, inc16(self().on_get_regp(rp))); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -2204,9 +2187,6 @@ public:
     void on_nop() {}
     void on_ret() {
         self().on_return(); }
-    void on_ret_cc(condition cc) {
-        if(check_condition(cc))
-            self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
 
@@ -2295,6 +2275,11 @@ public:
     using base::yf_mask;
     using base::zf_mask;
     using base::pf_mask;
+
+    using base::cf_bit;
+    using base::sf_bit;
+    using base::zf_bit;
+    using base::pf_bit;
 
     using base::cf_ari;
     using base::hf_ari;
@@ -2504,6 +2489,18 @@ private:
             self().on_set_f(flags.raw);
     }
 
+    bool check_condition(condition cc) {
+        // TODO: Would it make sense to store flags in a different order?
+        auto n = static_cast<unsigned>(cc);
+        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
+                             (cf_bit << 8) | (cf_bit << 12) |
+                             (pf_bit << 16) | (pf_bit << 20) |
+                             (sf_bit << 24) | (sf_bit << 28);
+        fast_u8 f = self().on_get_f();
+        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
+        return !(((f >> pos) ^ n) & 0x1);
+    }
+
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -2561,7 +2558,7 @@ public:
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
-        if(base::check_condition(cc))
+        if(check_condition(cc))
             self().on_call(nn);
         else
             self().on_set_wz(nn);
@@ -2618,6 +2615,11 @@ public:
         self().on_write_cycle_extra_2t();
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            self().on_jump(nn);
+        else
+            self().on_set_wz(nn); }
     void on_jp_irp() {
         self().set_pc_on_jump(self().on_get_hl()); }
     void on_in_a_n(fast_u8 n) {
@@ -2678,6 +2680,9 @@ public:
         } else {
             self().on_set_regp2(rp, nn);
         } }
+    void on_ret_cc(condition cc) {
+        if(check_condition(cc))
+            self().on_return(); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         flag_set flags = get_flags();
@@ -2926,6 +2931,18 @@ public:
         case iregp::iy: return self().on_set_iy(nn);
         }
         unreachable("Unknown index register.");
+    }
+
+    bool check_condition(condition cc) {
+        // TODO: Would it make sense to store flags in a different order?
+        auto n = static_cast<unsigned>(cc);
+        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
+                             (cf_bit << 8) | (cf_bit << 12) |
+                             (pf_bit << 16) | (pf_bit << 20) |
+                             (sf_bit << 24) | (sf_bit << 28);
+        fast_u8 f = self().on_get_f();
+        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
+        return !(((f >> pos) ^ n) & 0x1);
     }
 
     void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
@@ -3264,7 +3281,7 @@ public:
         f |= v & (xf_mask | yf_mask);
         self().on_set_f(f); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
-        if(base::check_condition(cc)) {
+        if(check_condition(cc)) {
             self().on_read_cycle_extra_1t();
             self().on_call(nn);
         } else {
@@ -3381,12 +3398,17 @@ public:
                 hf_inc(v) | pf_inc(v);
         self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            self().on_jump(nn);
+        else
+            self().on_set_wz(nn); }
     void on_jp_irp() {
         self().set_pc_on_jump(self().on_get_iregp()); }
     void on_jr(fast_u8 d) {
         self().on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
-        if(base::check_condition(cc))
+        if(check_condition(cc))
             self().on_relative_jump(d); }
     void on_ld_a_r() {
         fast_u8 n = self().on_get_r();
@@ -3473,6 +3495,9 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ret_cc(condition cc) {
+        if(check_condition(cc))
+            self().on_return(); }
     void on_reti() {
         self().on_return(); }
     void on_retn() {
