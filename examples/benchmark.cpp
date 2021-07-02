@@ -323,6 +323,8 @@ protected:
 
 #define WATCHER default_watcher
 
+#define USE_LAZY_FLAGS 0
+
 template<typename B>
 class emulator : public WATCHER<B> {
 public:
@@ -380,10 +382,37 @@ public:
         self().on_report();
     }
 
+#if USE_LAZY_FLAGS
+    bool on_is_to_use_lazy_flags() {
+        return true;
+    }
+
+    fast_u16 on_get_flags() {
+        return flags;
+    }
+
+    void on_set_flags(fast_u16 new_flags) {
+        flags = new_flags;
+    }
+
+    fast_u8 on_get_f() {
+        abort();
+    }
+
+    void on_set_f(fast_u8 n) {
+        unused(n);
+        abort();
+    }
+#endif
+
 protected:
     using base::self;
 
 private:
+#if USE_LAZY_FLAGS
+    fast_u16 flags = 0;
+#endif
+
     least_u8 memory[z80::address_space_size] = {};
 };
 
