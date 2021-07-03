@@ -2,6 +2,7 @@
 set(EXAMPLES
     accessing_state
     adding_memory
+    assembly_review
     benchmark
     custom_state
     hello
