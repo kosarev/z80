@@ -39,11 +39,13 @@ typedef uint_least32_t least_u32;
 static inline void unused(...) {}
 
 [[noreturn]] static inline void unreachable(const char *msg) {
-#if defined(NDEBUG)
-    __builtin_unreachable();
-#else
+#if !defined(NDEBUG)
     std::fprintf(stderr, "%s\n", msg);
     std::abort();
+#elif defined(_MSC_VER)
+    __assume(0);
+#else
+    __builtin_unreachable();
 #endif
 }
 
