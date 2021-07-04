@@ -271,6 +271,20 @@ public:
         unreachable("Unknown register.");
     }
 
+    void on_set_reg(reg r, fast_u8 n) {
+        switch(r) {
+        case reg::b: return self().on_set_b(n);
+        case reg::c: return self().on_set_c(n);
+        case reg::d: return self().on_set_d(n);
+        case reg::e: return self().on_set_e(n);
+        case reg::at_hl: unreachable("Can't set (HL) value.");
+        case reg::a: return self().on_set_a(n);
+        case reg::h: return self().on_set_h(n);
+        case reg::l: return self().on_set_l(n);
+        }
+        unreachable("Unknown register.");
+    }
+
     fast_u8 on_get_reg(reg r, iregp irp) {
         switch(r) {
         case reg::b: return self().on_get_b();
@@ -291,6 +305,32 @@ public:
             case iregp::hl: return self().on_get_l();
             case iregp::ix: return self().on_get_ixl();
             case iregp::iy: return self().on_get_iyl();
+            }
+            break;
+        }
+        unreachable("Unknown register.");
+    }
+
+    void on_set_reg(reg r, iregp irp, fast_u8 n) {
+        switch(r) {
+        case reg::b: return self().on_set_b(n);
+        case reg::c: return self().on_set_c(n);
+        case reg::d: return self().on_set_d(n);
+        case reg::e: return self().on_set_e(n);
+        case reg::at_hl: unreachable("Can't set (HL) value.");
+        case reg::a: return self().on_set_a(n);
+        case reg::h:
+            switch(irp) {
+            case iregp::hl: return self().on_set_h(n);
+            case iregp::ix: return self().on_set_ixh(n);
+            case iregp::iy: return self().on_set_iyh(n);
+            }
+            break;
+        case reg::l:
+            switch(irp) {
+            case iregp::hl: return self().on_set_l(n);
+            case iregp::ix: return self().on_set_ixl(n);
+            case iregp::iy: return self().on_set_iyl(n);
             }
             break;
         }
@@ -2342,17 +2382,8 @@ public:
     }
 
     void on_set_reg(reg r, fast_u8 n) {
-        switch(r) {
-        case reg::b: return self().on_set_b(n);
-        case reg::c: return self().on_set_c(n);
-        case reg::d: return self().on_set_d(n);
-        case reg::e: return self().on_set_e(n);
-        case reg::at_hl: return self().on_set_m(n);
-        case reg::a: return self().on_set_a(n);
-        case reg::h: return self().on_set_h(n);
-        case reg::l: return self().on_set_l(n);
-        }
-        unreachable("Unknown register.");
+        return r == reg::at_hl ? self().on_set_m(n) :
+                                 base::on_set_reg(r, n);
     }
 
     fast_u16 on_get_regp(regp rp) {
@@ -2881,29 +2912,8 @@ public:
     }
 
     void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
-        switch(r) {
-        case reg::b: return self().on_set_b(n);
-        case reg::c: return self().on_set_c(n);
-        case reg::d: return self().on_set_d(n);
-        case reg::e: return self().on_set_e(n);
-        case reg::at_hl: return write_at_disp(d, n);
-        case reg::a: return self().on_set_a(n);
-        case reg::h:
-            switch(irp) {
-            case iregp::hl: return self().on_set_h(n);
-            case iregp::ix: return self().on_set_ixh(n);
-            case iregp::iy: return self().on_set_iyh(n);
-            }
-            break;
-        case reg::l:
-            switch(irp) {
-            case iregp::hl: return self().on_set_l(n);
-            case iregp::ix: return self().on_set_ixl(n);
-            case iregp::iy: return self().on_set_iyl(n);
-            }
-            break;
-        }
-        unreachable("Unknown register.");
+        return r == reg::at_hl ? write_at_disp(d, n) :
+                                 base::on_set_reg(r, irp, n);
     }
 
     fast_u16 on_get_regp(regp rp) {
