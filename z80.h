@@ -365,6 +365,16 @@ public:
         unreachable("Unknown register.");
     }
 
+    void on_set_regp(regp rp, fast_u16 nn) {
+        switch(rp) {
+        case regp::bc: return self().on_set_bc(nn);
+        case regp::de: return self().on_set_de(nn);
+        case regp::hl: return self().on_set_hl(nn);
+        case regp::sp: return self().on_set_sp(nn);
+        }
+        unreachable("Unknown register.");
+    }
+
     // No dummy implementations for the following handlers as
     // being forgotten to be implemented, they would lead to
     // problems that are hard to diagnose.
@@ -2399,16 +2409,6 @@ public:
                                  base::on_set_reg(r, n);
     }
 
-    void on_set_regp(regp rp, fast_u16 nn) {
-        switch(rp) {
-        case regp::bc: return self().on_set_bc(nn);
-        case regp::de: return self().on_set_de(nn);
-        case regp::hl: return self().on_set_hl(nn);
-        case regp::sp: return self().on_set_sp(nn);
-        }
-        unreachable("Unknown register.");
-    }
-
     fast_u16 on_get_regp2(regp2 rp) {
         switch(rp) {
         case regp2::bc: return self().on_get_bc();
@@ -2942,13 +2942,8 @@ public:
     }
 
     void on_set_regp(regp rp, iregp irp, fast_u16 nn) {
-        switch(rp) {
-        case regp::bc: return self().on_set_bc(nn);
-        case regp::de: return self().on_set_de(nn);
-        case regp::hl: return self().on_set_iregp(irp, nn);
-        case regp::sp: return self().on_set_sp(nn);
-        }
-        unreachable("Unknown register.");
+        return rp == regp::hl ? self().on_set_iregp(irp, nn) :
+                                base::on_set_regp(rp, nn);
     }
 
     fast_u16 on_get_regp2(regp2 rp, iregp irp) {
