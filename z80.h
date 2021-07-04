@@ -257,6 +257,46 @@ public:
         fast_u8 h = self().on_get_r();
         return make16(h, l); }
 
+    fast_u8 on_get_reg(reg r) {
+        switch(r) {
+        case reg::b: return self().on_get_b();
+        case reg::c: return self().on_get_c();
+        case reg::d: return self().on_get_d();
+        case reg::e: return self().on_get_e();
+        case reg::at_hl: unreachable("Can't get (HL) value.");
+        case reg::a: return self().on_get_a();
+        case reg::h: return self().on_get_h();
+        case reg::l: return self().on_get_l();
+        }
+        unreachable("Unknown register.");
+    }
+
+    fast_u8 on_get_reg(reg r, iregp irp) {
+        switch(r) {
+        case reg::b: return self().on_get_b();
+        case reg::c: return self().on_get_c();
+        case reg::d: return self().on_get_d();
+        case reg::e: return self().on_get_e();
+        case reg::at_hl: unreachable("Can't get (HL) value.");
+        case reg::a: return self().on_get_a();
+        case reg::h:
+            switch(irp) {
+            case iregp::hl: return self().on_get_h();
+            case iregp::ix: return self().on_get_ixh();
+            case iregp::iy: return self().on_get_iyh();
+            }
+            break;
+        case reg::l:
+            switch(irp) {
+            case iregp::hl: return self().on_get_l();
+            case iregp::ix: return self().on_get_ixl();
+            case iregp::iy: return self().on_get_iyl();
+            }
+            break;
+        }
+        unreachable("Unknown register.");
+    }
+
     // No dummy implementations for the following handlers as
     // being forgotten to be implemented, they would lead to
     // problems that are hard to diagnose.
@@ -2297,17 +2337,8 @@ public:
         self().on_write_cycle(self().on_get_hl(), n); }
 
     fast_u8 on_get_reg(reg r) {
-        switch(r) {
-        case reg::b: return self().on_get_b();
-        case reg::c: return self().on_get_c();
-        case reg::d: return self().on_get_d();
-        case reg::e: return self().on_get_e();
-        case reg::at_hl: return self().on_get_m();
-        case reg::a: return self().on_get_a();
-        case reg::h: return self().on_get_h();
-        case reg::l: return self().on_get_l();
-        }
-        unreachable("Unknown register.");
+        return r == reg::at_hl ? self().on_get_m() :
+                                 base::on_get_reg(r);
     }
 
     void on_set_reg(reg r, fast_u8 n) {
@@ -2844,30 +2875,9 @@ public:
     }
 
     fast_u8 on_get_reg(reg r, iregp irp, fast_u8 d = 0,
-                     bool long_read_cycle = false) {
-        switch(r) {
-        case reg::b: return self().on_get_b();
-        case reg::c: return self().on_get_c();
-        case reg::d: return self().on_get_d();
-        case reg::e: return self().on_get_e();
-        case reg::at_hl: return read_at_disp(d, long_read_cycle);
-        case reg::a: return self().on_get_a();
-        case reg::h:
-            switch(irp) {
-            case iregp::hl: return self().on_get_h();
-            case iregp::ix: return self().on_get_ixh();
-            case iregp::iy: return self().on_get_iyh();
-            }
-            break;
-        case reg::l:
-            switch(irp) {
-            case iregp::hl: return self().on_get_l();
-            case iregp::ix: return self().on_get_ixl();
-            case iregp::iy: return self().on_get_iyl();
-            }
-            break;
-        }
-        unreachable("Unknown register.");
+                       bool long_read_cycle = false) {
+        return r == reg::at_hl ? read_at_disp(d, long_read_cycle) :
+                                 base::on_get_reg(r, irp);
     }
 
     void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
