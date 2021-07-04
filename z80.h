@@ -375,6 +375,16 @@ public:
         unreachable("Unknown register.");
     }
 
+    fast_u16 on_get_regp(regp rp, iregp irp) {
+        return rp == regp::hl ? self().on_get_iregp(irp) :
+                                self().on_get_regp(rp);
+    }
+
+    void on_set_regp(regp rp, iregp irp, fast_u16 nn) {
+        return rp == regp::hl ? self().on_set_iregp(irp, nn) :
+                                self().on_set_regp(rp, nn);
+    }
+
     fast_u16 on_get_regp2(regp2 rp) {
         switch(rp) {
         case regp2::bc: return self().on_get_bc();
@@ -393,6 +403,16 @@ public:
         case regp2::af: return self().on_set_af(nn);
         }
         unreachable("Unknown register.");
+    }
+
+    fast_u16 on_get_regp2(regp2 rp, iregp irp) {
+        return rp == regp2::hl ? self().on_get_iregp(irp) :
+                                 self().on_get_regp2(rp);
+    }
+
+    void on_set_regp2(regp2 rp, iregp irp, fast_u16 nn) {
+        return rp == regp2::hl ? self().on_set_iregp(irp, nn) :
+                                 self().on_set_regp2(rp, nn);
     }
 
     // No dummy implementations for the following handlers as
@@ -2934,26 +2954,6 @@ public:
     void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
         return r == reg::at_hl ? write_at_disp(d, n) :
                                  base::on_set_reg(r, irp, n);
-    }
-
-    fast_u16 on_get_regp(regp rp, iregp irp) {
-        return rp == regp::hl ? self().on_get_iregp(irp) :
-                                base::on_get_regp(rp);
-    }
-
-    void on_set_regp(regp rp, iregp irp, fast_u16 nn) {
-        return rp == regp::hl ? self().on_set_iregp(irp, nn) :
-                                base::on_set_regp(rp, nn);
-    }
-
-    fast_u16 on_get_regp2(regp2 rp, iregp irp) {
-        return rp == regp2::hl ? self().on_get_iregp(irp) :
-                                 base::on_get_regp2(rp);
-    }
-
-    void on_set_regp2(regp2 rp, iregp irp, fast_u16 nn) {
-        return rp == regp2::hl ? self().on_set_iregp(irp, nn) :
-                                 base::on_set_regp2(rp, nn);
     }
 
     bool check_condition(condition cc) {
