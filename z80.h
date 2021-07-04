@@ -337,6 +337,24 @@ public:
         unreachable("Unknown register.");
     }
 
+    fast_u16 on_get_iregp(iregp irp) {
+        switch(irp) {
+        case iregp::hl: return self().on_get_hl();
+        case iregp::ix: return self().on_get_ix();
+        case iregp::iy: return self().on_get_iy();
+        }
+        unreachable("Unknown index register.");
+    }
+
+    void on_set_iregp(iregp irp, fast_u16 nn) {
+        switch(irp) {
+        case iregp::hl: return self().on_set_hl(nn);
+        case iregp::ix: return self().on_set_ix(nn);
+        case iregp::iy: return self().on_set_iy(nn);
+        }
+        unreachable("Unknown index register.");
+    }
+
     // No dummy implementations for the following handlers as
     // being forgotten to be implemented, they would lead to
     // problems that are hard to diagnose.
@@ -2956,24 +2974,6 @@ public:
         case regp2::af: return self().on_set_af(nn);
         }
         unreachable("Unknown register.");
-    }
-
-    fast_u16 on_get_iregp(iregp irp) {
-        switch(irp) {
-        case iregp::hl: return self().on_get_hl();
-        case iregp::ix: return self().on_get_ix();
-        case iregp::iy: return self().on_get_iy();
-        }
-        unreachable("Unknown index register.");
-    }
-
-    void on_set_iregp(iregp irp, fast_u16 nn) {
-        switch(irp) {
-        case iregp::hl: return self().on_set_hl(nn);
-        case iregp::ix: return self().on_set_ix(nn);
-        case iregp::iy: return self().on_set_iy(nn);
-        }
-        unreachable("Unknown index register.");
     }
 
     bool check_condition(condition cc) {
