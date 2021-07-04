@@ -39,8 +39,12 @@ typedef uint_least32_t least_u32;
 static inline void unused(...) {}
 
 [[noreturn]] static inline void unreachable(const char *msg) {
+#if defined(NDEBUG)
+    __builtin_unreachable();
+#else
     std::fprintf(stderr, "%s\n", msg);
     std::abort();
+#endif
 }
 
 template<typename T>
