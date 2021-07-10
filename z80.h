@@ -2029,8 +2029,8 @@ public:
     fast_u16 get_pc() const { return pc.get(); }
     void set_pc(fast_u16 n) { pc.set(n); }
 
-    fast_u16 get_sp() const { return sp.get(); }
-    void set_sp(fast_u16 n) { sp.set(n); }
+    fast_u16 get_sp() const { return ref_rp(regp::sp).get(); }
+    void set_sp(fast_u16 n) { ref_rp(regp::sp).set(n); }
 
     bool is_int_disabled() const { return int_disabled.get(); }
     void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
@@ -2078,6 +2078,16 @@ public:
     // increasing performance.
     bool on_dispatch_register_accesses() { return true; }
 
+    using base::on_get_regp;
+    fast_u16 on_get_regp(regp rp) {
+        return self().on_dispatch_register_accesses() ?
+            base::on_get_regp(rp) : ref_rp(rp).get(); }
+
+    using base::on_set_regp;
+    void on_set_regp(regp rp, fast_u16 nn) {
+        return self().on_dispatch_register_accesses() ?
+            base::on_set_regp(rp, nn) : ref_rp(rp).set(nn); }
+
     using base::on_get_regp2;
     fast_u16 on_get_regp2(regp2 rp) {
         return self().on_dispatch_register_accesses() ?
@@ -2098,6 +2108,11 @@ protected:
     using base::self;
 
 private:
+    regp_value &ref_rp(regp rp) {
+        return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
+    const regp_value &ref_rp(regp rp) const {
+        return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
+
     regp_value &ref_rp(regp2 rp) {
         return rps[static_cast<unsigned>(rp)]; }
     const regp_value &ref_rp(regp2 rp) const {
@@ -2106,8 +2121,7 @@ private:
     // Most frequently used registers shall come first to reduce cache stress.
     reg16_value pc;
     flipflop int_disabled;
-    regp_value rps[4];  // bc, de, hl, af
-    reg16_value sp;
+    regp_value rps[5];  // bc, de, hl, af, sp
     flipflop halted;
 
     template<typename XB> friend class i8080_state;
