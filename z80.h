@@ -1976,29 +1976,29 @@ class internals::cpu_state_base : public B {
 public:
     typedef B base;
 
-    fast_u8 get_b() const { return bc.get_high(); }
-    void set_b(fast_u8 n) { bc.set_high(n); }
+    fast_u8 get_b() const { return ref_rp(regp2::bc).get_high(); }
+    void set_b(fast_u8 n) { ref_rp(regp2::bc).set_high(n); }
 
-    fast_u8 get_c() const { return bc.get_low(); }
-    void set_c(fast_u8 n) { bc.set_low(n); }
+    fast_u8 get_c() const { return ref_rp(regp2::bc).get_low(); }
+    void set_c(fast_u8 n) { ref_rp(regp2::bc).set_low(n); }
 
-    fast_u8 get_d() const { return de.get_high(); }
-    void set_d(fast_u8 n) { de.set_high(n); }
+    fast_u8 get_d() const { return ref_rp(regp2::de).get_high(); }
+    void set_d(fast_u8 n) { ref_rp(regp2::de).set_high(n); }
 
-    fast_u8 get_e() const { return de.get_low(); }
-    void set_e(fast_u8 n) { de.set_low(n); }
+    fast_u8 get_e() const { return ref_rp(regp2::de).get_low(); }
+    void set_e(fast_u8 n) { ref_rp(regp2::de).set_low(n); }
 
-    fast_u8 get_h() const { return hl.get_high(); }
-    void set_h(fast_u8 n) { hl.set_high(n); }
+    fast_u8 get_h() const { return ref_rp(regp2::hl).get_high(); }
+    void set_h(fast_u8 n) { ref_rp(regp2::hl).set_high(n); }
 
-    fast_u8 get_l() const { return hl.get_low(); }
-    void set_l(fast_u8 n) { hl.set_low(n); }
+    fast_u8 get_l() const { return ref_rp(regp2::hl).get_low(); }
+    void set_l(fast_u8 n) { ref_rp(regp2::hl).set_low(n); }
 
-    fast_u8 get_a() const { return af.get_high(); }
-    void set_a(fast_u8 n) { af.set_high(n); }
+    fast_u8 get_a() const { return ref_rp(regp2::af).get_high(); }
+    void set_a(fast_u8 n) { ref_rp(regp2::af).set_high(n); }
 
-    fast_u8 get_f() const { return af.get_low(); }
-    void set_f(fast_u8 n) { af.set_low(n); }
+    fast_u8 get_f() const { return ref_rp(regp2::af).get_low(); }
+    void set_f(fast_u8 n) { ref_rp(regp2::af).set_low(n); }
 
     fast_u8 get_reg(reg r) {
         switch(r) {
@@ -2014,17 +2014,17 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 get_bc() const { return bc.get(); }
-    void set_bc(fast_u16 n) { bc.set(n); }
+    fast_u16 get_bc() const { return ref_rp(regp2::bc).get(); }
+    void set_bc(fast_u16 n) { ref_rp(regp2::bc).set(n); }
 
-    fast_u16 get_de() const { return de.get(); }
-    void set_de(fast_u16 n) { de.set(n); }
+    fast_u16 get_de() const { return ref_rp(regp2::de).get(); }
+    void set_de(fast_u16 n) { ref_rp(regp2::de).set(n); }
 
-    fast_u16 get_hl() const { return hl.get(); }
-    void set_hl(fast_u16 n) { hl.set(n); }
+    fast_u16 get_hl() const { return ref_rp(regp2::hl).get(); }
+    void set_hl(fast_u16 n) { ref_rp(regp2::hl).set(n); }
 
-    fast_u16 get_af() const { return af.get(); }
-    void set_af(fast_u16 n) { af.set(n); }
+    fast_u16 get_af() const { return ref_rp(regp2::af).get(); }
+    void set_af(fast_u16 n) { ref_rp(regp2::af).set(n); }
 
     fast_u16 get_pc() const { return pc.get(); }
     void set_pc(fast_u16 n) { pc.set(n); }
@@ -2038,7 +2038,7 @@ public:
     bool is_halted() const { return halted.get(); }
     void set_is_halted(bool is_halted) { halted.set(is_halted); }
 
-    void on_ex_de_hl_regs() { de.swap(hl); }
+    void on_ex_de_hl_regs() { ref_rp(regp2::de).swap(ref_rp(regp2::hl)); }
 
     fast_u8 on_get_b() const { return get_b(); }
     void on_set_b(fast_u8 b) { set_b(b); }
@@ -2070,6 +2070,24 @@ public:
     fast_u16 on_get_sp() { return get_sp(); }
     void on_set_sp(fast_u16 n) { set_sp(n); }
 
+    // Returns true if generic register accessors like
+    // on_get_regp2() are required to operate via specific
+    // register accessors like on_get_hl(). Overriding this to
+    // return false allows such generic accessors to avoid
+    // calling register-specific handlers, thus potentially
+    // increasing performance.
+    bool on_dispatch_register_accesses() { return true; }
+
+    using base::on_get_regp2;
+    fast_u16 on_get_regp2(regp2 rp) {
+        return self().on_dispatch_register_accesses() ?
+            base::on_get_regp2(rp) : ref_rp(rp).get(); }
+
+    using base::on_set_regp2;
+    void on_set_regp2(regp2 rp, fast_u16 nn) {
+        return self().on_dispatch_register_accesses() ?
+            base::on_set_regp2(rp, nn) : ref_rp(rp).set(nn); }
+
     bool on_is_int_disabled() const { return is_int_disabled(); }
     void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
 
@@ -2080,12 +2098,16 @@ protected:
     using base::self;
 
 private:
+    regp_value &ref_rp(regp2 rp) {
+        return rps[static_cast<unsigned>(rp)]; }
+    const regp_value &ref_rp(regp2 rp) const {
+        return rps[static_cast<unsigned>(rp)]; }
+
     // Most frequently used registers shall come first to reduce cache stress.
     reg16_value pc;
-    regp_value af;
     flipflop int_disabled;
+    regp_value rps[4];  // bc, de, hl, af
     reg16_value sp;
-    regp_value hl, de, bc;
     flipflop halted;
 
     template<typename XB> friend class i8080_state;
@@ -2188,13 +2210,13 @@ public:
     }
 
     void ex_af_alt_af_regs() {
-        base::af.swap(alt_af);
+        base::ref_rp(regp2::af).swap(alt_af);
     }
 
     void exx_regs() {
-        base::bc.swap(alt_bc);
-        base::de.swap(alt_de);
-        base::hl.swap(alt_hl);
+        base::ref_rp(regp2::bc).swap(alt_bc);
+        base::ref_rp(regp2::de).swap(alt_de);
+        base::ref_rp(regp2::hl).swap(alt_hl);
     }
 
     fast_u8 on_get_ixh() const { return get_ixh(); }

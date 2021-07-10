@@ -332,6 +332,12 @@ public:
 
     emulator() {}
 
+    // Allow obtaining and setting register values without
+    // calling register-specific handlers.
+    bool on_dispatch_register_accesses() {
+        return false;
+    }
+
     fast_u8 on_read(fast_u16 addr) {
         assert(addr < z80::address_space_size);
         base::on_read(addr);
