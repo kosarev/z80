@@ -1625,7 +1625,8 @@ public:
         self().on_format("T", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
-        self().on_format("bit U, R", b, r, irp, d); }
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        self().on_format("bit U, R", b, access_r, irp, d); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
     void on_ccf() {
@@ -3324,12 +3325,13 @@ public:
         } }
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
-        fast_u8 v = self().on_get_reg(r, irp, d, /* long_read_cycle= */ true);
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        fast_u8 v = self().on_get_reg(access_r, irp, d, /* long_read_cycle= */ true);
         fast_u8 f = self().on_get_f();
         fast_u8 m = v & (1u << b);
         // TODO: Is it always (m & sf_mask)? Regardless of whether m is zero or not?
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
-        if(!is_hl_iregp() || r == reg::at_hl)
+        if(!is_hl_iregp() || access_r == reg::at_hl)
             v = get_high8(self().on_get_wz());
         f |= v & (xf_mask | yf_mask);
         self().on_set_f(f); }
