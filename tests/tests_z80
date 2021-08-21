@@ -2652,7 +2652,262 @@ c8 ret z
 c9 ret
 ca0000 jp z, 0x0000
 
-# TODO: cb
+cb00 rlc b
+cb01 rlc c
+cb02 rlc d
+cb03 rlc e
+cb04 rlc h
+cb05 rlc l
+cb06 rlc (hl)
+cb07 rlc a
+cb08 rrc b
+cb09 rrc c
+cb0a rrc d
+cb0b rrc e
+cb0c rrc h
+cb0d rrc l
+cb0e rrc (hl)
+cb0f rrc a
+cb10 rl b
+cb11 rl c
+cb12 rl d
+cb13 rl e
+cb14 rl h
+cb15 rl l
+cb16 rl (hl)
+cb17 rl a
+cb18 rr b
+cb19 rr c
+cb1a rr d
+cb1b rr e
+cb1c rr h
+cb1d rr l
+cb1e rr (hl)
+cb1f rr a
+cb20 sla b
+cb21 sla c
+cb22 sla d
+cb23 sla e
+cb24 sla h
+cb25 sla l
+cb26 sla (hl)
+cb27 sla a
+cb28 sra b
+cb29 sra c
+cb2a sra d
+cb2b sra e
+cb2c sra h
+cb2d sra l
+cb2e sra (hl)
+cb2f sra a
+cb30 sll b
+cb31 sll c
+cb32 sll d
+cb33 sll e
+cb34 sll h
+cb35 sll l
+cb36 sll (hl)
+cb37 sll a
+cb38 srl b
+cb39 srl c
+cb3a srl d
+cb3b srl e
+cb3c srl h
+cb3d srl l
+cb3e srl (hl)
+cb3f srl a
+cb40 bit 0, b
+cb41 bit 0, c
+cb42 bit 0, d
+cb43 bit 0, e
+cb44 bit 0, h
+cb45 bit 0, l
+cb46 bit 0, (hl)
+cb47 bit 0, a
+cb48 bit 1, b
+cb49 bit 1, c
+cb4a bit 1, d
+cb4b bit 1, e
+cb4c bit 1, h
+cb4d bit 1, l
+cb4e bit 1, (hl)
+cb4f bit 1, a
+cb50 bit 2, b
+cb51 bit 2, c
+cb52 bit 2, d
+cb53 bit 2, e
+cb54 bit 2, h
+cb55 bit 2, l
+cb56 bit 2, (hl)
+cb57 bit 2, a
+cb58 bit 3, b
+cb59 bit 3, c
+cb5a bit 3, d
+cb5b bit 3, e
+cb5c bit 3, h
+cb5d bit 3, l
+cb5e bit 3, (hl)
+cb5f bit 3, a
+cb60 bit 4, b
+cb61 bit 4, c
+cb62 bit 4, d
+cb63 bit 4, e
+cb64 bit 4, h
+cb65 bit 4, l
+cb66 bit 4, (hl)
+cb67 bit 4, a
+cb68 bit 5, b
+cb69 bit 5, c
+cb6a bit 5, d
+cb6b bit 5, e
+cb6c bit 5, h
+cb6d bit 5, l
+cb6e bit 5, (hl)
+cb6f bit 5, a
+cb70 bit 6, b
+cb71 bit 6, c
+cb72 bit 6, d
+cb73 bit 6, e
+cb74 bit 6, h
+cb75 bit 6, l
+cb76 bit 6, (hl)
+cb77 bit 6, a
+cb78 bit 7, b
+cb79 bit 7, c
+cb7a bit 7, d
+cb7b bit 7, e
+cb7c bit 7, h
+cb7d bit 7, l
+cb7e bit 7, (hl)
+cb7f bit 7, a
+cb80 res 0, b
+cb81 res 0, c
+cb82 res 0, d
+cb83 res 0, e
+cb84 res 0, h
+cb85 res 0, l
+cb86 res 0, (hl)
+cb87 res 0, a
+cb88 res 1, b
+cb89 res 1, c
+cb8a res 1, d
+cb8b res 1, e
+cb8c res 1, h
+cb8d res 1, l
+cb8e res 1, (hl)
+cb8f res 1, a
+cb90 res 2, b
+cb91 res 2, c
+cb92 res 2, d
+cb93 res 2, e
+cb94 res 2, h
+cb95 res 2, l
+cb96 res 2, (hl)
+cb97 res 2, a
+cb98 res 3, b
+cb99 res 3, c
+cb9a res 3, d
+cb9b res 3, e
+cb9c res 3, h
+cb9d res 3, l
+cb9e res 3, (hl)
+cb9f res 3, a
+cba0 res 4, b
+cba1 res 4, c
+cba2 res 4, d
+cba3 res 4, e
+cba4 res 4, h
+cba5 res 4, l
+cba6 res 4, (hl)
+cba7 res 4, a
+cba8 res 5, b
+cba9 res 5, c
+cbaa res 5, d
+cbab res 5, e
+cbac res 5, h
+cbad res 5, l
+cbae res 5, (hl)
+cbaf res 5, a
+cbb0 res 6, b
+cbb1 res 6, c
+cbb2 res 6, d
+cbb3 res 6, e
+cbb4 res 6, h
+cbb5 res 6, l
+cbb6 res 6, (hl)
+cbb7 res 6, a
+cbb8 res 7, b
+cbb9 res 7, c
+cbba res 7, d
+cbbb res 7, e
+cbbc res 7, h
+cbbd res 7, l
+cbbe res 7, (hl)
+cbbf res 7, a
+cbc0 set 0, b
+cbc1 set 0, c
+cbc2 set 0, d
+cbc3 set 0, e
+cbc4 set 0, h
+cbc5 set 0, l
+cbc6 set 0, (hl)
+cbc7 set 0, a
+cbc8 set 1, b
+cbc9 set 1, c
+cbca set 1, d
+cbcb set 1, e
+cbcc set 1, h
+cbcd set 1, l
+cbce set 1, (hl)
+cbcf set 1, a
+cbd0 set 2, b
+cbd1 set 2, c
+cbd2 set 2, d
+cbd3 set 2, e
+cbd4 set 2, h
+cbd5 set 2, l
+cbd6 set 2, (hl)
+cbd7 set 2, a
+cbd8 set 3, b
+cbd9 set 3, c
+cbda set 3, d
+cbdb set 3, e
+cbdc set 3, h
+cbdd set 3, l
+cbde set 3, (hl)
+cbdf set 3, a
+cbe0 set 4, b
+cbe1 set 4, c
+cbe2 set 4, d
+cbe3 set 4, e
+cbe4 set 4, h
+cbe5 set 4, l
+cbe6 set 4, (hl)
+cbe7 set 4, a
+cbe8 set 5, b
+cbe9 set 5, c
+cbea set 5, d
+cbeb set 5, e
+cbec set 5, h
+cbed set 5, l
+cbee set 5, (hl)
+cbef set 5, a
+cbf0 set 6, b
+cbf1 set 6, c
+cbf2 set 6, d
+cbf3 set 6, e
+cbf4 set 6, h
+cbf5 set 6, l
+cbf6 set 6, (hl)
+cbf7 set 6, a
+cbf8 set 7, b
+cbf9 set 7, c
+cbfa set 7, d
+cbfb set 7, e
+cbfc set 7, h
+cbfd set 7, l
+cbfe set 7, (hl)
+cbff set 7, a
 
 cc0000 call z, 0x0000
 cd0000 call 0x0000
