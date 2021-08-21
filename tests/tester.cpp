@@ -2,9 +2,7 @@
 /*  Z80 CPU Emulator.
     https://github.com/kosarev/z80
 
-    Copyright (C) 2017-2019 Ivan Kosarev.
-    ivan@kosarev.info
-
+    Copyright (c) 2017 Ivan Kosarev <ivan@kosarev.info>
     Published under the MIT license.
 */
 
@@ -207,6 +205,10 @@ public:
     fast_u8 on_read_next_byte() {
         assert(index < instr_size);
         return instr_code[index++];
+    }
+
+    unsigned get_num_consumed_bytes() const {
+        return index;
     }
 
     void set_instr_code(const least_u8 *code, unsigned size) {
@@ -877,6 +879,9 @@ void handle_test_entry(test_input &input) {
     if(std::strcmp(instr, p) != 0)
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     instr, p);
+
+    if(dis.get_num_consumed_bytes() != instr_size)
+        input.error("extra instruction bytes");
 
     // Test handlers.
     p = input.read_line();

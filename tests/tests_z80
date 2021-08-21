@@ -2,9 +2,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2019 Ivan Kosarev.
-#   ivan@kosarev.info
-#
+#   Copyright (c) 2017 Ivan Kosarev <ivan@kosarev.info>
 #   Published under the MIT license.
 
 
@@ -2448,3 +2446,269 @@ af xor a
  4 set_a 00 -> 00
  4 set_f 00 -> 44
  4 done
+
+# All instructions.
+00 nop
+010000 ld bc, 0x0000
+02 ld (bc), a
+03 inc bc
+04 inc b
+05 dec b
+0600 ld b, 0x00
+07 rlca
+08 ex af, af'
+09 add hl, bc
+0a ld a, (bc)
+0b dec bc
+0c inc c
+0d dec c
+0e00 ld c, 0x00
+0f rrca
+1000 djnz $ + 2
+110000 ld de, 0x0000
+12 ld (de), a
+13 inc de
+14 inc d
+15 dec d
+1600 ld d, 0x00
+17 rla
+1800 jr $ + 2
+19 add hl, de
+1a ld a, (de)
+1b dec de
+1c inc e
+1d dec e
+1e00 ld e, 0x00
+1f rra
+2000 jr nz, $ + 2
+210000 ld hl, 0x0000
+220000 ld (0x0000), hl
+23 inc hl
+24 inc h
+25 dec h
+2600 ld h, 0x00
+27 daa
+2800 jr z, $ + 2
+29 add hl, hl
+2a0000 ld hl, (0x0000)
+2b dec hl
+2c inc l
+2d dec l
+2e00 ld l, 0x00
+2f cpl
+3000 jr nc, $ + 2
+310000 ld sp, 0x0000
+320000 ld (0x0000), a
+33 inc sp
+34 inc (hl)
+35 dec (hl)
+3600 ld (hl), 0x00
+37 scf
+3800 jr c, $ + 2
+39 add hl, sp
+3a0000 ld a, (0x0000)
+3b dec sp
+3c inc a
+3d dec a
+3e00 ld a, 0x00
+3f ccf
+40 ld b, b
+41 ld b, c
+42 ld b, d
+43 ld b, e
+44 ld b, h
+45 ld b, l
+46 ld b, (hl)
+47 ld b, a
+48 ld c, b
+49 ld c, c
+4a ld c, d
+4b ld c, e
+4c ld c, h
+4d ld c, l
+4e ld c, (hl)
+4f ld c, a
+50 ld d, b
+51 ld d, c
+52 ld d, d
+53 ld d, e
+54 ld d, h
+55 ld d, l
+56 ld d, (hl)
+57 ld d, a
+58 ld e, b
+59 ld e, c
+5a ld e, d
+5b ld e, e
+5c ld e, h
+5d ld e, l
+5e ld e, (hl)
+5f ld e, a
+60 ld h, b
+61 ld h, c
+62 ld h, d
+63 ld h, e
+64 ld h, h
+65 ld h, l
+66 ld h, (hl)
+67 ld h, a
+68 ld l, b
+69 ld l, c
+6a ld l, d
+6b ld l, e
+6c ld l, h
+6d ld l, l
+6e ld l, (hl)
+6f ld l, a
+70 ld (hl), b
+71 ld (hl), c
+72 ld (hl), d
+73 ld (hl), e
+74 ld (hl), h
+75 ld (hl), l
+76 halt
+77 ld (hl), a
+78 ld a, b
+79 ld a, c
+7a ld a, d
+7b ld a, e
+7c ld a, h
+7d ld a, l
+7e ld a, (hl)
+7f ld a, a
+80 add a, b
+81 add a, c
+82 add a, d
+83 add a, e
+84 add a, h
+85 add a, l
+86 add a, (hl)
+87 add a, a
+88 adc a, b
+89 adc a, c
+8a adc a, d
+8b adc a, e
+8c adc a, h
+8d adc a, l
+8e adc a, (hl)
+8f adc a, a
+90 sub b
+91 sub c
+92 sub d
+93 sub e
+94 sub h
+95 sub l
+96 sub (hl)
+97 sub a
+98 sbc a, b
+99 sbc a, c
+9a sbc a, d
+9b sbc a, e
+9c sbc a, h
+9d sbc a, l
+9e sbc a, (hl)
+9f sbc a, a
+a0 and b
+a1 and c
+a2 and d
+a3 and e
+a4 and h
+a5 and l
+a6 and (hl)
+a7 and a
+a8 xor b
+a9 xor c
+aa xor d
+ab xor e
+ac xor h
+ad xor l
+ae xor (hl)
+af xor a
+b0 or b
+b1 or c
+b2 or d
+b3 or e
+b4 or h
+b5 or l
+b6 or (hl)
+b7 or a
+b8 cp b
+b9 cp c
+ba cp d
+bb cp e
+bc cp h
+bd cp l
+be cp (hl)
+bf cp a
+c0 ret nz
+c1 pop bc
+c20000 jp nz, 0x0000
+c30000 jp 0x0000
+c40000 call nz, 0x0000
+c5 push bc
+c600 add a, 0x00
+c7 rst 0x0000
+c8 ret z
+c9 ret
+ca0000 jp z, 0x0000
+
+# TODO: cb
+
+cc0000 call z, 0x0000
+cd0000 call 0x0000
+ce00 adc a, 0x00
+cf rst 0x0008
+d0 ret nc
+d1 pop de
+d20000 jp nc, 0x0000
+d300 out (0x00), a
+d40000 call nc, 0x0000
+d5 push de
+d600 sub 0x00
+d7 rst 0x0010
+d8 ret c
+d9 exx
+da0000 jp c, 0x0000
+db00 in a, (0x00)
+dc0000 call c, 0x0000
+
+# TODO: dd
+
+de00 sbc a, 0x00
+df rst 0x0018
+e0 ret po
+e1 pop hl
+e20000 jp po, 0x0000
+e3 ex (sp), hl
+e40000 call po, 0x0000
+e5 push hl
+e600 and 0x00
+e7 rst 0x0020
+e8 ret pe
+e9 jp (hl)
+ea0000 jp pe, 0x0000
+eb ex de, hl
+ec0000 call pe, 0x0000
+
+# TODO: ed
+
+ee00 xor 0x00
+ef rst 0x0028
+f0 ret p
+f1 pop af
+f20000 jp p, 0x0000
+f3 di
+f40000 call p, 0x0000
+f5 push af
+f600 or 0x00
+f7 rst 0x0030
+f8 ret m
+f9 ld sp, hl
+fa0000 jp m, 0x0000
+fb ei
+fc0000 call m, 0x0000
+
+# TODO: fd
+
+fe00 cp 0x00
+ff rst 0x0038
