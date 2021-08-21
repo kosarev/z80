@@ -1778,11 +1778,11 @@ public:
     void on_sbc_hl_rp(regp rp) {
         self().on_format("sbc hl, P", rp, iregp::hl); }
     void on_xim(fast_u8 op, fast_u8 mode) {
-        self().on_format("xim N, U", op, mode); }
+        self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
-        self().on_format("xneg N", op); }
+        self().on_format("xneg W", 0xed00 | op); }
     void on_xretn(fast_u8 op) {
-        self().on_format("xretn N", op); }
+        self().on_format("xretn W", 0xed00 | op); }
 
     static const char *get_reg_name(reg r, iregp irp = iregp::hl) {
         switch(r) {

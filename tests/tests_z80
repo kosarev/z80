@@ -573,11 +573,11 @@ ed56 im 1
 
 ed46 im 0
 ed5e im 2
-ed4e xim 0x4e, 0
-ed66 xim 0x66, 0
-ed6e xim 0x6e, 0
-ed76 xim 0x76, 1
-ed7e xim 0x7e, 2
+ed4e xim 0xed4e, 0
+ed66 xim 0xed66, 0
+ed6e xim 0xed6e, 0
+ed76 xim 0xed76, 1
+ed7e xim 0xed7e, 2
 
 # INC r
 04 inc b
@@ -1447,8 +1447,8 @@ ed44 neg
  8 set_f 00 -> 42
  8 done
 
-ed4c xneg 0x4c
-ed7c xneg 0x7c
+ed4c xneg 0xed4c
+ed7c xneg 0xed7c
 
 # NOP
 00 nop
@@ -2193,12 +2193,12 @@ ed45 retn
 14 set_pc_on_return 0002 -> 45ed
 14 done
 
-ed55 xretn 0x55
-ed5d xretn 0x5d
-ed65 xretn 0x65
-ed6d xretn 0x6d
-ed75 xretn 0x75
-ed7d xretn 0x7d
+ed55 xretn 0xed55
+ed5d xretn 0xed5d
+ed65 xretn 0xed65
+ed6d xretn 0xed6d
+ed75 xretn 0xed75
+ed7d xretn 0xed7d
 
 # RR
 cb18 rr b
@@ -2945,7 +2945,262 @@ ea0000 jp pe, 0x0000
 eb ex de, hl
 ec0000 call pe, 0x0000
 
-# TODO: ed
+ed00 xnop 0xed00
+ed01 xnop 0xed01
+ed02 xnop 0xed02
+ed03 xnop 0xed03
+ed04 xnop 0xed04
+ed05 xnop 0xed05
+ed06 xnop 0xed06
+ed07 xnop 0xed07
+ed08 xnop 0xed08
+ed09 xnop 0xed09
+ed0a xnop 0xed0a
+ed0b xnop 0xed0b
+ed0c xnop 0xed0c
+ed0d xnop 0xed0d
+ed0e xnop 0xed0e
+ed0f xnop 0xed0f
+ed10 xnop 0xed10
+ed11 xnop 0xed11
+ed12 xnop 0xed12
+ed13 xnop 0xed13
+ed14 xnop 0xed14
+ed15 xnop 0xed15
+ed16 xnop 0xed16
+ed17 xnop 0xed17
+ed18 xnop 0xed18
+ed19 xnop 0xed19
+ed1a xnop 0xed1a
+ed1b xnop 0xed1b
+ed1c xnop 0xed1c
+ed1d xnop 0xed1d
+ed1e xnop 0xed1e
+ed1f xnop 0xed1f
+ed20 xnop 0xed20
+ed21 xnop 0xed21
+ed22 xnop 0xed22
+ed23 xnop 0xed23
+ed24 xnop 0xed24
+ed25 xnop 0xed25
+ed26 xnop 0xed26
+ed27 xnop 0xed27
+ed28 xnop 0xed28
+ed29 xnop 0xed29
+ed2a xnop 0xed2a
+ed2b xnop 0xed2b
+ed2c xnop 0xed2c
+ed2d xnop 0xed2d
+ed2e xnop 0xed2e
+ed2f xnop 0xed2f
+ed30 xnop 0xed30
+ed31 xnop 0xed31
+ed32 xnop 0xed32
+ed33 xnop 0xed33
+ed34 xnop 0xed34
+ed35 xnop 0xed35
+ed36 xnop 0xed36
+ed37 xnop 0xed37
+ed38 xnop 0xed38
+ed39 xnop 0xed39
+ed3a xnop 0xed3a
+ed3b xnop 0xed3b
+ed3c xnop 0xed3c
+ed3d xnop 0xed3d
+ed3e xnop 0xed3e
+ed3f xnop 0xed3f
+ed40 in b, (c)
+ed41 out (c), b
+ed42 sbc hl, bc
+ed430000 ld (0x0000), bc
+ed44 neg
+ed45 retn
+ed46 im 0
+ed47 ld i, a
+ed48 in c, (c)
+ed49 out (c), c
+ed4a adc hl, bc
+ed4b0000 ld bc, (0x0000)
+ed4c xneg 0xed4c
+ed4d reti
+ed4e xim 0xed4e, 0
+ed4f ld r, a
+ed50 in d, (c)
+ed51 out (c), d
+ed52 sbc hl, de
+ed530000 ld (0x0000), de
+ed54 xneg 0xed54
+ed55 xretn 0xed55
+ed56 im 1
+ed57 ld a, i
+ed58 in e, (c)
+ed59 out (c), e
+ed5a adc hl, de
+ed5b0000 ld de, (0x0000)
+ed5c xneg 0xed5c
+ed5d xretn 0xed5d
+ed5e im 2
+ed5f ld a, r
+ed60 in h, (c)
+ed61 out (c), h
+ed62 sbc hl, hl
+ed630000 ld (0x0000), hl
+ed64 xneg 0xed64
+ed65 xretn 0xed65
+ed66 xim 0xed66, 0
+ed67 rrd
+ed68 in l, (c)
+ed69 out (c), l
+ed6a adc hl, hl
+ed6b0000 ld hl, (0x0000)
+ed6c xneg 0xed6c
+ed6d xretn 0xed6d
+ed6e xim 0xed6e, 0
+ed6f rld
+ed70 in (c)
+ed71 out (c), 0
+ed72 sbc hl, sp
+ed730000 ld (0x0000), sp
+ed74 xneg 0xed74
+ed75 xretn 0xed75
+ed76 xim 0xed76, 1
+ed77 xnop 0xed77
+ed78 in a, (c)
+ed79 out (c), a
+ed7a adc hl, sp
+ed7b0000 ld sp, (0x0000)
+ed7c xneg 0xed7c
+ed7d xretn 0xed7d
+ed7e xim 0xed7e, 2
+ed7f xnop 0xed7f
+ed80 xnop 0xed80
+ed81 xnop 0xed81
+ed82 xnop 0xed82
+ed83 xnop 0xed83
+ed84 xnop 0xed84
+ed85 xnop 0xed85
+ed86 xnop 0xed86
+ed87 xnop 0xed87
+ed88 xnop 0xed88
+ed89 xnop 0xed89
+ed8a xnop 0xed8a
+ed8b xnop 0xed8b
+ed8c xnop 0xed8c
+ed8d xnop 0xed8d
+ed8e xnop 0xed8e
+ed8f xnop 0xed8f
+ed90 xnop 0xed90
+ed91 xnop 0xed91
+ed92 xnop 0xed92
+ed93 xnop 0xed93
+ed94 xnop 0xed94
+ed95 xnop 0xed95
+ed96 xnop 0xed96
+ed97 xnop 0xed97
+ed98 xnop 0xed98
+ed99 xnop 0xed99
+ed9a xnop 0xed9a
+ed9b xnop 0xed9b
+ed9c xnop 0xed9c
+ed9d xnop 0xed9d
+ed9e xnop 0xed9e
+ed9f xnop 0xed9f
+eda0 ldi
+eda1 cpi
+eda2 ini
+eda3 outi
+eda4 xnop 0xeda4
+eda5 xnop 0xeda5
+eda6 xnop 0xeda6
+eda7 xnop 0xeda7
+eda8 ldd
+eda9 cpd
+edaa ind
+edab outd
+edac xnop 0xedac
+edad xnop 0xedad
+edae xnop 0xedae
+edaf xnop 0xedaf
+edb0 ldir
+edb1 cpir
+edb2 inir
+edb3 otir
+edb4 xnop 0xedb4
+edb5 xnop 0xedb5
+edb6 xnop 0xedb6
+edb7 xnop 0xedb7
+edb8 lddr
+edb9 cpdr
+edba indr
+edbb otdr
+edbc xnop 0xedbc
+edbd xnop 0xedbd
+edbe xnop 0xedbe
+edbf xnop 0xedbf
+edc0 xnop 0xedc0
+edc1 xnop 0xedc1
+edc2 xnop 0xedc2
+edc3 xnop 0xedc3
+edc4 xnop 0xedc4
+edc5 xnop 0xedc5
+edc6 xnop 0xedc6
+edc7 xnop 0xedc7
+edc8 xnop 0xedc8
+edc9 xnop 0xedc9
+edca xnop 0xedca
+edcb xnop 0xedcb
+edcc xnop 0xedcc
+edcd xnop 0xedcd
+edce xnop 0xedce
+edcf xnop 0xedcf
+edd0 xnop 0xedd0
+edd1 xnop 0xedd1
+edd2 xnop 0xedd2
+edd3 xnop 0xedd3
+edd4 xnop 0xedd4
+edd5 xnop 0xedd5
+edd6 xnop 0xedd6
+edd7 xnop 0xedd7
+edd8 xnop 0xedd8
+edd9 xnop 0xedd9
+edda xnop 0xedda
+eddb xnop 0xeddb
+eddc xnop 0xeddc
+eddd xnop 0xeddd
+edde xnop 0xedde
+eddf xnop 0xeddf
+ede0 xnop 0xede0
+ede1 xnop 0xede1
+ede2 xnop 0xede2
+ede3 xnop 0xede3
+ede4 xnop 0xede4
+ede5 xnop 0xede5
+ede6 xnop 0xede6
+ede7 xnop 0xede7
+ede8 xnop 0xede8
+ede9 xnop 0xede9
+edea xnop 0xedea
+edeb xnop 0xedeb
+edec xnop 0xedec
+eded xnop 0xeded
+edee xnop 0xedee
+edef xnop 0xedef
+edf0 xnop 0xedf0
+edf1 xnop 0xedf1
+edf2 xnop 0xedf2
+edf3 xnop 0xedf3
+edf4 xnop 0xedf4
+edf5 xnop 0xedf5
+edf6 xnop 0xedf6
+edf7 xnop 0xedf7
+edf8 xnop 0xedf8
+edf9 xnop 0xedf9
+edfa xnop 0xedfa
+edfb xnop 0xedfb
+edfc xnop 0xedfc
+edfd xnop 0xedfd
+edfe xnop 0xedfe
+edff xnop 0xedff
 
 ee00 xor 0x00
 ef rst 0x0028
