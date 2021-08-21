@@ -132,16 +132,8 @@ cddf0e call 0x0edf
 17 done
 
 eddf0e xcall 0xed, 0x0edf
-...
-17 done
-
 dddf0e xcall 0xdd, 0x0edf
-...
-17 done
-
 fddf0e xcall 0xfd, 0x0edf
-...
-17 done
 
 # Ccc, nn
 c4550c cnz 0x0c55
@@ -346,8 +338,6 @@ c3cdab jmp 0xabcd
 10 done
 
 cbcdab xjmp 0xcb, 0xabcd
-...
-10 done
 
 # Jcc nn
 d2d90a jnc 0x0ad9
@@ -752,32 +742,12 @@ d616 sui 0x16
  4 done
 
 08 xnop 0x08
-...
- 4 done
-
 10 xnop 0x10
-...
- 4 done
-
 18 xnop 0x18
-...
- 4 done
-
 20 xnop 0x20
-...
- 4 done
-
 28 xnop 0x28
-...
- 4 done
-
 30 xnop 0x30
-...
- 4 done
-
 38 xnop 0x38
-...
- 4 done
 
 # POP rp2
 c1 pop b
@@ -838,8 +808,6 @@ c9 ret
 10 done
 
 d9 xret 0xd9
-...
-10 done
 
 # Rcc
 c0 rnz

@@ -574,32 +574,12 @@ ed56 im 1
  8 done
 
 ed46 im 0
-...
- 8 done
-
 ed5e im 2
-...
- 8 done
-
 ed4e xim 0x4e, 0
-...
- 8 done
-
 ed66 xim 0x66, 0
-...
- 8 done
-
 ed6e xim 0x6e, 0
-...
- 8 done
-
 ed76 xim 0x76, 1
-...
- 8 done
-
 ed7e xim 0x7e, 2
-...
- 8 done
 
 # INC r
 04 inc b
@@ -1470,12 +1450,7 @@ ed44 neg
  8 done
 
 ed4c xneg 0x4c
-...
- 8 done
-
 ed7c xneg 0x7c
-...
- 8 done
 
 # NOP
 00 nop
@@ -1491,72 +1466,22 @@ ed7c xneg 0x7c
  4 done
 
 ed00 xnop 0xed00
-...
- 8 done
-
 ed3f xnop 0xed3f
-...
- 8 done
-
 ed77 xnop 0xed77
-...
- 8 done
-
 ed7f xnop 0xed7f
-...
- 8 done
-
 ed80 xnop 0xed80
-...
- 8 done
-
 ed87 xnop 0xed87
-...
- 8 done
-
 ed9f xnop 0xed9f
-...
- 8 done
-
 eda4 xnop 0xeda4
-...
- 8 done
-
 eda7 xnop 0xeda7
-...
- 8 done
-
 edac xnop 0xedac
-...
- 8 done
-
 edaf xnop 0xedaf
-...
- 8 done
-
 edb4 xnop 0xedb4
-...
- 8 done
-
 edb7 xnop 0xedb7
-...
- 8 done
-
 edbc xnop 0xedbc
-...
- 8 done
-
 edbf xnop 0xedbf
-...
- 8 done
-
 edc0 xnop 0xedc0
-...
- 8 done
-
 edff xnop 0xedff
-...
- 8 done
 
 # OR r
 b3 or e
@@ -2271,28 +2196,11 @@ ed45 retn
 14 done
 
 ed55 xretn 0x55
-...
-14 done
-
 ed5d xretn 0x5d
-...
-14 done
-
 ed65 xretn 0x65
-...
-14 done
-
 ed6d xretn 0x6d
-...
-14 done
-
 ed75 xretn 0x75
-...
-14 done
-
 ed7d xretn 0x7d
-...
-14 done
 
 # RR
 cb18 rr b

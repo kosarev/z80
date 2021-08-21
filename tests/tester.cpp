@@ -106,7 +106,6 @@ public:
     void read_and_match(const char *format, unsigned ticks, ...) {
         // Handle the skip directive.
         if(!in_skipping_mode) {
-            read_line();
             in_skipping_mode = (std::strcmp(line, "...") == 0);
             if(in_skipping_mode)
                 read_line();
@@ -126,6 +125,7 @@ public:
 
         if(std::strcmp(buff2, line) == 0) {
             reset_skipping_mode();
+            read_line();
             return;
         }
 
@@ -136,7 +136,7 @@ public:
     }
 
     void handle_end_of_test_entry() {
-        if(in_skipping_mode && *line != '\0')
+        if(in_skipping_mode)
             error("this line is expected, but not found");
 
         reset_skipping_mode();
@@ -764,21 +764,31 @@ public:
     }
 };
 
+int translate_hex_digit(char c) {
+    int n = static_cast<unsigned char>(c);
+    if(n >= static_cast<unsigned char>('0') &&
+           n <= static_cast<unsigned char>('9'))
+        return n - '0';
+
+    if(n >= static_cast<unsigned char>('a') &&
+           n <= static_cast<unsigned char>('f'))
+        return n - 'a' + 10;
+
+    return (-1);
+}
+
+bool is_hex_digit(char c) {
+    return translate_hex_digit(c) >= 0;
+}
+
 bool parse_hex_digit(const char *&p, fast_u8 &res) {
-    auto c = static_cast<unsigned char>(*p);
-    if(c >= static_cast<unsigned char>('0') &&
-           c <= static_cast<unsigned char>('9')) {
-        res = static_cast<fast_u8>(c - '0');
-        ++p;
-        return true;
-    }
-    if(c >= static_cast<unsigned char>('a') &&
-           c <= static_cast<unsigned char>('f')) {
-        res = static_cast<fast_u8>(c - 'a' + 10);
-        ++p;
-        return true;
-    }
-    return false;
+    int n = translate_hex_digit(*p);
+    if(n < 0)
+        return false;
+
+    res = static_cast<fast_u8>(n);
+    ++p;
+    return true;
 }
 
 bool parse_u8(const char *&p, fast_u8 &res) {
@@ -868,10 +878,14 @@ void handle_test_entry(test_input &input) {
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     instr, p);
 
-    mach.set_instr_code(instr_code, instr_size);
-    mach.on_step();
+    // Test handlers.
+    p = input.read_line();
+    if(p[0] != '\0' && !is_hex_digit(p[0])) {
+        mach.set_instr_code(instr_code, instr_size);
+        mach.on_step();
 
-    input.handle_end_of_test_entry();
+        input.handle_end_of_test_entry();
+    }
 }
 
 enum class cpu_kind {
@@ -907,11 +921,14 @@ int main(int argc, char *argv[]) {
     }
 
     test_input input(f);
+    input.read_line();
     while(input) {
         // Skip empty lines and comments.
-        const char *line = input.read_line();
-        if(line[0] == '\0' || line[0] == '#')
+        const char *line = input.get_line();
+        if(line[0] == '\0' || line[0] == '#') {
+            input.read_line();
             continue;
+        }
 
         switch(cpu) {
         case cpu_kind::i8080:
