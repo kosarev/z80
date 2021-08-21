@@ -3529,7 +3529,270 @@ fa0000 jp m, 0x0000
 fb ei
 fc0000 call m, 0x0000
 
-# TODO: fd
+fd00 (db 0xfd), nop
+fd010000 (db 0xfd), ld bc, 0x0000
+fd02 (db 0xfd), ld (bc), a
+fd03 (db 0xfd), inc bc
+fd04 (db 0xfd), inc b
+fd05 (db 0xfd), dec b
+fd0600 (db 0xfd), ld b, 0x00
+fd07 (db 0xfd), rlca
+fd08 (db 0xfd), ex af, af'
+fd09 add iy, bc
+fd0a (db 0xfd), ld a, (bc)
+fd0b (db 0xfd), dec bc
+fd0c (db 0xfd), inc c
+fd0d (db 0xfd), dec c
+fd0e00 (db 0xfd), ld c, 0x00
+fd0f (db 0xfd), rrca
+fd1000 (db 0xfd), djnz $ + 2
+fd110000 (db 0xfd), ld de, 0x0000
+fd12 (db 0xfd), ld (de), a
+fd13 (db 0xfd), inc de
+fd14 (db 0xfd), inc d
+fd15 (db 0xfd), dec d
+fd1600 (db 0xfd), ld d, 0x00
+fd17 (db 0xfd), rla
+fd1800 (db 0xfd), jr $ + 2
+fd19 add iy, de
+fd1a (db 0xfd), ld a, (de)
+fd1b (db 0xfd), dec de
+fd1c (db 0xfd), inc e
+fd1d (db 0xfd), dec e
+fd1e00 (db 0xfd), ld e, 0x00
+fd1f (db 0xfd), rra
+fd2000 (db 0xfd), jr nz, $ + 2
+fd210000 ld iy, 0x0000
+fd220000 ld (0x0000), iy
+fd23 inc iy
+fd24 inc iyh
+fd25 dec iyh
+fd2600 ld iyh, 0x00
+fd27 (db 0xfd), daa
+fd2800 (db 0xfd), jr z, $ + 2
+fd29 add iy, iy
+fd2a0000 ld iy, (0x0000)
+fd2b dec iy
+fd2c inc iyl
+fd2d dec iyl
+fd2e00 ld iyl, 0x00
+fd2f (db 0xfd), cpl
+fd3000 (db 0xfd), jr nc, $ + 2
+fd310000 (db 0xfd), ld sp, 0x0000
+fd320000 (db 0xfd), ld (0x0000), a
+fd33 (db 0xfd), inc sp
+fd3400 inc (iy + 0)
+fd3500 dec (iy + 0)
+fd360000 ld (iy + 0), 0x00
+fd37 (db 0xfd), scf
+fd3800 (db 0xfd), jr c, $ + 2
+fd39 add iy, sp
+fd3a0000 (db 0xfd), ld a, (0x0000)
+fd3b (db 0xfd), dec sp
+fd3c (db 0xfd), inc a
+fd3d (db 0xfd), dec a
+fd3e00 (db 0xfd), ld a, 0x00
+fd3f (db 0xfd), ccf
+fd40 (db 0xfd), ld b, b
+fd41 (db 0xfd), ld b, c
+fd42 (db 0xfd), ld b, d
+fd43 (db 0xfd), ld b, e
+fd44 ld b, iyh
+fd45 ld b, iyl
+fd4600 ld b, (iy + 0)
+fd47 (db 0xfd), ld b, a
+fd48 (db 0xfd), ld c, b
+fd49 (db 0xfd), ld c, c
+fd4a (db 0xfd), ld c, d
+fd4b (db 0xfd), ld c, e
+fd4c ld c, iyh
+fd4d ld c, iyl
+fd4e00 ld c, (iy + 0)
+fd4f (db 0xfd), ld c, a
+fd50 (db 0xfd), ld d, b
+fd51 (db 0xfd), ld d, c
+fd52 (db 0xfd), ld d, d
+fd53 (db 0xfd), ld d, e
+fd54 ld d, iyh
+fd55 ld d, iyl
+fd5600 ld d, (iy + 0)
+fd57 (db 0xfd), ld d, a
+fd58 (db 0xfd), ld e, b
+fd59 (db 0xfd), ld e, c
+fd5a (db 0xfd), ld e, d
+fd5b (db 0xfd), ld e, e
+fd5c ld e, iyh
+fd5d ld e, iyl
+fd5e00 ld e, (iy + 0)
+fd5f (db 0xfd), ld e, a
+fd60 ld iyh, b
+fd61 ld iyh, c
+fd62 ld iyh, d
+fd63 ld iyh, e
+fd64 ld iyh, iyh
+fd65 ld iyh, iyl
+fd6600 ld h, (iy + 0)
+fd67 ld iyh, a
+fd68 ld iyl, b
+fd69 ld iyl, c
+fd6a ld iyl, d
+fd6b ld iyl, e
+fd6c ld iyl, iyh
+fd6d ld iyl, iyl
+fd6e00 ld l, (iy + 0)
+fd6f ld iyl, a
+fd7000 ld (iy + 0), b
+fd7100 ld (iy + 0), c
+fd7200 ld (iy + 0), d
+fd7300 ld (iy + 0), e
+fd7400 ld (iy + 0), h
+fd7500 ld (iy + 0), l
+fd76 (db 0xfd), halt
+fd7700 ld (iy + 0), a
+fd78 (db 0xfd), ld a, b
+fd79 (db 0xfd), ld a, c
+fd7a (db 0xfd), ld a, d
+fd7b (db 0xfd), ld a, e
+fd7c ld a, iyh
+fd7d ld a, iyl
+fd7e00 ld a, (iy + 0)
+fd7f (db 0xfd), ld a, a
+fd80 (db 0xfd), add a, b
+fd81 (db 0xfd), add a, c
+fd82 (db 0xfd), add a, d
+fd83 (db 0xfd), add a, e
+fd84 add a, iyh
+fd85 add a, iyl
+fd8600 add a, (iy + 0)
+fd87 (db 0xfd), add a, a
+fd88 (db 0xfd), adc a, b
+fd89 (db 0xfd), adc a, c
+fd8a (db 0xfd), adc a, d
+fd8b (db 0xfd), adc a, e
+fd8c adc a, iyh
+fd8d adc a, iyl
+fd8e00 adc a, (iy + 0)
+fd8f (db 0xfd), adc a, a
+fd90 (db 0xfd), sub b
+fd91 (db 0xfd), sub c
+fd92 (db 0xfd), sub d
+fd93 (db 0xfd), sub e
+fd94 sub iyh
+fd95 sub iyl
+fd9600 sub (iy + 0)
+fd97 (db 0xfd), sub a
+fd98 (db 0xfd), sbc a, b
+fd99 (db 0xfd), sbc a, c
+fd9a (db 0xfd), sbc a, d
+fd9b (db 0xfd), sbc a, e
+fd9c sbc a, iyh
+fd9d sbc a, iyl
+fd9e00 sbc a, (iy + 0)
+fd9f (db 0xfd), sbc a, a
+fda0 (db 0xfd), and b
+fda1 (db 0xfd), and c
+fda2 (db 0xfd), and d
+fda3 (db 0xfd), and e
+fda4 and iyh
+fda5 and iyl
+fda600 and (iy + 0)
+fda7 (db 0xfd), and a
+fda8 (db 0xfd), xor b
+fda9 (db 0xfd), xor c
+fdaa (db 0xfd), xor d
+fdab (db 0xfd), xor e
+fdac xor iyh
+fdad xor iyl
+fdae00 xor (iy + 0)
+fdaf (db 0xfd), xor a
+fdb0 (db 0xfd), or b
+fdb1 (db 0xfd), or c
+fdb2 (db 0xfd), or d
+fdb3 (db 0xfd), or e
+fdb4 or iyh
+fdb5 or iyl
+fdb600 or (iy + 0)
+fdb7 (db 0xfd), or a
+fdb8 (db 0xfd), cp b
+fdb9 (db 0xfd), cp c
+fdba (db 0xfd), cp d
+fdbb (db 0xfd), cp e
+fdbc cp iyh
+fdbd cp iyl
+fdbe00 cp (iy + 0)
+fdbf (db 0xfd), cp a
+fdc0 (db 0xfd), ret nz
+fdc1 (db 0xfd), pop bc
+fdc20000 (db 0xfd), jp nz, 0x0000
+fdc30000 (db 0xfd), jp 0x0000
+fdc40000 (db 0xfd), call nz, 0x0000
+fdc5 (db 0xfd), push bc
+fdc600 (db 0xfd), add a, 0x00
+fdc7 (db 0xfd), rst 0x0000
+fdc8 (db 0xfd), ret z
+fdc9 (db 0xfd), ret
+fdca0000 (db 0xfd), jp z, 0x0000
+
+# TODO: fdcb
+
+fdcc0000 (db 0xfd), call z, 0x0000
+fdcd0000 (db 0xfd), call 0x0000
+fdce00 (db 0xfd), adc a, 0x00
+fdcf (db 0xfd), rst 0x0008
+fdd0 (db 0xfd), ret nc
+fdd1 (db 0xfd), pop de
+fdd20000 (db 0xfd), jp nc, 0x0000
+fdd300 (db 0xfd), out (0x00), a
+fdd40000 (db 0xfd), call nc, 0x0000
+fdd5 (db 0xfd), push de
+fdd600 (db 0xfd), sub 0x00
+fdd7 (db 0xfd), rst 0x0010
+fdd8 (db 0xfd), ret c
+fdd9 (db 0xfd), exx
+fdda0000 (db 0xfd), jp c, 0x0000
+fddb00 (db 0xfd), in a, (0x00)
+fddc0000 (db 0xfd), call c, 0x0000
+
+# fddd
+
+fdde00 (db 0xfd), sbc a, 0x00
+fddf (db 0xfd), rst 0x0018
+fde0 (db 0xfd), ret po
+fde1 pop iy
+fde20000 (db 0xfd), jp po, 0x0000
+fde3 ex (sp), iy
+fde40000 (db 0xfd), call po, 0x0000
+fde5 push iy
+fde600 (db 0xfd), and 0x00
+fde7 (db 0xfd), rst 0x0020
+fde8 (db 0xfd), ret pe
+fde9 jp (iy)
+fdea0000 (db 0xfd), jp pe, 0x0000
+fdeb (db 0xfd), ex de, hl
+fdec0000 (db 0xfd), call pe, 0x0000
+
+# TODO: fded
+
+fdee00 (db 0xfd), xor 0x00
+fdef (db 0xfd), rst 0x0028
+fdf0 (db 0xfd), ret p
+fdf1 (db 0xfd), pop af
+fdf20000 (db 0xfd), jp p, 0x0000
+fdf3 (db 0xfd), di
+fdf40000 (db 0xfd), call p, 0x0000
+fdf5 (db 0xfd), push af
+fdf600 (db 0xfd), or 0x00
+fdf7 (db 0xfd), rst 0x0030
+fdf8 (db 0xfd), ret m
+fdf9 ld sp, iy
+fdfa0000 (db 0xfd), jp m, 0x0000
+fdfb (db 0xfd), ei
+fdfc0000 (db 0xfd), call m, 0x0000
+
+# fdfd
+
+fdfe00 (db 0xfd), cp 0x00
+fdff (db 0xfd), rst 0x0038
 
 fe00 cp 0x00
 ff rst 0x0038
