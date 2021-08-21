@@ -2975,7 +2975,270 @@ da0000 jp c, 0x0000
 db00 in a, (0x00)
 dc0000 call c, 0x0000
 
-# TODO: dd
+dd00 (db 0xdd), nop
+dd010000 (db 0xdd), ld bc, 0x0000
+dd02 (db 0xdd), ld (bc), a
+dd03 (db 0xdd), inc bc
+dd04 (db 0xdd), inc b
+dd05 (db 0xdd), dec b
+dd0600 (db 0xdd), ld b, 0x00
+dd07 (db 0xdd), rlca
+dd08 (db 0xdd), ex af, af'
+dd09 add ix, bc
+dd0a (db 0xdd), ld a, (bc)
+dd0b (db 0xdd), dec bc
+dd0c (db 0xdd), inc c
+dd0d (db 0xdd), dec c
+dd0e00 (db 0xdd), ld c, 0x00
+dd0f (db 0xdd), rrca
+dd1000 (db 0xdd), djnz $ + 2
+dd110000 (db 0xdd), ld de, 0x0000
+dd12 (db 0xdd), ld (de), a
+dd13 (db 0xdd), inc de
+dd14 (db 0xdd), inc d
+dd15 (db 0xdd), dec d
+dd1600 (db 0xdd), ld d, 0x00
+dd17 (db 0xdd), rla
+dd1800 (db 0xdd), jr $ + 2
+dd19 add ix, de
+dd1a (db 0xdd), ld a, (de)
+dd1b (db 0xdd), dec de
+dd1c (db 0xdd), inc e
+dd1d (db 0xdd), dec e
+dd1e00 (db 0xdd), ld e, 0x00
+dd1f (db 0xdd), rra
+dd2000 (db 0xdd), jr nz, $ + 2
+dd210000 ld ix, 0x0000
+dd220000 ld (0x0000), ix
+dd23 inc ix
+dd24 inc ixh
+dd25 dec ixh
+dd2600 ld ixh, 0x00
+dd27 (db 0xdd), daa
+dd2800 (db 0xdd), jr z, $ + 2
+dd29 add ix, ix
+dd2a0000 ld ix, (0x0000)
+dd2b dec ix
+dd2c inc ixl
+dd2d dec ixl
+dd2e00 ld ixl, 0x00
+dd2f (db 0xdd), cpl
+dd3000 (db 0xdd), jr nc, $ + 2
+dd310000 (db 0xdd), ld sp, 0x0000
+dd320000 (db 0xdd), ld (0x0000), a
+dd33 (db 0xdd), inc sp
+dd3400 inc (ix + 0)
+dd3500 dec (ix + 0)
+dd360000 ld (ix + 0), 0x00
+dd37 (db 0xdd), scf
+dd3800 (db 0xdd), jr c, $ + 2
+dd39 add ix, sp
+dd3a0000 (db 0xdd), ld a, (0x0000)
+dd3b (db 0xdd), dec sp
+dd3c (db 0xdd), inc a
+dd3d (db 0xdd), dec a
+dd3e00 (db 0xdd), ld a, 0x00
+dd3f (db 0xdd), ccf
+dd40 (db 0xdd), ld b, b
+dd41 (db 0xdd), ld b, c
+dd42 (db 0xdd), ld b, d
+dd43 (db 0xdd), ld b, e
+dd44 ld b, ixh
+dd45 ld b, ixl
+dd4600 ld b, (ix + 0)
+dd47 (db 0xdd), ld b, a
+dd48 (db 0xdd), ld c, b
+dd49 (db 0xdd), ld c, c
+dd4a (db 0xdd), ld c, d
+dd4b (db 0xdd), ld c, e
+dd4c ld c, ixh
+dd4d ld c, ixl
+dd4e00 ld c, (ix + 0)
+dd4f (db 0xdd), ld c, a
+dd50 (db 0xdd), ld d, b
+dd51 (db 0xdd), ld d, c
+dd52 (db 0xdd), ld d, d
+dd53 (db 0xdd), ld d, e
+dd54 ld d, ixh
+dd55 ld d, ixl
+dd5600 ld d, (ix + 0)
+dd57 (db 0xdd), ld d, a
+dd58 (db 0xdd), ld e, b
+dd59 (db 0xdd), ld e, c
+dd5a (db 0xdd), ld e, d
+dd5b (db 0xdd), ld e, e
+dd5c ld e, ixh
+dd5d ld e, ixl
+dd5e00 ld e, (ix + 0)
+dd5f (db 0xdd), ld e, a
+dd60 ld ixh, b
+dd61 ld ixh, c
+dd62 ld ixh, d
+dd63 ld ixh, e
+dd64 ld ixh, ixh
+dd65 ld ixh, ixl
+dd6600 ld h, (ix + 0)
+dd67 ld ixh, a
+dd68 ld ixl, b
+dd69 ld ixl, c
+dd6a ld ixl, d
+dd6b ld ixl, e
+dd6c ld ixl, ixh
+dd6d ld ixl, ixl
+dd6e00 ld l, (ix + 0)
+dd6f ld ixl, a
+dd7000 ld (ix + 0), b
+dd7100 ld (ix + 0), c
+dd7200 ld (ix + 0), d
+dd7300 ld (ix + 0), e
+dd7400 ld (ix + 0), h
+dd7500 ld (ix + 0), l
+dd76 (db 0xdd), halt
+dd7700 ld (ix + 0), a
+dd78 (db 0xdd), ld a, b
+dd79 (db 0xdd), ld a, c
+dd7a (db 0xdd), ld a, d
+dd7b (db 0xdd), ld a, e
+dd7c ld a, ixh
+dd7d ld a, ixl
+dd7e00 ld a, (ix + 0)
+dd7f (db 0xdd), ld a, a
+dd80 (db 0xdd), add a, b
+dd81 (db 0xdd), add a, c
+dd82 (db 0xdd), add a, d
+dd83 (db 0xdd), add a, e
+dd84 add a, ixh
+dd85 add a, ixl
+dd8600 add a, (ix + 0)
+dd87 (db 0xdd), add a, a
+dd88 (db 0xdd), adc a, b
+dd89 (db 0xdd), adc a, c
+dd8a (db 0xdd), adc a, d
+dd8b (db 0xdd), adc a, e
+dd8c adc a, ixh
+dd8d adc a, ixl
+dd8e00 adc a, (ix + 0)
+dd8f (db 0xdd), adc a, a
+dd90 (db 0xdd), sub b
+dd91 (db 0xdd), sub c
+dd92 (db 0xdd), sub d
+dd93 (db 0xdd), sub e
+dd94 sub ixh
+dd95 sub ixl
+dd9600 sub (ix + 0)
+dd97 (db 0xdd), sub a
+dd98 (db 0xdd), sbc a, b
+dd99 (db 0xdd), sbc a, c
+dd9a (db 0xdd), sbc a, d
+dd9b (db 0xdd), sbc a, e
+dd9c sbc a, ixh
+dd9d sbc a, ixl
+dd9e00 sbc a, (ix + 0)
+dd9f (db 0xdd), sbc a, a
+dda0 (db 0xdd), and b
+dda1 (db 0xdd), and c
+dda2 (db 0xdd), and d
+dda3 (db 0xdd), and e
+dda4 and ixh
+dda5 and ixl
+dda600 and (ix + 0)
+dda7 (db 0xdd), and a
+dda8 (db 0xdd), xor b
+dda9 (db 0xdd), xor c
+ddaa (db 0xdd), xor d
+ddab (db 0xdd), xor e
+ddac xor ixh
+ddad xor ixl
+ddae00 xor (ix + 0)
+ddaf (db 0xdd), xor a
+ddb0 (db 0xdd), or b
+ddb1 (db 0xdd), or c
+ddb2 (db 0xdd), or d
+ddb3 (db 0xdd), or e
+ddb4 or ixh
+ddb5 or ixl
+ddb600 or (ix + 0)
+ddb7 (db 0xdd), or a
+ddb8 (db 0xdd), cp b
+ddb9 (db 0xdd), cp c
+ddba (db 0xdd), cp d
+ddbb (db 0xdd), cp e
+ddbc cp ixh
+ddbd cp ixl
+ddbe00 cp (ix + 0)
+ddbf (db 0xdd), cp a
+ddc0 (db 0xdd), ret nz
+ddc1 (db 0xdd), pop bc
+ddc20000 (db 0xdd), jp nz, 0x0000
+ddc30000 (db 0xdd), jp 0x0000
+ddc40000 (db 0xdd), call nz, 0x0000
+ddc5 (db 0xdd), push bc
+ddc600 (db 0xdd), add a, 0x00
+ddc7 (db 0xdd), rst 0x0000
+ddc8 (db 0xdd), ret z
+ddc9 (db 0xdd), ret
+ddca0000 (db 0xdd), jp z, 0x0000
+
+# TODO: ddcb
+
+ddcc0000 (db 0xdd), call z, 0x0000
+ddcd0000 (db 0xdd), call 0x0000
+ddce00 (db 0xdd), adc a, 0x00
+ddcf (db 0xdd), rst 0x0008
+ddd0 (db 0xdd), ret nc
+ddd1 (db 0xdd), pop de
+ddd20000 (db 0xdd), jp nc, 0x0000
+ddd300 (db 0xdd), out (0x00), a
+ddd40000 (db 0xdd), call nc, 0x0000
+ddd5 (db 0xdd), push de
+ddd600 (db 0xdd), sub 0x00
+ddd7 (db 0xdd), rst 0x0010
+ddd8 (db 0xdd), ret c
+ddd9 (db 0xdd), exx
+ddda0000 (db 0xdd), jp c, 0x0000
+dddb00 (db 0xdd), in a, (0x00)
+dddc0000 (db 0xdd), call c, 0x0000
+
+# dddd
+
+ddde00 (db 0xdd), sbc a, 0x00
+dddf (db 0xdd), rst 0x0018
+dde0 (db 0xdd), ret po
+dde1 pop ix
+dde20000 (db 0xdd), jp po, 0x0000
+dde3 ex (sp), ix
+dde40000 (db 0xdd), call po, 0x0000
+dde5 push ix
+dde600 (db 0xdd), and 0x00
+dde7 (db 0xdd), rst 0x0020
+dde8 (db 0xdd), ret pe
+dde9 jp (ix)
+ddea0000 (db 0xdd), jp pe, 0x0000
+ddeb (db 0xdd), ex de, hl
+ddec0000 (db 0xdd), call pe, 0x0000
+
+# TODO: dded
+
+ddee00 (db 0xdd), xor 0x00
+ddef (db 0xdd), rst 0x0028
+ddf0 (db 0xdd), ret p
+ddf1 (db 0xdd), pop af
+ddf20000 (db 0xdd), jp p, 0x0000
+ddf3 (db 0xdd), di
+ddf40000 (db 0xdd), call p, 0x0000
+ddf5 (db 0xdd), push af
+ddf600 (db 0xdd), or 0x00
+ddf7 (db 0xdd), rst 0x0030
+ddf8 (db 0xdd), ret m
+ddf9 ld sp, ix
+ddfa0000 (db 0xdd), jp m, 0x0000
+ddfb (db 0xdd), ei
+ddfc0000 (db 0xdd), call m, 0x0000
+
+# ddfd
+
+ddfe00 (db 0xdd), cp 0x00
+ddff (db 0xdd), rst 0x0038
 
 de00 sbc a, 0x00
 df rst 0x0018

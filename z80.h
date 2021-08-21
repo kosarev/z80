@@ -1159,8 +1159,8 @@ protected:
     }
 
 private:
-    fast_u8 read_disp_or_null(bool may_need_disp = true) {
-        if(is_hl_iregp() || !may_need_disp)
+    fast_u8 read_disp_or_null(bool may_need_disp) {
+        if(!may_need_disp || is_hl_iregp())
             return 0;
         fast_u8 d = self().on_disp_read();
         self().on_5t_exec_cycle();
@@ -1613,7 +1613,7 @@ public:
     void on_alu_n(alu k, fast_u8 n) {
         self().on_format("A N", k, n); }
     void on_alu_r(alu k, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("A R", k, r, irp, d); }
     void on_block_cp(block_cp k) {
         self().on_format("M", k); }
@@ -1634,10 +1634,10 @@ public:
     void on_cpl() {
         self().on_format("cpl"); }
     void on_dec_r(reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("dec R", r, irp, d); }
     void on_dec_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("dec P", rp, irp); }
     void on_djnz(fast_u8 d) {
         self().on_format("djnz D", sign_extend8(d) + 2); }
@@ -1664,10 +1664,10 @@ public:
         else
             self().on_format("in R, (c)", r, iregp::hl, 0); }
     void on_inc_r(reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("inc R", r, irp, d); }
     void on_inc_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("inc P", rp, irp); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("jp C, W", cc, nn); }
@@ -1689,15 +1689,14 @@ public:
     void on_ld_i_a() {
         self().on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        iregp irpd = rs == reg::at_hl ? iregp::hl : irp;
-        iregp irps = rd == reg::at_hl ? iregp::hl : irp;
+        iregp irpd = get_iregp_kind_or_hl(rs != reg::at_hl && is_indexable(rd));
+        iregp irps = get_iregp_kind_or_hl(rd != reg::at_hl && is_indexable(rs));
         self().on_format("ld R, R", rd, irpd, d, rs, irps, d); }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("ld R, N", r, irp, d, n); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("ld P, W", rp, irp, nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         iregp irp = self().on_get_iregp_kind();
@@ -1730,10 +1729,10 @@ public:
     void on_out_n_a(fast_u8 n) {
         self().on_format("out (N), a", n); }
     void on_pop_rp(regp2 rp) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("pop G", rp, irp); }
     void on_push_rp(regp2 rp) {
-        iregp irp = self().on_get_iregp_kind();
+        iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("push G", rp, irp); }
     void on_res(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
@@ -1916,6 +1915,27 @@ public:
         case block_out::otdr: return "otdr";
         }
         unreachable("Unknown block output operation.");
+    }
+
+private:
+    static bool is_indexable(reg r) {
+        return r == reg::at_hl || r == reg::h || r == reg::l;
+    }
+
+    iregp get_iregp_kind_or_hl(bool indexable) {
+        return indexable ? self().on_get_iregp_kind() : iregp::hl;
+    }
+
+    iregp get_iregp_kind_or_hl(reg r) {
+        return get_iregp_kind_or_hl(is_indexable(r));
+    }
+
+    iregp get_iregp_kind_or_hl(regp rp) {
+        return get_iregp_kind_or_hl(rp == regp::hl);
+    }
+
+    iregp get_iregp_kind_or_hl(regp2 rp) {
+        return get_iregp_kind_or_hl(rp == regp2::hl);
     }
 
 protected:

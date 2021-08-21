@@ -228,17 +228,36 @@ private:
     char output_buff[max_output_buff_size];
 };
 
-class i8080_disasm : public disasm_base<z80::i8080_disasm<i8080_disasm>>
-{};
+class i8080_disasm : public disasm_base<z80::i8080_disasm<i8080_disasm>> {
+public:
+    bool depends_on_iregp_kind() const {
+        return false;
+    }
+};
 
 class z80_disasm : public disasm_base<z80::z80_disasm<z80_disasm>> {
 public:
+    using base = disasm_base<z80::z80_disasm<z80_disasm>>;
+
+    z80::iregp on_get_iregp_kind() {
+        does_depend_on_iregp_kind = true;
+        return base::on_get_iregp_kind();
+    }
+
+    bool depends_on_iregp_kind() const {
+        return does_depend_on_iregp_kind;
+    }
+
     void on_disassemble() {
-        // Skip prefixes.
         base::on_disassemble();
-        while(base::get_iregp_kind() != z80::iregp::hl)
+
+        // Do one more step if the previous opcode was a prefix.
+        if(base::get_iregp_kind() != z80::iregp::hl)
             base::on_disassemble();
     }
+
+private:
+    bool does_depend_on_iregp_kind = false;
 };
 
 template<typename B>
@@ -757,9 +776,10 @@ public:
                                   return base::on_set_wz(wz); }
 
     void on_step() {
-        // Skip prefixes.
         base::on_step();
-        while(base::get_iregp_kind() != z80::iregp::hl)
+
+        // Do one more step if the previous opcode was a prefix.
+        if(base::get_iregp_kind() != z80::iregp::hl)
             base::on_step();
 
         input.read_and_match("done", static_cast<unsigned>(get_ticks()));
@@ -845,7 +865,13 @@ void handle_directive(const test_input &input, M &mach) {
     input.error("unknown directive");
 }
 
-template<typename M, typename D>
+enum class cpu_kind {
+    unknown,
+    i8080,
+    z80,
+};
+
+template<cpu_kind kind, typename M, typename D>
 void handle_test_entry(test_input &input) {
     typedef M machine;
     typedef D disasm;
@@ -876,9 +902,19 @@ void handle_test_entry(test_input &input) {
     dis.set_instr_code(instr_code, instr_size);
     dis.on_disassemble();
     const char *instr = dis.get_output();
-    if(std::strcmp(instr, p) != 0)
+
+    const char *prefix = "";
+    unsigned opcode = instr_code[0];
+    if(kind == cpu_kind::z80 &&
+            (opcode == 0xdd || opcode == 0xfd) &&
+            !dis.depends_on_iregp_kind())
+        prefix = (opcode == 0xdd) ? "(db 0xdd), " : "(db 0xfd), ";
+
+    char buff[1024];
+    std::snprintf(buff, sizeof(buff), "%s%s", prefix, instr);
+    if(std::strcmp(buff, p) != 0)
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
-                    instr, p);
+                    buff, p);
 
     if(dis.get_num_consumed_bytes() != instr_size)
         input.error("extra instruction bytes");
@@ -892,12 +928,6 @@ void handle_test_entry(test_input &input) {
         input.handle_end_of_test_entry();
     }
 }
-
-enum class cpu_kind {
-    unknown,
-    i8080,
-    z80,
-};
 
 cpu_kind get_cpu_kind(const char *id) {
     if(std::strcmp(id, "i8080") == 0)
@@ -937,10 +967,12 @@ int main(int argc, char *argv[]) {
 
         switch(cpu) {
         case cpu_kind::i8080:
-            handle_test_entry<i8080_machine, i8080_disasm>(input);
+            handle_test_entry<cpu_kind::i8080,
+                              i8080_machine, i8080_disasm>(input);
             break;
         case cpu_kind::z80:
-            handle_test_entry<z80_machine, z80_disasm>(input);
+            handle_test_entry<cpu_kind::z80,
+                              z80_machine, z80_disasm>(input);
             break;
         case cpu_kind::unknown:
             unreachable("Unknown CPU.");
