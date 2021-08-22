@@ -186,7 +186,7 @@ fdcb014e bit 1, (iy + 1)
 20 done
 
 # Undocumented BIT
-ddcb0440 bit 0, (ix + 4)
+ddcb0440 bit 0, (ix + 4), b
  0 m1_fetch
  0   fetch dd at 0000
  0     get_pc_on_fetch 0000
@@ -3179,7 +3179,262 @@ ddc8 (db 0xdd), ret z
 ddc9 (db 0xdd), ret
 ddca0000 (db 0xdd), jp z, 0x0000
 
-# TODO: ddcb
+ddcb0000 rlc (ix + 0), b
+ddcb0001 rlc (ix + 0), c
+ddcb0002 rlc (ix + 0), d
+ddcb0003 rlc (ix + 0), e
+ddcb0004 rlc (ix + 0), h
+ddcb0005 rlc (ix + 0), l
+ddcb0006 rlc (ix + 0)
+ddcb0007 rlc (ix + 0), a
+ddcb0008 rrc (ix + 0), b
+ddcb0009 rrc (ix + 0), c
+ddcb000a rrc (ix + 0), d
+ddcb000b rrc (ix + 0), e
+ddcb000c rrc (ix + 0), h
+ddcb000d rrc (ix + 0), l
+ddcb000e rrc (ix + 0)
+ddcb000f rrc (ix + 0), a
+ddcb0010 rl (ix + 0), b
+ddcb0011 rl (ix + 0), c
+ddcb0012 rl (ix + 0), d
+ddcb0013 rl (ix + 0), e
+ddcb0014 rl (ix + 0), h
+ddcb0015 rl (ix + 0), l
+ddcb0016 rl (ix + 0)
+ddcb0017 rl (ix + 0), a
+ddcb0018 rr (ix + 0), b
+ddcb0019 rr (ix + 0), c
+ddcb001a rr (ix + 0), d
+ddcb001b rr (ix + 0), e
+ddcb001c rr (ix + 0), h
+ddcb001d rr (ix + 0), l
+ddcb001e rr (ix + 0)
+ddcb001f rr (ix + 0), a
+ddcb0020 sla (ix + 0), b
+ddcb0021 sla (ix + 0), c
+ddcb0022 sla (ix + 0), d
+ddcb0023 sla (ix + 0), e
+ddcb0024 sla (ix + 0), h
+ddcb0025 sla (ix + 0), l
+ddcb0026 sla (ix + 0)
+ddcb0027 sla (ix + 0), a
+ddcb0028 sra (ix + 0), b
+ddcb0029 sra (ix + 0), c
+ddcb002a sra (ix + 0), d
+ddcb002b sra (ix + 0), e
+ddcb002c sra (ix + 0), h
+ddcb002d sra (ix + 0), l
+ddcb002e sra (ix + 0)
+ddcb002f sra (ix + 0), a
+ddcb0030 sll (ix + 0), b
+ddcb0031 sll (ix + 0), c
+ddcb0032 sll (ix + 0), d
+ddcb0033 sll (ix + 0), e
+ddcb0034 sll (ix + 0), h
+ddcb0035 sll (ix + 0), l
+ddcb0036 sll (ix + 0)
+ddcb0037 sll (ix + 0), a
+ddcb0038 srl (ix + 0), b
+ddcb0039 srl (ix + 0), c
+ddcb003a srl (ix + 0), d
+ddcb003b srl (ix + 0), e
+ddcb003c srl (ix + 0), h
+ddcb003d srl (ix + 0), l
+ddcb003e srl (ix + 0)
+ddcb003f srl (ix + 0), a
+ddcb0040 bit 0, (ix + 0), b
+ddcb0041 bit 0, (ix + 0), c
+ddcb0042 bit 0, (ix + 0), d
+ddcb0043 bit 0, (ix + 0), e
+ddcb0044 bit 0, (ix + 0), h
+ddcb0045 bit 0, (ix + 0), l
+ddcb0046 bit 0, (ix + 0)
+ddcb0047 bit 0, (ix + 0), a
+ddcb0048 bit 1, (ix + 0), b
+ddcb0049 bit 1, (ix + 0), c
+ddcb004a bit 1, (ix + 0), d
+ddcb004b bit 1, (ix + 0), e
+ddcb004c bit 1, (ix + 0), h
+ddcb004d bit 1, (ix + 0), l
+ddcb004e bit 1, (ix + 0)
+ddcb004f bit 1, (ix + 0), a
+ddcb0050 bit 2, (ix + 0), b
+ddcb0051 bit 2, (ix + 0), c
+ddcb0052 bit 2, (ix + 0), d
+ddcb0053 bit 2, (ix + 0), e
+ddcb0054 bit 2, (ix + 0), h
+ddcb0055 bit 2, (ix + 0), l
+ddcb0056 bit 2, (ix + 0)
+ddcb0057 bit 2, (ix + 0), a
+ddcb0058 bit 3, (ix + 0), b
+ddcb0059 bit 3, (ix + 0), c
+ddcb005a bit 3, (ix + 0), d
+ddcb005b bit 3, (ix + 0), e
+ddcb005c bit 3, (ix + 0), h
+ddcb005d bit 3, (ix + 0), l
+ddcb005e bit 3, (ix + 0)
+ddcb005f bit 3, (ix + 0), a
+ddcb0060 bit 4, (ix + 0), b
+ddcb0061 bit 4, (ix + 0), c
+ddcb0062 bit 4, (ix + 0), d
+ddcb0063 bit 4, (ix + 0), e
+ddcb0064 bit 4, (ix + 0), h
+ddcb0065 bit 4, (ix + 0), l
+ddcb0066 bit 4, (ix + 0)
+ddcb0067 bit 4, (ix + 0), a
+ddcb0068 bit 5, (ix + 0), b
+ddcb0069 bit 5, (ix + 0), c
+ddcb006a bit 5, (ix + 0), d
+ddcb006b bit 5, (ix + 0), e
+ddcb006c bit 5, (ix + 0), h
+ddcb006d bit 5, (ix + 0), l
+ddcb006e bit 5, (ix + 0)
+ddcb006f bit 5, (ix + 0), a
+ddcb0070 bit 6, (ix + 0), b
+ddcb0071 bit 6, (ix + 0), c
+ddcb0072 bit 6, (ix + 0), d
+ddcb0073 bit 6, (ix + 0), e
+ddcb0074 bit 6, (ix + 0), h
+ddcb0075 bit 6, (ix + 0), l
+ddcb0076 bit 6, (ix + 0)
+ddcb0077 bit 6, (ix + 0), a
+ddcb0078 bit 7, (ix + 0), b
+ddcb0079 bit 7, (ix + 0), c
+ddcb007a bit 7, (ix + 0), d
+ddcb007b bit 7, (ix + 0), e
+ddcb007c bit 7, (ix + 0), h
+ddcb007d bit 7, (ix + 0), l
+ddcb007e bit 7, (ix + 0)
+ddcb007f bit 7, (ix + 0), a
+ddcb0080 res 0, (ix + 0), b
+ddcb0081 res 0, (ix + 0), c
+ddcb0082 res 0, (ix + 0), d
+ddcb0083 res 0, (ix + 0), e
+ddcb0084 res 0, (ix + 0), h
+ddcb0085 res 0, (ix + 0), l
+ddcb0086 res 0, (ix + 0)
+ddcb0087 res 0, (ix + 0), a
+ddcb0088 res 1, (ix + 0), b
+ddcb0089 res 1, (ix + 0), c
+ddcb008a res 1, (ix + 0), d
+ddcb008b res 1, (ix + 0), e
+ddcb008c res 1, (ix + 0), h
+ddcb008d res 1, (ix + 0), l
+ddcb008e res 1, (ix + 0)
+ddcb008f res 1, (ix + 0), a
+ddcb0090 res 2, (ix + 0), b
+ddcb0091 res 2, (ix + 0), c
+ddcb0092 res 2, (ix + 0), d
+ddcb0093 res 2, (ix + 0), e
+ddcb0094 res 2, (ix + 0), h
+ddcb0095 res 2, (ix + 0), l
+ddcb0096 res 2, (ix + 0)
+ddcb0097 res 2, (ix + 0), a
+ddcb0098 res 3, (ix + 0), b
+ddcb0099 res 3, (ix + 0), c
+ddcb009a res 3, (ix + 0), d
+ddcb009b res 3, (ix + 0), e
+ddcb009c res 3, (ix + 0), h
+ddcb009d res 3, (ix + 0), l
+ddcb009e res 3, (ix + 0)
+ddcb009f res 3, (ix + 0), a
+ddcb00a0 res 4, (ix + 0), b
+ddcb00a1 res 4, (ix + 0), c
+ddcb00a2 res 4, (ix + 0), d
+ddcb00a3 res 4, (ix + 0), e
+ddcb00a4 res 4, (ix + 0), h
+ddcb00a5 res 4, (ix + 0), l
+ddcb00a6 res 4, (ix + 0)
+ddcb00a7 res 4, (ix + 0), a
+ddcb00a8 res 5, (ix + 0), b
+ddcb00a9 res 5, (ix + 0), c
+ddcb00aa res 5, (ix + 0), d
+ddcb00ab res 5, (ix + 0), e
+ddcb00ac res 5, (ix + 0), h
+ddcb00ad res 5, (ix + 0), l
+ddcb00ae res 5, (ix + 0)
+ddcb00af res 5, (ix + 0), a
+ddcb00b0 res 6, (ix + 0), b
+ddcb00b1 res 6, (ix + 0), c
+ddcb00b2 res 6, (ix + 0), d
+ddcb00b3 res 6, (ix + 0), e
+ddcb00b4 res 6, (ix + 0), h
+ddcb00b5 res 6, (ix + 0), l
+ddcb00b6 res 6, (ix + 0)
+ddcb00b7 res 6, (ix + 0), a
+ddcb00b8 res 7, (ix + 0), b
+ddcb00b9 res 7, (ix + 0), c
+ddcb00ba res 7, (ix + 0), d
+ddcb00bb res 7, (ix + 0), e
+ddcb00bc res 7, (ix + 0), h
+ddcb00bd res 7, (ix + 0), l
+ddcb00be res 7, (ix + 0)
+ddcb00bf res 7, (ix + 0), a
+ddcb00c0 set 0, (ix + 0), b
+ddcb00c1 set 0, (ix + 0), c
+ddcb00c2 set 0, (ix + 0), d
+ddcb00c3 set 0, (ix + 0), e
+ddcb00c4 set 0, (ix + 0), h
+ddcb00c5 set 0, (ix + 0), l
+ddcb00c6 set 0, (ix + 0)
+ddcb00c7 set 0, (ix + 0), a
+ddcb00c8 set 1, (ix + 0), b
+ddcb00c9 set 1, (ix + 0), c
+ddcb00ca set 1, (ix + 0), d
+ddcb00cb set 1, (ix + 0), e
+ddcb00cc set 1, (ix + 0), h
+ddcb00cd set 1, (ix + 0), l
+ddcb00ce set 1, (ix + 0)
+ddcb00cf set 1, (ix + 0), a
+ddcb00d0 set 2, (ix + 0), b
+ddcb00d1 set 2, (ix + 0), c
+ddcb00d2 set 2, (ix + 0), d
+ddcb00d3 set 2, (ix + 0), e
+ddcb00d4 set 2, (ix + 0), h
+ddcb00d5 set 2, (ix + 0), l
+ddcb00d6 set 2, (ix + 0)
+ddcb00d7 set 2, (ix + 0), a
+ddcb00d8 set 3, (ix + 0), b
+ddcb00d9 set 3, (ix + 0), c
+ddcb00da set 3, (ix + 0), d
+ddcb00db set 3, (ix + 0), e
+ddcb00dc set 3, (ix + 0), h
+ddcb00dd set 3, (ix + 0), l
+ddcb00de set 3, (ix + 0)
+ddcb00df set 3, (ix + 0), a
+ddcb00e0 set 4, (ix + 0), b
+ddcb00e1 set 4, (ix + 0), c
+ddcb00e2 set 4, (ix + 0), d
+ddcb00e3 set 4, (ix + 0), e
+ddcb00e4 set 4, (ix + 0), h
+ddcb00e5 set 4, (ix + 0), l
+ddcb00e6 set 4, (ix + 0)
+ddcb00e7 set 4, (ix + 0), a
+ddcb00e8 set 5, (ix + 0), b
+ddcb00e9 set 5, (ix + 0), c
+ddcb00ea set 5, (ix + 0), d
+ddcb00eb set 5, (ix + 0), e
+ddcb00ec set 5, (ix + 0), h
+ddcb00ed set 5, (ix + 0), l
+ddcb00ee set 5, (ix + 0)
+ddcb00ef set 5, (ix + 0), a
+ddcb00f0 set 6, (ix + 0), b
+ddcb00f1 set 6, (ix + 0), c
+ddcb00f2 set 6, (ix + 0), d
+ddcb00f3 set 6, (ix + 0), e
+ddcb00f4 set 6, (ix + 0), h
+ddcb00f5 set 6, (ix + 0), l
+ddcb00f6 set 6, (ix + 0)
+ddcb00f7 set 6, (ix + 0), a
+ddcb00f8 set 7, (ix + 0), b
+ddcb00f9 set 7, (ix + 0), c
+ddcb00fa set 7, (ix + 0), d
+ddcb00fb set 7, (ix + 0), e
+ddcb00fc set 7, (ix + 0), h
+ddcb00fd set 7, (ix + 0), l
+ddcb00fe set 7, (ix + 0)
+ddcb00ff set 7, (ix + 0), a
 
 ddcc0000 (db 0xdd), call z, 0x0000
 ddcd0000 (db 0xdd), call 0x0000

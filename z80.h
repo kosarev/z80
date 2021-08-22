@@ -1625,8 +1625,11 @@ public:
         self().on_format("T", k); }
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
-        reg access_r = irp == iregp::hl ? r : reg::at_hl;
-        self().on_format("bit U, R", b, access_r, irp, d); }
+        if(irp == iregp::hl || r == reg::at_hl)
+            self().on_format("bit U, R", b, r, irp, d);
+        else
+            self().on_format("bit U, R, R", b, reg::at_hl, irp, d,
+                             r, iregp::hl, /* d= */ 0); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
     void on_ccf() {
