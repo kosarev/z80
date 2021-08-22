@@ -183,7 +183,7 @@ private:
     test_input &input;
 };
 
-static const unsigned max_instr_size = 4;
+static const unsigned max_instr_size = 5;
 
 template<typename B>
 class disasm_base : public B {
