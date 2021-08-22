@@ -2,9 +2,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2019 Ivan Kosarev.
-#   ivan@kosarev.info
-#
+#   Copyright (c) 2019 Ivan Kosarev <ivan@kosarev.info>
 #   Published under the MIT license.
 
 # ACI n
@@ -995,3 +993,261 @@ e3 xthl
 18 set_l 00 -> e3
 18 set_h 00 -> 00
 18 done
+
+# All instructions.
+00 nop
+010000 lxi b, 0x0000
+02 stax b
+03 inx b
+04 inr b
+05 dcr b
+0600 mvi b, 0x00
+07 rlc
+08 xnop 0x08
+09 dad b
+0a ldax b
+0b dcx b
+0c inr c
+0d dcr c
+0e00 mvi c, 0x00
+0f rrc
+10 xnop 0x10
+110000 lxi d, 0x0000
+12 stax d
+13 inx d
+14 inr d
+15 dcr d
+1600 mvi d, 0x00
+17 ral
+18 xnop 0x18
+19 dad d
+1a ldax d
+1b dcx d
+1c inr e
+1d dcr e
+1e00 mvi e, 0x00
+1f rar
+20 xnop 0x20
+210000 lxi h, 0x0000
+220000 shld 0x0000
+23 inx h
+24 inr h
+25 dcr h
+2600 mvi h, 0x00
+27 daa
+28 xnop 0x28
+29 dad h
+2a0000 lhld 0x0000
+2b dcx h
+2c inr l
+2d dcr l
+2e00 mvi l, 0x00
+2f cma
+30 xnop 0x30
+310000 lxi sp, 0x0000
+320000 sta 0x0000
+33 inx sp
+34 inr m
+35 dcr m
+3600 mvi m, 0x00
+37 stc
+38 xnop 0x38
+39 dad sp
+3a0000 lda 0x0000
+3b dcx sp
+3c inr a
+3d dcr a
+3e00 mvi a, 0x00
+3f cmc
+40 mov b, b
+41 mov b, c
+42 mov b, d
+43 mov b, e
+44 mov b, h
+45 mov b, l
+46 mov b, m
+47 mov b, a
+48 mov c, b
+49 mov c, c
+4a mov c, d
+4b mov c, e
+4c mov c, h
+4d mov c, l
+4e mov c, m
+4f mov c, a
+50 mov d, b
+51 mov d, c
+52 mov d, d
+53 mov d, e
+54 mov d, h
+55 mov d, l
+56 mov d, m
+57 mov d, a
+58 mov e, b
+59 mov e, c
+5a mov e, d
+5b mov e, e
+5c mov e, h
+5d mov e, l
+5e mov e, m
+5f mov e, a
+60 mov h, b
+61 mov h, c
+62 mov h, d
+63 mov h, e
+64 mov h, h
+65 mov h, l
+66 mov h, m
+67 mov h, a
+68 mov l, b
+69 mov l, c
+6a mov l, d
+6b mov l, e
+6c mov l, h
+6d mov l, l
+6e mov l, m
+6f mov l, a
+70 mov m, b
+71 mov m, c
+72 mov m, d
+73 mov m, e
+74 mov m, h
+75 mov m, l
+76 hlt
+77 mov m, a
+78 mov a, b
+79 mov a, c
+7a mov a, d
+7b mov a, e
+7c mov a, h
+7d mov a, l
+7e mov a, m
+7f mov a, a
+80 add b
+81 add c
+82 add d
+83 add e
+84 add h
+85 add l
+86 add m
+87 add a
+88 adc b
+89 adc c
+8a adc d
+8b adc e
+8c adc h
+8d adc l
+8e adc m
+8f adc a
+90 sub b
+91 sub c
+92 sub d
+93 sub e
+94 sub h
+95 sub l
+96 sub m
+97 sub a
+98 sbb b
+99 sbb c
+9a sbb d
+9b sbb e
+9c sbb h
+9d sbb l
+9e sbb m
+9f sbb a
+a0 ana b
+a1 ana c
+a2 ana d
+a3 ana e
+a4 ana h
+a5 ana l
+a6 ana m
+a7 ana a
+a8 xra b
+a9 xra c
+aa xra d
+ab xra e
+ac xra h
+ad xra l
+ae xra m
+af xra a
+b0 ora b
+b1 ora c
+b2 ora d
+b3 ora e
+b4 ora h
+b5 ora l
+b6 ora m
+b7 ora a
+b8 cmp b
+b9 cmp c
+ba cmp d
+bb cmp e
+bc cmp h
+bd cmp l
+be cmp m
+bf cmp a
+c0 rnz
+c1 pop b
+c20000 jnz 0x0000
+c30000 jmp 0x0000
+c40000 cnz 0x0000
+c5 push b
+c600 adi 0x00
+c7 rst 0x0000
+c8 rz
+c9 ret
+ca0000 jz 0x0000
+cb0000 xjmp 0xcb, 0x0000
+cc0000 cz 0x0000
+cd0000 call 0x0000
+ce00 aci 0x00
+cf rst 0x0008
+d0 rnc
+d1 pop d
+d20000 jnc 0x0000
+d300 out 0x00
+d40000 cnc 0x0000
+d5 push d
+d600 sui 0x00
+d7 rst 0x0010
+d8 rc
+d9 xret 0xd9
+da0000 jc 0x0000
+db00 in 0x00
+dc0000 cc 0x0000
+dd0000 xcall 0xdd, 0x0000
+de00 sbi 0x00
+df rst 0x0018
+e0 rpo
+e1 pop h
+e20000 jpo 0x0000
+e3 xthl
+e40000 cpo 0x0000
+e5 push h
+e600 ani 0x00
+e7 rst 0x0020
+e8 rpe
+e9 pchl
+ea0000 jpe 0x0000
+eb xchg
+ec0000 cpe 0x0000
+ed0000 xcall 0xed, 0x0000
+ee00 xri 0x00
+ef rst 0x0028
+f0 rp
+f1 pop psw
+f20000 jp 0x0000
+f3 di
+f40000 cp 0x0000
+f5 push psw
+f600 ori 0x00
+f7 rst 0x0030
+f8 rm
+f9 sphl
+fa0000 jm 0x0000
+fb ei
+fc0000 cm 0x0000
+fd0000 xcall 0xfd, 0x0000
+fe00 cpi 0x00
+ff rst 0x0038
