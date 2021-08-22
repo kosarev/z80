@@ -3175,8 +3175,7 @@ public:
         self().on_set_f(f); }
     void on_adc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 n = self().on_get_regp(rp, irp);
+        fast_u16 n = self().on_get_regp(rp, iregp::hl);
         bool cf = self().on_get_f() & cf_mask;
 
         self().on_4t_exec_cycle();
@@ -3479,9 +3478,8 @@ public:
         fast_u8 f = self().on_get_f();
         self().on_set_wz(inc16(bc));
         fast_u8 n = self().on_input_cycle(bc);
-        iregp irp = self().on_get_iregp_kind();
         if(r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, n);
+            self().on_set_reg(r, iregp::hl, /* d= */ 0, n);
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
                 pf_log(n);
         self().on_set_f(f); }
@@ -3566,11 +3564,9 @@ public:
         nn = inc16(nn);
         self().on_set_wz(nn);
         fast_u8 hi = self().on_read_cycle(nn);
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_regp(rp, irp, make16(hi, lo)); }
+        self().on_set_regp(rp, iregp::hl, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 rpv = self().on_get_regp(rp, irp);
+        fast_u16 rpv = self().on_get_regp(rp, iregp::hl);
         self().on_write_cycle(nn, get_low8(rpv));
         nn = inc16(nn);
         self().on_set_wz(nn);
@@ -3592,9 +3588,8 @@ public:
     void on_out_c_r(reg r) {
         fast_u16 bc = self().on_get_bc();
         self().on_set_wz(inc16(bc));
-        iregp irp = self().on_get_iregp_kind();
         fast_u8 n = (r == reg::at_hl) ?
-            0 : self().on_get_reg(r, irp, /* d= */ 0);
+            0 : self().on_get_reg(r, iregp::hl, /* d= */ 0);
         self().on_output_cycle(bc, n); }
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -3716,8 +3711,7 @@ public:
             self().on_set_reg(r, irp, /* d= */ 0, v); }
     void on_sbc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 n = self().on_get_regp(rp, irp);
+        fast_u16 n = self().on_get_regp(rp, iregp::hl);
         bool cf = self().on_get_f() & cf_mask;
 
         self().on_4t_exec_cycle();

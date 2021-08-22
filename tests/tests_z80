@@ -120,6 +120,51 @@ ed5a adc hl, de
 15 set_f 00 -> 40
 15 done
 
+# 'ADC HL, rp' is never affected by DD/FD prefixes.
+dded6a (db 0xdd), adc hl, hl
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 6a at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 get_l 00
+12 get_h 00
+12 get_l 00
+12 get_h 00
+12 get_f 00
+12 4t_exec
+16 3t_exec
+19 set_wz 0000 -> 0001
+19 set_l 00 -> 00
+19 set_h 00 -> 00
+19 set_f 00 -> 40
+19 set_index_rp ix -> hl
+19 done
+
 # AND r
 a7 and a
  0 m1_fetch
@@ -718,6 +763,49 @@ ed78 in a, (c)
 12 set_f 00 -> ac
 12 done
 
+# 'IN r, (C)' is never affected by DD/FD prefixes.
+dded60 (db 0xdd), in h, (c)
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 60 at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 get_c 00
+12 get_b 00
+12 get_f 00
+12 set_wz 0000 -> 0001
+12 input at 0000
+12   set_addr_bus 0002 -> 0000
+15   iorq_wait 0000
+16 set_h 00 -> ff
+16 set_f 00 -> ac
+16 set_index_rp ix -> hl
+16 done
+
 # JP cc, nn
 d2d90a jp nc, 0x0ad9
  0 m1_fetch
@@ -1208,6 +1296,58 @@ ed4bb45c ld bc, (0x5cb4)
 20 set_b 00 -> 00
 20 done
 
+# ED-prefixed 'LD rp, (nn)' is never affected by DD/FD prefixes.
+dded6bb45c (db 0xdd), ld hl, (0x5cb4)
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 6b at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 imm16_read 5cb4 at 0003
+12   get_pc_on_imm16_read 0003
+12   read b4 at 0003
+12     set_addr_bus 0002 -> 0003
+14     mreq_wait 0003
+15   read 5c at 0004
+15     set_addr_bus 0003 -> 0004
+17     mreq_wait 0004
+18   set_pc_on_imm16_read 0003 -> 0005
+18 read 00 at 5cb4
+18   set_addr_bus 0004 -> 5cb4
+20   mreq_wait 5cb4
+21 set_wz 0000 -> 5cb5
+21 read 00 at 5cb5
+21   set_addr_bus 5cb4 -> 5cb5
+23   mreq_wait 5cb5
+24 set_l 00 -> 00
+24 set_h 00 -> 00
+24 set_index_rp ix -> hl
+24 done
+
 # LD irp, (nn)
 2ab25c ld hl, (0x5cb2)
  0 m1_fetch
@@ -1363,6 +1503,58 @@ ed43b45c ld (0x5cb4), bc
 17   set_addr_bus 5cb4 -> 5cb5
 19   mreq_wait 5cb5
 20 done
+
+# ED-prefixed 'LD (nn), rp' is never affected by DD/FD prefixes.
+dded63b45c (db 0xdd), ld (0x5cb4), hl
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 63 at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 imm16_read 5cb4 at 0003
+12   get_pc_on_imm16_read 0003
+12   read b4 at 0003
+12     set_addr_bus 0002 -> 0003
+14     mreq_wait 0003
+15   read 5c at 0004
+15     set_addr_bus 0003 -> 0004
+17     mreq_wait 0004
+18   set_pc_on_imm16_read 0003 -> 0005
+18 get_l 00
+18 get_h 00
+18 write 00 -> 00 at 5cb4
+18   set_addr_bus 0004 -> 5cb4
+20   mreq_wait 5cb4
+21 set_wz 0000 -> 5cb5
+21 write 00 -> 00 at 5cb5
+21   set_addr_bus 5cb4 -> 5cb5
+23   mreq_wait 5cb5
+24 set_index_rp ix -> hl
+24 done
 
 # LD A, (rp)
 1a ld a, (de)
@@ -1574,6 +1766,47 @@ ed79 out (c), a
  8   set_addr_bus 0001 -> 0000
 11   iorq_wait 0000
 12 done
+
+# 'OUT (C), r' is never affected by DD/FD prefixes.
+dded61 (db 0xdd), out (c), h
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 61 at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 get_c 00
+12 get_b 00
+12 set_wz 0000 -> 0001
+12 get_h 00
+12 output 00 at 0000
+12   set_addr_bus 0002 -> 0000
+15   iorq_wait 0000
+16 set_index_rp ix -> hl
+16 done
 
 # Block input.
 edb2 inir
@@ -2324,6 +2557,51 @@ ed52 sbc hl, de
 15 set_h 00 -> 00
 15 set_f 00 -> 42
 15 done
+
+# 'SBC HL, rp' is never affected by DD/FD prefixes.
+dded62 (db 0xdd), sbc hl, hl
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch ed at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 m1_fetch
+ 8   fetch 62 at 0002
+ 8     get_pc_on_fetch 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+10     get_ir_on_refresh 0002
+10     set_addr_bus 0002 -> 0002
+12     set_pc_on_fetch 0002 -> 0003
+12   set_r 02 -> 03
+12 get_l 00
+12 get_h 00
+12 get_l 00
+12 get_h 00
+12 get_f 00
+12 4t_exec
+16 3t_exec
+19 set_wz 0000 -> 0001
+19 set_l 00 -> 00
+19 set_h 00 -> 00
+19 set_f 00 -> 42
+19 set_index_rp ix -> hl
+19 done
 
 # SCF
 37 scf

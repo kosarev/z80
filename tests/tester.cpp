@@ -190,8 +190,8 @@ class disasm_base : public B {
 public:
     typedef B base;
 
-    disasm_base()
-        : index(0), instr_size(0)
+    disasm_base(test_input &input)
+        : index(0), instr_size(0), input(input)
     {}
 
     const char *get_output() const {
@@ -219,17 +219,23 @@ public:
         output_buff[0] = '\0';
     }
 
-private:
+protected:
     unsigned index;
     least_u8 instr_code[max_instr_size];
     unsigned instr_size;
 
     static const std::size_t max_output_buff_size = 32;
     char output_buff[max_output_buff_size];
+
+    test_input &input;
 };
 
 class i8080_disasm : public disasm_base<z80::i8080_disasm<i8080_disasm>> {
 public:
+    using base = disasm_base<z80::i8080_disasm<i8080_disasm>>;
+
+    i8080_disasm(test_input &input) : base(input) {}
+
     bool depends_on_iregp_kind() const {
         return false;
     }
@@ -239,7 +245,15 @@ class z80_disasm : public disasm_base<z80::z80_disasm<z80_disasm>> {
 public:
     using base = disasm_base<z80::z80_disasm<z80_disasm>>;
 
+    z80_disasm(test_input &input) : base(input) {}
+
     z80::iregp on_get_iregp_kind() {
+        assert(instr_size > 0);
+        if(instr_code[0] == 0xed) {
+            input.error("disassembling of ED-prefixed instruction shall not "
+                        "depend on current selected index register");
+        }
+
         does_depend_on_iregp_kind = true;
         return base::on_get_iregp_kind();
     }
@@ -301,6 +315,9 @@ public:
             cell = 0;
         for(unsigned i = 0; i != size; ++i)
             on_write(z80::add16(pc, i), code[i]);
+
+        instr_addr = pc;
+        instr_size = size;
     }
 
     void match_get_r(const char *name, fast_u8 n) {
@@ -737,11 +754,13 @@ public:
 protected:
     test_input &input;
 
-private:
     ticks_type ticks = 0;
     fast_u16 addr_bus = 0;
 
     least_u8 image[z80::address_space_size];
+
+    fast_u16 instr_addr = 0;
+    unsigned instr_size = 0;
 };
 
 class i8080_machine : public machine_base<z80::i8080_cpu<i8080_machine>> {
@@ -764,6 +783,16 @@ public:
     z80_machine(test_input &input)
         : machine_base<z80::z80_cpu<z80_machine>>(input)
     {}
+
+    z80::iregp on_get_iregp_kind() {
+        assert(instr_size > 0);
+        if(image[0] == 0xed) {
+            input.error("execution of ED-prefixed instruction shall not "
+                        "depend on current selected index register");
+        }
+
+        return base::on_get_iregp_kind();
+    }
 
     fast_u8 on_m1_fetch_cycle() {
         input.read_and_match("m1_fetch",
@@ -898,7 +927,7 @@ void handle_test_entry(test_input &input) {
     skip_whitespace(p);
 
     // Test instruction disassembly.
-    disasm dis;
+    disasm dis(input);
     dis.set_instr_code(instr_code, instr_size);
     dis.on_disassemble();
     const char *instr = dis.get_output();
