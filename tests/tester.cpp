@@ -183,7 +183,28 @@ private:
     test_input &input;
 };
 
-static const unsigned max_instr_size = 5;
+class instr_encoding {
+public:
+    static const unsigned max_size = 5;
+
+    instr_encoding() {}
+
+    unsigned get_size() const { return size; }
+
+    fast_u8 operator[](unsigned i) const {
+        assert(i < size);
+        return bytes[i];
+    }
+
+    void add_byte(fast_u8 b) {
+        assert(size < max_size);
+        bytes[size++] = static_cast<least_u8>(b);
+    }
+
+private:
+    least_u8 bytes[max_size] = {};
+    unsigned size = 0;
+};
 
 template<typename B>
 class disasm_base : public B {
@@ -191,7 +212,7 @@ public:
     typedef B base;
 
     disasm_base(test_input &input)
-        : index(0), instr_size(0), input(input)
+        : index(0), input(input)
     {}
 
     const char *get_output() const {
@@ -203,26 +224,24 @@ public:
     }
 
     fast_u8 on_read_next_byte() {
-        assert(index < instr_size);
-        return instr_code[index++];
+        if(index == encoding.get_size())
+            input.error("instruction encoding is too short");
+        return encoding[index++];
     }
 
     unsigned get_num_consumed_bytes() const {
         return index;
     }
 
-    void set_instr_code(const least_u8 *code, unsigned size) {
-        assert(size <= max_instr_size);
-        std::memcpy(instr_code, code, size);
-        instr_size = size;
+    void set_encoding(const instr_encoding &e) {
+        encoding = e;
         index = 0;
         output_buff[0] = '\0';
     }
 
 protected:
     unsigned index;
-    least_u8 instr_code[max_instr_size];
-    unsigned instr_size;
+    instr_encoding encoding;
 
     static const std::size_t max_output_buff_size = 32;
     char output_buff[max_output_buff_size];
@@ -248,8 +267,7 @@ public:
     z80_disasm(test_input &input) : base(input) {}
 
     z80::iregp on_get_iregp_kind() {
-        assert(instr_size > 0);
-        if(instr_code[0] == 0xed) {
+        if(encoding[0] == 0xed) {
             input.error("disassembling of ED-prefixed instruction shall not "
                         "depend on current selected index register");
         }
@@ -309,15 +327,15 @@ public:
         z80::unused(port, n);
     }
 
-    void set_instr_code(const least_u8 *code, unsigned size) {
+    void set_encoding(const instr_encoding &encoding) {
         fast_u16 pc = base::get_pc();
         for(least_u8 &cell : image)
             cell = 0;
-        for(unsigned i = 0; i != size; ++i)
-            on_write(z80::add16(pc, i), code[i]);
+        for(unsigned i = 0, e = encoding.get_size(); i != e; ++i)
+            on_write(z80::add16(pc, i), encoding[i]);
 
         instr_addr = pc;
-        instr_size = size;
+        instr_size = encoding.get_size();
     }
 
     void match_get_r(const char *name, fast_u8 n) {
@@ -914,26 +932,25 @@ void handle_test_entry(test_input &input) {
     }
 
     // Parse instruction bytes.
-    least_u8 instr_code[max_instr_size];
-    unsigned instr_size = 0;
+    instr_encoding encoding;
     fast_u8 instr_byte;
     while(parse_u8(p, instr_byte)) {
-        if(instr_size == max_instr_size)
-            input.error("intstruction code is too large");
-        instr_code[instr_size++] = static_cast<least_u8>(instr_byte);
+        if(encoding.get_size() == instr_encoding::max_size)
+            input.error("intstruction encoding is too large");
+        encoding.add_byte(instr_byte);
     }
-    if(instr_size == 0)
+    if(encoding.get_size() == 0)
         input.error("expected instruction code");
     skip_whitespace(p);
 
     // Test instruction disassembly.
     disasm dis(input);
-    dis.set_instr_code(instr_code, instr_size);
+    dis.set_encoding(encoding);
     dis.on_disassemble();
     const char *instr = dis.get_output();
 
     const char *prefix = "";
-    unsigned opcode = instr_code[0];
+    unsigned opcode = encoding[0];
     if(kind == cpu_kind::z80 &&
             (opcode == 0xdd || opcode == 0xfd) &&
             !dis.depends_on_iregp_kind())
@@ -945,13 +962,13 @@ void handle_test_entry(test_input &input) {
         input.error("instruction disassembly mismatch: '%s' vs '%s'",
                     buff, p);
 
-    if(dis.get_num_consumed_bytes() != instr_size)
+    if(dis.get_num_consumed_bytes() != encoding.get_size())
         input.error("extra instruction bytes");
 
     // Test handlers.
     p = input.read_line();
     if(p[0] != '\0' && !is_hex_digit(p[0])) {
-        mach.set_instr_code(instr_code, instr_size);
+        mach.set_encoding(encoding);
         mach.on_step();
 
         input.handle_end_of_test_entry();
