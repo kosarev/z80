@@ -133,13 +133,6 @@ public:
         error("mismatch: expected '%s'", buff2);
     }
 
-    void handle_end_of_test_entry() {
-        if(in_skipping_mode)
-            error("this line is expected, but not found");
-
-        reset_skipping_mode();
-    }
-
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
@@ -166,6 +159,25 @@ private:
 
     static const std::size_t max_line_size = 1024;
     char line[max_line_size];
+
+    friend class test_context;  // TODO: Remove.
+};
+
+class test_context {
+public:
+    test_context(test_input &input) : input(input) {}
+
+    test_input &get_input() { return input; }
+
+    void handle_end_of_test_entry() {
+        if(input.in_skipping_mode)
+            error("this line is expected, but not found");
+
+        input.reset_skipping_mode();
+    }
+
+private:
+    test_input &input;
 };
 
 class input_level_guard {
@@ -919,9 +931,11 @@ enum class cpu_kind {
 };
 
 template<cpu_kind kind, typename M, typename D>
-void handle_test_entry(test_input &input) {
+void handle_test_entry(test_context &context) {
     typedef M machine;
     typedef D disasm;
+
+    test_input &input = context.get_input();
 
     // Handle directives.
     machine mach(input);
@@ -971,7 +985,7 @@ void handle_test_entry(test_input &input) {
         mach.set_encoding(encoding);
         mach.on_step();
 
-        input.handle_end_of_test_entry();
+        context.handle_end_of_test_entry();
     }
 }
 
@@ -1002,6 +1016,8 @@ int main(int argc, char *argv[]) {
     }
 
     test_input input(f);
+    test_context context(input);
+
     input.read_line();
     while(input) {
         // Skip empty lines and comments.
@@ -1014,11 +1030,11 @@ int main(int argc, char *argv[]) {
         switch(cpu) {
         case cpu_kind::i8080:
             handle_test_entry<cpu_kind::i8080,
-                              i8080_machine, i8080_disasm>(input);
+                              i8080_machine, i8080_disasm>(context);
             break;
         case cpu_kind::z80:
             handle_test_entry<cpu_kind::z80,
-                              z80_machine, z80_disasm>(input);
+                              z80_machine, z80_disasm>(context);
             break;
         case cpu_kind::unknown:
             unreachable("Unknown CPU.");
