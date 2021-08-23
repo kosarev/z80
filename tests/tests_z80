@@ -1297,7 +1297,7 @@ ed4bb45c ld bc, (0x5cb4)
 20 done
 
 # ED-prefixed 'LD rp, (nn)' is never affected by DD/FD prefixes.
-dded6bb45c (db 0xdd), ld hl, (0x5cb4)
+dded6bb45c (db 0xdd), xld 0xed6b, hl, (0x5cb4)
  0 m1_fetch
  0   fetch dd at 0000
  0     get_pc_on_fetch 0000
@@ -1505,7 +1505,7 @@ ed43b45c ld (0x5cb4), bc
 20 done
 
 # ED-prefixed 'LD (nn), rp' is never affected by DD/FD prefixes.
-dded63b45c (db 0xdd), ld (0x5cb4), hl
+dded63b45c (db 0xdd), xld 0xed63, (0x5cb4), hl
  0 m1_fetch
  0   fetch dd at 0000
  0     get_pc_on_fetch 0000
@@ -3849,7 +3849,7 @@ dded5f (db 0xdd), ld a, r
 dded60 (db 0xdd), in h, (c)
 dded61 (db 0xdd), out (c), h
 dded62 (db 0xdd), sbc hl, hl
-dded630000 (db 0xdd), ld (0x0000), hl
+dded630000 (db 0xdd), xld 0xed63, (0x0000), hl
 dded64 (db 0xdd), xneg 0xed64
 dded65 (db 0xdd), xretn 0xed65
 dded66 (db 0xdd), xim 0xed66, 0
@@ -3857,7 +3857,7 @@ dded67 (db 0xdd), rrd
 dded68 (db 0xdd), in l, (c)
 dded69 (db 0xdd), out (c), l
 dded6a (db 0xdd), adc hl, hl
-dded6b0000 (db 0xdd), ld hl, (0x0000)
+dded6b0000 (db 0xdd), xld 0xed6b, hl, (0x0000)
 dded6c (db 0xdd), xneg 0xed6c
 dded6d (db 0xdd), xretn 0xed6d
 dded6e (db 0xdd), xim 0xed6e, 0
@@ -4143,7 +4143,7 @@ ed5f ld a, r
 ed60 in h, (c)
 ed61 out (c), h
 ed62 sbc hl, hl
-ed630000 ld (0x0000), hl
+ed630000 xld 0xed63, (0x0000), hl
 ed64 xneg 0xed64
 ed65 xretn 0xed65
 ed66 xim 0xed66, 0
@@ -4151,7 +4151,7 @@ ed67 rrd
 ed68 in l, (c)
 ed69 out (c), l
 ed6a adc hl, hl
-ed6b0000 ld hl, (0x0000)
+ed6b0000 xld 0xed6b, hl, (0x0000)
 ed6c xneg 0xed6c
 ed6d xretn 0xed6d
 ed6e xim 0xed6e, 0
@@ -4913,7 +4913,7 @@ fded5f (db 0xfd), ld a, r
 fded60 (db 0xfd), in h, (c)
 fded61 (db 0xfd), out (c), h
 fded62 (db 0xfd), sbc hl, hl
-fded630000 (db 0xfd), ld (0x0000), hl
+fded630000 (db 0xfd), xld 0xed63, (0x0000), hl
 fded64 (db 0xfd), xneg 0xed64
 fded65 (db 0xfd), xretn 0xed65
 fded66 (db 0xfd), xim 0xed66, 0
@@ -4921,7 +4921,7 @@ fded67 (db 0xfd), rrd
 fded68 (db 0xfd), in l, (c)
 fded69 (db 0xfd), out (c), l
 fded6a (db 0xfd), adc hl, hl
-fded6b0000 (db 0xfd), ld hl, (0x0000)
+fded6b0000 (db 0xfd), xld 0xed6b, hl, (0x0000)
 fded6c (db 0xfd), xneg 0xed6c
 fded6d (db 0xfd), xretn 0xed6d
 fded6e (db 0xfd), xim 0xed6e, 0

@@ -10,6 +10,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <string>
 
 #include "z80.h"
 
@@ -114,11 +116,47 @@ private:
     char line[max_line_size];
 };
 
+class instr_encoding {
+public:
+    static const unsigned max_size = 5;
+
+    instr_encoding() {}
+
+    unsigned get_size() const { return size; }
+
+    fast_u8 operator[](unsigned i) const {
+        assert(i < size);
+        return bytes[i];
+    }
+
+    void add_byte(fast_u8 b) {
+        assert(size < max_size);
+        bytes[size++] = static_cast<least_u8>(b);
+    }
+
+    bool operator == (const instr_encoding &other) const {
+        return size == other.size &&
+               std::memcmp(bytes, other.bytes, size) == 0;
+    }
+
+    bool operator != (const instr_encoding &other) const {
+        return !(*this == other);
+    }
+
+private:
+    least_u8 bytes[max_size] = {};
+    unsigned size = 0;
+};
+
 class test_context {
+    using encodings_type = std::map<std::string, instr_encoding>;
+
 public:
     test_context(test_input &input) : input(input) {}
 
     test_input &get_input() { return input; }
+
+    encodings_type &get_encodings() { return encodings; }
 
     void handle_end_of_test_entry() {
         if(in_skipping_mode)
@@ -164,6 +202,8 @@ private:
     bool in_skipping_mode = false;
     unsigned level = 0;
 
+    encodings_type encodings;
+
     test_input &input;
 
     friend class level_guard;
@@ -183,29 +223,6 @@ public:
 
 private:
     test_context &context;
-};
-
-class instr_encoding {
-public:
-    static const unsigned max_size = 5;
-
-    instr_encoding() {}
-
-    unsigned get_size() const { return size; }
-
-    fast_u8 operator[](unsigned i) const {
-        assert(i < size);
-        return bytes[i];
-    }
-
-    void add_byte(fast_u8 b) {
-        assert(size < max_size);
-        bytes[size++] = static_cast<least_u8>(b);
-    }
-
-private:
-    least_u8 bytes[max_size] = {};
-    unsigned size = 0;
 };
 
 template<typename B>
@@ -969,6 +986,13 @@ void handle_test_entry(test_context &context) {
 
     if(dis.get_num_consumed_bytes() != encoding.get_size())
         input.error("extra instruction bytes");
+
+    auto &encodings = context.get_encodings();
+    auto i = encodings.insert({buff, encoding});
+    bool inserted = i.second;
+    const instr_encoding &prev_encoding = i.first->second;
+    if(!inserted && prev_encoding != encoding)
+        input.error("multiple encodings for same instruction");
 
     // Test handlers.
     p = input.read_line();

@@ -1708,9 +1708,21 @@ public:
         iregp irp = self().on_get_iregp_kind();
         self().on_format("ld (W), P", nn, regp::hl, irp); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
-        self().on_format("ld P, (W)", rp, iregp::hl, nn); }
+        // The HL case repeats the unprefixed LD HL, (nn)
+        // instruction, so we have to represent it as an
+        // x-instruction.
+        if(rp == regp::hl)
+            self().on_format("xld W, P, (W)", 0xed6b, rp, iregp::hl, nn);
+        else
+            self().on_format("ld P, (W)", rp, iregp::hl, nn); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
-        self().on_format("ld (W), P", nn, rp, iregp::hl); }
+        // The HL case repeats the unprefixed LD (nn), HL
+        // instruction, so we have to represent it as an
+        // x-instruction.
+        if(rp == regp::hl)
+            self().on_format("xld W, (W), P", 0xed63, nn, rp, iregp::hl);
+        else
+            self().on_format("ld (W), P", nn, rp, iregp::hl); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
