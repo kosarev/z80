@@ -52,7 +52,7 @@ static const std::size_t max_line_size = 1024;
 class test_input {
 public:
     test_input(FILE *stream)
-        : stream(stream), read(false), eof(false), line_no(0), level(0)
+        : stream(stream), read(false), eof(false), line_no(0)
     {}
 
     const char *read_line() {
@@ -89,15 +89,6 @@ public:
         return line;
     }
 
-    void step_in() {
-        ++level;
-    }
-
-    void step_out() {
-        assert(level > 0);
-        --level;
-    }
-
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
@@ -119,7 +110,6 @@ private:
     bool read;
     bool eof;
     unsigned long line_no;
-    unsigned level;
 
     char line[max_line_size];
 
@@ -158,7 +148,7 @@ public:
         char buff2[max_line_size];
         std::snprintf(buff2, max_line_size, "%2u %*s%.100s",
                       static_cast<unsigned>(ticks),
-                      static_cast<int>(input.level * 2), "", buff);
+                      static_cast<int>(level * 2), "", buff);
 
         if(std::strcmp(buff2, input.line) == 0) {
             in_skipping_mode = false;
@@ -174,23 +164,27 @@ public:
 
 private:
     bool in_skipping_mode = false;
+    unsigned level = 0;
 
     test_input &input;
+
+    friend class level_guard;
 };
 
-class input_level_guard {
+class level_guard {
 public:
-    input_level_guard(test_input &input)
-            : input(input) {
-        input.step_in();
+    level_guard(test_context &context)
+            : context(context) {
+        ++context.level;
     }
 
-    ~input_level_guard() {
-        input.step_out();
+    ~level_guard() {
+        assert(context.level > 0);
+        --context.level;
     }
 
 private:
-    test_input &input;
+    test_context &context;
 };
 
 class instr_encoding {
@@ -555,7 +549,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(on_read(addr)),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_fetch_cycle();
     }
 
@@ -582,7 +576,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(on_read(addr)),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_read_cycle(addr);
     }
 
@@ -604,7 +598,7 @@ public:
                       static_cast<unsigned>(on_read(addr)),
                       static_cast<unsigned>(n),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::on_write_cycle(addr, n);
     }
 
@@ -636,7 +630,7 @@ public:
         context.match("input at %02x",
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(n));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_input_cycle(n);
     }
 
@@ -644,7 +638,7 @@ public:
         context.match("input at %04x",
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_input_cycle(addr);
     }
 
@@ -653,7 +647,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(b),
                       static_cast<unsigned>(n));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::on_output_cycle(n, b);
     }
 
@@ -662,7 +656,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(b),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::on_output_cycle(addr, b);
     }
 
@@ -672,7 +666,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(on_read(addr)),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_imm8_read();
     }
 
@@ -684,7 +678,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(v),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_imm16_read();
     }
 
@@ -694,7 +688,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(on_read(addr)),
                       static_cast<unsigned>(addr));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_disp_read();
     }
 
@@ -703,7 +697,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff()),
                       static_cast<unsigned>(iff));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff_on_di(iff);
     }
 
@@ -712,7 +706,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff1()),
                       static_cast<unsigned>(f));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff1_on_di(f);
     }
 
@@ -721,7 +715,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff2()),
                       static_cast<unsigned>(f));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff2_on_di(f);
     }
 
@@ -730,7 +724,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff()),
                       static_cast<unsigned>(iff));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff_on_ei(iff);
     }
 
@@ -739,7 +733,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff1()),
                       static_cast<unsigned>(f));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff1_on_ei(f);
     }
 
@@ -748,7 +742,7 @@ public:
                       static_cast<unsigned>(get_ticks()),
                       static_cast<unsigned>(base::get_iff2()),
                       static_cast<unsigned>(f));
-        input_level_guard guard(input);
+        level_guard guard(context);
         base::set_iff2_on_ei(f);
     }
 
@@ -826,7 +820,7 @@ public:
     fast_u8 on_m1_fetch_cycle() {
         context.match("m1_fetch",
                       static_cast<unsigned>(get_ticks()));
-        input_level_guard guard(input);
+        level_guard guard(context);
         return base::on_m1_fetch_cycle();
     }
 
