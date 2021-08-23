@@ -98,10 +98,6 @@ public:
         --level;
     }
 
-    void reset_skipping_mode() {
-        in_skipping_mode = false;
-    }
-
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
@@ -124,7 +120,6 @@ private:
     bool eof;
     unsigned long line_no;
     unsigned level;
-    bool in_skipping_mode = false;
 
     char line[max_line_size];
 
@@ -138,18 +133,18 @@ public:
     test_input &get_input() { return input; }
 
     void handle_end_of_test_entry() {
-        if(input.in_skipping_mode)
+        if(in_skipping_mode)
             error("this line is expected, but not found");
 
-        input.reset_skipping_mode();
+        in_skipping_mode = false;
     }
 
     LIKE_PRINTF(2, 4)
     void match(const char *format, unsigned ticks, ...) {
         // Handle the skip directive.
-        if(!input.in_skipping_mode) {
-            input.in_skipping_mode = (std::strcmp(input.line, "...") == 0);
-            if(input.in_skipping_mode)
+        if(!in_skipping_mode) {
+            in_skipping_mode = (std::strcmp(input.line, "...") == 0);
+            if(in_skipping_mode)
                 input.read_line();
         }
 
@@ -166,18 +161,20 @@ public:
                       static_cast<int>(input.level * 2), "", buff);
 
         if(std::strcmp(buff2, input.line) == 0) {
-            input.reset_skipping_mode();
+            in_skipping_mode = false;
             input.read_line();
             return;
         }
 
-        if(input.in_skipping_mode)
+        if(in_skipping_mode)
             return;
 
         error("mismatch: expected '%s'", buff2);
     }
 
 private:
+    bool in_skipping_mode = false;
+
     test_input &input;
 };
 
