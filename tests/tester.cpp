@@ -47,6 +47,8 @@ using z80::least_u8;
 using z80::reg;
 using z80::unreachable;
 
+static const std::size_t max_line_size = 1024;
+
 class test_input {
 public:
     test_input(FILE *stream)
@@ -100,39 +102,6 @@ public:
         in_skipping_mode = false;
     }
 
-    LIKE_PRINTF(2, 4)
-    void read_and_match(const char *format, unsigned ticks, ...) {
-        // Handle the skip directive.
-        if(!in_skipping_mode) {
-            in_skipping_mode = (std::strcmp(line, "...") == 0);
-            if(in_skipping_mode)
-                read_line();
-        }
-
-        char buff[max_line_size];
-        va_list args;
-        va_start(args, ticks);
-        std::vsnprintf(buff, max_line_size, format, args);
-        buff[max_line_size - 1] = '\0';
-        va_end(args);
-
-        char buff2[max_line_size];
-        std::snprintf(buff2, max_line_size, "%2u %*s%.100s",
-                      static_cast<unsigned>(ticks),
-                      static_cast<int>(level * 2), "", buff);
-
-        if(std::strcmp(buff2, line) == 0) {
-            reset_skipping_mode();
-            read_line();
-            return;
-        }
-
-        if(in_skipping_mode)
-            return;
-
-        error("mismatch: expected '%s'", buff2);
-    }
-
     void quote_line() const {
         assert(read);
         std::fprintf(stderr, "%s: line %lu: '%s'\n", program_name,
@@ -157,7 +126,6 @@ private:
     unsigned level;
     bool in_skipping_mode = false;
 
-    static const std::size_t max_line_size = 1024;
     char line[max_line_size];
 
     friend class test_context;  // TODO: Remove.
@@ -174,6 +142,39 @@ public:
             error("this line is expected, but not found");
 
         input.reset_skipping_mode();
+    }
+
+    LIKE_PRINTF(2, 4)
+    void match(const char *format, unsigned ticks, ...) {
+        // Handle the skip directive.
+        if(!input.in_skipping_mode) {
+            input.in_skipping_mode = (std::strcmp(input.line, "...") == 0);
+            if(input.in_skipping_mode)
+                input.read_line();
+        }
+
+        char buff[max_line_size];
+        va_list args;
+        va_start(args, ticks);
+        std::vsnprintf(buff, max_line_size, format, args);
+        buff[max_line_size - 1] = '\0';
+        va_end(args);
+
+        char buff2[max_line_size];
+        std::snprintf(buff2, max_line_size, "%2u %*s%.100s",
+                      static_cast<unsigned>(ticks),
+                      static_cast<int>(input.level * 2), "", buff);
+
+        if(std::strcmp(buff2, input.line) == 0) {
+            input.reset_skipping_mode();
+            input.read_line();
+            return;
+        }
+
+        if(input.in_skipping_mode)
+            return;
+
+        error("mismatch: expected '%s'", buff2);
     }
 
 private:
@@ -312,8 +313,8 @@ public:
     typedef z80::z80_disasm<derived> disasm;
     typedef fast_u32 ticks_type;
 
-    machine_base(test_input &input)
-        : input(input)
+    machine_base(test_context &context)
+        : context(context), input(context.get_input())
     {}
 
     void on_tick(unsigned t) { ticks += t; }
@@ -351,29 +352,29 @@ public:
     }
 
     void match_get_r(const char *name, fast_u8 n) {
-        input.read_and_match("get_%s %02x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(n));
+        context.match("get_%s %02x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(n));
     }
 
     void match_set_r(const char *name, fast_u8 old_n, fast_u8 new_n) {
-        input.read_and_match("set_%s %02x -> %02x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(old_n),
-                             static_cast<unsigned>(new_n));
+        context.match("set_%s %02x -> %02x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(old_n),
+                      static_cast<unsigned>(new_n));
     }
 
     void match_get_rp(const char *name, fast_u16 nn) {
-        input.read_and_match("get_%s %04x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(nn));
+        context.match("get_%s %04x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(nn));
     }
 
     void match_set_rp(const char *name, fast_u16 old_nn, fast_u16 new_nn) {
-        input.read_and_match("set_%s %04x -> %04x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(old_nn),
-                             static_cast<unsigned>(new_nn));
+        context.match("set_%s %04x -> %04x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(old_nn),
+                      static_cast<unsigned>(new_nn));
     }
 
     fast_u8 on_get_b() { match_get_r("b", base::get_b());
@@ -456,14 +457,14 @@ public:
                                   return base::on_set_sp(sp); }
 
     void match_get_pc(const char *name) const {
-        input.read_and_match("get_pc_on_%s %04x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(base::get_pc())); }
+        context.match("get_pc_on_%s %04x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(base::get_pc())); }
     void match_set_pc(const char *name, fast_u16 pc) {
-        input.read_and_match("set_pc_on_%s %04x -> %04x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(base::get_pc()),
-                             static_cast<unsigned>(pc)); }
+        context.match("set_pc_on_%s %04x -> %04x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(base::get_pc()),
+                      static_cast<unsigned>(pc)); }
 
     fast_u16 get_pc_on_fetch() {
         match_get_pc("fetch");
@@ -523,157 +524,157 @@ public:
         base::set_pc_on_halt(pc); }
 
     void match_get_ir(const char *name) const {
-        input.read_and_match("get_ir_on_%s %04x",
-                             static_cast<unsigned>(get_ticks()), name,
-                             static_cast<unsigned>(base::get_ir())); }
+        context.match("get_ir_on_%s %04x",
+                      static_cast<unsigned>(get_ticks()), name,
+                      static_cast<unsigned>(base::get_ir())); }
 
     fast_u16 get_ir_on_refresh() {
         match_get_ir("refresh");
         return base::get_ir_on_refresh(); }
 
     void on_set_addr_bus(fast_u16 addr) {
-        input.read_and_match("set_addr_bus %04x -> %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr_bus),
-                             static_cast<unsigned>(addr));
+        context.match("set_addr_bus %04x -> %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(addr_bus),
+                      static_cast<unsigned>(addr));
         addr_bus = addr;
     }
 
     void on_mreq_wait(fast_u16 addr) {
-        input.read_and_match("mreq_wait %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr));
+        context.match("mreq_wait %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(addr));
     }
 
     void on_iorq_wait(fast_u16 port) {
-        input.read_and_match("iorq_wait %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(port));
+        context.match("iorq_wait %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(port));
     }
 
     fast_u8 on_fetch_cycle() {
         fast_u16 addr = base::get_pc();
-        input.read_and_match("fetch %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
+        context.match("fetch %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(on_read(addr)),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_fetch_cycle();
     }
 
     void on_fetch_cycle_extra_1t() {
-        input.read_and_match("fetch_cycle_extra_1t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("fetch_cycle_extra_1t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_fetch_cycle_extra_1t();
     }
 
     void on_fetch_cycle_extra_2t() {
-        input.read_and_match("fetch_cycle_extra_2t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("fetch_cycle_extra_2t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_fetch_cycle_extra_2t();
     }
 
     void on_fetch_cycle_extra_3t() {
-        input.read_and_match("fetch_cycle_extra_3t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("fetch_cycle_extra_3t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_fetch_cycle_extra_3t();
     }
 
     fast_u8 on_read_cycle(fast_u16 addr) {
-        input.read_and_match("read %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
+        context.match("read %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(on_read(addr)),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_read_cycle(addr);
     }
 
     void on_read_cycle_extra_1t() {
-        input.read_and_match("read_cycle_extra_1t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("read_cycle_extra_1t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_read_cycle_extra_1t();
     }
 
     void on_read_cycle_extra_2t() {
-        input.read_and_match("read_cycle_extra_2t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("read_cycle_extra_2t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_read_cycle_extra_2t();
     }
 
     void on_write_cycle(fast_u16 addr, fast_u8 n) {
-        input.read_and_match("write %02x -> %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(n),
-                             static_cast<unsigned>(addr));
+        context.match("write %02x -> %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(on_read(addr)),
+                      static_cast<unsigned>(n),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         base::on_write_cycle(addr, n);
     }
 
     void on_write_cycle_extra_2t() {
-        input.read_and_match("write_cycle_extra_2t",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("write_cycle_extra_2t",
+                      static_cast<unsigned>(get_ticks()));
         base::on_write_cycle_extra_2t();
     }
 
     void on_3t_exec_cycle() {
-        input.read_and_match("3t_exec",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("3t_exec",
+                      static_cast<unsigned>(get_ticks()));
         base::on_3t_exec_cycle();
     }
 
     void on_4t_exec_cycle() {
-        input.read_and_match("4t_exec",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("4t_exec",
+                      static_cast<unsigned>(get_ticks()));
         base::on_4t_exec_cycle();
     }
 
     void on_5t_exec_cycle() {
-        input.read_and_match("5t_exec",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("5t_exec",
+                      static_cast<unsigned>(get_ticks()));
         base::on_5t_exec_cycle();
     }
 
     fast_u8 on_input_cycle(fast_u8 n) {
-        input.read_and_match("input at %02x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(n));
+        context.match("input at %02x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(n));
         input_level_guard guard(input);
         return base::on_input_cycle(n);
     }
 
     fast_u8 on_input_cycle(fast_u16 addr) {
-        input.read_and_match("input at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(addr));
+        context.match("input at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_input_cycle(addr);
     }
 
     void on_output_cycle(fast_u8 n, fast_u8 b) {
-        input.read_and_match("output %02x at %02x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(b),
-                             static_cast<unsigned>(n));
+        context.match("output %02x at %02x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(b),
+                      static_cast<unsigned>(n));
         input_level_guard guard(input);
         base::on_output_cycle(n, b);
     }
 
     void on_output_cycle(fast_u16 addr, fast_u8 b) {
-        input.read_and_match("output %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(b),
-                             static_cast<unsigned>(addr));
+        context.match("output %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(b),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         base::on_output_cycle(addr, b);
     }
 
     fast_u8 on_imm8_read() {
         fast_u16 addr = base::get_pc();
-        input.read_and_match("imm8_read %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
+        context.match("imm8_read %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(on_read(addr)),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_imm8_read();
     }
@@ -682,97 +683,97 @@ public:
         fast_u16 addr = base::get_pc();
         fast_u16 v = z80::make16(on_read(z80::inc16(addr)),
                                  on_read(addr));
-        input.read_and_match("imm16_read %04x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(v),
-                             static_cast<unsigned>(addr));
+        context.match("imm16_read %04x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(v),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_imm16_read();
     }
 
     fast_u8 on_disp_read() {
         fast_u16 addr = base::get_pc();
-        input.read_and_match("disp_read %02x at %04x",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(on_read(addr)),
-                             static_cast<unsigned>(addr));
+        context.match("disp_read %02x at %04x",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(on_read(addr)),
+                      static_cast<unsigned>(addr));
         input_level_guard guard(input);
         return base::on_disp_read();
     }
 
     void set_iff_on_di(bool iff) {
-        input.read_and_match("set_iff_on_di %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff()),
-                             static_cast<unsigned>(iff));
+        context.match("set_iff_on_di %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff()),
+                      static_cast<unsigned>(iff));
         input_level_guard guard(input);
         base::set_iff_on_di(iff);
     }
 
     void set_iff1_on_di(bool f) {
-        input.read_and_match("set_iff1_on_di %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff1()),
-                             static_cast<unsigned>(f));
+        context.match("set_iff1_on_di %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff1()),
+                      static_cast<unsigned>(f));
         input_level_guard guard(input);
         base::set_iff1_on_di(f);
     }
 
     void set_iff2_on_di(bool f) {
-        input.read_and_match("set_iff2_on_di %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff2()),
-                             static_cast<unsigned>(f));
+        context.match("set_iff2_on_di %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff2()),
+                      static_cast<unsigned>(f));
         input_level_guard guard(input);
         base::set_iff2_on_di(f);
     }
 
     void set_iff_on_ei(bool iff) {
-        input.read_and_match("set_iff_on_ei %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff()),
-                             static_cast<unsigned>(iff));
+        context.match("set_iff_on_ei %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff()),
+                      static_cast<unsigned>(iff));
         input_level_guard guard(input);
         base::set_iff_on_ei(iff);
     }
 
     void set_iff1_on_ei(bool f) {
-        input.read_and_match("set_iff1_on_ei %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff1()),
-                             static_cast<unsigned>(f));
+        context.match("set_iff1_on_ei %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff1()),
+                      static_cast<unsigned>(f));
         input_level_guard guard(input);
         base::set_iff1_on_ei(f);
     }
 
     void set_iff2_on_ei(bool f) {
-        input.read_and_match("set_iff2_on_ei %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_iff2()),
-                             static_cast<unsigned>(f));
+        context.match("set_iff2_on_ei %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff2()),
+                      static_cast<unsigned>(f));
         input_level_guard guard(input);
         base::set_iff2_on_ei(f);
     }
 
     void on_set_int_mode(unsigned mode) {
-        input.read_and_match("set_int_mode %u -> %u",
-                             static_cast<unsigned>(get_ticks()),
-                             static_cast<unsigned>(base::get_int_mode()),
-                             static_cast<unsigned>(mode));
+        context.match("set_int_mode %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_int_mode()),
+                      static_cast<unsigned>(mode));
         base::on_set_int_mode(mode);
     }
 
     void on_set_is_int_disabled(bool f) {
         if(f) {
-            input.read_and_match("disable_int",
-                                 static_cast<unsigned>(get_ticks()));
+            context.match("disable_int",
+                          static_cast<unsigned>(get_ticks()));
         }
         base::on_set_is_int_disabled(f);
     }
 
     void on_set_iregp_kind(z80::iregp irp) {
         if(irp != base::get_iregp_kind()) {
-            input.read_and_match(
+            context.match(
                 "set_index_rp %s -> %s",
                 static_cast<unsigned>(get_ticks()),
                 disasm::get_reg_name(base::get_iregp_kind()),
@@ -782,7 +783,8 @@ public:
     }
 
 protected:
-    test_input &input;
+    test_context &context;
+    test_input &input;  // TODO: Eliminate.
 
     ticks_type ticks = 0;
     fast_u16 addr_bus = 0;
@@ -795,8 +797,8 @@ protected:
 
 class i8080_machine : public machine_base<z80::i8080_cpu<i8080_machine>> {
 public:
-    i8080_machine(test_input &input)
-        : machine_base<z80::i8080_cpu<i8080_machine>>(input)
+    i8080_machine(test_context &context)
+        : machine_base<z80::i8080_cpu<i8080_machine>>(context)
     {}
 
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", 0, wz);
@@ -804,14 +806,14 @@ public:
 
     void on_step() {
         base::on_step();
-        input.read_and_match("done", static_cast<unsigned>(get_ticks()));
+        context.match("done", static_cast<unsigned>(get_ticks()));
     }
 };
 
 class z80_machine : public machine_base<z80::z80_cpu<z80_machine>> {
 public:
-    z80_machine(test_input &input)
-        : machine_base<z80::z80_cpu<z80_machine>>(input)
+    z80_machine(test_context &context)
+        : machine_base<z80::z80_cpu<z80_machine>>(context)
     {}
 
     z80::iregp on_get_iregp_kind() {
@@ -825,8 +827,8 @@ public:
     }
 
     fast_u8 on_m1_fetch_cycle() {
-        input.read_and_match("m1_fetch",
-                             static_cast<unsigned>(get_ticks()));
+        context.match("m1_fetch",
+                      static_cast<unsigned>(get_ticks()));
         input_level_guard guard(input);
         return base::on_m1_fetch_cycle();
     }
@@ -841,7 +843,7 @@ public:
         if(base::get_iregp_kind() != z80::iregp::hl)
             base::on_step();
 
-        input.read_and_match("done", static_cast<unsigned>(get_ticks()));
+        context.match("done", static_cast<unsigned>(get_ticks()));
     }
 };
 
@@ -938,7 +940,7 @@ void handle_test_entry(test_context &context) {
     test_input &input = context.get_input();
 
     // Handle directives.
-    machine mach(input);
+    machine mach(context);
     const char *p = input.get_line();
     while(*p == '.') {
         handle_directive(input, mach);
