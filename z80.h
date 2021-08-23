@@ -1628,8 +1628,8 @@ public:
         if(irp == iregp::hl || r == reg::at_hl)
             self().on_format("bit U, R", b, r, irp, d);
         else
-            self().on_format("bit U, R, R", b, reg::at_hl, irp, d,
-                             r, iregp::hl, /* d= */ 0); }
+            self().on_format("bit R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
     void on_ccf() {
@@ -1754,8 +1754,8 @@ public:
         if(irp == iregp::hl || r == reg::at_hl)
             self().on_format("res U, R", b, r, irp, d);
         else
-            self().on_format("res U, R, R", b, reg::at_hl, irp, d,
-                               r, iregp::hl, /* d= */ 0); }
+            self().on_format("res R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
     void on_ret_cc(condition cc) {
         self().on_format("ret C", cc); }
     void on_reti() {
@@ -1788,8 +1788,8 @@ public:
         if(irp == iregp::hl || r == reg::at_hl)
             self().on_format("set U, R", b, r, irp, d);
         else
-            self().on_format("set U, R, R", b, reg::at_hl, irp, d,
-                               r, iregp::hl, /* d= */ 0); }
+            self().on_format("set R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
     void on_sbc_hl_rp(regp rp) {
         self().on_format("sbc hl, P", rp, iregp::hl); }
     void on_xim(fast_u8 op, fast_u8 mode) {
