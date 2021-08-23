@@ -112,8 +112,6 @@ private:
     unsigned long line_no;
 
     char line[max_line_size];
-
-    friend class test_context;  // TODO: Remove.
 };
 
 class test_context {
@@ -133,7 +131,7 @@ public:
     void match(const char *format, unsigned ticks, ...) {
         // Handle the skip directive.
         if(!in_skipping_mode) {
-            in_skipping_mode = (std::strcmp(input.line, "...") == 0);
+            in_skipping_mode = (std::strcmp(input.get_line(), "...") == 0);
             if(in_skipping_mode)
                 input.read_line();
         }
@@ -150,7 +148,7 @@ public:
                       static_cast<unsigned>(ticks),
                       static_cast<int>(level * 2), "", buff);
 
-        if(std::strcmp(buff2, input.line) == 0) {
+        if(std::strcmp(buff2, input.get_line()) == 0) {
             in_skipping_mode = false;
             input.read_line();
             return;
