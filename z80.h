@@ -3379,7 +3379,7 @@ public:
         fast_u8 m = v & (1u << b);
         // TODO: Is it always (m & sf_mask)? Regardless of whether m is zero or not?
         f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
-        if(!is_hl_iregp() || access_r == reg::at_hl)
+        if(irp != iregp::hl || access_r == reg::at_hl)
             v = get_high8(self().on_get_wz());
         f |= v & (xf_mask | yf_mask);
         self().on_set_f(f); }
@@ -3869,10 +3869,6 @@ public:
 
 protected:
     using base::self;
-
-    bool is_hl_iregp() {
-        return self().on_get_iregp_kind() == iregp::hl;
-    }
 };
 
 template<typename D>
