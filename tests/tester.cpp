@@ -197,7 +197,7 @@ public:
         if(in_skipping_mode)
             return;
 
-        error("mismatch: expected '%s'", buff2);
+        input.error("mismatch: expected '%s'", buff2);
     }
 
 private:
@@ -337,8 +337,10 @@ public:
     typedef fast_u32 ticks_type;
 
     machine_base(test_context &context)
-        : context(context), input(context.get_input())
-    {}
+            : context(context), input(context.get_input()) {
+        this->set_af(0x0000);
+        this->set_sp(0x0000);
+    }
 
     void on_tick(unsigned t) { ticks += t; }
 

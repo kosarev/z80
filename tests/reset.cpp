@@ -23,8 +23,8 @@ static void test_reset_state(const my_emulator &e) {
     CHECK(e.get_int_mode() == 0);
     CHECK(e.get_iff1() == 0);
     CHECK(e.get_iff2() == 0);
-    // TODO: CHECK(e.get_sp() == 0xffff);
-    // TODO: CHECK(e.get_af() == 0xffff);
+    CHECK(e.get_sp() == 0xffff);
+    CHECK(e.get_af() == 0xffff);
 }
 
 static void test_initial_state() {

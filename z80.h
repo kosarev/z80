@@ -2002,6 +2002,7 @@ protected:
 class reg16_value {
 public:
     reg16_value() {}
+    reg16_value(fast_u16 v) : v(v) {}
     reg16_value(const reg16_value &other) = delete;
 
     fast_u16 get() const { return v; }
@@ -2020,6 +2021,7 @@ protected:
 class regp_value : public reg16_value {
 public:
     regp_value() {}
+    regp_value(fast_u16 v) : reg16_value(v) {}
     regp_value(const regp_value &other) = delete;
 
     fast_u8 get_low() const { return get_low8(v); }
@@ -2212,7 +2214,8 @@ private:
 
         reg16_value pc;
         flipflop int_disabled;
-        regp_value rps[5];  // bc, de, hl, af, sp
+        regp_value rps[5] = {{0}, {0}, {0},
+                             {0xffff}, {0xffff}};  // bc, de, hl, af, sp
         flipflop halted;
     };
 
