@@ -142,6 +142,11 @@ enum class block_out { outi, outd, otir, otdr };
 
 enum class condition { nz, z, nc, c, po, pe, p, m };
 
+enum class z80_variant {
+    common,
+    cmos,  // Newer chips.
+};
+
 // Entities for internal needs of the library.
 class internals {
 private:
@@ -506,6 +511,16 @@ public:
     void on_xretn(fast_u8 op) {
         unused(op);
         self().on_retn(); }
+
+    z80_variant on_get_z80_variant() {
+        return z80_variant::common; }
+
+    fast_u8 on_get_out_c_r_op() {
+        switch(self().on_get_z80_variant()) {
+        case z80_variant::common: return 0;
+        case z80_variant::cmos: return 0xff;
+        }
+        unreachable("Unknown Z80 variant."); }
 
 protected:
     const derived &self() const{ return static_cast<const derived&>(*this); }
@@ -1738,7 +1753,7 @@ public:
         self().on_format("neg"); }
     void on_out_c_r(reg r) {
         if(r == reg::at_hl)
-            self().on_format("out (c), 0");
+            self().on_format("out (c), N", self().on_get_out_c_r_op());
         else
             self().on_format("out (c), R", r, iregp::hl, 0); }
     void on_out_n_a(fast_u8 n) {
@@ -3601,7 +3616,8 @@ public:
         fast_u16 bc = self().on_get_bc();
         self().on_set_wz(inc16(bc));
         fast_u8 n = (r == reg::at_hl) ?
-            0 : self().on_get_reg(r, iregp::hl, /* d= */ 0);
+            self().on_get_out_c_r_op() :
+            self().on_get_reg(r, iregp::hl, /* d= */ 0);
         self().on_output_cycle(bc, n); }
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = self().on_get_a();
