@@ -48,6 +48,8 @@ using z80::fast_u32;
 using z80::least_u8;
 using z80::reg;
 using z80::unreachable;
+using z80::unused;
+using z80::z80_variant;
 
 static const std::size_t max_line_size = 1024;
 
@@ -160,7 +162,7 @@ public:
 
     void handle_end_of_test_entry() {
         if(in_skipping_mode)
-            error("this line is expected, but not found");
+            input.error("this line is expected, but not found");
 
         in_skipping_mode = false;
     }
@@ -277,6 +279,11 @@ public:
     bool depends_on_iregp_kind() const {
         return false;
     }
+
+    [[noreturn]] void set_variant(z80_variant v, const test_input &input) {
+        unused(v);
+        input.error("unsupported variant");
+    }
 };
 
 class z80_disasm : public disasm_base<z80::z80_disasm<z80_disasm>> {
@@ -307,8 +314,18 @@ public:
             base::on_disassemble();
     }
 
+    void set_variant(z80_variant v, const test_input &input) {
+        unused(&input);
+        variant = v;
+    }
+
+    z80_variant on_get_z80_variant() const {
+        return variant;
+    }
+
 private:
     bool does_depend_on_iregp_kind = false;
+    z80_variant variant = z80_variant::common;
 };
 
 template<typename B>
@@ -814,6 +831,11 @@ public:
         base::on_step();
         context.match("done", static_cast<unsigned>(get_ticks()));
     }
+
+    [[noreturn]] void set_variant(z80_variant v, const test_input &input) {
+        unused(v);
+        input.error("unsupported variant");
+    }
 };
 
 class z80_machine : public machine_base<z80::z80_cpu<z80_machine>> {
@@ -851,6 +873,18 @@ public:
 
         context.match("done", static_cast<unsigned>(get_ticks()));
     }
+
+    void set_variant(z80_variant v, const test_input &input) {
+        unused(&input);
+        variant = v;
+    }
+
+    z80_variant on_get_z80_variant() const {
+        return variant;
+    }
+
+private:
+    z80_variant variant = z80_variant::common;
 };
 
 int translate_hex_digit(char c) {
@@ -921,13 +955,34 @@ bool parse_set_r_directive(const char *r, fast_u8 &n,
     return true;
 }
 
-template<typename M>
-void handle_directive(const test_input &input, M &mach) {
+bool parse_z80_variant_directive(z80_variant &variant,
+                                 const test_input &input) {
+    const char *p = input.get_line();
+    if(!parse(p, ".z80_variant="))
+        return false;
+
+    if(std::strcmp(p, "common") == 0)
+        variant = z80_variant::common;
+    else if(std::strcmp(p, "cmos") == 0)
+        variant = z80_variant::cmos;
+    else
+        input.error("unknown Z80 variant '%s'", p);
+    return true;
+}
+
+template<typename M, typename D>
+void handle_directive(M &mach, D &dis, const test_input &input) {
     fast_u8 n;
+    z80_variant variant;
     if(parse_set_r_directive("b", n, input))
         return mach.set_b(n);
     if(parse_set_r_directive("c", n, input))
         return mach.set_c(n);
+    if(parse_z80_variant_directive(variant, input)) {
+        mach.set_variant(variant, input);
+        dis.set_variant(variant, input);
+        return;
+    }
 
     input.error("unknown directive");
 }
@@ -945,11 +1000,13 @@ void handle_test_entry(test_context &context) {
 
     test_input &input = context.get_input();
 
-    // Handle directives.
     machine mach(context);
+    disasm dis(input);
+
+    // Handle directives.
     const char *p = input.get_line();
     while(*p == '.') {
-        handle_directive(input, mach);
+        handle_directive(mach, dis, input);
         p = input.read_line();
     }
 
@@ -966,7 +1023,6 @@ void handle_test_entry(test_context &context) {
     skip_whitespace(p);
 
     // Test instruction disassembly.
-    disasm dis(input);
     dis.set_encoding(encoding);
     dis.on_disassemble();
     const char *instr = dis.get_output();

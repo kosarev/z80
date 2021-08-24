@@ -1808,6 +1808,20 @@ dded61 (db 0xdd), out (c), h
 16 set_index_rp ix -> hl
 16 done
 
+# NMOS and CMOS versions of OUT (C), 0
+ed71 out (c), 0x00
+...
+ 8 output 00 at 0000
+...
+12 done
+
+.z80_variant=cmos
+ed71 out (c), 0xff
+...
+ 8 output ff at 0000
+...
+12 done
+
 # Block input.
 edb2 inir
  0 m1_fetch
@@ -3863,7 +3877,7 @@ dded6d (db 0xdd), xretn 0xed6d
 dded6e (db 0xdd), xim 0xed6e, 0
 dded6f (db 0xdd), rld
 dded70 (db 0xdd), in (c)
-dded71 (db 0xdd), out (c), 0
+dded71 (db 0xdd), out (c), 0x00
 dded72 (db 0xdd), sbc hl, sp
 dded730000 (db 0xdd), ld (0x0000), sp
 dded74 (db 0xdd), xneg 0xed74
@@ -4157,7 +4171,7 @@ ed6d xretn 0xed6d
 ed6e xim 0xed6e, 0
 ed6f rld
 ed70 in (c)
-ed71 out (c), 0
+ed71 out (c), 0x00
 ed72 sbc hl, sp
 ed730000 ld (0x0000), sp
 ed74 xneg 0xed74
@@ -4927,7 +4941,7 @@ fded6d (db 0xfd), xretn 0xed6d
 fded6e (db 0xfd), xim 0xed6e, 0
 fded6f (db 0xfd), rld
 fded70 (db 0xfd), in (c)
-fded71 (db 0xfd), out (c), 0
+fded71 (db 0xfd), out (c), 0x00
 fded72 (db 0xfd), sbc hl, sp
 fded730000 (db 0xfd), ld (0x0000), sp
 fded74 (db 0xfd), xneg 0xed74
