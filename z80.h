@@ -455,6 +455,15 @@ public:
     void on_tick(unsigned t) {
         unused(t); }
 
+    void on_reset_decoder() {}
+    void on_reset_cpu(bool soft = false) {
+        unused(soft);
+        self().on_reset_decoder(); }
+    void on_reset_memory() {}
+    void on_reset(bool soft = false) {
+        self().on_reset_cpu(soft);
+        self().on_reset_memory(); }
+
     fast_u8 on_m1_fetch_cycle() {
         fast_u8 n = self().on_fetch_cycle();
         return n; }
@@ -530,16 +539,27 @@ protected:
 template<typename B>
 class z80_decoder_state : public B {
 public:
+    using base = B;
+
     z80_decoder_state() {}
 
-    iregp get_iregp_kind() const { return irp; }
-    void set_iregp_kind(iregp r) { irp = r; }
+    iregp get_iregp_kind() const { return fields.irp; }
+    void set_iregp_kind(iregp r) { fields.irp = r; }
 
     iregp on_get_iregp_kind() const { return get_iregp_kind(); }
     void on_set_iregp_kind(iregp r) { set_iregp_kind(r); }
 
+    void on_reset_decoder() {
+        base::on_reset_decoder();
+        fields = state_fields();
+    }
+
 private:
-    iregp irp = iregp::hl;
+    struct state_fields {
+        iregp irp = iregp::hl;
+    };
+
+    state_fields fields;
 };
 
 template<typename B>
@@ -2027,29 +2047,29 @@ class internals::cpu_state_base : public B {
 public:
     typedef B base;
 
-    fast_u8 get_b() const { return ref_rp(regp2::bc).get_high(); }
-    void set_b(fast_u8 n) { ref_rp(regp2::bc).set_high(n); }
+    fast_u8 get_b() const { return fields.ref(regp2::bc).get_high(); }
+    void set_b(fast_u8 n) { fields.ref(regp2::bc).set_high(n); }
 
-    fast_u8 get_c() const { return ref_rp(regp2::bc).get_low(); }
-    void set_c(fast_u8 n) { ref_rp(regp2::bc).set_low(n); }
+    fast_u8 get_c() const { return fields.ref(regp2::bc).get_low(); }
+    void set_c(fast_u8 n) { fields.ref(regp2::bc).set_low(n); }
 
-    fast_u8 get_d() const { return ref_rp(regp2::de).get_high(); }
-    void set_d(fast_u8 n) { ref_rp(regp2::de).set_high(n); }
+    fast_u8 get_d() const { return fields.ref(regp2::de).get_high(); }
+    void set_d(fast_u8 n) { fields.ref(regp2::de).set_high(n); }
 
-    fast_u8 get_e() const { return ref_rp(regp2::de).get_low(); }
-    void set_e(fast_u8 n) { ref_rp(regp2::de).set_low(n); }
+    fast_u8 get_e() const { return fields.ref(regp2::de).get_low(); }
+    void set_e(fast_u8 n) { fields.ref(regp2::de).set_low(n); }
 
-    fast_u8 get_h() const { return ref_rp(regp2::hl).get_high(); }
-    void set_h(fast_u8 n) { ref_rp(regp2::hl).set_high(n); }
+    fast_u8 get_h() const { return fields.ref(regp2::hl).get_high(); }
+    void set_h(fast_u8 n) { fields.ref(regp2::hl).set_high(n); }
 
-    fast_u8 get_l() const { return ref_rp(regp2::hl).get_low(); }
-    void set_l(fast_u8 n) { ref_rp(regp2::hl).set_low(n); }
+    fast_u8 get_l() const { return fields.ref(regp2::hl).get_low(); }
+    void set_l(fast_u8 n) { fields.ref(regp2::hl).set_low(n); }
 
-    fast_u8 get_a() const { return ref_rp(regp2::af).get_high(); }
-    void set_a(fast_u8 n) { ref_rp(regp2::af).set_high(n); }
+    fast_u8 get_a() const { return fields.ref(regp2::af).get_high(); }
+    void set_a(fast_u8 n) { fields.ref(regp2::af).set_high(n); }
 
-    fast_u8 get_f() const { return ref_rp(regp2::af).get_low(); }
-    void set_f(fast_u8 n) { ref_rp(regp2::af).set_low(n); }
+    fast_u8 get_f() const { return fields.ref(regp2::af).get_low(); }
+    void set_f(fast_u8 n) { fields.ref(regp2::af).set_low(n); }
 
     fast_u8 get_reg(reg r) {
         switch(r) {
@@ -2065,31 +2085,34 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 get_bc() const { return ref_rp(regp2::bc).get(); }
-    void set_bc(fast_u16 n) { ref_rp(regp2::bc).set(n); }
+    fast_u16 get_bc() const { return fields.ref(regp2::bc).get(); }
+    void set_bc(fast_u16 n) { fields.ref(regp2::bc).set(n); }
 
-    fast_u16 get_de() const { return ref_rp(regp2::de).get(); }
-    void set_de(fast_u16 n) { ref_rp(regp2::de).set(n); }
+    fast_u16 get_de() const { return fields.ref(regp2::de).get(); }
+    void set_de(fast_u16 n) { fields.ref(regp2::de).set(n); }
 
-    fast_u16 get_hl() const { return ref_rp(regp2::hl).get(); }
-    void set_hl(fast_u16 n) { ref_rp(regp2::hl).set(n); }
+    fast_u16 get_hl() const { return fields.ref(regp2::hl).get(); }
+    void set_hl(fast_u16 n) { fields.ref(regp2::hl).set(n); }
 
-    fast_u16 get_af() const { return ref_rp(regp2::af).get(); }
-    void set_af(fast_u16 n) { ref_rp(regp2::af).set(n); }
+    fast_u16 get_af() const { return fields.ref(regp2::af).get(); }
+    void set_af(fast_u16 n) { fields.ref(regp2::af).set(n); }
 
-    fast_u16 get_pc() const { return pc.get(); }
-    void set_pc(fast_u16 n) { pc.set(n); }
+    fast_u16 get_pc() const { return fields.pc.get(); }
+    void set_pc(fast_u16 n) { fields.pc.set(n); }
 
-    fast_u16 get_sp() const { return ref_rp(regp::sp).get(); }
-    void set_sp(fast_u16 n) { ref_rp(regp::sp).set(n); }
+    fast_u16 get_sp() const { return fields.ref(regp::sp).get(); }
+    void set_sp(fast_u16 n) { fields.ref(regp::sp).set(n); }
 
-    bool is_int_disabled() const { return int_disabled.get(); }
-    void set_is_int_disabled(bool disabled) { int_disabled.set(disabled); }
+    bool is_int_disabled() const {
+        return fields.int_disabled.get(); }
+    void set_is_int_disabled(bool disabled) {
+        fields.int_disabled.set(disabled); }
 
-    bool is_halted() const { return halted.get(); }
-    void set_is_halted(bool is_halted) { halted.set(is_halted); }
+    bool is_halted() const { return fields.halted.get(); }
+    void set_is_halted(bool is_halted) { fields.halted.set(is_halted); }
 
-    void on_ex_de_hl_regs() { ref_rp(regp2::de).swap(ref_rp(regp2::hl)); }
+    void on_ex_de_hl_regs() {
+        fields.ref(regp2::de).swap(fields.ref(regp2::hl)); }
 
     fast_u8 on_get_b() const { return get_b(); }
     void on_set_b(fast_u8 b) { set_b(b); }
@@ -2132,22 +2155,22 @@ public:
     using base::on_get_regp;
     fast_u16 on_get_regp(regp rp) {
         return self().on_dispatch_register_accesses() ?
-            base::on_get_regp(rp) : ref_rp(rp).get(); }
+            base::on_get_regp(rp) : fields.ref(rp).get(); }
 
     using base::on_set_regp;
     void on_set_regp(regp rp, fast_u16 nn) {
         return self().on_dispatch_register_accesses() ?
-            base::on_set_regp(rp, nn) : ref_rp(rp).set(nn); }
+            base::on_set_regp(rp, nn) : fields.ref(rp).set(nn); }
 
     using base::on_get_regp2;
     fast_u16 on_get_regp2(regp2 rp) {
         return self().on_dispatch_register_accesses() ?
-            base::on_get_regp2(rp) : ref_rp(rp).get(); }
+            base::on_get_regp2(rp) : fields.ref(rp).get(); }
 
     using base::on_set_regp2;
     void on_set_regp2(regp2 rp, fast_u16 nn) {
         return self().on_dispatch_register_accesses() ?
-            base::on_set_regp2(rp, nn) : ref_rp(rp).set(nn); }
+            base::on_set_regp2(rp, nn) : fields.ref(rp).set(nn); }
 
     bool on_is_int_disabled() const { return is_int_disabled(); }
     void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
@@ -2155,25 +2178,45 @@ public:
     bool on_is_halted() const { return is_halted(); }
     void on_set_is_halted(bool f) { set_is_halted(f); }
 
+    void on_reset_cpu(bool soft = false) {
+        base::on_reset_cpu(soft);
+
+        state_fields power_on_state;
+        if(!soft) {
+            fields = power_on_state;
+        } else {
+            fields.pc = power_on_state.pc;
+            fields.int_disabled = power_on_state.int_disabled;
+            fields.ref(regp::sp) = power_on_state.ref(regp::sp);
+            fields.ref(regp2::af) = power_on_state.ref(regp2::af);
+            fields.halted = power_on_state.halted;
+        }
+    }
+
 protected:
     using base::self;
 
 private:
-    regp_value &ref_rp(regp rp) {
-        return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
-    const regp_value &ref_rp(regp rp) const {
-        return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
-
-    regp_value &ref_rp(regp2 rp) {
-        return rps[static_cast<unsigned>(rp)]; }
-    const regp_value &ref_rp(regp2 rp) const {
-        return rps[static_cast<unsigned>(rp)]; }
 
     // Most frequently used registers shall come first to reduce cache stress.
-    reg16_value pc;
-    flipflop int_disabled;
-    regp_value rps[5];  // bc, de, hl, af, sp
-    flipflop halted;
+    struct state_fields {
+        regp_value &ref(regp rp) {
+            return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
+        const regp_value &ref(regp rp) const {
+            return rps[rp == regp::sp ? 4 : static_cast<unsigned>(rp)]; }
+
+        regp_value &ref(regp2 rp) {
+            return rps[static_cast<unsigned>(rp)]; }
+        const regp_value &ref(regp2 rp) const {
+            return rps[static_cast<unsigned>(rp)]; }
+
+        reg16_value pc;
+        flipflop int_disabled;
+        regp_value rps[5];  // bc, de, hl, af, sp
+        flipflop halted;
+    };
+
+    state_fields fields;
 
     template<typename XB> friend class i8080_state;
     template<typename XB> friend class z80_state;
@@ -2184,11 +2227,20 @@ class i8080_state : public internals::cpu_state_base<B> {
 public:
     typedef internals::cpu_state_base<B> base;
 
-    bool get_iff() const { return iff.get(); }
-    void set_iff(bool f) { iff.set(f); }
+    bool get_iff() const { return fields.iff.get(); }
+    void set_iff(bool f) { fields.iff.set(f); }
+
+    void on_reset_cpu(bool soft = false) {
+        base::on_reset_cpu(soft);
+        fields = state_fields();
+    }
 
 private:
-    flipflop iff;
+    struct state_fields {
+        flipflop iff;
+    };
+
+    state_fields fields;
 };
 
 class int_mode {
@@ -2214,56 +2266,56 @@ public:
 
     z80_state() {}
 
-    fast_u8 get_ixh() const { return ix.get_high(); }
-    void set_ixh(fast_u8 n) { ix.set_high(n); }
+    fast_u8 get_ixh() const { return fields.ix.get_high(); }
+    void set_ixh(fast_u8 n) { fields.ix.set_high(n); }
 
-    fast_u8 get_ixl() const { return ix.get_low(); }
-    void set_ixl(fast_u8 n) { ix.set_low(n); }
+    fast_u8 get_ixl() const { return fields.ix.get_low(); }
+    void set_ixl(fast_u8 n) { fields.ix.set_low(n); }
 
-    fast_u8 get_iyh() const { return iy.get_high(); }
-    void set_iyh(fast_u8 n) { iy.set_high(n); }
+    fast_u8 get_iyh() const { return fields.iy.get_high(); }
+    void set_iyh(fast_u8 n) { fields.iy.set_high(n); }
 
-    fast_u8 get_iyl() const { return iy.get_low(); }
-    void set_iyl(fast_u8 n) { iy.set_low(n); }
+    fast_u8 get_iyl() const { return fields.iy.get_low(); }
+    void set_iyl(fast_u8 n) { fields.iy.set_low(n); }
 
-    fast_u8 get_i() const { return ir.get_high(); }
-    void set_i(fast_u8 n) { ir.set_high(n); }
+    fast_u8 get_i() const { return fields.ir.get_high(); }
+    void set_i(fast_u8 n) { fields.ir.set_high(n); }
 
-    fast_u8 get_r() const { return ir.get_low(); }
-    void set_r(fast_u8 n) { ir.set_low(n); }
+    fast_u8 get_r() const { return fields.ir.get_low(); }
+    void set_r(fast_u8 n) { fields.ir.set_low(n); }
 
-    fast_u16 get_alt_af() const { return alt_af.get(); }
-    void set_alt_af(fast_u16 n) { alt_af.set(n); }
+    fast_u16 get_alt_af() const { return fields.alt_af.get(); }
+    void set_alt_af(fast_u16 n) { fields.alt_af.set(n); }
 
-    fast_u16 get_alt_hl() const { return alt_hl.get(); }
-    void set_alt_hl(fast_u16 n) { alt_hl.set(n); }
+    fast_u16 get_alt_hl() const { return fields.alt_hl.get(); }
+    void set_alt_hl(fast_u16 n) { fields.alt_hl.set(n); }
 
-    fast_u16 get_alt_bc() const { return alt_bc.get(); }
-    void set_alt_bc(fast_u16 n) { alt_bc.set(n); }
+    fast_u16 get_alt_bc() const { return fields.alt_bc.get(); }
+    void set_alt_bc(fast_u16 n) { fields.alt_bc.set(n); }
 
-    fast_u16 get_alt_de() const { return alt_de.get(); }
-    void set_alt_de(fast_u16 n) { alt_de.set(n); }
+    fast_u16 get_alt_de() const { return fields.alt_de.get(); }
+    void set_alt_de(fast_u16 n) { fields.alt_de.set(n); }
 
-    fast_u16 get_ix() const { return ix.get(); }
-    void set_ix(fast_u16 n) { ix.set(n); }
+    fast_u16 get_ix() const { return fields.ix.get(); }
+    void set_ix(fast_u16 n) { fields.ix.set(n); }
 
-    fast_u16 get_iy() const { return iy.get(); }
-    void set_iy(fast_u16 n) { iy.set(n); }
+    fast_u16 get_iy() const { return fields.iy.get(); }
+    void set_iy(fast_u16 n) { fields.iy.set(n); }
 
-    fast_u16 get_ir() const { return ir.get(); }
-    void set_ir(fast_u16 n) { ir.set(n); }
+    fast_u16 get_ir() const { return fields.ir.get(); }
+    void set_ir(fast_u16 n) { fields.ir.set(n); }
 
     fast_u16 on_get_wz() const { return get_wz(); }
     void on_set_wz(fast_u16 n) { set_wz(n); }
 
-    bool get_iff1() const { return iff1.get(); }
-    void set_iff1(bool f) { iff1.set(f); }
+    bool get_iff1() const { return fields.iff1.get(); }
+    void set_iff1(bool f) { fields.iff1.set(f); }
 
-    bool get_iff2() const { return iff2.get(); }
-    void set_iff2(bool f) { iff2.set(f); }
+    bool get_iff2() const { return fields.iff2.get(); }
+    void set_iff2(bool f) { fields.iff2.set(f); }
 
-    unsigned get_int_mode() const { return im.get(); }
-    void set_int_mode(unsigned mode) { im.set(mode); }
+    unsigned get_int_mode() const { return fields.im.get(); }
+    void set_int_mode(unsigned mode) { fields.im.set(mode); }
 
     fast_u16 get_index_rp(iregp irp) {
         switch(irp) {
@@ -2275,13 +2327,13 @@ public:
     }
 
     void ex_af_alt_af_regs() {
-        base::ref_rp(regp2::af).swap(alt_af);
+        base::fields.ref(regp2::af).swap(fields.alt_af);
     }
 
     void exx_regs() {
-        base::ref_rp(regp2::bc).swap(alt_bc);
-        base::ref_rp(regp2::de).swap(alt_de);
-        base::ref_rp(regp2::hl).swap(alt_hl);
+        base::fields.ref(regp2::bc).swap(fields.alt_bc);
+        base::fields.ref(regp2::de).swap(fields.alt_de);
+        base::fields.ref(regp2::hl).swap(fields.alt_hl);
     }
 
     fast_u8 on_get_ixh() const { return get_ixh(); }
@@ -2305,8 +2357,8 @@ public:
     // TODO: on_get_i() + on_get_r() ?
     fast_u16 on_get_ir() const { return get_ir(); }
 
-    fast_u16 get_wz() const { return wz.get(); }
-    void set_wz(fast_u16 n) { wz.set(n); }
+    fast_u16 get_wz() const { return fields.wz.get(); }
+    void set_wz(fast_u16 n) { fields.wz.set(n); }
 
     bool on_get_iff1() const { return get_iff1(); }
     void on_set_iff1(bool f) { set_iff1(f); }
@@ -2320,12 +2372,30 @@ public:
     void on_ex_af_alt_af_regs() { ex_af_alt_af_regs(); }
     void on_exx_regs() { exx_regs(); }
 
+    void on_reset_cpu(bool soft = false) {
+        base::on_reset_cpu(soft);
+
+        state_fields power_on_state;
+        if(!soft) {
+            fields = power_on_state;
+        } else {
+            fields.ir = power_on_state.ir;
+            fields.iff1 = power_on_state.iff1;
+            fields.iff2 = power_on_state.iff2;
+            fields.im = power_on_state.im;
+        }
+    }
+
 private:
-    regp_value ix, iy, ir;
-    reg16_value wz;
-    reg16_value alt_bc, alt_de, alt_hl, alt_af;
-    flipflop iff1, iff2;
-    int_mode im;
+    struct state_fields {
+        regp_value ix, iy, ir;
+        reg16_value wz;
+        reg16_value alt_bc, alt_de, alt_hl, alt_af;
+        flipflop iff1, iff2;
+        int_mode im;
+    };
+
+    state_fields fields;
 };
 
 template<typename B>
@@ -3902,34 +3972,43 @@ class machine_memory : public B {
 public:
     typedef B base;
 
-    machine_memory() { reset(); }
-
-    void reset() {
-        uint_fast32_t rnd = 0xde347a01;
-        for(auto &b : memory_bytes) {
-            b = static_cast<least_u8>(rnd & 0xff);
-            rnd = (rnd * 0x74392cef) ^ (rnd >> 16);
-        }
-    }
+    machine_memory() {}
 
     fast_u8 read(fast_u16 addr) const {
         assert(addr < address_space_size);
-        return memory_bytes[addr];
+        return image.bytes[addr];
     }
 
     void write(fast_u16 addr, fast_u8 n) {
         assert(addr < address_space_size);
-        memory_bytes[addr] = static_cast<least_u8>(n);
+        image.bytes[addr] = static_cast<least_u8>(n);
     }
 
     fast_u8 on_read(fast_u16 addr) { return read(addr); }
     void on_write(fast_u16 addr, fast_u8 n) { write(addr, n); }
 
+    void on_reset_memory() {
+        base::on_reset_memory();
+        image = memory_image();
+    }
+
 protected:
     using base::self;
 
 private:
-    least_u8 memory_bytes[address_space_size] = {};
+    struct memory_image {
+        memory_image() {
+            uint_fast32_t rnd = 0xde347a01;
+            for(auto &b : bytes) {
+                b = static_cast<least_u8>(rnd & 0xff);
+                rnd = (rnd * 0x74392cef) ^ (rnd >> 16);
+            }
+        }
+
+        least_u8 bytes[address_space_size] = {};
+    };
+
+    memory_image image;
 };
 
 class events_mask {
@@ -3951,11 +4030,11 @@ public:
     machine_state() {}
 
     bool is_marked_addr(fast_u16 addr, fast_u8 marks) const {
-        return (address_marks[mask16(addr)] & marks) != 0;
+        return (fields.address_marks[mask16(addr)] & marks) != 0;
     }
 
     void mark_addr(fast_u16 addr, fast_u8 marks) {
-        address_marks[mask16(addr)] |= static_cast<least_u8>(marks);
+        fields.address_marks[mask16(addr)] |= static_cast<least_u8>(marks);
     }
 
     void mark_addrs(fast_u16 addr, fast_u16 size, fast_u8 marks) {
@@ -3964,59 +4043,68 @@ public:
     }
 
     void unmark_addr(fast_u16 addr, fast_u8 marks) {
-        address_marks[addr] &= ~marks;
+        fields.address_marks[addr] &= ~marks;
     }
 
     bool is_breakpoint_addr(fast_u16 addr) const {
-        return is_marked_addr(addr, breakpoint_mark);
+        return is_marked_addr(addr, state_fields::breakpoint_mark);
     }
 
     void set_breakpoint(fast_u16 addr) {
-        mark_addr(addr, breakpoint_mark);
+        mark_addr(addr, state_fields::breakpoint_mark);
     }
 
     void clear_breakpoint(fast_u16 addr) {
-        unmark_addr(addr, breakpoint_mark);
+        unmark_addr(addr, state_fields::breakpoint_mark);
     }
 
     void on_tick(unsigned t) {
         base::on_tick(t);
 
-        frame_tick += t;
-        if(frame_tick >= ticks_per_frame) {
-            frame_tick %= ticks_per_frame;
-            events |= events_mask::end_of_frame;
+        fields.frame_tick += t;
+        if(fields.frame_tick >= state_fields::ticks_per_frame) {
+            fields.frame_tick %= state_fields::ticks_per_frame;
+            fields.events |= events_mask::end_of_frame;
         }
     }
 
     void on_set_pc(fast_u16 n) {
         if(is_breakpoint_addr(n))
-            events |= events_mask::breakpoint_hit;
+            fields.events |= events_mask::breakpoint_hit;
         base::on_set_pc(n);
     }
 
     void on_raise_events(events_mask::type new_events) {
-        events |= new_events;
+        fields.events |= new_events;
     }
 
     events_mask::type on_run() {
-        events = 0;
-        while(!events)
+        fields.events = 0;
+        while(!fields.events)
             self().on_step();
-        return events;
+        return fields.events;
+    }
+
+    void on_reset() {
+        base::on_reset();
+        fields = state_fields();
     }
 
 protected:
     using base::self;
 
 private:
-    ticks_type frame_tick = 0;
-    static const ticks_type ticks_per_frame = 100 * 1000;
+    struct state_fields {
+        ticks_type frame_tick = 0;
+        static const ticks_type ticks_per_frame = 100 * 1000;
 
-    events_mask::type events = 0;
+        events_mask::type events = 0;
 
-    static const fast_u8 breakpoint_mark = 1u << 0;
-    least_u8 address_marks[address_space_size] = {};
+        static const fast_u8 breakpoint_mark = 1u << 0;
+        least_u8 address_marks[address_space_size] = {};
+    };
+
+    state_fields fields;
 };
 
 template<typename D>
