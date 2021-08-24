@@ -3,6 +3,7 @@
 
 #define CHECK(c) (check((c), __LINE__))
 
+using z80::fast_u8;
 using z80::fast_u16;
 
 static void check(bool c, unsigned line_no) {
@@ -14,7 +15,7 @@ static void check(bool c, unsigned line_no) {
     std::abort();
 }
 
-class my_emulator : public z80::z80_cpu<my_emulator>
+class my_emulator : public z80::z80_machine<my_emulator>
 {};
 
 static void test_reset_state(const my_emulator &e) {
@@ -41,6 +42,7 @@ static void clobber(my_emulator &e) {
     e.set_sp(0x3333);
     e.set_af(0x4444);
     e.set_bc(z80::inc16(e.get_bc()));
+    e.on_write(0x0000, z80::inc8(e.on_read(0x0000)));
 }
 
 static void test_hard_reset() {
@@ -55,11 +57,13 @@ static void test_soft_reset() {
     clobber(e);
 
     fast_u16 bc = e.get_bc();
+    fast_u8 m = e.on_read(0x0000);
 
     e.on_reset(/* soft= */ true);
     test_reset_state(e);
 
     CHECK(e.get_bc() == bc);
+    CHECK(e.on_read(0x0000) == m);
 }
 
 int main() {

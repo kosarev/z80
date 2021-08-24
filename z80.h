@@ -462,7 +462,8 @@ public:
     void on_reset_memory() {}
     void on_reset(bool soft = false) {
         self().on_reset_cpu(soft);
-        self().on_reset_memory(); }
+        if (!soft)
+            self().on_reset_memory(); }
 
     fast_u8 on_m1_fetch_cycle() {
         fast_u8 n = self().on_fetch_cycle();
@@ -4088,8 +4089,8 @@ public:
         return fields.events;
     }
 
-    void on_reset() {
-        base::on_reset();
+    void on_reset(bool soft = false) {
+        base::on_reset(soft);
         fields = state_fields();
     }
 
