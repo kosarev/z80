@@ -3082,12 +3082,12 @@ public:
 
     void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
     void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
-    void set_iff1_on_retn(bool f) { self().on_set_iff1(f); }
+    void set_iff1_on_reti_retn(bool f) { self().on_set_iff1(f); }
 
     void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
     void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
 
-    bool get_iff2_on_retn() { return self().on_get_iff2(); }
+    bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
 
     fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
         return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
@@ -3715,11 +3715,16 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             self().on_return(); }
+    void on_reti_retn() {
+        // According to Sean Young's The Undocumented Z80
+        // Documented, both RETI and RETN copy IFF2 to IFF1.
+        // http://z80.info/zip/z80-documented.pdf
+        self().set_iff1_on_reti_retn(self().get_iff2_on_reti_retn());
+        self().on_return(); }
     void on_reti() {
-        self().on_return(); }
+        self().on_reti_retn(); }
     void on_retn() {
-        self().set_iff1_on_retn(self().get_iff2_on_retn());
-        self().on_return(); }
+        self().on_reti_retn(); }
     void on_rla() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
