@@ -735,6 +735,22 @@ public:
         base::set_iff_on_di(iff);
     }
 
+    void on_set_iff1(bool f) {
+        context.match("on_set_iff1 %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff1()),
+                      static_cast<unsigned>(f));
+        base::on_set_iff1(f);
+    }
+
+    void on_set_iff2(bool f) {
+        context.match("on_set_iff2 %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff2()),
+                      static_cast<unsigned>(f));
+        base::on_set_iff2(f);
+    }
+
     void set_iff1_on_di(bool f) {
         context.match("set_iff1_on_di %u -> %u",
                       static_cast<unsigned>(get_ticks()),
@@ -742,6 +758,15 @@ public:
                       static_cast<unsigned>(f));
         level_guard guard(context);
         base::set_iff1_on_di(f);
+    }
+
+    void set_iff1_on_reti_retn(bool f) {
+        context.match("set_iff1_on_reti_retn %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff1()),
+                      static_cast<unsigned>(f));
+        level_guard guard(context);
+        base::set_iff1_on_reti_retn(f);
     }
 
     void set_iff2_on_di(bool f) {

@@ -509,7 +509,9 @@ f3 di
  4     set_pc_on_fetch 0000 -> 0001
  4   set_r 00 -> 01
  4 set_iff1_on_di 0 -> 0
+ 4   on_set_iff1 0 -> 0
  4 set_iff2_on_di 0 -> 0
+ 4   on_set_iff2 0 -> 0
  4 done
 
 # DJNZ d
@@ -550,7 +552,9 @@ fb ei
  4     set_pc_on_fetch 0000 -> 0001
  4   set_r 00 -> 01
  4 set_iff1_on_ei 0 -> 1
+ 4   on_set_iff1 0 -> 1
  4 set_iff2_on_ei 0 -> 1
+ 4   on_set_iff2 0 -> 1
  4 disable_int
  4 done
 
@@ -2444,6 +2448,8 @@ ed4d reti
  6     set_addr_bus 0001 -> 0001
  8     set_pc_on_fetch 0001 -> 0002
  8   set_r 01 -> 02
+ 8 set_iff1_on_reti_retn 0 -> 0
+ 8   on_set_iff1 0 -> 0
  8 get_sp 0000
  8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
@@ -2476,6 +2482,8 @@ ed45 retn
  6     set_addr_bus 0001 -> 0001
  8     set_pc_on_fetch 0001 -> 0002
  8   set_r 01 -> 02
+ 8 set_iff1_on_reti_retn 0 -> 0
+ 8   on_set_iff1 0 -> 0
  8 get_sp 0000
  8 read ed at 0000
  8   set_addr_bus 0001 -> 0000
