@@ -878,6 +878,8 @@ class i8080_decoder : public internals::decoder_base<B> {
 public:
     typedef internals::decoder_base<B> base;
 
+    bool on_is_z80() { return false; }
+
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r); }
     void on_decode_call_cc_nn(condition cc) {
@@ -947,6 +949,8 @@ public:
     typedef internals::decoder_base<B> base;
 
     z80_decoder() {}
+
+    bool on_is_z80() { return true; }
 
     void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
 
@@ -1296,6 +1300,10 @@ public:
                              reg::at_hl, irp, d); }
     void on_call_nn(fast_u16 nn) {
         self().on_format("call W", nn); }
+    void on_ccf() {
+        self().on_format(self().on_is_z80() ? "ccf" : "cmc"); }
+    void on_scf() {
+        self().on_format(self().on_is_z80() ? "scf" : "stc"); }
     void on_daa() {
         self().on_format("daa"); }
     void on_di() {
@@ -1435,8 +1443,6 @@ public:
         self().on_format("A R", k, r); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("cC W", cc, nn); }
-    void on_ccf() {
-        self().on_format("cmc"); }
     void on_cpl() {
         self().on_format("cma"); }
     void on_dec_r(reg r) {
@@ -1497,8 +1503,6 @@ public:
         self().on_format("rrc"); }
     void on_ret_cc(condition cc) {
         self().on_format("rC", cc); }
-    void on_scf() {
-        self().on_format("stc"); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -1681,8 +1685,6 @@ public:
         self().on_format("T", k); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
-    void on_ccf() {
-        self().on_format("ccf"); }
     void on_cpl() {
         self().on_format("cpl"); }
     void on_dec_r(reg r, fast_u8 d) {
@@ -1823,8 +1825,6 @@ public:
         self().on_format("rrca"); }
     void on_rrd() {
         self().on_format("rrd"); }
-    void on_scf() {
-        self().on_format("scf"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2518,6 +2518,111 @@ public:
     void on_set_addr_bus(fast_u16 addr) {
         unused(addr); }
 
+protected:
+    static fast_u8 cf(fast_u8 f) {
+        return f & cf_mask; }
+    static fast_u8 sf(fast_u8 f) {
+        return f & sf_mask; }
+    static fast_u8 zf(fast_u8 n) {
+        return zf_ari(n); }
+    static fast_u8 pf(fast_u8 n) {
+        return pf_log(n); }
+    static fast_u8 cf9(fast_u16 res) {
+        return (res >> (8 - cf_bit)) & cf_mask; }
+    static fast_u8 hf(fast_u8 n) {
+        return n & hf_mask; }
+
+    struct flag_set {
+        bool is_lazy;
+        fast_u8 raw = 0;
+        fast_u16 lazy = 0;
+
+        flag_set(bool is_lazy) : is_lazy(is_lazy) {}
+
+        // TODO
+        static fast_u8 eval(fast_u8 ops, fast_u16 res9) {
+            fast_u8 res8 = mask8(res9);
+            return sf(res8) | zf(res8) | hf(ops) | pf(res8) | cf9(res9);
+        }
+
+        fast_u8 get_cf() const {
+            return (is_lazy ? (lazy >> 8) : raw) & 0x1;
+        }
+
+        void set_cf(fast_u8 v) {
+            if(is_lazy)
+                lazy = (lazy & ~0x100u) | ((v << 8) & 0x100);
+            else
+                raw = (raw & ~0x1u) | (v & 0x1);
+        }
+
+        fast_u8 get_hf_cf() const {
+            return (is_lazy ? (lazy >> 8) : raw) & (hf_mask | cf_mask);
+        }
+
+        fast_u8 get_f() const {
+            if(!is_lazy)
+                return raw;
+
+            fast_u8 ops = static_cast<fast_u8>(lazy >> 8);
+            fast_u16 res9 = lazy;
+            return eval(ops, res9) | ops;
+        }
+
+        void set(fast_u8 ops, fast_u16 res9) {
+            if(is_lazy)
+                lazy = (ops << 8) | res9;
+            else
+                raw = eval(ops, res9);
+        }
+    };
+
+    bool on_is_to_use_lazy_flags() {
+        return false;
+    }
+
+    // TODO: Move to the root module.
+    fast_u16 on_get_flags() {
+#if 0  // TODO
+        return 0;
+#else
+        fast_u8 f = self().on_get_f();
+        return (static_cast<fast_u16>(f) << 8) | 1;
+#endif
+    }
+
+    // TODO: Move to the root module.
+    void on_set_flags(fast_u16 flags) {
+#if 0  // TODO
+        unused(flags);
+#else
+        fast_u8 ops = static_cast<fast_u8>(flags >> 8);
+        fast_u16 res9 = flags;
+        self().on_set_f(flag_set::eval(ops, res9) | ops);
+#endif
+    }
+
+    flag_set get_flags(bool is_lazy) {
+        flag_set flags(is_lazy);
+        if(flags.is_lazy)
+            flags.lazy = self().on_get_flags();
+        else
+            flags.raw = self().on_get_f();
+        return flags;
+    }
+
+    flag_set get_flags() {
+        return get_flags(self().on_is_to_use_lazy_flags());
+    }
+
+    void set_flags(flag_set flags) {
+        if(flags.is_lazy)
+            self().on_set_flags(flags.lazy);
+        else
+            self().on_set_f(flags.raw);
+    }
+
+public:
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         reg access_r = irp == iregp::hl ? r : reg::at_hl;
@@ -2579,6 +2684,34 @@ public:
         self().do_alu(k, n); }
     void on_call_nn(fast_u16 nn) {
         self().on_call(nn); }
+    void on_ccf() {
+        if(!self().on_is_z80()) {
+            flag_set flags = get_flags();
+            // TODO: Make sure this is optimised for lazy flags.
+            flags.set_cf(flags.get_cf() ^ 1);
+            set_flags(flags);
+            return;
+        }
+
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        bool cf = f & cf_mask;
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                (cf ? hf_mask : 0) | cf_ari(!cf);
+        self().on_set_f(f); }
+    void on_scf() {
+        if(!self().on_is_z80()) {
+            flag_set flags = get_flags();
+            flags.set_cf(1);
+            set_flags(flags);
+            return;
+        }
+
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                cf_mask;
+        self().on_set_f(f); }
     void on_ex_de_hl() {
         self().on_ex_de_hl_regs(); }
     void on_halt() {
@@ -2789,8 +2922,6 @@ public:
     using base::pf_log;
     using base::zf_ari;
 
-    bool on_is_z80() { return false; }
-
     void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
 
@@ -2810,109 +2941,6 @@ public:
     }
 
 private:
-    static fast_u8 cf(fast_u8 f) {
-        return f & cf_mask; }
-    static fast_u8 sf(fast_u8 f) {
-        return f & sf_mask; }
-    static fast_u8 zf(fast_u8 n) {
-        return zf_ari(n); }
-    static fast_u8 pf(fast_u8 n) {
-        return pf_log(n); }
-    static fast_u8 cf9(fast_u16 res) {
-        return (res >> (8 - base::cf_bit)) & cf_mask; }
-    static fast_u8 hf(fast_u8 n) {
-        return n & hf_mask; }
-
-    struct flag_set {
-        bool is_lazy;
-        fast_u8 raw = 0;
-        fast_u16 lazy = 0;
-
-        flag_set(bool is_lazy) : is_lazy(is_lazy) {}
-
-        // TODO
-        static fast_u8 eval(fast_u8 ops, fast_u16 res9) {
-            fast_u8 res8 = mask8(res9);
-            return sf(res8) | zf(res8) | hf(ops) | pf(res8) | cf9(res9);
-        }
-
-        fast_u8 get_cf() const {
-            return (is_lazy ? (lazy >> 8) : raw) & 0x1;
-        }
-
-        void set_cf(fast_u8 v) {
-            if(is_lazy)
-                lazy = (lazy & ~0x100u) | ((v << 8) & 0x100);
-            else
-                raw = (raw & ~0x1u) | (v & 0x1);
-        }
-
-        fast_u8 get_hf_cf() const {
-            return (is_lazy ? (lazy >> 8) : raw) & (hf_mask | cf_mask);
-        }
-
-        fast_u8 get_f() const {
-            if(!is_lazy)
-                return raw;
-
-            fast_u8 ops = static_cast<fast_u8>(lazy >> 8);
-            fast_u16 res9 = lazy;
-            return eval(ops, res9) | ops;
-        }
-
-        void set(fast_u8 ops, fast_u16 res9) {
-            if(is_lazy)
-                lazy = (ops << 8) | res9;
-            else
-                raw = eval(ops, res9);
-        }
-    };
-
-    bool on_is_to_use_lazy_flags() {
-        return false;
-    }
-
-    // TODO: Move to the root module.
-    fast_u16 on_get_flags() {
-#if 0  // TODO
-        return 0;
-#else
-        fast_u8 f = self().on_get_f();
-        return (static_cast<fast_u16>(f) << 8) | 1;
-#endif
-    }
-
-    // TODO: Move to the root module.
-    void on_set_flags(fast_u16 flags) {
-#if 0  // TODO
-        unused(flags);
-#else
-        fast_u8 ops = static_cast<fast_u8>(flags >> 8);
-        fast_u16 res9 = flags;
-        self().on_set_f(flag_set::eval(ops, res9) | ops);
-#endif
-    }
-
-    flag_set get_flags(bool is_lazy) {
-        flag_set flags(is_lazy);
-        if(flags.is_lazy)
-            flags.lazy = self().on_get_flags();
-        else
-            flags.raw = self().on_get_f();
-        return flags;
-    }
-
-    flag_set get_flags() {
-        return get_flags(self().on_is_to_use_lazy_flags());
-    }
-
-    void set_flags(flag_set flags) {
-        if(flags.is_lazy)
-            self().on_set_flags(flags.lazy);
-        else
-            self().on_set_f(flags.raw);
-    }
-
     bool check_condition(condition cc) {
         auto n = static_cast<unsigned>(cc);
         if(self().on_is_to_use_lazy_flags()) {
@@ -3008,11 +3036,6 @@ public:
         else
             self().on_set_wz(nn);
         }
-    void on_ccf() {
-        flag_set flags = get_flags();
-        // TODO: Make sure this is optimised for lazy flags.
-        flags.set_cf(flags.get_cf() ^ 1);
-        set_flags(flags); }
     void on_cpl() {
         self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
@@ -3171,13 +3194,12 @@ public:
         self().on_set_a(a);
         flags.set_cf(a >> 7);
         set_flags(flags); }
-    void on_scf() {
-        flag_set flags = get_flags();
-        flags.set_cf(1);
-        set_flags(flags); }
 
 protected:
     using base::self;
+    using flag_set = typename base::flag_set;
+    using base::get_flags;
+    using base::set_flags;
 };
 
 template<typename B>
@@ -3214,8 +3236,6 @@ public:
     using base::pf_dec;
     using base::pf_inc;
     using base::cf_ari;
-
-    bool on_is_z80() { return true; }
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
 
@@ -3632,13 +3652,6 @@ public:
         } else {
             self().on_set_wz(nn);
         } }
-    void on_ccf() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        bool cf = f & cf_mask;
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
-                (cf ? hf_mask : 0) | cf_ari(!cf);
-        self().on_set_f(f); }
     void on_daa() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -3945,12 +3958,6 @@ public:
         self().on_set_a(a);
         self().on_set_f(f);
         self().on_write_cycle(hl, get_low8(t)); }
-    void on_scf() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
-                cf_mask;
-        self().on_set_f(f); }
 
 protected:
     using base::self;
