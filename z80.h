@@ -2453,6 +2453,29 @@ public:
     void on_3t_exec_cycle() {
         self().on_tick(3); }
 
+    fast_u8 on_input_cycle(fast_u16 port) {
+        // Z80 samples the value at t4 of the input cycle, see
+        // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
+        bool z80 = self().on_is_z80();
+        if(z80) {
+            // TODO: Should we do the same for i8080?
+            self().on_set_addr_bus(port);
+        }
+        self().on_tick(z80 ? 3 : 2);
+        self().on_iorq_wait(port);
+        self().on_tick(1);
+        return self().on_input(port); }
+    void on_output_cycle(fast_u16 port, fast_u8 n) {
+        bool z80 = self().on_is_z80();
+        if(z80) {
+            // TODO: Should we do the same for i8080?
+            self().on_set_addr_bus(port);
+        }
+        self().on_tick(z80 ? 3 : 2);
+        self().on_iorq_wait(port);
+        self().on_tick(1);
+        self().on_output(port, n); }
+
     void on_set_addr_bus(fast_u16 addr) {
         unused(addr); }
 
@@ -2705,17 +2728,6 @@ public:
         self().on_tick(2);
         self().set_pc_on_fetch(inc16(addr));
         return n; }
-
-    fast_u8 on_input_cycle(fast_u8 port) {
-        self().on_tick(2);
-        self().on_iorq_wait(port);
-        self().on_tick(1);
-        return self().on_input(port); }
-    void on_output_cycle(fast_u8 port, fast_u8 n) {
-        self().on_tick(2);
-        self().on_iorq_wait(port);
-        self().on_tick(1);
-        self().on_output(port, n); }
 
 private:
     static fast_u8 cf(fast_u8 f) {
@@ -3948,25 +3960,6 @@ public:
 
     void on_5t_exec_cycle() {
         self().on_tick(5);
-    }
-
-    fast_u8 on_input_cycle(fast_u16 port) {
-        // Z80 samples the value at t4 of the input cycle, see
-        // <http://ramsoft.bbk.org.omegahg.com/floatingbus.html>.
-        self().on_set_addr_bus(port);
-        self().on_tick(3);
-        self().on_iorq_wait(port);
-        self().on_tick(1);
-        fast_u8 n = self().on_input(port);
-        return n;
-    }
-
-    void on_output_cycle(fast_u16 port, fast_u8 n) {
-        self().on_set_addr_bus(port);
-        self().on_tick(3);
-        self().on_iorq_wait(port);
-        self().on_tick(1);
-        self().on_output(port, n);
     }
 
 protected:
