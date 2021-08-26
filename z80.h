@@ -1316,6 +1316,8 @@ public:
         self().on_format("ret"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
+    void on_rra() {
+        self().on_format(self().on_is_z80() ? "rra" : "rar"); }
     void on_rrca() {
         self().on_format(self().on_is_z80() ? "rrca" : "rrc"); }
     void on_rrd() {
@@ -1499,8 +1501,6 @@ public:
         self().on_format("push G", rp); }
     void on_rla() {
         self().on_format("ral"); }
-    void on_rra() {
-        self().on_format("rar"); }
     void on_rlca() {
         self().on_format("rlc"); }
     void on_ret_cc(condition cc) {
@@ -1821,8 +1821,6 @@ public:
         else
             self().on_format("O R, R", k, reg::at_hl, irp, d,
                                r, iregp::hl, /* d= */ 0); }
-    void on_rra() {
-        self().on_format("rra"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2730,6 +2728,23 @@ public:
         self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
+    void on_rra() {
+        if(!self().on_is_z80()) {
+            fast_u8 a = self().on_get_a();
+            flag_set flags = get_flags();
+            fast_u8 r = (a >> 1) | (flags.get_cf() << 7);
+            self().on_set_a(r);
+            flags.set_cf(a);
+            set_flags(flags);
+            return;
+        }
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        fast_u8 r = (a >> 1) | ((f & cf_mask) ? 0x80 : 0);
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
+                cf_ari(a & 0x1);
+        self().on_set_a(r);
+        self().on_set_f(f); }
     void on_rrca() {
         if(!self().on_is_z80()) {
             fast_u8 a = self().on_get_a();
@@ -3204,13 +3219,6 @@ public:
         fast_u16 t = (a << 1) | flags.get_cf();
         self().on_set_a(mask8(t));
         flags.set_cf(static_cast<unsigned>(t >> 8));
-        set_flags(flags); }
-    void on_rra() {
-        fast_u8 a = self().on_get_a();
-        flag_set flags = get_flags();
-        fast_u8 r = (a >> 1) | (flags.get_cf() << 7);
-        self().on_set_a(r);
-        flags.set_cf(a);
         set_flags(flags); }
     void on_rlca() {
         fast_u8 a = self().on_get_a();
@@ -3950,14 +3958,6 @@ public:
         self().on_set_reg(access_r, irp, d, n);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, n);
-        self().on_set_f(f); }
-    void on_rra() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        fast_u8 r = (a >> 1) | ((f & cf_mask) ? 0x80 : 0);
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
-                cf_ari(a & 0x1);
-        self().on_set_a(r);
         self().on_set_f(f); }
 
 protected:
