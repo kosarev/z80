@@ -2409,6 +2409,14 @@ public:
 
     executor_base() {}
 
+    fast_u8 on_disp_read() {
+        assert(self().on_is_z80());
+        fast_u16 pc = self().get_pc_on_disp_read();
+        fast_u8 op = self().on_disp_read_cycle(pc);
+        self().set_pc_on_disp_read(inc16(pc));
+        return op;
+    }
+
     fast_u16 get_pc_on_fetch() { return self().on_get_pc(); }
     void set_pc_on_fetch(fast_u16 pc) { self().on_set_pc(pc); }
 
@@ -2667,6 +2675,8 @@ public:
     using base::hf_inc;
     using base::pf_log;
     using base::zf_ari;
+
+    bool on_is_z80() { return false; }
 
     void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
@@ -3112,6 +3122,8 @@ public:
     using base::pf_dec;
     using base::pf_inc;
     using base::cf_ari;
+
+    bool on_is_z80() { return true; }
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
 
@@ -3957,28 +3969,17 @@ public:
         self().on_output(port, n);
     }
 
-    fast_u8 on_disp_read() {
-        fast_u16 pc = self().get_pc_on_disp_read();
-        fast_u8 op = self().on_disp_read_cycle(pc);
-        self().set_pc_on_disp_read(inc16(pc));
-        return op;
-    }
-
 protected:
     using base::self;
 };
 
 template<typename D>
-class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>> {
-public:
-    bool on_is_z80() { return false; }
-};
+class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>>
+{};
 
 template<typename D>
-class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>> {
-public:
-    bool on_is_z80() { return true; }
-};
+class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>>
+{};
 
 static const fast_u32 address_space_size = 0x10000;  // 64K bytes.
 
