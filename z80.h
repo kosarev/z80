@@ -2409,8 +2409,11 @@ public:
 
     executor_base() {}
 
-    fast_u8 on_disp_read() {
+    fast_u8 on_disp_read_cycle(fast_u16 addr) {
         assert(self().on_is_z80());
+        return self().on_read_cycle(addr); }
+
+    fast_u8 on_disp_read() {
         fast_u16 pc = self().get_pc_on_disp_read();
         fast_u8 op = self().on_disp_read_cycle(pc);
         self().set_pc_on_disp_read(inc16(pc));
@@ -3949,10 +3952,6 @@ public:
         fast_u8 n = self().on_fetch_cycle();
         self().on_inc_r_reg();
         return n;
-    }
-
-    fast_u8 on_disp_read_cycle(fast_u16 addr) {
-        return self().on_read_cycle(addr);
     }
 
 protected:
