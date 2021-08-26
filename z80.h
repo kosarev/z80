@@ -1316,6 +1316,8 @@ public:
         self().on_format("ret"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
+    void on_rrca() {
+        self().on_format(self().on_is_z80() ? "rrca" : "rrc"); }
     void on_rrd() {
         self().on_format("rrd"); }
     void on_sbc_hl_rp(regp rp) {
@@ -1501,8 +1503,6 @@ public:
         self().on_format("rar"); }
     void on_rlca() {
         self().on_format("rlc"); }
-    void on_rrca() {
-        self().on_format("rrc"); }
     void on_ret_cc(condition cc) {
         self().on_format("rC", cc); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -1823,8 +1823,6 @@ public:
                                r, iregp::hl, /* d= */ 0); }
     void on_rra() {
         self().on_format("rra"); }
-    void on_rrca() {
-        self().on_format("rrca"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2732,6 +2730,24 @@ public:
         self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
+    void on_rrca() {
+        if(!self().on_is_z80()) {
+            fast_u8 a = self().on_get_a();
+            flag_set flags = get_flags();
+            a = ror8(a);
+            self().on_set_a(a);
+            flags.set_cf(a >> 7);
+            set_flags(flags);
+            return;
+        }
+
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        a = ror8(a);
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
+                cf_ari(a & 0x80);
+        self().on_set_a(a);
+        self().on_set_f(f); }
     void on_rrd() {
         fast_u8 a = self().on_get_a();
         fast_u8 f = self().on_get_f();
@@ -3202,13 +3218,6 @@ public:
         a = rol8(a);
         self().on_set_a(a);
         flags.set_cf(a);
-        set_flags(flags); }
-    void on_rrca() {
-        fast_u8 a = self().on_get_a();
-        flag_set flags = get_flags();
-        a = ror8(a);
-        self().on_set_a(a);
-        flags.set_cf(a >> 7);
         set_flags(flags); }
 
 protected:
@@ -3949,14 +3958,6 @@ public:
         f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
                 cf_ari(a & 0x1);
         self().on_set_a(r);
-        self().on_set_f(f); }
-    void on_rrca() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        a = ror8(a);
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
-                cf_ari(a & 0x80);
-        self().on_set_a(a);
         self().on_set_f(f); }
 
 protected:
