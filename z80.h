@@ -1316,6 +1316,8 @@ public:
         self().on_format("ret"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
+    void on_rrd() {
+        self().on_format("rrd"); }
     void on_sbc_hl_rp(regp rp) {
         self().on_format("sbc hl, P", rp, iregp::hl); }
 
@@ -1823,8 +1825,6 @@ public:
         self().on_format("rra"); }
     void on_rrca() {
         self().on_format("rrca"); }
-    void on_rrd() {
-        self().on_format("rrd"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2732,6 +2732,22 @@ public:
         self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
+    void on_rrd() {
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        fast_u16 hl = self().on_get_hl();
+        self().on_set_wz(inc16(hl));
+        fast_u16 t = make16(a, self().on_read_cycle(hl));
+        self().on_4t_exec_cycle();
+
+        t = (t & 0xf000) | ((t & 0xf) << 8) | ((t & 0x0ff0) >> 4);
+        a = get_high8(t);
+        f = (f & cf_mask) | (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) |
+                pf_log(a);
+
+        self().on_set_a(a);
+        self().on_set_f(f);
+        self().on_write_cycle(hl, get_low8(t)); }
     void on_sbc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp, iregp::hl);
@@ -3942,22 +3958,6 @@ public:
                 cf_ari(a & 0x80);
         self().on_set_a(a);
         self().on_set_f(f); }
-    void on_rrd() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        fast_u16 hl = self().on_get_hl();
-        self().on_set_wz(inc16(hl));
-        fast_u16 t = make16(a, self().on_read_cycle(hl));
-        self().on_4t_exec_cycle();
-
-        t = (t & 0xf000) | ((t & 0xf) << 8) | ((t & 0x0ff0) >> 4);
-        a = get_high8(t);
-        f = (f & cf_mask) | (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) |
-                pf_log(a);
-
-        self().on_set_a(a);
-        self().on_set_f(f);
-        self().on_write_cycle(hl, get_low8(t)); }
 
 protected:
     using base::self;
