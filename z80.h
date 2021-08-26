@@ -1287,6 +1287,8 @@ public:
         self().on_format("ret"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
+    void on_sbc_hl_rp(regp rp) {
+        self().on_format("sbc hl, P", rp, iregp::hl); }
 
     static const char *get_condition_name(condition cc) {
         switch(cc) {
@@ -1823,8 +1825,6 @@ public:
         else
             self().on_format("set R, U, R", r, iregp::hl, /* d= */ 0, b,
                              reg::at_hl, irp, d); }
-    void on_sbc_hl_rp(regp rp) {
-        self().on_format("sbc hl, P", rp, iregp::hl); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2569,6 +2569,27 @@ public:
         self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
+    void on_sbc_hl_rp(regp rp) {
+        fast_u16 hl = self().on_get_hl();
+        fast_u16 n = self().on_get_regp(rp, iregp::hl);
+        bool cf = self().on_get_f() & cf_mask;
+
+        self().on_4t_exec_cycle();
+        self().on_3t_exec_cycle();
+
+        fast_u16 t = add16(n, cf);
+        bool of = cf && t == 0;
+        fast_u32 r32 = hl - t;
+        fast_u16 r16 = mask16(r32);
+        fast_u8 f = (get_high8(r16) & (sf_mask | yf_mask | xf_mask)) |
+                        zf_ari(r16) | hf_ari(r16 >> 8, hl >> 8, n >> 8) |
+                        (pf_ari(r32 >> 8, hl >> 8, n >> 8) ^
+                             (of ? pf_mask : 0)) |
+                        cf_ari(r16 > hl || of) | nf_mask;
+
+        self().on_set_wz(inc16(hl));
+        self().on_set_hl(r16);
+        self().on_set_f(f); }
 
     void on_step() {
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
@@ -3930,27 +3951,6 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
-    void on_sbc_hl_rp(regp rp) {
-        fast_u16 hl = self().on_get_hl();
-        fast_u16 n = self().on_get_regp(rp, iregp::hl);
-        bool cf = self().on_get_f() & cf_mask;
-
-        self().on_4t_exec_cycle();
-        self().on_3t_exec_cycle();
-
-        fast_u16 t = add16(n, cf);
-        bool of = cf && t == 0;
-        fast_u32 r32 = hl - t;
-        fast_u16 r16 = mask16(r32);
-        fast_u8 f = (get_high8(r16) & (sf_mask | yf_mask | xf_mask)) |
-                        zf_ari(r16) | hf_ari(r16 >> 8, hl >> 8, n >> 8) |
-                        (pf_ari(r32 >> 8, hl >> 8, n >> 8) ^
-                             (of ? pf_mask : 0)) |
-                        cf_ari(r16 > hl || of) | nf_mask;
-
-        self().on_set_wz(inc16(hl));
-        self().on_set_hl(r16);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
