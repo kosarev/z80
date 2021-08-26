@@ -5,6 +5,7 @@ add_test(z80_tests tester z80 "${CMAKE_CURRENT_SOURCE_DIR}/tests_z80")
 
 set(TESTS
     dummy_state
+    interrupts
     reset
     )
 
