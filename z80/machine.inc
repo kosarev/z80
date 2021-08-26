@@ -78,8 +78,11 @@ class machine_object
     : public z80::machine_state<
         machine<z80::z80_executor<
             z80::z80_decoder<z80::root<machine_object>>>,
-        object_state>>
-{};
+        object_state>> {
+public:
+    fast_u8 on_get_r() const { return state.r; }
+    void on_set_r(fast_u8 n) { state.r = n; }
+};
 
 class disasm : public disasm_base<z80::z80_disasm<disasm>> {
 public:

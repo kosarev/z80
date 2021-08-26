@@ -169,9 +169,6 @@ public:
     fast_u8 on_get_i() const { return state.i; }
     void on_set_i(fast_u8 n) { state.i = n; }
 
-    fast_u8 on_get_r() const { return state.r; }
-    void on_set_r(fast_u8 n) { state.r = n; }
-
     fast_u16 on_get_ir() const { return make16(state.i, state.r); }
 
     fast_u16 on_get_pc() const { return state.pc; }
@@ -263,9 +260,9 @@ public:
 
 protected:
     using base::self;
+    machine_state state;
 
 private:
-    machine_state state;
     PyObject *on_input_callback = nullptr;
 };
 

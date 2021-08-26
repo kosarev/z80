@@ -845,11 +845,14 @@ protected:
     unsigned instr_size = 0;
 };
 
-class i8080_machine : public machine_base<z80::i8080_cpu<i8080_machine>> {
+class i8080_machine
+    : public machine_base<z80::i8080_executor<
+        z80::i8080_decoder<z80::generic_state<z80::root<i8080_machine>>>>> {
+    using base = machine_base<z80::i8080_executor<
+        z80::i8080_decoder<z80::generic_state<z80::root<i8080_machine>>>>>;
+
 public:
-    i8080_machine(test_context &context)
-        : machine_base<z80::i8080_cpu<i8080_machine>>(context)
-    {}
+    i8080_machine(test_context &context) : base(context) {}
 
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", 0, wz);
                                   return base::on_set_wz(wz); }
@@ -865,11 +868,14 @@ public:
     }
 };
 
-class z80_machine : public machine_base<z80::z80_cpu<z80_machine>> {
+class z80_machine
+    : public machine_base<z80::z80_executor<
+        z80::z80_decoder<z80::generic_state<z80::root<z80_machine>>>>> {
+    using base = machine_base<z80::z80_executor<
+        z80::z80_decoder<z80::generic_state<z80::root<z80_machine>>>>>;
+
 public:
-    z80_machine(test_context &context)
-        : machine_base<z80::z80_cpu<z80_machine>>(context)
-    {}
+    z80_machine(test_context &context) : base(context) {}
 
     z80::iregp on_get_iregp_kind() {
         assert(instr_size > 0);

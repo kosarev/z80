@@ -2403,11 +2403,35 @@ private:
 };
 
 template<typename B>
+class generic_state : public z80_state<B> {
+    using base = z80_state<B>;
+
+public:
+    bool get_iff() { return base::get_iff1(); }
+    void set_iff(bool f) { base::set_iff1(f); }
+
+    bool on_get_iff() { return base::on_get_iff1(); }
+    void on_set_iff(bool f) { base::on_set_iff1(f); }
+};
+
+template<typename B>
 class internals::executor_base : public B {
 public:
     typedef B base;
 
     executor_base() {}
+
+    void on_inc_r_reg() {
+        // TODO: Consider splitting R into R[7] and R[6:0].
+        fast_u8 r = self().on_get_r();
+        r = (r & 0x80) | (inc8(r) & 0x7f);
+        self().on_set_r(r); }
+
+    fast_u8 on_m1_fetch_cycle() {
+        fast_u8 n = self().on_fetch_cycle();
+        if(self().on_is_z80())
+            self().on_inc_r_reg();
+        return n; }
 
     fast_u8 on_disp_read_cycle(fast_u16 addr) {
         assert(self().on_is_z80());
@@ -3142,13 +3166,6 @@ public:
     bool on_is_z80() { return true; }
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
-
-    void on_inc_r_reg() {
-        // TODO: Consider splitting R into R[7] and R[6:0].
-        fast_u8 r = self().on_get_r();
-        r = (r & 0x80) | (inc8(r) & 0x7f);
-        self().on_set_r(r);
-    }
 
     fast_u16 on_get_ix() {
         // Always get the low byte first.
@@ -3945,12 +3962,6 @@ public:
         self().on_set_addr_bus(self().get_ir_on_refresh());
         self().on_tick(2);
         self().set_pc_on_fetch(inc16(addr));
-        return n;
-    }
-
-    fast_u8 on_m1_fetch_cycle() {
-        fast_u8 n = self().on_fetch_cycle();
-        self().on_inc_r_reg();
         return n;
     }
 
