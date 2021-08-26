@@ -1273,6 +1273,27 @@ public:
         self().on_emit(out.get_buff());
     }
 
+    void on_bit(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        if(irp == iregp::hl || r == reg::at_hl)
+            self().on_format("bit U, R", b, r, irp, d);
+        else
+            self().on_format("bit R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
+    void on_res(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        if(irp == iregp::hl || r == reg::at_hl)
+            self().on_format("res U, R", b, r, irp, d);
+        else
+            self().on_format("res R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
+    void on_set(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        if(irp == iregp::hl || r == reg::at_hl)
+            self().on_format("set U, R", b, r, irp, d);
+        else
+            self().on_format("set R, U, R", r, iregp::hl, /* d= */ 0, b,
+                             reg::at_hl, irp, d); }
     void on_call_nn(fast_u16 nn) {
         self().on_format("call W", nn); }
     void on_daa() {
@@ -1658,13 +1679,6 @@ public:
         self().on_format("I", k); }
     void on_block_out(block_out k) {
         self().on_format("T", k); }
-    void on_bit(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        if(irp == iregp::hl || r == reg::at_hl)
-            self().on_format("bit U, R", b, r, irp, d);
-        else
-            self().on_format("bit R, U, R", r, iregp::hl, /* d= */ 0, b,
-                             reg::at_hl, irp, d); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
     void on_ccf() {
@@ -1784,13 +1798,6 @@ public:
     void on_push_rp(regp2 rp) {
         iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("push G", rp, irp); }
-    void on_res(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        if(irp == iregp::hl || r == reg::at_hl)
-            self().on_format("res U, R", b, r, irp, d);
-        else
-            self().on_format("res R, U, R", r, iregp::hl, /* d= */ 0, b,
-                             reg::at_hl, irp, d); }
     void on_ret_cc(condition cc) {
         self().on_format("ret C", cc); }
     void on_reti() {
@@ -1818,13 +1825,6 @@ public:
         self().on_format("rrd"); }
     void on_scf() {
         self().on_format("scf"); }
-    void on_set(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        if(irp == iregp::hl || r == reg::at_hl)
-            self().on_format("set U, R", b, r, irp, d);
-        else
-            self().on_format("set R, U, R", r, iregp::hl, /* d= */ 0, b,
-                             reg::at_hl, irp, d); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2518,6 +2518,36 @@ public:
     void on_set_addr_bus(fast_u16 addr) {
         unused(addr); }
 
+    void on_bit(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        fast_u8 v = self().on_get_reg(access_r, irp, d, /* long_read_cycle= */ true);
+        fast_u8 f = self().on_get_f();
+        fast_u8 m = v & (1u << b);
+        // TODO: Is it always (m & sf_mask)? Regardless of whether m is zero or not?
+        f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
+        if(irp != iregp::hl || access_r == reg::at_hl)
+            v = get_high8(self().on_get_wz());
+        f |= v & (xf_mask | yf_mask);
+        self().on_set_f(f); }
+    void on_res(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        fast_u8 v = self().on_get_reg(access_r, irp, d,
+                                      /* long_read_cycle= */ true);
+        v &= ~(1u << b);
+        self().on_set_reg(access_r, irp, d, v);
+        if(irp != iregp::hl && r != reg::at_hl)
+            self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_set(unsigned b, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        fast_u8 v = self().on_get_reg(access_r, irp, d,
+                                      /* long_read_cycle= */ true);
+        v |= 1u << b;
+        self().on_set_reg(access_r, irp, d, v);
+        if(irp != iregp::hl && r != reg::at_hl)
+            self().on_set_reg(r, irp, /* d= */ 0, v); }
     void on_push(fast_u16 nn) {
         fast_u16 sp = self().on_get_sp();
         sp = dec16(sp);
@@ -3595,18 +3625,6 @@ public:
             fast_u16 pc = self().get_pc_on_block_instr();
             self().set_pc_on_block_instr(sub16(pc, 2));
         } }
-    void on_bit(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        reg access_r = irp == iregp::hl ? r : reg::at_hl;
-        fast_u8 v = self().on_get_reg(access_r, irp, d, /* long_read_cycle= */ true);
-        fast_u8 f = self().on_get_f();
-        fast_u8 m = v & (1u << b);
-        // TODO: Is it always (m & sf_mask)? Regardless of whether m is zero or not?
-        f = (f & cf_mask) | hf_mask | (m ? (m & sf_mask) : (zf_mask | pf_mask));
-        if(irp != iregp::hl || access_r == reg::at_hl)
-            v = get_high8(self().on_get_wz());
-        f |= v & (xf_mask | yf_mask);
-        self().on_set_f(f); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         if(check_condition(cc)) {
             self().on_read_cycle_extra_1t();
@@ -3838,15 +3856,6 @@ public:
     void on_pop_rp(regp2 rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_regp2(rp, irp, self().on_pop()); }
-    void on_res(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        reg access_r = irp == iregp::hl ? r : reg::at_hl;
-        fast_u8 v = self().on_get_reg(access_r, irp, d,
-                                      /* long_read_cycle= */ true);
-        v &= ~(1u << b);
-        self().on_set_reg(access_r, irp, d, v);
-        if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, v); }
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             self().on_return(); }
@@ -3942,15 +3951,6 @@ public:
         f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
                 cf_mask;
         self().on_set_f(f); }
-    void on_set(unsigned b, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        reg access_r = irp == iregp::hl ? r : reg::at_hl;
-        fast_u8 v = self().on_get_reg(access_r, irp, d,
-                                      /* long_read_cycle= */ true);
-        v |= 1u << b;
-        self().on_set_reg(access_r, irp, d, v);
-        if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, v); }
 
 protected:
     using base::self;
