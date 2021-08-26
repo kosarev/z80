@@ -166,11 +166,6 @@ public:
     fast_u16 on_get_iy() const { return make16(state.iyh, state.iyl); }
     void on_set_iy(fast_u16 n) { split16(state.iyh, state.iyl, n); }
 
-    fast_u8 on_get_i() const { return state.i; }
-    void on_set_i(fast_u8 n) { state.i = n; }
-
-    fast_u16 on_get_ir() const { return make16(state.i, state.r); }
-
     fast_u16 on_get_pc() const { return state.pc; }
     void on_set_pc(fast_u16 n) { state.pc = n; }
 

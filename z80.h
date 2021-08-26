@@ -1222,6 +1222,9 @@ public:
 
     disasm_base() {}
 
+    fast_u8 on_fetch_cycle() {
+        return self().on_read_next_byte(); }
+
     fast_u8 on_imm8_read() { return self().on_read_next_byte(); }
 
     fast_u16 on_imm16_read() {
@@ -1372,9 +1375,6 @@ public:
     typedef internals::disasm_base<i8080_decoder<root<D>>> base;
 
     i8080_disasm() {}
-
-    fast_u8 on_fetch_cycle() {
-        return self().on_read_next_byte(); }
 
     void on_format_char(char c, const void **&args,
                         typename base::output_buff &out) {
@@ -1564,9 +1564,6 @@ public:
         base;
 
     z80_disasm() {}
-
-    fast_u8 on_fetch_cycle() {
-        return self().on_read_next_byte(); }
 
     fast_u8 on_disp_read() { return self().on_read_next_byte(); }
 
@@ -2421,6 +2418,18 @@ public:
 
     executor_base() {}
 
+    fast_u8 on_fetch_cycle() {
+        fast_u16 addr = self().get_pc_on_fetch();
+        self().on_set_addr_bus(addr);
+        fast_u8 n = self().on_read(addr);
+        self().on_tick(2);
+        self().on_mreq_wait(addr);
+        if(self().on_is_z80())
+            self().on_set_addr_bus(self().get_ir_on_refresh());
+        self().on_tick(2);
+        self().set_pc_on_fetch(inc16(addr));
+        return n; }
+
     void on_inc_r_reg() {
         // TODO: Consider splitting R into R[7] and R[6:0].
         fast_u8 r = self().on_get_r();
@@ -2461,6 +2470,8 @@ public:
 
     void set_pc_on_call(fast_u16 pc) { self().on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { self().on_set_pc(pc); }
+
+    fast_u16 get_ir_on_refresh() { return self().on_get_ir(); }
 
     void disable_int_on_ei() { self().on_set_is_int_disabled(true); }
 
@@ -2746,16 +2757,6 @@ public:
         return r == reg::at_hl ? self().on_set_m(n) :
                                  base::on_set_reg(r, n);
     }
-
-    fast_u8 on_fetch_cycle() {
-        fast_u16 addr = self().get_pc_on_fetch();
-        self().on_set_addr_bus(addr);
-        fast_u8 n = self().on_read(addr);
-        self().on_tick(2);
-        self().on_mreq_wait(addr);
-        self().on_tick(2);
-        self().set_pc_on_fetch(inc16(addr));
-        return n; }
 
 private:
     static fast_u8 cf(fast_u8 f) {
@@ -3192,8 +3193,6 @@ public:
 
     fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
-
-    fast_u16 get_ir_on_refresh() { return self().on_get_ir(); }
 
     void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
     void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
@@ -3952,18 +3951,6 @@ public:
         self().on_set_wz(inc16(hl));
         self().on_set_hl(r16);
         self().on_set_f(f); }
-
-    fast_u8 on_fetch_cycle() {
-        fast_u16 addr = self().get_pc_on_fetch();
-        self().on_set_addr_bus(addr);
-        fast_u8 n = self().on_read(addr);
-        self().on_tick(2);
-        self().on_mreq_wait(addr);
-        self().on_set_addr_bus(self().get_ir_on_refresh());
-        self().on_tick(2);
-        self().set_pc_on_fetch(inc16(addr));
-        return n;
-    }
 
 protected:
     using base::self;
