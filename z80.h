@@ -1316,6 +1316,13 @@ public:
         self().on_format("ret"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
+    void on_rot(rot k, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        if(irp == iregp::hl || r == reg::at_hl)
+            self().on_format("O R", k, r, irp, d);
+        else
+            self().on_format("O R, R", k, reg::at_hl, irp, d,
+                               r, iregp::hl, /* d= */ 0); }
     void on_rra() {
         self().on_format(self().on_is_z80() ? "rra" : "rar"); }
     void on_rrca() {
@@ -1814,13 +1821,6 @@ public:
         self().on_format("rlca"); }
     void on_rld() {
         self().on_format("rld"); }
-    void on_rot(rot k, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        if(irp == iregp::hl || r == reg::at_hl)
-            self().on_format("O R", k, r, irp, d);
-        else
-            self().on_format("O R, R", k, reg::at_hl, irp, d,
-                               r, iregp::hl, /* d= */ 0); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2728,6 +2728,17 @@ public:
         self().on_return(); }
     void on_rst(fast_u16 nn) {
         self().on_call(nn); }
+    void on_rot(rot k, reg r, fast_u8 d) {
+        iregp irp = self().on_get_iregp_kind();
+        reg access_r = irp == iregp::hl ? r : reg::at_hl;
+        fast_u8 n = self().on_get_reg(access_r, irp, d,
+                                      /* long_read_cycle= */ true);
+        fast_u8 f = self().on_get_f();
+        do_rot(k, n, f);
+        self().on_set_reg(access_r, irp, d, n);
+        if(irp != iregp::hl && r != reg::at_hl)
+            self().on_set_reg(r, irp, /* d= */ 0, n);
+        self().on_set_f(f); }
     void on_rra() {
         if(!self().on_is_z80()) {
             fast_u8 a = self().on_get_a();
@@ -2807,6 +2818,58 @@ public:
     }
 
 private:
+    void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
+        fast_u8 t = n;
+        bool cf = f & cf_mask;
+        switch(k) {
+        case rot::rlc:
+            n = rol8(n);
+            f = (n & (sf_mask | yf_mask | xf_mask | cf_mask)) | zf_ari(n) |
+                    pf_log(n);
+            break;
+        case rot::rrc:
+            n = mask8((n >> 1) | (n << 7));
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                cf_ari(t & 0x01);
+            break;
+        case rot::rl:
+            n = mask8((n << 1) | (cf ? 1 : 0));
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x80);
+            break;
+        case rot::rr:
+            n = (n >> 1) | ((cf ? 1u : 0u) << 7);
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x01);
+            break;
+        case rot::sla:
+            n = mask8(n << 1);
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x80);
+            break;
+        case rot::sra:
+            n = (n >> 1) | (n & 0x80);
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x01);
+            break;
+        case rot::sll:
+            n = mask8(n << 1) | 1;
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x80);
+            break;
+        case rot::srl:
+            n >>= 1;
+            // TODO: We don't need to read F here.
+            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
+                    cf_ari(t & 0x1);
+            break;
+        }
+    }
+
+
     void initiate_interrupt(bool is_nmi) {
         assert(self().on_is_z80());
 
@@ -3419,57 +3482,6 @@ public:
         self().on_set_f(f);
     }
 
-    void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
-        fast_u8 t = n;
-        bool cf = f & cf_mask;
-        switch(k) {
-        case rot::rlc:
-            n = rol8(n);
-            f = (n & (sf_mask | yf_mask | xf_mask | cf_mask)) | zf_ari(n) |
-                    pf_log(n);
-            break;
-        case rot::rrc:
-            n = mask8((n >> 1) | (n << 7));
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                cf_ari(t & 0x01);
-            break;
-        case rot::rl:
-            n = mask8((n << 1) | (cf ? 1 : 0));
-            // TODO: We don't need to read F here.
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x80);
-            break;
-        case rot::rr:
-            n = (n >> 1) | ((cf ? 1u : 0u) << 7);
-            // TODO: We don't need to read F here.
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x01);
-            break;
-        case rot::sla:
-            n = mask8(n << 1);
-            // TODO: We don't need to read F here.
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x80);
-            break;
-        case rot::sra:
-            n = (n >> 1) | (n & 0x80);
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x01);
-            break;
-        case rot::sll:
-            n = mask8(n << 1) | 1;
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x80);
-            break;
-        case rot::srl:
-            n >>= 1;
-            // TODO: We don't need to read F here.
-            f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
-                    cf_ari(t & 0x1);
-            break;
-        }
-    }
-
     void on_relative_jump(fast_u8 d) {
         self().on_5t_exec_cycle();
         self().on_jump(get_disp_target(self().get_pc_on_jump(), d));
@@ -3948,17 +3960,6 @@ public:
         self().on_set_a(a);
         self().on_set_f(f);
         self().on_write_cycle(hl, get_low8(t)); }
-    void on_rot(rot k, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        reg access_r = irp == iregp::hl ? r : reg::at_hl;
-        fast_u8 n = self().on_get_reg(access_r, irp, d,
-                                      /* long_read_cycle= */ true);
-        fast_u8 f = self().on_get_f();
-        do_rot(k, n, f);
-        self().on_set_reg(access_r, irp, d, n);
-        if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, n);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
