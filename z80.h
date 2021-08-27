@@ -1330,6 +1330,8 @@ public:
         self().on_format("ei"); }
     void on_nop() {
         self().on_format("nop"); }
+    void on_neg() {
+        self().on_format("neg"); }
     void on_out_c_r(reg r) {
         if(r == reg::at_hl)
             self().on_format("out (c), N", self().on_get_out_c_r_op());
@@ -1853,8 +1855,6 @@ public:
     void on_ld_sp_irp() {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("ld sp, P", regp::hl, irp); }
-    void on_neg() {
-        self().on_format("neg"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2678,6 +2678,13 @@ protected:
         return !(((f >> pos) ^ n) & 0x1);
     }
 
+    void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
+        fast_u8 t = sub8(a, n);
+        f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
+        a = t;
+    }
+
 public:
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
@@ -2837,6 +2844,14 @@ public:
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
         self().on_write_cycle(nn, a); }
     void on_nop() {}
+    void on_neg() {
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        fast_u8 n = a;
+        a = 0;
+        do_sub(a, f, n);
+        self().on_set_a(a);
+        self().on_set_f(f); }
     void on_out_c_r(reg r) {
         fast_u16 bc = self().on_get_bc();
         self().on_set_wz(inc16(bc));
@@ -3484,13 +3499,6 @@ public:
                                  base::on_set_reg(r, irp, n);
     }
 
-    void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
-        fast_u8 t = sub8(a, n);
-        f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
-        a = t;
-    }
-
     void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
         f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
@@ -3957,18 +3965,11 @@ public:
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_regp(rp, irp, nn); }
-    void on_neg() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        fast_u8 n = a;
-        a = 0;
-        do_sub(a, f, n);
-        self().on_set_a(a);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
     using base::check_condition;
+    using base::do_sub;
 };
 
 template<typename D>
