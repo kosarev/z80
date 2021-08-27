@@ -1328,6 +1328,12 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_sp_irp() {
+        if(!self().on_is_z80()) {
+            self().on_format("sphl");
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_format("ld sp, P", regp::hl, irp); } }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         if(!self().on_is_z80()) {
             self().on_format("lxi P, W", rp, nn);
@@ -1571,8 +1577,6 @@ public:
         self().on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         self().on_format("mov R, R", rd, rs); }
-    void on_ld_sp_irp() {
-        self().on_format("sphl"); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         self().on_format("lhld W", nn); }
     void on_ld_at_nn_irp(fast_u16 nn) {
@@ -1853,9 +1857,6 @@ public:
         self().on_format("ld a, (P)", rp, iregp::hl); }
     void on_ld_at_rp_a(regp rp) {
         self().on_format("ld (P), a", rp, iregp::hl); }
-    void on_ld_sp_irp() {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_format("ld sp, P", regp::hl, irp); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2717,6 +2718,12 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_sp_irp() {
+        if(!self().on_is_z80()) {
+            self().on_set_sp(self().on_get_hl());
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_sp(self().on_get_iregp(irp)); } }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         // TODO: Unify on_set_regp()?
         if(!self().on_is_z80()) {
@@ -3391,8 +3398,6 @@ public:
     void on_ld_r_r(reg rd, reg rs) {
         self().on_fetch_cycle_extra_1t();
         self().on_set_reg(rd, self().on_get_reg(rs)); }
-    void on_ld_sp_irp() {
-        self().on_set_sp(self().on_get_hl()); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
@@ -3965,9 +3970,6 @@ public:
         nn = inc16(nn);
         self().on_set_wz(nn);
         self().on_write_cycle(nn, get_high8(rpv)); }
-    void on_ld_sp_irp() {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_sp(self().on_get_iregp(irp)); }
 
 protected:
     using base::self;
