@@ -1330,6 +1330,13 @@ public:
         self().on_format("ei"); }
     void on_nop() {
         self().on_format("nop"); }
+    void on_push_rp(regp2 rp) {
+        // TODO: Unify handling the G specifier.
+        if(!self().on_is_z80()) {
+            self().on_format("push G", rp);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(rp);
+            self().on_format("push G", rp, irp); } }
     void on_pop_rp(regp2 rp) {
         // TODO: Unify handling the G specifier.
         if(!self().on_is_z80()) {
@@ -1559,8 +1566,6 @@ public:
         self().on_format("shld W", nn); }
     void on_out_n_a(fast_u8 n) {
         self().on_format("out N", n); }
-    void on_push_rp(regp2 rp) {
-        self().on_format("push G", rp); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -1852,9 +1857,6 @@ public:
             self().on_format("out (c), R", r, iregp::hl, 0); }
     void on_out_n_a(fast_u8 n) {
         self().on_format("out (N), a", n); }
-    void on_push_rp(regp2 rp) {
-        iregp irp = get_iregp_kind_or_hl(rp);
-        self().on_format("push G", rp, irp); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2724,6 +2726,25 @@ public:
         sp = inc16(sp);
         self().on_set_sp(sp);
         return make16(hi, lo); }
+    void on_push_rp(regp2 rp) {
+        if(self().on_is_z80()) {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_push(self().on_get_regp2(rp, irp));
+            return;
+        }
+
+        fast_u16 nn;
+        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
+            flag_set flags = get_flags();
+            nn = make16(self().on_get_a(), flags.get_f());
+        } else {
+            nn = self().on_get_regp2(rp);
+        }
+        if(rp == regp2::af) {
+            // NF is always raised on i8080.
+            nn |= nf_mask;
+        }
+        self().on_push(nn); }
     void on_pop_rp(regp2 rp) {
         if(self().on_is_z80()) {
             iregp irp = self().on_get_iregp_kind();
@@ -3358,19 +3379,6 @@ public:
         self().on_set_regp(rp, nn); }
     void on_out_n_a(fast_u8 n) {
         self().on_output_cycle(n, self().on_get_a()); }
-    void on_push_rp(regp2 rp) {
-        fast_u16 nn;
-        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
-            flag_set flags = get_flags();
-            nn = make16(self().on_get_a(), flags.get_f());
-        } else {
-            nn = self().on_get_regp2(rp);
-        }
-        if(rp == regp2::af) {
-            // NF is always raised on i8080.
-            nn |= nf_mask;
-        }
-        self().on_push(nn); }
 
 protected:
     using base::self;
@@ -3958,9 +3966,6 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_output_cycle(make16(a, n), a);
         self().on_set_wz(make16(a, inc8(n))); }
-    void on_push_rp(regp2 rp) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_push(self().on_get_regp2(rp, irp)); }
 
 protected:
     using base::self;
