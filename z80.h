@@ -1330,6 +1330,8 @@ public:
         self().on_format("ei"); }
     void on_nop() {
         self().on_format("nop"); }
+    void on_out_n_a(fast_u8 n) {
+        self().on_format(self().on_is_z80() ? "out (N), a" : "out N", n); }
     void on_push_rp(regp2 rp) {
         // TODO: Unify handling the G specifier.
         if(!self().on_is_z80()) {
@@ -1564,8 +1566,6 @@ public:
         self().on_format("lhld W", nn); }
     void on_ld_at_nn_irp(fast_u16 nn) {
         self().on_format("shld W", nn); }
-    void on_out_n_a(fast_u8 n) {
-        self().on_format("out N", n); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -1855,8 +1855,6 @@ public:
             self().on_format("out (c), N", self().on_get_out_c_r_op());
         else
             self().on_format("out (c), R", r, iregp::hl, 0); }
-    void on_out_n_a(fast_u8 n) {
-        self().on_format("out (N), a", n); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2839,6 +2837,13 @@ public:
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
         self().on_write_cycle(nn, a); }
     void on_nop() {}
+    void on_out_n_a(fast_u8 n) {
+        fast_u8 a = self().on_get_a();
+        if(!self().on_is_z80()) {
+            self().on_output_cycle(n, a);
+        } else {
+            self().on_output_cycle(make16(a, n), a);
+            self().on_set_wz(make16(a, inc8(n))); } }
     void on_ret() {
         self().on_return(); }
     void on_rst(fast_u16 nn) {
@@ -3377,8 +3382,6 @@ public:
         self().on_write_cycle(nn, a); }
     void on_ld_rp_nn(regp rp, fast_u16 nn) {
         self().on_set_regp(rp, nn); }
-    void on_out_n_a(fast_u8 n) {
-        self().on_output_cycle(n, self().on_get_a()); }
 
 protected:
     using base::self;
@@ -3962,10 +3965,6 @@ public:
             self().on_get_out_c_r_op() :
             self().on_get_reg(r, iregp::hl, /* d= */ 0);
         self().on_output_cycle(bc, n); }
-    void on_out_n_a(fast_u8 n) {
-        fast_u8 a = self().on_get_a();
-        self().on_output_cycle(make16(a, n), a);
-        self().on_set_wz(make16(a, inc8(n))); }
 
 protected:
     using base::self;
