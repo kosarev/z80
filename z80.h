@@ -1314,6 +1314,10 @@ public:
         self().on_format("nop"); }
     void on_ret() {
         self().on_format("ret"); }
+    void on_reti() {
+        self().on_format("reti"); }
+    void on_retn() {
+        self().on_format("retn"); }
     void on_rst(fast_u16 nn) {
         self().on_format("rst W", nn); }
     void on_rot(rot k, reg r, fast_u8 d) {
@@ -1813,10 +1817,6 @@ public:
         self().on_format("push G", rp, irp); }
     void on_ret_cc(condition cc) {
         self().on_format("ret C", cc); }
-    void on_reti() {
-        self().on_format("reti"); }
-    void on_retn() {
-        self().on_format("retn"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2668,6 +2668,16 @@ public:
         fast_u16 pc = self().on_pop();
         self().on_set_wz(pc);
         self().set_pc_on_return(pc); }
+    void on_reti_retn() {
+        // According to Sean Young's The Undocumented Z80
+        // Documented, both RETI and RETN copy IFF2 to IFF1.
+        // http://z80.info/zip/z80-documented.pdf
+        self().set_iff1_on_reti_retn(self().get_iff2_on_reti_retn());
+        self().on_return(); }
+    void on_reti() {
+        self().on_reti_retn(); }
+    void on_retn() {
+        self().on_reti_retn(); }
     void on_jump(fast_u16 nn) {
         self().on_set_wz(nn);
         self().set_pc_on_jump(nn); }
@@ -3952,16 +3962,6 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             self().on_return(); }
-    void on_reti_retn() {
-        // According to Sean Young's The Undocumented Z80
-        // Documented, both RETI and RETN copy IFF2 to IFF1.
-        // http://z80.info/zip/z80-documented.pdf
-        self().set_iff1_on_reti_retn(self().get_iff2_on_reti_retn());
-        self().on_return(); }
-    void on_reti() {
-        self().on_reti_retn(); }
-    void on_retn() {
-        self().on_reti_retn(); }
 
 protected:
     using base::self;
