@@ -2848,6 +2848,16 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, get_low8(nn + 1)));
         self().on_write_cycle(nn, a); }
+    void on_ld_a_at_rp(regp rp) {
+        fast_u16 nn;
+        if(!self().on_is_z80()) {
+            nn = self().on_get_regp(rp);
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            nn = self().on_get_regp(rp, irp);
+        }
+        self().on_set_wz(inc16(nn));
+        self().on_set_a(self().on_read_cycle(nn)); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
@@ -3516,10 +3526,6 @@ public:
         set_flags(flags); }
     void on_inc_rp(regp rp) {
         self().on_set_regp(rp, inc16(self().on_get_regp(rp))); }
-    void on_ld_a_at_rp(regp rp) {
-        fast_u16 nn = self().on_get_regp(rp);
-        self().on_set_wz(inc16(nn));
-        self().on_set_a(self().on_read_cycle(nn)); }
 
 protected:
     using base::self;
@@ -3978,11 +3984,6 @@ public:
     void on_jr_cc(condition cc, fast_u8 d) {
         if(check_condition(cc))
             self().on_relative_jump(d); }
-    void on_ld_a_at_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 nn = self().on_get_regp(rp, irp);
-        self().on_set_wz(inc16(nn));
-        self().on_set_a(self().on_read_cycle(nn)); }
 
 protected:
     using base::self;
