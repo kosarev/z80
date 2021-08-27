@@ -1328,6 +1328,14 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
+        // The HL case repeats the unprefixed LD HL, (nn)
+        // instruction, so we have to represent it as an
+        // x-instruction.
+        if(rp == regp::hl)
+            self().on_format("xld W, P, (W)", 0xed6b, rp, iregp::hl, nn);
+        else
+            self().on_format("ld P, (W)", rp, iregp::hl, nn); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         // The HL case repeats the unprefixed LD (nn), HL
         // instruction, so we have to represent it as an
@@ -1841,14 +1849,6 @@ public:
     void on_ld_at_nn_irp(fast_u16 nn) {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("ld (W), P", nn, regp::hl, irp); }
-    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
-        // The HL case repeats the unprefixed LD HL, (nn)
-        // instruction, so we have to represent it as an
-        // x-instruction.
-        if(rp == regp::hl)
-            self().on_format("xld W, P, (W)", 0xed6b, rp, iregp::hl, nn);
-        else
-            self().on_format("ld P, (W)", rp, iregp::hl, nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2718,6 +2718,12 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
+        fast_u8 lo = self().on_read_cycle(nn);
+        nn = inc16(nn);
+        self().on_set_wz(nn);
+        fast_u8 hi = self().on_read_cycle(nn);
+        self().on_set_regp(rp, iregp::hl, make16(hi, lo)); }
     void on_ld_at_nn_rp(fast_u16 nn, regp rp) {
         fast_u16 rpv = self().on_get_regp(rp, iregp::hl);
         self().on_write_cycle(nn, get_low8(rpv));
@@ -3964,12 +3970,6 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, get_low8(nn + 1)));
         self().on_write_cycle(nn, a); }
-    void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
-        fast_u8 lo = self().on_read_cycle(nn);
-        nn = inc16(nn);
-        self().on_set_wz(nn);
-        fast_u8 hi = self().on_read_cycle(nn);
-        self().on_set_regp(rp, iregp::hl, make16(hi, lo)); }
 
 protected:
     using base::self;
