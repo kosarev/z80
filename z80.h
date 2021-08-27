@@ -1328,6 +1328,12 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        if(!self().on_is_z80()) {
+            self().on_format("lxi P, W", rp, nn);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(rp);
+            self().on_format("ld P, W", rp, irp, nn); } }
     void on_nop() {
         self().on_format("nop"); }
     void on_neg() {
@@ -1565,8 +1571,6 @@ public:
         self().on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         self().on_format("mov R, R", rd, rs); }
-    void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        self().on_format("lxi P, W", rp, nn); }
     void on_ld_sp_irp() {
         self().on_format("sphl"); }
     void on_ld_irp_at_nn(fast_u16 nn) {
@@ -1819,9 +1823,6 @@ public:
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
         iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("ld R, N", r, irp, d, n); }
-    void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        iregp irp = get_iregp_kind_or_hl(rp);
-        self().on_format("ld P, W", rp, irp, nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("ld P, (W)", regp::hl, irp, nn); }
@@ -2716,6 +2717,13 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_rp_nn(regp rp, fast_u16 nn) {
+        // TODO: Unify on_set_regp()?
+        if(!self().on_is_z80()) {
+            self().on_set_regp(rp, nn);
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_regp(rp, irp, nn); } }
     void on_push(fast_u16 nn) {
         fast_u16 sp = self().on_get_sp();
         sp = dec16(sp);
@@ -3402,8 +3410,6 @@ public:
         fast_u8 a = self().on_get_a();
         self().on_set_wz(make16(a, get_low8(nn + 1)));
         self().on_write_cycle(nn, a); }
-    void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        self().on_set_regp(rp, nn); }
 
 protected:
     using base::self;
@@ -3962,9 +3968,6 @@ public:
     void on_ld_sp_irp() {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_sp(self().on_get_iregp(irp)); }
-    void on_ld_rp_nn(regp rp, fast_u16 nn) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_regp(rp, irp, nn); }
 
 protected:
     using base::self;
