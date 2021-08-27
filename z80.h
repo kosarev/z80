@@ -1314,6 +1314,8 @@ public:
         self().on_format("nop"); }
     void on_ret() {
         self().on_format("ret"); }
+    void on_ret_cc(condition cc) {
+        self().on_format(self().on_is_z80() ? "ret C" : "rC", cc); }
     void on_reti() {
         self().on_format("reti"); }
     void on_retn() {
@@ -1516,8 +1518,6 @@ public:
         self().on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
         self().on_format("push G", rp); }
-    void on_ret_cc(condition cc) {
-        self().on_format("rC", cc); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -1815,8 +1815,6 @@ public:
     void on_push_rp(regp2 rp) {
         iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("push G", rp, irp); }
-    void on_ret_cc(condition cc) {
-        self().on_format("ret C", cc); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2614,6 +2612,51 @@ protected:
             self().on_set_f(flags.raw);
     }
 
+    bool check_condition(condition cc) {
+        if(self().on_is_z80()) {
+            // TODO: Would it make sense to store flags in a different order?
+            auto n = static_cast<unsigned>(cc);
+            unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
+                                 (cf_bit << 8) | (cf_bit << 12) |
+                                 (pf_bit << 16) | (pf_bit << 20) |
+                                 (sf_bit << 24) | (sf_bit << 28);
+            fast_u8 f = self().on_get_f();
+            unsigned pos = (flag_bits >> (n * 4)) & 0xf;
+            return !(((f >> pos) ^ n) & 0x1);
+        }
+
+        auto n = static_cast<unsigned>(cc);
+        if(self().on_is_to_use_lazy_flags()) {
+            fast_u16 flags = self().on_get_flags();
+            fast_u8 res8 = get_low8(flags);
+            switch(cc) {
+            case condition::nz:
+            case condition::z:
+                return (((res8 == 0) | (flags >> (zf_bit + 8))) ^ n ^ 1) & 0x1;
+            case condition::nc:
+            case condition::c:
+                return ((flags >> (cf_bit + 8)) ^ n ^ 1) & 0x1;
+            case condition::po:
+            case condition::pe:
+                return ((pf_log(res8) | (flags >> (pf_bit + 8))) ^ n ^ 1) & 0x1;
+            case condition::p:
+            case condition::m:
+                return (((flags >> (sf_bit + 8)) |
+                         (flags >> sf_bit)) ^ n ^ 1) & 0x1;
+            }
+            unreachable("Unknown condition code.");
+        }
+
+        // TODO: Would it make sense to store flags in a different order?
+        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
+                             (cf_bit << 8) | (cf_bit << 12) |
+                             (pf_bit << 16) | (pf_bit << 20) |
+                             (sf_bit << 24) | (sf_bit << 28);
+        fast_u8 f = self().on_get_f();
+        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
+        return !(((f >> pos) ^ n) & 0x1);
+    }
+
 public:
     void on_bit(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
@@ -2668,6 +2711,9 @@ public:
         fast_u16 pc = self().on_pop();
         self().on_set_wz(pc);
         self().set_pc_on_return(pc); }
+    void on_ret_cc(condition cc) {
+        if(check_condition(cc))
+            self().on_return(); }
     void on_reti_retn() {
         // According to Sean Young's The Undocumented Z80
         // Documented, both RETI and RETN copy IFF2 to IFF1.
@@ -3109,40 +3155,6 @@ public:
                                  base::on_set_reg(r, n);
     }
 
-private:
-    bool check_condition(condition cc) {
-        auto n = static_cast<unsigned>(cc);
-        if(self().on_is_to_use_lazy_flags()) {
-            fast_u16 flags = self().on_get_flags();
-            fast_u8 res8 = get_low8(flags);
-            switch(cc) {
-            case condition::nz:
-            case condition::z:
-                return (((res8 == 0) | (flags >> (zf_bit + 8))) ^ n ^ 1) & 0x1;
-            case condition::nc:
-            case condition::c:
-                return ((flags >> (cf_bit + 8)) ^ n ^ 1) & 0x1;
-            case condition::po:
-            case condition::pe:
-                return ((pf_log(res8) | (flags >> (pf_bit + 8))) ^ n ^ 1) & 0x1;
-            case condition::p:
-            case condition::m:
-                return (((flags >> (sf_bit + 8)) |
-                         (flags >> sf_bit)) ^ n ^ 1) & 0x1;
-            }
-            unreachable("Unknown condition code.");
-        }
-
-        // TODO: Would it make sense to store flags in a different order?
-        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
-                             (cf_bit << 8) | (cf_bit << 12) |
-                             (pf_bit << 16) | (pf_bit << 20) |
-                             (sf_bit << 24) | (sf_bit << 28);
-        fast_u8 f = self().on_get_f();
-        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
-        return !(((f >> pos) ^ n) & 0x1);
-    }
-
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -3332,15 +3344,13 @@ public:
         } else {
             self().on_set_regp2(rp, nn);
         } }
-    void on_ret_cc(condition cc) {
-        if(check_condition(cc))
-            self().on_return(); }
 
 protected:
     using base::self;
     using flag_set = typename base::flag_set;
     using base::get_flags;
     using base::set_flags;
+    using base::check_condition;
 };
 
 template<typename B>
@@ -3447,18 +3457,6 @@ public:
     void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
         return r == reg::at_hl ? write_at_disp(d, n) :
                                  base::on_set_reg(r, irp, n);
-    }
-
-    bool check_condition(condition cc) {
-        // TODO: Would it make sense to store flags in a different order?
-        auto n = static_cast<unsigned>(cc);
-        unsigned flag_bits = (zf_bit << 0) | (zf_bit << 4) |
-                             (cf_bit << 8) | (cf_bit << 12) |
-                             (pf_bit << 16) | (pf_bit << 20) |
-                             (sf_bit << 24) | (sf_bit << 28);
-        fast_u8 f = self().on_get_f();
-        unsigned pos = (flag_bits >> (n * 4)) & 0xf;
-        return !(((f >> pos) ^ n) & 0x1);
     }
 
     void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
@@ -3959,12 +3957,10 @@ public:
     void on_pop_rp(regp2 rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_regp2(rp, irp, self().on_pop()); }
-    void on_ret_cc(condition cc) {
-        if(check_condition(cc))
-            self().on_return(); }
 
 protected:
     using base::self;
+    using base::check_condition;
 };
 
 template<typename D>
