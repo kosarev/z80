@@ -946,7 +946,7 @@ public:
         self().on_jp_irp(); }
     void on_decode_ld_r_n(reg r) {
         fast_u8 n = self().on_imm8_read();
-        self().on_ld_r_n(r, n); }
+        self().on_ld_r_n(r, /* d= */ 0, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs); }
     void on_decode_ld_sp_irp() {
@@ -1328,6 +1328,12 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
+        if(!self().on_is_z80()) {
+            self().on_format("mvi R, N", r, n);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(r);
+            self().on_format("ld R, N", r, irp, d, n); } }
     void on_ld_irp_at_nn(fast_u16 nn) {
         if(!self().on_is_z80()) {
             self().on_format("lhld W", nn);
@@ -1605,8 +1611,6 @@ public:
         self().on_format("sta W", nn); }
     void on_ld_a_at_rp(regp rp) {
         self().on_format("ldax P", rp); }
-    void on_ld_r_n(reg r, fast_u8 n) {
-        self().on_format("mvi R, N", r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         self().on_format("mov R, R", rd, rs); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -1852,9 +1856,6 @@ public:
         iregp irpd = get_iregp_kind_or_hl(rs != reg::at_hl && is_indexable(rd));
         iregp irps = get_iregp_kind_or_hl(rd != reg::at_hl && is_indexable(rs));
         self().on_format("ld R, R", rd, irpd, d, rs, irps, d); }
-    void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        iregp irp = get_iregp_kind_or_hl(r);
-        self().on_format("ld R, N", r, irp, d, n); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2435,6 +2436,56 @@ public:
 
     executor_base() {}
 
+    // TODO: Eliminate?
+    fast_u8 on_get_m() {
+        return self().on_read_cycle(self().on_get_hl()); }
+    void on_set_m(fast_u8 n) {
+        self().on_write_cycle(self().on_get_hl(), n); }
+
+    fast_u8 on_get_reg(reg r) {
+        return r == reg::at_hl ? self().on_get_m() :
+                                 base::on_get_reg(r);
+    }
+
+    void on_set_reg(reg r, fast_u8 n) {
+        return r == reg::at_hl ? self().on_set_m(n) :
+                                 base::on_set_reg(r, n);
+    }
+
+    fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
+        return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
+    }
+
+    fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
+        iregp irp = self().on_get_iregp_kind();
+        fast_u16 addr = get_disp_target(self().on_get_iregp(irp), d);
+        fast_u8 res = self().on_read_cycle(addr);
+        if(long_read_cycle)  // TODO: Remove. Do extra ticks manually.
+            self().on_read_cycle_extra_1t();
+        if(irp != iregp::hl)
+            self().on_set_wz(addr);
+        return res;
+    }
+
+    void write_at_disp(fast_u8 d, fast_u8 n) {
+        iregp irp = self().on_get_iregp_kind();
+        fast_u16 addr = get_disp_target(self().on_get_iregp(irp), d);
+        self().on_write_cycle(addr, n);
+        if(irp != iregp::hl)
+            self().on_set_wz(addr);
+    }
+
+    fast_u8 on_get_reg(reg r, iregp irp, fast_u8 d = 0,
+                       bool long_read_cycle = false) {
+        return r == reg::at_hl ? read_at_disp(d, long_read_cycle) :
+                                 base::on_get_reg(r, irp);
+    }
+
+    void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
+        return r == reg::at_hl ? write_at_disp(d, n) :
+                                 base::on_set_reg(r, irp, n);
+    }
+
     fast_u8 on_fetch_cycle() {
         fast_u16 addr = self().get_pc_on_fetch();
         self().on_set_addr_bus(addr);
@@ -2722,6 +2773,12 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
+        if(!self().on_is_z80()) {
+            self().on_set_reg(r, n);
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_reg(r, irp, d, n); } }
     void on_ld_irp_at_nn(fast_u16 nn) {
         fast_u8 lo = self().on_read_cycle(nn);
         nn = inc16(nn);
@@ -3300,21 +3357,6 @@ public:
     void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
 
-    fast_u8 on_get_m() {
-        return self().on_read_cycle(self().on_get_hl()); }
-    void on_set_m(fast_u8 n) {
-        self().on_write_cycle(self().on_get_hl(), n); }
-
-    fast_u8 on_get_reg(reg r) {
-        return r == reg::at_hl ? self().on_get_m() :
-                                 base::on_get_reg(r);
-    }
-
-    void on_set_reg(reg r, fast_u8 n) {
-        return r == reg::at_hl ? self().on_set_m(n) :
-                                 base::on_set_reg(r, n);
-    }
-
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -3448,8 +3490,6 @@ public:
         fast_u16 nn = self().on_get_regp(rp);
         self().on_set_wz(inc16(nn));
         self().on_set_a(self().on_read_cycle(nn)); }
-    void on_ld_r_n(reg r, fast_u8 n) {
-        self().on_set_reg(r, n); }
     void on_ld_r_r(reg rd, reg rs) {
         self().on_fetch_cycle_extra_1t();
         self().on_set_reg(rd, self().on_get_reg(rs)); }
@@ -3513,40 +3553,6 @@ public:
     void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
 
     bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
-
-    fast_u16 get_disp_target(fast_u16 base, fast_u8 d) {
-        return !get_sign8(d) ? add16(base, d) : sub16(base, neg8(d));
-    }
-
-    fast_u8 read_at_disp(fast_u8 d, bool long_read_cycle = false) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 addr = get_disp_target(self().on_get_iregp(irp), d);
-        fast_u8 res = self().on_read_cycle(addr);
-        if(long_read_cycle)  // TODO: Remove. Do extra ticks manually.
-            self().on_read_cycle_extra_1t();
-        if(irp != iregp::hl)
-            self().on_set_wz(addr);
-        return res;
-    }
-
-    void write_at_disp(fast_u8 d, fast_u8 n) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 addr = get_disp_target(self().on_get_iregp(irp), d);
-        self().on_write_cycle(addr, n);
-        if(irp != iregp::hl)
-            self().on_set_wz(addr);
-    }
-
-    fast_u8 on_get_reg(reg r, iregp irp, fast_u8 d = 0,
-                       bool long_read_cycle = false) {
-        return r == reg::at_hl ? read_at_disp(d, long_read_cycle) :
-                                 base::on_get_reg(r, irp);
-    }
-
-    void on_set_reg(reg r, iregp irp, fast_u8 d, fast_u8 n) {
-        return r == reg::at_hl ? write_at_disp(d, n) :
-                                 base::on_set_reg(r, irp, n);
-    }
 
     void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
@@ -3973,14 +3979,12 @@ public:
         iregp irpd = rs == reg::at_hl ? iregp::hl : irp;
         iregp irps = rd == reg::at_hl ? iregp::hl : irp;
         self().on_set_reg(rd, irpd, d, self().on_get_reg(rs, irps, d)); }
-    void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_reg(r, irp, d, n); }
 
 protected:
     using base::self;
     using base::check_condition;
     using base::do_sub;
+    using base::get_disp_target;
 };
 
 template<typename D>
