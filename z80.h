@@ -1328,6 +1328,8 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_a_i() {
+        self().on_format("ld a, i"); }
     void on_ld_i_a() {
         self().on_format("ld i, a"); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d = 0) {
@@ -1857,8 +1859,6 @@ public:
         self().on_format("ld a, r"); }
     void on_ld_r_a() {
         self().on_format("ld r, a"); }
-    void on_ld_a_i() {
-        self().on_format("ld a, i"); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2776,6 +2776,13 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_a_i() {
+        fast_u8 i = self().on_get_i();
+        fast_u8 f = self().on_get_f();
+        f = (f & cf_mask) | (i & (sf_mask | yf_mask | xf_mask)) |
+                zf_ari(i) | (self().on_get_iff2() ? pf_mask : 0);
+        self().on_set_a(i);
+        self().on_set_f(f); }
     void on_ld_i_a() {
         self().set_i_on_ld(self().on_get_a()); }
     void on_ld_r_r(reg rd, reg rs, fast_u8 d = 0) {
@@ -3976,13 +3983,6 @@ public:
         self().on_set_f(f); }
     void on_ld_r_a() {
         self().on_set_r(self().on_get_a()); }
-    void on_ld_a_i() {
-        fast_u8 i = self().on_get_i();
-        fast_u8 f = self().on_get_f();
-        f = (f & cf_mask) | (i & (sf_mask | yf_mask | xf_mask)) |
-                zf_ari(i) | (self().on_get_iff2() ? pf_mask : 0);
-        self().on_set_a(i);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
