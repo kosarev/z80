@@ -1323,6 +1323,8 @@ public:
         else
             self().on_format("O R, R", k, reg::at_hl, irp, d,
                                r, iregp::hl, /* d= */ 0); }
+    void on_rld() {
+        self().on_format("rld"); }
     void on_rra() {
         self().on_format(self().on_is_z80() ? "rra" : "rar"); }
     void on_rrca() {
@@ -1819,8 +1821,6 @@ public:
         self().on_format("rla"); }
     void on_rlca() {
         self().on_format("rlca"); }
-    void on_rld() {
-        self().on_format("rld"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2739,6 +2739,22 @@ public:
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, n);
         self().on_set_f(f); }
+    void on_rld() {
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        fast_u16 hl = self().on_get_hl();
+        self().on_set_wz(inc16(hl));
+        fast_u16 t = make16(a, self().on_read_cycle(hl));
+        self().on_4t_exec_cycle();
+
+        t = (t & 0xf000) | ((t & 0xff) << 4) | ((t & 0x0f00) >> 8);
+        a = get_high8(t);
+        f = (f & cf_mask) | (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) |
+                pf_log(a);
+
+        self().on_set_a(a);
+        self().on_set_f(f);
+        self().on_write_cycle(hl, get_low8(t)); }
     void on_rra() {
         if(!self().on_is_z80()) {
             fast_u8 a = self().on_get_a();
@@ -3944,22 +3960,6 @@ public:
                 (a & (yf_mask | xf_mask | cf_mask));
         self().on_set_a(a);
         self().on_set_f(f); }
-    void on_rld() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        fast_u16 hl = self().on_get_hl();
-        self().on_set_wz(inc16(hl));
-        fast_u16 t = make16(a, self().on_read_cycle(hl));
-        self().on_4t_exec_cycle();
-
-        t = (t & 0xf000) | ((t & 0xff) << 4) | ((t & 0x0f00) >> 8);
-        a = get_high8(t);
-        f = (f & cf_mask) | (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) |
-                pf_log(a);
-
-        self().on_set_a(a);
-        self().on_set_f(f);
-        self().on_write_cycle(hl, get_low8(t)); }
 
 protected:
     using base::self;
