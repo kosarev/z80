@@ -1328,6 +1328,8 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_a_r() {
+        self().on_format("ld a, r"); }
     void on_ld_r_a() {
         self().on_format("ld r, a"); }
     void on_ld_a_i() {
@@ -1857,8 +1859,6 @@ public:
         self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
-    void on_ld_a_r() {
-        self().on_format("ld a, r"); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2776,6 +2776,13 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_a_r() {
+        fast_u8 n = self().on_get_r();
+        fast_u8 f = self().on_get_f();
+        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
+                ((self().on_get_iff2() ? 1u : 0u) << pf_bit);
+        self().on_set_a(n);
+        self().on_set_f(f); }
     void on_ld_r_a() {
         self().on_set_r(self().on_get_a()); }
     void on_ld_a_i() {
@@ -3976,13 +3983,6 @@ public:
         fast_u16 nn = self().on_get_regp(rp, irp);
         self().on_set_wz(inc16(nn));
         self().on_set_a(self().on_read_cycle(nn)); }
-    void on_ld_a_r() {
-        fast_u8 n = self().on_get_r();
-        fast_u8 f = self().on_get_f();
-        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
-                ((self().on_get_iff2() ? 1u : 0u) << pf_bit);
-        self().on_set_a(n);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
