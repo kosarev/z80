@@ -80,11 +80,34 @@ class machine_object
             z80::z80_decoder<z80::root<machine_object>>>,
         object_state>> {
 public:
+    iregp on_get_iregp_kind() const {
+        return static_cast<iregp>(state.irp_kind); }
+    void on_set_iregp_kind(iregp irp) {
+        state.irp_kind = static_cast<least_u8>(irp); }
+
+    fast_u8 on_get_ixh() const { return state.ixh; }
+    void on_set_ixh(fast_u8 n) { state.ixh = n; }
+
+    fast_u8 on_get_ixl() const { return state.ixl; }
+    void on_set_ixl(fast_u8 n) { state.ixl = n; }
+
+    fast_u8 on_get_iyh() const { return state.iyh; }
+    void on_set_iyh(fast_u8 n) { state.iyh = n; }
+
+    fast_u8 on_get_iyl() const { return state.iyl; }
+    void on_set_iyl(fast_u8 n) { state.iyl = n; }
+
     fast_u8 on_get_i() const { return state.i; }
     void on_set_i(fast_u8 n) { state.i = n; }
 
     fast_u8 on_get_r() const { return state.r; }
     void on_set_r(fast_u8 n) { state.r = n; }
+
+    fast_u16 on_get_ix() const { return make16(state.ixh, state.ixl); }
+    void on_set_ix(fast_u16 n) { split16(state.ixh, state.ixl, n); }
+
+    fast_u16 on_get_iy() const { return make16(state.iyh, state.iyl); }
+    void on_set_iy(fast_u16 n) { split16(state.iyh, state.iyl, n); }
 
     fast_u16 on_get_ir() const { return make16(state.i, state.r); }
 };

@@ -136,18 +136,6 @@ public:
     fast_u8 on_get_f() const { return state.f; }
     void on_set_f(fast_u8 n) { state.f = n; }
 
-    fast_u8 on_get_ixh() const { return state.ixh; }
-    void on_set_ixh(fast_u8 n) { state.ixh = n; }
-
-    fast_u8 on_get_ixl() const { return state.ixl; }
-    void on_set_ixl(fast_u8 n) { state.ixl = n; }
-
-    fast_u8 on_get_iyh() const { return state.iyh; }
-    void on_set_iyh(fast_u8 n) { state.iyh = n; }
-
-    fast_u8 on_get_iyl() const { return state.iyl; }
-    void on_set_iyl(fast_u8 n) { state.iyl = n; }
-
     fast_u16 on_get_bc() const { return make16(state.b, state.c); }
     void on_set_bc(fast_u16 n) { split16(state.b, state.c, n); }
 
@@ -160,12 +148,6 @@ public:
     fast_u16 on_get_af() const { return make16(state.a, state.f); }
     void on_set_af(fast_u16 n) { split16(state.a, state.f, n); }
 
-    fast_u16 on_get_ix() const { return make16(state.ixh, state.ixl); }
-    void on_set_ix(fast_u16 n) { split16(state.ixh, state.ixl, n); }
-
-    fast_u16 on_get_iy() const { return make16(state.iyh, state.iyl); }
-    void on_set_iy(fast_u16 n) { split16(state.iyh, state.iyl, n); }
-
     fast_u16 on_get_pc() const { return state.pc; }
     void on_set_pc(fast_u16 n) { state.pc = n; }
 
@@ -177,11 +159,6 @@ public:
 
     fast_u16 on_get_last_read_addr() const { return state.last_read_addr; }
     void on_set_last_read_addr(fast_u16 n) { state.last_read_addr = n; }
-
-    iregp on_get_iregp_kind() const {
-        return static_cast<iregp>(state.irp_kind); }
-    void on_set_iregp_kind(iregp irp) {
-        state.irp_kind = static_cast<least_u8>(irp); }
 
     bool on_is_int_disabled() const { return state.int_disabled; }
     void on_set_is_int_disabled(bool f) { state.int_disabled = f; }

@@ -262,6 +262,24 @@ public:
         // Always set the low byte first.
         self().on_set_f(get_low8(n));
         self().on_set_a(get_high8(n)); }
+    fast_u16 on_get_ix() {
+        // Always get the low byte first.
+        fast_u8 l = self().on_get_ixl();
+        fast_u8 h = self().on_get_ixh();
+        return make16(h, l); }
+    void on_set_ix(fast_u16 ix) {
+        // Always set the low byte first.
+        self().on_set_ixl(get_low8(ix));
+        self().on_set_ixh(get_high8(ix)); }
+    fast_u16 on_get_iy() {
+        // Always get the low byte first.
+        fast_u8 l = self().on_get_iyl();
+        fast_u8 h = self().on_get_iyh();
+        return make16(h, l); }
+    void on_set_iy(fast_u16 iy) {
+        // Always set the low byte first.
+        self().on_set_iyl(get_low8(iy));
+        self().on_set_iyh(get_high8(iy)); }
     fast_u16 on_get_ir() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_i();
@@ -1312,6 +1330,13 @@ public:
         self().on_format("ei"); }
     void on_nop() {
         self().on_format("nop"); }
+    void on_pop_rp(regp2 rp) {
+        // TODO: Unify handling the G specifier.
+        if(!self().on_is_z80()) {
+            self().on_format("pop G", rp);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(rp);
+            self().on_format("pop G", rp, irp); } }
     void on_ret() {
         self().on_format("ret"); }
     void on_ret_cc(condition cc) {
@@ -1422,6 +1447,26 @@ protected:
         ++args;
         return value;
     }
+
+    static bool is_indexable(reg r) {
+        return r == reg::at_hl || r == reg::h || r == reg::l;
+    }
+
+    iregp get_iregp_kind_or_hl(bool indexable) {
+        return indexable ? self().on_get_iregp_kind() : iregp::hl;
+    }
+
+    iregp get_iregp_kind_or_hl(reg r) {
+        return get_iregp_kind_or_hl(is_indexable(r));
+    }
+
+    iregp get_iregp_kind_or_hl(regp rp) {
+        return get_iregp_kind_or_hl(rp == regp::hl);
+    }
+
+    iregp get_iregp_kind_or_hl(regp2 rp) {
+        return get_iregp_kind_or_hl(rp == regp2::hl);
+    }
 };
 
 // TODO: Split to a instructions verbalizer and a disassembler.
@@ -1514,8 +1559,6 @@ public:
         self().on_format("shld W", nn); }
     void on_out_n_a(fast_u8 n) {
         self().on_format("out N", n); }
-    void on_pop_rp(regp2 rp) {
-        self().on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
         self().on_format("push G", rp); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -1809,9 +1852,6 @@ public:
             self().on_format("out (c), R", r, iregp::hl, 0); }
     void on_out_n_a(fast_u8 n) {
         self().on_format("out (N), a", n); }
-    void on_pop_rp(regp2 rp) {
-        iregp irp = get_iregp_kind_or_hl(rp);
-        self().on_format("pop G", rp, irp); }
     void on_push_rp(regp2 rp) {
         iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("push G", rp, irp); }
@@ -1955,29 +1995,10 @@ public:
         unreachable("Unknown block output operation.");
     }
 
-private:
-    static bool is_indexable(reg r) {
-        return r == reg::at_hl || r == reg::h || r == reg::l;
-    }
-
-    iregp get_iregp_kind_or_hl(bool indexable) {
-        return indexable ? self().on_get_iregp_kind() : iregp::hl;
-    }
-
-    iregp get_iregp_kind_or_hl(reg r) {
-        return get_iregp_kind_or_hl(is_indexable(r));
-    }
-
-    iregp get_iregp_kind_or_hl(regp rp) {
-        return get_iregp_kind_or_hl(rp == regp::hl);
-    }
-
-    iregp get_iregp_kind_or_hl(regp2 rp) {
-        return get_iregp_kind_or_hl(rp == regp2::hl);
-    }
-
 protected:
     using base::self;
+    using base::is_indexable;
+    using base::get_iregp_kind_or_hl;
 
     template<typename T>
     static T get_arg(const void **&args) {
@@ -2703,6 +2724,27 @@ public:
         sp = inc16(sp);
         self().on_set_sp(sp);
         return make16(hi, lo); }
+    void on_pop_rp(regp2 rp) {
+        if(self().on_is_z80()) {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_regp2(rp, irp, self().on_pop());
+            return;
+        }
+
+        fast_u16 nn = self().on_pop();
+        if(rp == regp2::af) {
+            // Not all flags are updated on pop psw.
+            nn = (nn & ~(xf_mask | yf_mask | nf_mask));
+        }
+        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
+            flag_set flags(/* is_lazy= */ true);
+            flags.set(get_low8(nn), 1);
+            set_flags(flags);
+
+            self().on_set_a(get_high8(nn));
+        } else {
+            self().on_set_regp2(rp, nn);
+        } }
     void on_call(fast_u16 nn) {
         self().on_push(self().on_get_pc());
         self().on_set_wz(nn);
@@ -3329,21 +3371,6 @@ public:
             nn |= nf_mask;
         }
         self().on_push(nn); }
-    void on_pop_rp(regp2 rp) {
-        fast_u16 nn = self().on_pop();
-        if(rp == regp2::af) {
-            // Not all flags are updated on pop psw.
-            nn = (nn & ~(xf_mask | yf_mask | nf_mask));
-        }
-        if(rp == regp2::af && self().on_is_to_use_lazy_flags()) {
-            flag_set flags(/* is_lazy= */ true);
-            flags.set(get_low8(nn), 1);
-            set_flags(flags);
-
-            self().on_set_a(get_high8(nn));
-        } else {
-            self().on_set_regp2(rp, nn);
-        } }
 
 protected:
     using base::self;
@@ -3389,26 +3416,6 @@ public:
     using base::cf_ari;
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
-
-    fast_u16 on_get_ix() {
-        // Always get the low byte first.
-        fast_u8 l = self().on_get_ixl();
-        fast_u8 h = self().on_get_ixh();
-        return make16(h, l); }
-    void on_set_ix(fast_u16 ix) {
-        // Always set the low byte first.
-        self().on_set_ixl(get_low8(ix));
-        self().on_set_ixh(get_high8(ix)); }
-
-    fast_u16 on_get_iy() {
-        // Always get the low byte first.
-        fast_u8 l = self().on_get_iyl();
-        fast_u8 h = self().on_get_iyh();
-        return make16(h, l); }
-    void on_set_iy(fast_u16 iy) {
-        // Always set the low byte first.
-        self().on_set_iyl(get_low8(iy));
-        self().on_set_iyh(get_high8(iy)); }
 
     fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
     void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
@@ -3954,9 +3961,6 @@ public:
     void on_push_rp(regp2 rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_push(self().on_get_regp2(rp, irp)); }
-    void on_pop_rp(regp2 rp) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_regp2(rp, irp, self().on_pop()); }
 
 protected:
     using base::self;
