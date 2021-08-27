@@ -1323,6 +1323,8 @@ public:
         else
             self().on_format("O R, R", k, reg::at_hl, irp, d,
                                r, iregp::hl, /* d= */ 0); }
+    void on_rla() {
+        self().on_format(self().on_is_z80() ? "rla" : "ral"); }
     void on_rlca() {
         self().on_format(self().on_is_z80() ? "rlca" : "rlc"); }
     void on_rld() {
@@ -1510,8 +1512,6 @@ public:
         self().on_format("pop G", rp); }
     void on_push_rp(regp2 rp) {
         self().on_format("push G", rp); }
-    void on_rla() {
-        self().on_format("ral"); }
     void on_ret_cc(condition cc) {
         self().on_format("rC", cc); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -1817,8 +1817,6 @@ public:
         self().on_format("reti"); }
     void on_retn() {
         self().on_format("retn"); }
-    void on_rla() {
-        self().on_format("rla"); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2737,6 +2735,25 @@ public:
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, n);
         self().on_set_f(f); }
+    void on_rla() {
+        if(!self().on_is_z80()) {
+            fast_u8 a = self().on_get_a();
+            flag_set flags = get_flags();
+            fast_u16 t = (a << 1) | flags.get_cf();
+            self().on_set_a(mask8(t));
+            flags.set_cf(static_cast<unsigned>(t >> 8));
+            set_flags(flags);
+            return;
+        }
+
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        bool cf = f & cf_mask;
+        fast_u8 r = mask8((a << 1) | (cf ? 1 : 0));
+        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
+                cf_ari(a & 0x80);
+        self().on_set_a(r);
+        self().on_set_f(f); }
     void on_rlca() {
         if(!self().on_is_z80()) {
             fast_u8 a = self().on_get_a();
@@ -3308,13 +3325,6 @@ public:
     void on_ret_cc(condition cc) {
         if(check_condition(cc))
             self().on_return(); }
-    void on_rla() {
-        fast_u8 a = self().on_get_a();
-        flag_set flags = get_flags();
-        fast_u16 t = (a << 1) | flags.get_cf();
-        self().on_set_a(mask8(t));
-        flags.set_cf(static_cast<unsigned>(t >> 8));
-        set_flags(flags); }
 
 protected:
     using base::self;
@@ -3952,15 +3962,6 @@ public:
         self().on_reti_retn(); }
     void on_retn() {
         self().on_reti_retn(); }
-    void on_rla() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        bool cf = f & cf_mask;
-        fast_u8 r = mask8((a << 1) | (cf ? 1 : 0));
-        f = (f & (sf_mask | zf_mask | pf_mask)) | (r & (yf_mask | xf_mask)) |
-                cf_ari(a & 0x80);
-        self().on_set_a(r);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
