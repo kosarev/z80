@@ -1330,6 +1330,11 @@ public:
         self().on_format("ei"); }
     void on_nop() {
         self().on_format("nop"); }
+    void on_out_c_r(reg r) {
+        if(r == reg::at_hl)
+            self().on_format("out (c), N", self().on_get_out_c_r_op());
+        else
+            self().on_format("out (c), R", r, iregp::hl, 0); }
     void on_out_n_a(fast_u8 n) {
         self().on_format(self().on_is_z80() ? "out (N), a" : "out N", n); }
     void on_push_rp(regp2 rp) {
@@ -1850,11 +1855,6 @@ public:
         self().on_format("ld sp, P", regp::hl, irp); }
     void on_neg() {
         self().on_format("neg"); }
-    void on_out_c_r(reg r) {
-        if(r == reg::at_hl)
-            self().on_format("out (c), N", self().on_get_out_c_r_op());
-        else
-            self().on_format("out (c), R", r, iregp::hl, 0); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
@@ -2837,6 +2837,13 @@ public:
         self().on_set_wz(make16(a, inc8(get_low8(nn))));
         self().on_write_cycle(nn, a); }
     void on_nop() {}
+    void on_out_c_r(reg r) {
+        fast_u16 bc = self().on_get_bc();
+        self().on_set_wz(inc16(bc));
+        fast_u8 n = (r == reg::at_hl) ?
+            self().on_get_out_c_r_op() :
+            self().on_get_reg(r, iregp::hl, /* d= */ 0);
+        self().on_output_cycle(bc, n); }
     void on_out_n_a(fast_u8 n) {
         fast_u8 a = self().on_get_a();
         if(!self().on_is_z80()) {
@@ -3958,13 +3965,6 @@ public:
         do_sub(a, f, n);
         self().on_set_a(a);
         self().on_set_f(f); }
-    void on_out_c_r(reg r) {
-        fast_u16 bc = self().on_get_bc();
-        self().on_set_wz(inc16(bc));
-        fast_u8 n = (r == reg::at_hl) ?
-            self().on_get_out_c_r_op() :
-            self().on_get_reg(r, iregp::hl, /* d= */ 0);
-        self().on_output_cycle(bc, n); }
 
 protected:
     using base::self;
