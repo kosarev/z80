@@ -1328,6 +1328,15 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            self().on_format("mov R, R", rd, rs);
+        } else {
+            iregp irpd = get_iregp_kind_or_hl(rs != reg::at_hl &&
+                                              is_indexable(rd));
+            iregp irps = get_iregp_kind_or_hl(rd != reg::at_hl &&
+                                              is_indexable(rs));
+        self().on_format("ld R, R", rd, irpd, d, rs, irps, d); } }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
         if(!self().on_is_z80()) {
             self().on_format("mvi R, N", r, n);
@@ -1611,8 +1620,6 @@ public:
         self().on_format("sta W", nn); }
     void on_ld_a_at_rp(regp rp) {
         self().on_format("ldax P", rp); }
-    void on_ld_r_r(reg rd, reg rs) {
-        self().on_format("mov R, R", rd, rs); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -1852,10 +1859,6 @@ public:
         self().on_format("ld a, i"); }
     void on_ld_i_a() {
         self().on_format("ld i, a"); }
-    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        iregp irpd = get_iregp_kind_or_hl(rs != reg::at_hl && is_indexable(rd));
-        iregp irps = get_iregp_kind_or_hl(rd != reg::at_hl && is_indexable(rs));
-        self().on_format("ld R, R", rd, irpd, d, rs, irps, d); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2773,6 +2776,15 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_ld_r_r(reg rd, reg rs, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            self().on_fetch_cycle_extra_1t();
+            self().on_set_reg(rd, self().on_get_reg(rs));
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            iregp irpd = rs == reg::at_hl ? iregp::hl : irp;
+            iregp irps = rd == reg::at_hl ? iregp::hl : irp;
+            self().on_set_reg(rd, irpd, d, self().on_get_reg(rs, irps, d)); } }
     void on_ld_r_n(reg r, fast_u8 d, fast_u8 n) {
         if(!self().on_is_z80()) {
             self().on_set_reg(r, n);
@@ -3490,9 +3502,6 @@ public:
         fast_u16 nn = self().on_get_regp(rp);
         self().on_set_wz(inc16(nn));
         self().on_set_a(self().on_read_cycle(nn)); }
-    void on_ld_r_r(reg rd, reg rs) {
-        self().on_fetch_cycle_extra_1t();
-        self().on_set_reg(rd, self().on_get_reg(rs)); }
 
 protected:
     using base::self;
@@ -3974,11 +3983,6 @@ public:
         self().on_set_f(f); }
     void on_ld_i_a() {
         self().set_i_on_ld(self().on_get_a()); }
-    void on_ld_r_r(reg rd, reg rs, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        iregp irpd = rs == reg::at_hl ? iregp::hl : irp;
-        iregp irps = rd == reg::at_hl ? iregp::hl : irp;
-        self().on_set_reg(rd, irpd, d, self().on_get_reg(rs, irps, d)); }
 
 protected:
     using base::self;
