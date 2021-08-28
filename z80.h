@@ -1671,6 +1671,20 @@ protected:
         return get_iregp_kind_or_hl(rp == regp2::hl);
     }
 
+    static const char *get_mnemonic(alu k) {
+        switch(k) {
+        case alu::add: return "add";
+        case alu::adc: return "adc";
+        case alu::sub: return "sub";
+        case alu::sbc: return "sbc";
+        case alu::and_a: return "and";
+        case alu::xor_a: return "xor";
+        case alu::or_a: return "or";
+        case alu::cp: return "cp";
+        }
+        unreachable("Unknown ALU operation.");
+    }
+
     static const char *get_mnemonic(rot k) {
         switch(k) {
         case rot::rlc: return "rlc";
@@ -2020,20 +2034,6 @@ public:
 
     static bool is_two_operand_alu_instr(alu k) {
         return k == alu::add || k == alu::adc || k == alu::sbc;
-    }
-
-    static const char *get_mnemonic(alu k) {
-        switch(k) {
-        case alu::add: return "add";
-        case alu::adc: return "adc";
-        case alu::sub: return "sub";
-        case alu::sbc: return "sbc";
-        case alu::and_a: return "and";
-        case alu::xor_a: return "xor";
-        case alu::or_a: return "or";
-        case alu::cp: return "cp";
-        }
-        unreachable("Unknown ALU operation.");
     }
 
 protected:
