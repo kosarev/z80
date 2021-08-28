@@ -1671,6 +1671,17 @@ protected:
         return get_iregp_kind_or_hl(rp == regp2::hl);
     }
 
+public:
+    static const char *get_reg_name(iregp irp) {
+        switch(irp) {
+        case iregp::hl: return "hl";
+        case iregp::ix: return "ix";
+        case iregp::iy: return "iy";
+        }
+        unreachable("Unknown register.");
+    }
+
+protected:
     static bool is_two_operand_alu_instr(alu k) {
         return k == alu::add || k == alu::adc || k == alu::sbc;
     }
@@ -2027,14 +2038,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    static const char *get_reg_name(iregp irp) {
-        switch(irp) {
-        case iregp::hl: return "hl";
-        case iregp::ix: return "ix";
-        case iregp::iy: return "iy";
-        }
-        unreachable("Unknown register.");
-    }
+    using base::get_reg_name;
 
 protected:
     using base::self;
