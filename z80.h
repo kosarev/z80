@@ -1629,6 +1629,8 @@ public:
             self().on_format("pop G", rp, irp); } }
     void on_ret() {
         self().on_format("ret"); }
+    void on_xret() {
+        self().on_format("xret N", 0xd9); }
     void on_ret_cc(condition cc) {
         self().on_format(self().on_is_z80() ? "ret C" : "rC", cc); }
     void on_reti() {
@@ -1957,8 +1959,6 @@ public:
         self().on_format("xjmp N, W", 0xcb, nn); }
     void on_xnop(fast_u8 op) {
         self().on_format("xnop N", op); }
-    void on_xret() {
-        self().on_format("xret N", 0xd9); }
 
 protected:
     using base::self;
