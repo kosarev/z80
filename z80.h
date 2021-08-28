@@ -531,6 +531,12 @@ public:
         self().on_tick(1); }
     void on_write_cycle_extra_2t() {
         self().on_tick(2); }
+    void on_3t_exec_cycle() {
+        self().on_tick(3); }
+    void on_4t_exec_cycle() {
+        self().on_tick(4); }
+    void on_5t_exec_cycle() {
+        self().on_tick(5); }
 
     void on_mreq_wait(fast_u16 addr) {
         unused(addr); }
@@ -1273,10 +1279,6 @@ public:
         fast_u8 lo = self().on_read_next_byte();
         fast_u8 hi = self().on_read_next_byte();
         return make16(hi, lo); }
-
-    void on_3t_exec_cycle() {}
-    void on_4t_exec_cycle() {}
-    void on_5t_exec_cycle() {}
 
     void on_format(const char *fmt) {
         self().on_format_impl(fmt, /* args= */ nullptr);
@@ -2587,10 +2589,6 @@ public:
         fast_u8 hi = self().on_read_cycle(pc);
         self().set_pc_on_imm16_read(inc16(pc));
         return make16(hi, lo); }
-
-    void on_3t_exec_cycle() { self().on_tick(3); }
-    void on_4t_exec_cycle() { self().on_tick(4); }
-    void on_5t_exec_cycle() { self().on_tick(5); }
 
     fast_u8 on_input_cycle(fast_u16 port) {
         // Z80 samples the value at t4 of the input cycle, see
