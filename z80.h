@@ -1273,6 +1273,8 @@ public:
     fast_u8 on_fetch_cycle() {
         return self().on_read_next_byte(); }
 
+    fast_u8 on_disp_read() { return self().on_read_next_byte(); }
+
     fast_u8 on_imm8_read() { return self().on_read_next_byte(); }
 
     fast_u16 on_imm16_read() {
@@ -1965,18 +1967,8 @@ protected:
 
 template<typename D>
 class z80_disasm
-    : public internals::disasm_base<z80_decoder<z80_decoder_state<root<D>>>> {
-public:
-    typedef internals::disasm_base<z80_decoder<z80_decoder_state<root<D>>>>
-        base;
-
-    z80_disasm() {}
-
-    fast_u8 on_disp_read() { return self().on_read_next_byte(); }
-
-protected:
-    using base::self;
-};
+    : public internals::disasm_base<z80_decoder<z80_decoder_state<root<D>>>>
+{};
 
 // Provides access to the value of a 16-bit register. Supposed to
 // be as efficient as possible.
