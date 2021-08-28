@@ -1324,10 +1324,15 @@ public:
         self().on_format(self().on_is_z80() ? "scf" : "stc"); }
     void on_daa() {
         self().on_format("daa"); }
+
+    // Interrupts.
     void on_di() {
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_im(unsigned mode) {
+        self().on_format("im U", mode); }
+
     void on_inc_r(reg r, fast_u8 d = 0) {
         if(!self().on_is_z80()) {
             self().on_format("inr R", r);
@@ -1854,8 +1859,6 @@ public:
         self().on_format("exx"); }
     void on_halt() {
         self().on_format("halt"); }
-    void on_im(unsigned mode) {
-        self().on_format("im U", mode); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -3040,10 +3043,15 @@ public:
         self().on_set_f(f); }
     void on_ex_de_hl() {
         self().on_ex_de_hl_regs(); }
+
+    // Interrupts.
     void on_halt() {
         self().on_set_is_halted(true);
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
         self().set_pc_on_halt(dec16(self().get_pc_on_halt())); }
+    void on_im(unsigned mode) {
+        self().on_set_int_mode(mode); }
+
     void on_jp_nn(fast_u16 nn) {
         self().on_jump(nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -3987,8 +3995,6 @@ public:
         self().on_set_iregp(irp, i); }
     void on_exx() {
         self().on_exx_regs(); }
-    void on_im(unsigned mode) {
-        self().on_set_int_mode(mode); }
 
 protected:
     using base::self;
