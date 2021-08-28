@@ -1315,6 +1315,21 @@ public:
             auto irp = !self().on_is_z80() ? iregp::hl : get_arg<iregp>(args);
             out.append(get_reg_name(rp, irp));
             break; }
+        case 'R': {  // A register.
+            bool z80 = self().on_is_z80();
+            auto r = get_arg<reg>(args);
+            auto irp = !z80 ? iregp::hl : get_arg<iregp>(args);
+            auto d = !z80 ? 0 : get_arg<fast_u8>(args);
+            if(!z80 || r != reg::at_hl || irp == iregp::hl) {
+                out.append(get_reg_name(r, irp));
+            } else {
+                out.append('(');
+                out.append(get_reg_name(irp));
+                out.append(' ');
+                out.append_disp(sign_extend8(d));
+                out.append(')');
+            }
+            break; }
         case 'W': {  // A 16-bit immediate operand.
             auto nn = get_arg<fast_u16>(args);
             out.append_u16(nn);
@@ -1896,10 +1911,6 @@ public:
             auto k = get_arg<alu>(args);
             out.append(get_mnemonic_imm(k));
             break; }
-        case 'R': {  // A register.
-            auto r = get_arg<reg>(args);
-            out.append(get_reg_name(r));
-            break; }
         default:
             base::on_format_char(c, args, out);
         }
@@ -1978,20 +1989,6 @@ public:
         case 'O': {  // Rotation mnemonic.
             auto k = get_arg<rot>(args);
             out.append(get_mnemonic(k));
-            break; }
-        case 'R': {  // A register.
-            auto r = get_arg<reg>(args);
-            auto irp = get_arg<iregp>(args);
-            auto d = get_arg<fast_u8>(args);
-            if(r != reg::at_hl || irp == iregp::hl) {
-                out.append(get_reg_name(r, irp));
-            } else {
-                out.append('(');
-                out.append(get_reg_name(irp));
-                out.append(' ');
-                out.append_disp(sign_extend8(d));
-                out.append(')');
-            }
             break; }
         default:
             base::on_format_char(c, args, out);
