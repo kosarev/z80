@@ -1670,6 +1670,46 @@ protected:
     iregp get_iregp_kind_or_hl(regp2 rp) {
         return get_iregp_kind_or_hl(rp == regp2::hl);
     }
+
+    static const char *get_mnemonic(block_ld k) {
+        switch(k) {
+        case block_ld::ldi: return "ldi";
+        case block_ld::ldd: return "ldd";
+        case block_ld::ldir: return "ldir";
+        case block_ld::lddr: return "lddr";
+        }
+        unreachable("Unknown block load operation.");
+    }
+
+    static const char *get_mnemonic(block_cp k) {
+        switch(k) {
+        case block_cp::cpi: return "cpi";
+        case block_cp::cpd: return "cpd";
+        case block_cp::cpir: return "cpir";
+        case block_cp::cpdr: return "cpdr";
+        }
+        unreachable("Unknown block compare operation.");
+    }
+
+    static const char *get_mnemonic(block_in k) {
+        switch(k) {
+        case block_in::ini: return "ini";
+        case block_in::ind: return "ind";
+        case block_in::inir: return "inir";
+        case block_in::indr: return "indr";
+        }
+        unreachable("Unknown block input operation.");
+    }
+
+    static const char *get_mnemonic(block_out k) {
+        switch(k) {
+        case block_out::outi: return "outi";
+        case block_out::outd: return "outd";
+        case block_out::otir: return "otir";
+        case block_out::otdr: return "otdr";
+        }
+        unreachable("Unknown block output operation.");
+    }
 };
 
 // TODO: Split to a instructions verbalizer and a disassembler.
@@ -1996,50 +2036,11 @@ public:
         unreachable("Unknown rotation operation.");
     }
 
-    static const char *get_mnemonic(block_ld k) {
-        switch(k) {
-        case block_ld::ldi: return "ldi";
-        case block_ld::ldd: return "ldd";
-        case block_ld::ldir: return "ldir";
-        case block_ld::lddr: return "lddr";
-        }
-        unreachable("Unknown block load operation.");
-    }
-
-    static const char *get_mnemonic(block_cp k) {
-        switch(k) {
-        case block_cp::cpi: return "cpi";
-        case block_cp::cpd: return "cpd";
-        case block_cp::cpir: return "cpir";
-        case block_cp::cpdr: return "cpdr";
-        }
-        unreachable("Unknown block compare operation.");
-    }
-
-    static const char *get_mnemonic(block_in k) {
-        switch(k) {
-        case block_in::ini: return "ini";
-        case block_in::ind: return "ind";
-        case block_in::inir: return "inir";
-        case block_in::indr: return "indr";
-        }
-        unreachable("Unknown block input operation.");
-    }
-
-    static const char *get_mnemonic(block_out k) {
-        switch(k) {
-        case block_out::outi: return "outi";
-        case block_out::outd: return "outd";
-        case block_out::otir: return "otir";
-        case block_out::otdr: return "otdr";
-        }
-        unreachable("Unknown block output operation.");
-    }
-
 protected:
     using base::self;
     using base::is_indexable;
     using base::get_iregp_kind_or_hl;
+    using base::get_mnemonic;
 
     template<typename T>
     static T get_arg(const void **&args) {
