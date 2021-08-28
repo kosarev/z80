@@ -1328,6 +1328,12 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_inc_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_format("inx P", rp);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(rp);
+            self().on_format("inc P", rp, irp); } }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         self().on_format(self().on_is_z80() ? "jp C, W" : "jC W", cc, nn); }
     void on_jp_irp() {
@@ -1628,8 +1634,6 @@ public:
         self().on_format("in N", n); }
     void on_inc_r(reg r) {
         self().on_format("inr R", r); }
-    void on_inc_rp(regp rp) {
-        self().on_format("inx P", rp); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -1853,9 +1857,6 @@ public:
     void on_inc_r(reg r, fast_u8 d) {
         iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("inc R", r, irp, d); }
-    void on_inc_rp(regp rp) {
-        iregp irp = get_iregp_kind_or_hl(rp);
-        self().on_format("inc P", rp, irp); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -2775,6 +2776,12 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_inc_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_set_regp(rp, inc16(self().on_get_regp(rp)));
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_regp(rp, irp, inc16(self().on_get_regp(rp, irp))); } }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         if(check_condition(cc))
             self().on_jump(nn);
@@ -3535,8 +3542,6 @@ public:
         self().on_set_reg(r, t);
         flags.set((n ^ t) & hf_mask, (flags.get_cf() << 8) | t);
         set_flags(flags); }
-    void on_inc_rp(regp rp) {
-        self().on_set_regp(rp, inc16(self().on_get_regp(rp))); }
 
 protected:
     using base::self;
@@ -3979,9 +3984,6 @@ public:
                 hf_inc(v) | pf_inc(v);
         self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
-    void on_inc_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_regp(rp, irp, inc16(self().on_get_regp(rp, irp))); }
 
 protected:
     using base::self;
