@@ -1467,12 +1467,18 @@ public:
         } else {
             iregp irp = self().on_get_iregp_kind();
             self().on_format("ld (W), P", nn, regp::hl, irp); } }
+    void on_ld_a_at_rp(regp rp) {
+        // TODO: Unify handling of the P specifier.
+        if(!self().on_is_z80())
+            self().on_format("ldax P", rp);
+        else
+            self().on_format("ld a, (P)", rp, iregp::hl); }
     void on_ld_at_rp_a(regp rp) {
         // TODO: Unify handling of the P specifier.
-        if(!self().on_is_z80()) {
+        if(!self().on_is_z80())
             self().on_format("stax P", rp);
-        } else {
-            self().on_format("ld (P), a", rp, iregp::hl); } }
+        else
+            self().on_format("ld (P), a", rp, iregp::hl); }
     void on_ld_rp_at_nn(regp rp, fast_u16 nn) {
         // The HL case repeats the unprefixed LD HL, (nn)
         // instruction, so we have to represent it as an
@@ -1868,8 +1874,6 @@ public:
         self().on_format("lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
         self().on_format("sta W", nn); }
-    void on_ld_a_at_rp(regp rp) {
-        self().on_format("ldax P", rp); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -2012,8 +2016,6 @@ public:
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
         self().on_format("ld (W), a", nn); }
-    void on_ld_a_at_rp(regp rp) {
-        self().on_format("ld a, (P)", rp, iregp::hl); }
 
     using base::get_reg_name;
 
