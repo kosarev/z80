@@ -1352,6 +1352,8 @@ public:
         self().on_format("ei"); }
     void on_im(unsigned mode) {
         self().on_format("im U", mode); }
+    void on_xim(fast_u8 op, fast_u8 mode) {
+        self().on_format("xim W, U", 0xed00 | op, mode); }
 
     // Arithmetic.
     void on_alu_r(alu k, reg r, fast_u8 d = 0) {
@@ -2012,8 +2014,6 @@ public:
         self().on_format("ld (W), a", nn); }
     void on_ld_a_at_rp(regp rp) {
         self().on_format("ld a, (P)", rp, iregp::hl); }
-    void on_xim(fast_u8 op, fast_u8 mode) {
-        self().on_format("xim W, U", 0xed00 | op, mode); }
 
     using base::get_reg_name;
 
