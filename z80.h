@@ -1593,6 +1593,8 @@ public:
 
     void on_nop() {
         self().on_format("nop"); }
+    void on_xnop(fast_u8 op) {
+        self().on_format("xnop N", op); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_neg() {
@@ -1957,8 +1959,6 @@ public:
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
         self().on_format("xjmp N, W", 0xcb, nn); }
-    void on_xnop(fast_u8 op) {
-        self().on_format("xnop N", op); }
 
 protected:
     using base::self;
