@@ -1489,6 +1489,8 @@ public:
             self().on_format("jp (P)", regp::hl, irp); } }
     void on_jp_nn(fast_u16 nn) {
         self().on_format(self().on_is_z80() ? "jp W" : "jmp W", nn); }
+    void on_xjp_nn(fast_u16 nn) {
+        self().on_format("xjmp N, W", 0xcb, nn); }
     void on_jr(fast_u8 d) {
         self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -1957,8 +1959,6 @@ public:
         self().on_format("lda W", nn); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
-    void on_xjp_nn(fast_u16 nn) {
-        self().on_format("xjmp N, W", 0xcb, nn); }
 
 protected:
     using base::self;
