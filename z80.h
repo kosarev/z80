@@ -1310,6 +1310,10 @@ public:
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
             break; }
+        case 'O': {  // Rotation mnemonic.
+            auto k = get_arg<rot>(args);
+            out.append(get_mnemonic(k));
+            break; }
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
             auto irp = !self().on_is_z80() ? iregp::hl : get_arg<iregp>(args);
@@ -1985,10 +1989,6 @@ public:
             out.append(get_mnemonic(k));
             if(is_two_operand_alu_instr(k))
                 out.append(" a,");
-            break; }
-        case 'O': {  // Rotation mnemonic.
-            auto k = get_arg<rot>(args);
-            out.append(get_mnemonic(k));
             break; }
         default:
             base::on_format_char(c, args, out);
