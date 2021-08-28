@@ -1304,6 +1304,22 @@ public:
             auto nn = get_arg<fast_u16>(args);
             out.append_u16(nn);
             break; }
+        case 'L': {  // A block transfer instruction.
+            auto k = get_arg<block_ld>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'M': {  // A block comparison instruction.
+            auto k = get_arg<block_cp>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'I': {  // A block in instruction.
+            auto k = get_arg<block_in>(args);
+            out.append(get_mnemonic(k));
+            break; }
+        case 'T': {  // A block out instruction.
+            auto k = get_arg<block_out>(args);
+            out.append(get_mnemonic(k));
+            break; }
         default:
             out.append(c);
         }
@@ -1988,22 +2004,6 @@ public:
             auto d = get_arg<int>(args);
             out.append("$ ");
             out.append_disp(d);
-            break; }
-        case 'L': {  // A block transfer instruction.
-            auto k = get_arg<block_ld>(args);
-            out.append(get_mnemonic(k));
-            break; }
-        case 'M': {  // A block comparison instruction.
-            auto k = get_arg<block_cp>(args);
-            out.append(get_mnemonic(k));
-            break; }
-        case 'I': {  // A block in instruction.
-            auto k = get_arg<block_in>(args);
-            out.append(get_mnemonic(k));
-            break; }
-        case 'T': {  // A block out instruction.
-            auto k = get_arg<block_out>(args);
-            out.append(get_mnemonic(k));
             break; }
         default:
             base::on_format_char(c, args, out);
