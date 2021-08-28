@@ -2457,8 +2457,8 @@ public:
     bool get_iff() { return base::get_iff1(); }
     void set_iff(bool f) { base::set_iff1(f); }
 
-    bool on_get_iff() { return base::on_get_iff1(); }
-    void on_set_iff(bool f) { base::on_set_iff1(f); }
+    bool on_get_iff() { return get_iff(); }
+    void on_set_iff(bool f) { set_iff(f); }
 };
 
 template<typename B>
