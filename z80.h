@@ -1350,6 +1350,8 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_halt() {
+        self().on_format(self().on_is_z80() ? "halt" : "hlt"); }
     void on_im(unsigned mode) {
         self().on_format("im U", mode); }
     void on_xim(fast_u8 op, fast_u8 mode) {
@@ -1872,8 +1874,6 @@ public:
 
     void on_ex_de_hl() {
         self().on_format("xchg"); }
-    void on_halt() {
-        self().on_format("hlt"); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -2010,8 +2010,6 @@ public:
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
         self().on_format("ex de, hl"); }
-    void on_halt() {
-        self().on_format("halt"); }
 
     using base::get_reg_name;
 
