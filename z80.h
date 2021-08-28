@@ -2450,7 +2450,7 @@ private:
 };
 
 template<typename B>
-class generic_state : public z80_state<B> {
+class generic_cpu_state : public z80_state<B> {
     using base = z80_state<B>;
 
 public:

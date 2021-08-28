@@ -821,9 +821,9 @@ protected:
 
 class i8080_machine
     : public machine_base<z80::i8080_executor<
-        z80::i8080_decoder<z80::generic_state<z80::root<i8080_machine>>>>> {
+        z80::i8080_decoder<z80::generic_cpu_state<z80::root<i8080_machine>>>>> {
     using base = machine_base<z80::i8080_executor<
-        z80::i8080_decoder<z80::generic_state<z80::root<i8080_machine>>>>>;
+        z80::i8080_decoder<z80::generic_cpu_state<z80::root<i8080_machine>>>>>;
 
 public:
     i8080_machine(test_context &context) : base(context) {}
@@ -844,9 +844,9 @@ public:
 
 class z80_machine
     : public machine_base<z80::z80_executor<
-        z80::z80_decoder<z80::generic_state<z80::root<z80_machine>>>>> {
+        z80::z80_decoder<z80::generic_cpu_state<z80::root<z80_machine>>>>> {
     using base = machine_base<z80::z80_executor<
-        z80::z80_decoder<z80::generic_state<z80::root<z80_machine>>>>>;
+        z80::z80_decoder<z80::generic_cpu_state<z80::root<z80_machine>>>>>;
 
 public:
     z80_machine(test_context &context) : base(context) {}
