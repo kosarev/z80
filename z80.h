@@ -1334,8 +1334,6 @@ public:
         self().on_format(self().on_is_z80() ? "ccf" : "cmc"); }
     void on_scf() {
         self().on_format(self().on_is_z80() ? "scf" : "stc"); }
-    void on_daa() {
-        self().on_format("daa"); }
 
     // Interrupts.
     void on_di() {
@@ -1346,6 +1344,8 @@ public:
         self().on_format("im U", mode); }
 
     // Arithmetic.
+    void on_daa() {
+        self().on_format("daa"); }
     void on_cpl() {
         self().on_format(self().on_is_z80() ? "cpl" : "cma"); }
     void on_inc_r(reg r, fast_u8 d = 0) {
@@ -2799,6 +2799,60 @@ public:
             self().on_set_reg(r, irp, /* d= */ 0, v); }
 
     // Arithmetic.
+private:
+    void do_i8080_daa() {
+        fast_u8 a = self().on_get_a();
+        flag_set flags = get_flags();
+        fast_u8 f = flags.get_hf_cf();
+
+        fast_u8 r = a;
+        fast_u8 t = r + 6;
+        fast_u8 hfv = a ^ t;
+        if((hfv | f) & hf_mask)
+            r = t;
+
+        fast_u16 t2 = r + 0x60;
+        fast_u16 w = ((t2 >> 8) | f) << 8;
+        if(w & 0x100)
+            r = mask8(t2);
+
+        self().on_set_a(r);
+        flags.set(hfv & hf_mask, (w | r) & 0x1ff);
+        set_flags(flags); }
+    void do_z80_daa() {
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+        bool cf = f & cf_mask;
+        bool hf = f & hf_mask;
+        bool nf = f & nf_mask;
+
+        fast_u8 d = 0x00;
+        if(cf || a >= 0x9a) {
+            d |= 0x60;
+            f |= cf_mask;
+        }
+        if(hf || (a & 0x0f) >= 0x0a) {
+            d |= 0x06;
+        }
+
+        if(!nf) {
+            f = (f & cf_mask) | ((a & 0x0f) >= 0x0a ? hf_mask : 0);
+            a = add8(a, d);
+        } else {
+            f = (f & cf_mask) | (hf && (a & 0x0f) <= 0x05 ? hf_mask : 0) |
+                    nf_mask;
+            a = sub8(a, d);
+        }
+        f |= (a & (sf_mask | xf_mask | yf_mask)) | pf_log(a) | zf_ari(a);
+
+        self().on_set_a(a);
+        self().on_set_f(f); }
+public:
+    void on_daa() {
+        if(!self().on_is_z80())
+            do_i8080_daa();
+        else
+            do_z80_daa(); }
     void on_cpl() {
         if(!self().on_is_z80()) {
             self().on_set_a(self().on_get_a() ^ 0xff);
@@ -3642,25 +3696,6 @@ public:
         else
             self().on_set_wz(nn);
         }
-    void on_daa() {
-        fast_u8 a = self().on_get_a();
-        flag_set flags = get_flags();
-        fast_u8 f = flags.get_hf_cf();
-
-        fast_u8 r = a;
-        fast_u8 t = r + 6;
-        fast_u8 hfv = a ^ t;
-        if((hfv | f) & hf_mask)
-            r = t;
-
-        fast_u16 t2 = r + 0x60;
-        fast_u16 w = ((t2 >> 8) | f) << 8;
-        if(w & 0x100)
-            r = mask8(t2);
-
-        self().on_set_a(r);
-        flags.set(hfv & hf_mask, (w | r) & 0x1ff);
-        set_flags(flags); }
 
 protected:
     using base::self;
@@ -3987,34 +4022,6 @@ public:
         } else {
             self().on_set_wz(nn);
         } }
-    void on_daa() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        bool cf = f & cf_mask;
-        bool hf = f & hf_mask;
-        bool nf = f & nf_mask;
-
-        fast_u8 d = 0x00;
-        if(cf || a >= 0x9a) {
-            d |= 0x60;
-            f |= cf_mask;
-        }
-        if(hf || (a & 0x0f) >= 0x0a) {
-            d |= 0x06;
-        }
-
-        if(!nf) {
-            f = (f & cf_mask) | ((a & 0x0f) >= 0x0a ? hf_mask : 0);
-            a = add8(a, d);
-        } else {
-            f = (f & cf_mask) | (hf && (a & 0x0f) <= 0x05 ? hf_mask : 0) |
-                    nf_mask;
-            a = sub8(a, d);
-        }
-        f |= (a & (sf_mask | xf_mask | yf_mask)) | pf_log(a) | zf_ari(a);
-
-        self().on_set_a(a);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
