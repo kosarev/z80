@@ -3096,6 +3096,12 @@ public:
         self().on_ex_de_hl_regs(); }
 
     // Interrupts.
+    void on_di() {
+        if(!self().on_is_z80()) {
+            self().set_iff_on_di(false);
+        } else {
+            self().set_iff1_on_di(false);
+            self().set_iff2_on_di(false); } }
     void on_ei() {
         if(!self().on_is_z80()) {
             self().set_iff_on_ei(true);
@@ -3616,8 +3622,6 @@ public:
         set_flags(flags); }
     void on_dec_rp(regp rp) {
         self().on_set_regp(rp, dec16(self().on_get_regp(rp))); }
-    void on_di() {
-        self().set_iff_on_di(false); }
 
 protected:
     using base::self;
@@ -3992,9 +3996,6 @@ public:
     void on_dec_rp(regp rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_regp(rp, irp, dec16(self().on_get_regp(rp, irp))); }
-    void on_di() {
-        self().set_iff1_on_di(false);
-        self().set_iff2_on_di(false); }
     void on_djnz(fast_u8 d) {
         fast_u8 b = self().on_get_b();
         b = dec8(b);
