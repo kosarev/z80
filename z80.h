@@ -1672,6 +1672,17 @@ protected:
     }
 
 public:
+    const char *get_reg_name(regp2 rp, iregp irp = iregp::hl) {
+        bool z80 = self().on_is_z80();
+        switch(rp) {
+        case regp2::bc: return z80 ? "bc" : "b";
+        case regp2::de: return z80 ? "de" : "d";
+        case regp2::hl: return z80 ? get_reg_name(irp) : "h";
+        case regp2::af: return z80 ? "af" : "psw";
+        }
+        unreachable("Unknown register.");
+    }
+
     static const char *get_reg_name(iregp irp) {
         switch(irp) {
         case iregp::hl: return "hl";
@@ -1836,16 +1847,6 @@ public:
         unreachable("Unknown register.");
     }
 
-    static const char *get_reg_name(regp2 rp) {
-        switch(rp) {
-        case regp2::bc: return "b";
-        case regp2::de: return "d";
-        case regp2::hl: return "h";
-        case regp2::af: return "psw";
-        }
-        unreachable("Unknown register.");
-    }
-
     static const char *get_mnemonic_r(alu k) {
         switch(k) {
         case alu::add: return "add";
@@ -1873,6 +1874,8 @@ public:
         }
         unreachable("Unknown ALU operation.");
     }
+
+    using base::get_reg_name;
 
 protected:
     using base::self;
@@ -2024,16 +2027,6 @@ public:
         case regp::de: return "de";
         case regp::hl: return get_reg_name(irp);
         case regp::sp: return "sp";
-        }
-        unreachable("Unknown register.");
-    }
-
-    static const char *get_reg_name(regp2 rp, iregp irp = iregp::hl) {
-        switch(rp) {
-        case regp2::bc: return "bc";
-        case regp2::de: return "de";
-        case regp2::hl: return get_reg_name(irp);
-        case regp2::af: return "af";
         }
         unreachable("Unknown register.");
     }
