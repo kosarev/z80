@@ -1292,6 +1292,21 @@ public:
 
     void on_format_char(char c, const void **&args, output_buff &out) {
         switch(c) {
+        case 'A': {  // Register-operand i8080 ALU mnemonic or
+                     // Z80 ALU mnemonic.
+            auto k = get_arg<alu>(args);
+            if(!self().on_is_z80()) {
+                out.append(get_mnemonic_r(k));
+            } else {
+                out.append(get_mnemonic(k));
+                if(is_two_operand_alu_instr(k))
+                    out.append(" a,");
+            }
+            break; }
+        case 'B': {  // Immediate-operand ALU mnemonic.
+            auto k = get_arg<alu>(args);
+            out.append(get_mnemonic_imm(k));
+            break; }
         case 'C': {  // A condition operand.
             auto cc = get_arg<condition>(args);
             out.append(get_condition_name(cc));
@@ -1419,7 +1434,7 @@ public:
             iregp irp = get_iregp_kind_or_hl(r);
             self().on_format("A R", k, r, irp, d); } }
     void on_alu_n(alu k, fast_u8 n) {
-        self().on_format(self().on_is_z80() ? "A N" : "I N", k, n); }
+        self().on_format(self().on_is_z80() ? "A N" : "B N", k, n); }
     void on_daa() {
         self().on_format("daa"); }
     void on_cpl() {
@@ -1841,6 +1856,34 @@ protected:
         unreachable("Unknown ALU operation.");
     }
 
+    static const char *get_mnemonic_r(alu k) {
+        switch(k) {
+        case alu::add: return "add";
+        case alu::adc: return "adc";
+        case alu::sub: return "sub";
+        case alu::sbc: return "sbb";
+        case alu::and_a: return "ana";
+        case alu::xor_a: return "xra";
+        case alu::or_a: return "ora";
+        case alu::cp: return "cmp";
+        }
+        unreachable("Unknown ALU operation.");
+    }
+
+    static const char *get_mnemonic_imm(alu k) {
+        switch(k) {
+        case alu::add: return "adi";
+        case alu::adc: return "aci";
+        case alu::sub: return "sui";
+        case alu::sbc: return "sbi";
+        case alu::and_a: return "ani";
+        case alu::xor_a: return "xri";
+        case alu::or_a: return "ori";
+        case alu::cp: return "cpi";
+        }
+        unreachable("Unknown ALU operation.");
+    }
+
     static const char *get_mnemonic(rot k) {
         switch(k) {
         case rot::rlc: return "rlc";
@@ -1904,22 +1947,6 @@ public:
 
     i8080_disasm() {}
 
-    void on_format_char(char c, const void **&args,
-                        typename base::output_buff &out) {
-        switch(c) {
-        case 'A': {  // Register-operand ALU mnemonic.
-            auto k = get_arg<alu>(args);
-            out.append(get_mnemonic_r(k));
-            break; }
-        case 'I': {  // Immediate-operand ALU mnemonic.
-            auto k = get_arg<alu>(args);
-            out.append(get_mnemonic_imm(k));
-            break; }
-        default:
-            base::on_format_char(c, args, out);
-        }
-    }
-
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -1931,43 +1958,9 @@ public:
     void on_xret() {
         self().on_format("xret N", 0xd9); }
 
-    static const char *get_mnemonic_r(alu k) {
-        switch(k) {
-        case alu::add: return "add";
-        case alu::adc: return "adc";
-        case alu::sub: return "sub";
-        case alu::sbc: return "sbb";
-        case alu::and_a: return "ana";
-        case alu::xor_a: return "xra";
-        case alu::or_a: return "ora";
-        case alu::cp: return "cmp";
-        }
-        unreachable("Unknown ALU operation.");
-    }
-
-    static const char *get_mnemonic_imm(alu k) {
-        switch(k) {
-        case alu::add: return "adi";
-        case alu::adc: return "aci";
-        case alu::sub: return "sui";
-        case alu::sbc: return "sbi";
-        case alu::and_a: return "ani";
-        case alu::xor_a: return "xri";
-        case alu::or_a: return "ori";
-        case alu::cp: return "cpi";
-        }
-        unreachable("Unknown ALU operation.");
-    }
-
-    using base::get_reg_name;
-
 protected:
     using base::self;
-
-    template<typename T>
-    static T get_arg(const void **&args) {
-        return base::template get_arg<T>(args);
-    }
+    using base::get_mnemonic_imm;
 };
 
 template<typename D>
@@ -1981,33 +1974,8 @@ public:
 
     fast_u8 on_disp_read() { return self().on_read_next_byte(); }
 
-    void on_format_char(char c, const void **&args,
-                        typename base::output_buff &out) {
-        switch(c) {
-        case 'A': {  // ALU mnemonic.
-            auto k = get_arg<alu>(args);
-            out.append(get_mnemonic(k));
-            if(is_two_operand_alu_instr(k))
-                out.append(" a,");
-            break; }
-        default:
-            base::on_format_char(c, args, out);
-        }
-    }
-
-    using base::get_reg_name;
-
 protected:
     using base::self;
-    using base::is_indexable;
-    using base::get_iregp_kind_or_hl;
-    using base::is_two_operand_alu_instr;
-    using base::get_mnemonic;
-
-    template<typename T>
-    static T get_arg(const void **&args) {
-        return base::template get_arg<T>(args);
-    }
 };
 
 // Provides access to the value of a 16-bit register. Supposed to
