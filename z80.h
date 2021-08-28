@@ -1455,6 +1455,8 @@ public:
         } else {
             iregp irp = get_iregp_kind_or_hl(r);
             self().on_format("ld R, N", r, irp, d, n); } }
+    void on_ld_at_nn_a(fast_u16 nn) {
+        self().on_format(self().on_is_z80() ? "ld (W), a" : "sta W", nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
         if(!self().on_is_z80()) {
             self().on_format("lhld W", nn);
@@ -1872,8 +1874,6 @@ public:
         self().on_format("jmp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
-    void on_ld_at_nn_a(fast_u16 nn) {
-        self().on_format("sta W", nn); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         self().on_format("xcall N, W", op, nn); }
     void on_xjp_nn(fast_u16 nn) {
@@ -2014,8 +2014,6 @@ public:
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
-    void on_ld_at_nn_a(fast_u16 nn) {
-        self().on_format("ld (W), a", nn); }
 
     using base::get_reg_name;
 
