@@ -1374,6 +1374,8 @@ public:
             self().on_format("dec P", rp, irp); } }
 
     // Jumps.
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        self().on_format(self().on_is_z80() ? "call C, W" : "cC W", cc, nn); }
     void on_djnz(fast_u8 d) {
         self().on_format("djnz D", sign_extend8(d) + 2); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
@@ -1676,8 +1678,6 @@ public:
         self().on_format("I N", k, n); }
     void on_alu_r(alu k, reg r) {
         self().on_format("A R", k, r); }
-    void on_call_cc_nn(condition cc, fast_u16 nn) {
-        self().on_format("cC W", cc, nn); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1870,8 +1870,6 @@ public:
         self().on_format("I", k); }
     void on_block_out(block_out k) {
         self().on_format("T", k); }
-    void on_call_cc_nn(condition cc, fast_u16 nn) {
-        self().on_format("call C, W", cc, nn); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -3143,6 +3141,14 @@ public:
         self().on_push(self().on_get_pc());
         self().on_set_wz(nn);
         self().set_pc_on_call(nn); }
+    void on_call_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc)) {
+            if(self().on_is_z80())
+                self().on_read_cycle_extra_1t();
+            self().on_call(nn);
+        } else {
+            self().on_set_wz(nn);
+        } }
     void on_return() {
         fast_u16 pc = self().on_pop();
         self().on_set_wz(pc);
@@ -3690,12 +3696,6 @@ public:
         set_flags(flags); }
     void on_alu_r(alu k, reg r) {
         do_alu(k, self().on_get_reg(r)); }
-    void on_call_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_call(nn);
-        else
-            self().on_set_wz(nn);
-        }
 
 protected:
     using base::self;
@@ -4014,13 +4014,6 @@ public:
             self().on_5t_exec_cycle();
             fast_u16 pc = self().get_pc_on_block_instr();
             self().set_pc_on_block_instr(sub16(pc, 2));
-        } }
-    void on_call_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc)) {
-            self().on_read_cycle_extra_1t();
-            self().on_call(nn);
-        } else {
-            self().on_set_wz(nn);
         } }
 
 protected:
