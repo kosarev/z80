@@ -1536,6 +1536,16 @@ public:
     void on_sbc_hl_rp(regp rp) {
         self().on_format("sbc hl, P", rp, iregp::hl); }
 
+    // Block operations.
+    void on_block_cp(block_cp k) {
+        self().on_format("M", k); }
+    void on_block_ld(block_ld k) {
+        self().on_format("L", k); }
+    void on_block_in(block_in k) {
+        self().on_format("I", k); }
+    void on_block_out(block_out k) {
+        self().on_format("T", k); }
+
     static const char *get_condition_name(condition cc) {
         switch(cc) {
         case condition::nz: return "nz";
@@ -1862,14 +1872,6 @@ public:
     void on_alu_r(alu k, reg r, fast_u8 d) {
         iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("A R", k, r, irp, d); }
-    void on_block_cp(block_cp k) {
-        self().on_format("M", k); }
-    void on_block_ld(block_ld k) {
-        self().on_format("L", k); }
-    void on_block_in(block_in k) {
-        self().on_format("I", k); }
-    void on_block_out(block_out k) {
-        self().on_format("T", k); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -2757,6 +2759,12 @@ protected:
         return !(((f >> pos) ^ n) & 0x1);
     }
 
+    void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
+        fast_u8 t = sub8(a, n);
+        f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
+            hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
+    }
+
     void do_sub(fast_u8 &a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
         f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
@@ -3420,6 +3428,170 @@ public:
         self().on_set_hl(r16);
         self().on_set_f(f); }
 
+    // Block operations.
+    void on_block_cp(block_cp k) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u16 wz = self().on_get_wz();
+        fast_u16 hl = self().on_get_hl();
+        // TODO: Block comparisons implicitly depend on the
+        // register 'a'. We probably want to request its value
+        // here with a special handler.
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+
+        fast_u8 t = self().on_read_cycle(hl);
+        fast_u8 tf = f;
+        do_cp(a, tf, t);
+
+        self().on_5t_exec_cycle();
+        bc = dec16(bc);
+
+        t = a - t - ((tf & hf_mask) ? 1 : 0);
+        f = (tf & (sf_mask | zf_mask | hf_mask)) |
+                ((t << 4) & yf_mask) | (t & xf_mask) |
+                (bc != 0 ? pf_mask : 0) | nf_mask | (f & cf_mask);
+
+        if(static_cast<unsigned>(k) & 1) {
+            // CPD, CPDR
+            hl = dec16(hl);
+            wz = dec16(wz);
+        } else {
+            // CPI, CPIR
+            hl = inc16(hl);
+            wz = inc16(wz);
+        }
+
+        self().on_set_bc(bc);
+        self().on_set_wz(wz);
+        self().on_set_hl(hl);
+        self().on_set_f(f);
+
+        // CPIR, CPDR
+        if((static_cast<unsigned>(k) & 2) && bc && !(f & zf_mask)) {
+            self().on_5t_exec_cycle();
+            fast_u16 pc = self().get_pc_on_block_instr();
+            self().on_set_wz(dec16(pc));
+            self().set_pc_on_block_instr(sub16(pc, 2));
+        } }
+    void on_block_ld(block_ld k) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u16 de = self().on_get_de();
+        fast_u16 hl = self().on_get_hl();
+        // TODO: Block loads implicitly depend on the register 'a'. We probably
+        // want to request its value here with a special handler.
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = self().on_get_f();
+
+        fast_u8 t = self().on_read_cycle(hl);
+
+        self().on_write_cycle(de, t);
+        self().on_write_cycle_extra_2t();
+        bc = dec16(bc);
+
+        t += a;
+        f = (f & (sf_mask | zf_mask | cf_mask)) |
+                ((t << 4) & yf_mask) | (t & xf_mask) | (bc != 0 ? pf_mask : 0);
+        if(static_cast<unsigned>(k) & 1) {
+            // LDD, LDDR
+            hl = dec16(hl);
+            de = dec16(de);
+        } else {
+            // LDI, LDIR
+            hl = inc16(hl);
+            de = inc16(de);
+        }
+
+        self().on_set_bc(bc);
+        self().on_set_de(de);
+        self().on_set_hl(hl);
+        self().on_set_f(f);
+
+        // LDIR, LDDR
+        if((static_cast<unsigned>(k) & 2) && bc) {
+            self().on_5t_exec_cycle();
+            fast_u16 pc = self().get_pc_on_block_instr();
+            self().on_set_wz(dec16(pc));
+            self().set_pc_on_block_instr(sub16(pc, 2));
+        } }
+    void on_block_in(block_in k) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u16 wz = self().on_get_wz();
+        fast_u16 hl = self().on_get_hl();
+        fast_u8 f = self().on_get_f();
+
+        self().on_fetch_cycle_extra_1t();
+        bc = sub16(bc, 0x0100);
+        fast_u8 r = self().on_input_cycle(bc);
+        self().on_write_cycle(hl, r);
+        fast_u8 s = get_high8(bc);
+
+        if(static_cast<unsigned>(k) & 1) {
+            // IND, INR
+            hl = dec16(hl);
+            wz = dec16(bc);
+        } else {
+            // INI, INIR
+            hl = inc16(hl);
+            wz = inc16(bc);
+        }
+
+        fast_u16 cf = get_low8(wz) + r;
+        fast_u8 pf = (get_low8(cf) & 7) ^ s;
+        f = (s & (sf_mask | yf_mask | xf_mask)) | zf_ari(s) |
+            ((r & 0x80) >> (7 - nf_bit)) | pf_log(pf) |
+            ((cf < 0x100) ? 0 : (hf_mask | cf_mask));
+
+        self().on_set_bc(bc);
+        self().on_set_wz(wz);
+        self().on_set_hl(hl);
+        self().on_set_f(f);
+
+        // INIR, INDR
+        if((static_cast<unsigned>(k) & 2) && s) {
+            self().on_5t_exec_cycle();
+            fast_u16 pc = self().get_pc_on_block_instr();
+            self().set_pc_on_block_instr(sub16(pc, 2));
+        } }
+    void on_block_out(block_out k) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u16 wz = self().on_get_wz();
+        fast_u16 hl = self().on_get_hl();
+        fast_u8 f = self().on_get_f();
+
+        self().on_fetch_cycle_extra_1t();
+        fast_u8 r = self().on_read_cycle(hl);
+        bc = sub16(bc, 0x0100);
+        self().on_output_cycle(bc, r);
+        fast_u8 s = get_high8(bc);
+
+        if(static_cast<unsigned>(k) & 1) {
+            // OUTD, OTDR
+            hl = dec16(hl);
+            wz = dec16(bc);
+        } else {
+            // OUTI, OTIR
+            hl = inc16(hl);
+            wz = inc16(bc);
+        }
+
+        fast_u16 cf = get_low8(hl) + r;
+        fast_u8 pf = (get_low8(cf) & 7) ^ s;
+        f = (s & (sf_mask | yf_mask | xf_mask)) | zf_ari(s) |
+            ((r & 0x80) >> (7 - nf_bit)) | pf_log(pf) |
+            ((cf < 0x100) ? 0 : (hf_mask | cf_mask));
+
+        self().on_set_bc(bc);
+        self().on_set_wz(wz);
+        self().on_set_hl(hl);
+        self().on_set_f(f);
+
+        // OTIR, OTDR
+        if((static_cast<unsigned>(k) & 2) && s) {
+            self().on_5t_exec_cycle();
+            fast_u16 pc = self().get_pc_on_block_instr();
+            self().set_pc_on_block_instr(sub16(pc, 2));
+        } }
+
     void on_step() {
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
         self().on_fetch_and_decode();
@@ -3748,12 +3920,6 @@ public:
     fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
 
-    void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
-        fast_u8 t = sub8(a, n);
-        f = (t & sf_mask) | zf_ari(t) | (n & (yf_mask | xf_mask)) |
-            hf_ari(t, a, n) | pf_ari(a - n, a, n) | cf_ari(t > a) | nf_mask;
-    }
-
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
         fast_u8 f = 0;
@@ -3853,172 +4019,11 @@ public:
     void on_alu_r(alu k, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         do_alu(k, self().on_get_reg(r, irp, d)); }
-    void on_block_cp(block_cp k) {
-        fast_u16 bc = self().on_get_bc();
-        fast_u16 wz = self().on_get_wz();
-        fast_u16 hl = self().on_get_hl();
-        // TODO: Block comparisons implicitly depend on the
-        // register 'a'. We probably want to request its value
-        // here with a special handler.
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-
-        fast_u8 t = self().on_read_cycle(hl);
-        fast_u8 tf = f;
-        do_cp(a, tf, t);
-
-        self().on_5t_exec_cycle();
-        bc = dec16(bc);
-
-        t = a - t - ((tf & hf_mask) ? 1 : 0);
-        f = (tf & (sf_mask | zf_mask | hf_mask)) |
-                ((t << 4) & yf_mask) | (t & xf_mask) |
-                (bc != 0 ? pf_mask : 0) | nf_mask | (f & cf_mask);
-
-        if(static_cast<unsigned>(k) & 1) {
-            // CPD, CPDR
-            hl = dec16(hl);
-            wz = dec16(wz);
-        } else {
-            // CPI, CPIR
-            hl = inc16(hl);
-            wz = inc16(wz);
-        }
-
-        self().on_set_bc(bc);
-        self().on_set_wz(wz);
-        self().on_set_hl(hl);
-        self().on_set_f(f);
-
-        // CPIR, CPDR
-        if((static_cast<unsigned>(k) & 2) && bc && !(f & zf_mask)) {
-            self().on_5t_exec_cycle();
-            fast_u16 pc = self().get_pc_on_block_instr();
-            self().on_set_wz(dec16(pc));
-            self().set_pc_on_block_instr(sub16(pc, 2));
-        } }
-    void on_block_ld(block_ld k) {
-        fast_u16 bc = self().on_get_bc();
-        fast_u16 de = self().on_get_de();
-        fast_u16 hl = self().on_get_hl();
-        // TODO: Block loads implicitly depend on the register 'a'. We probably
-        // want to request its value here with a special handler.
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-
-        fast_u8 t = self().on_read_cycle(hl);
-
-        self().on_write_cycle(de, t);
-        self().on_write_cycle_extra_2t();
-        bc = dec16(bc);
-
-        t += a;
-        f = (f & (sf_mask | zf_mask | cf_mask)) |
-                ((t << 4) & yf_mask) | (t & xf_mask) | (bc != 0 ? pf_mask : 0);
-        if(static_cast<unsigned>(k) & 1) {
-            // LDD, LDDR
-            hl = dec16(hl);
-            de = dec16(de);
-        } else {
-            // LDI, LDIR
-            hl = inc16(hl);
-            de = inc16(de);
-        }
-
-        self().on_set_bc(bc);
-        self().on_set_de(de);
-        self().on_set_hl(hl);
-        self().on_set_f(f);
-
-        // LDIR, LDDR
-        if((static_cast<unsigned>(k) & 2) && bc) {
-            self().on_5t_exec_cycle();
-            fast_u16 pc = self().get_pc_on_block_instr();
-            self().on_set_wz(dec16(pc));
-            self().set_pc_on_block_instr(sub16(pc, 2));
-        } }
-    void on_block_in(block_in k) {
-        fast_u16 bc = self().on_get_bc();
-        fast_u16 wz = self().on_get_wz();
-        fast_u16 hl = self().on_get_hl();
-        fast_u8 f = self().on_get_f();
-
-        self().on_fetch_cycle_extra_1t();
-        bc = sub16(bc, 0x0100);
-        fast_u8 r = self().on_input_cycle(bc);
-        self().on_write_cycle(hl, r);
-        fast_u8 s = get_high8(bc);
-
-        if(static_cast<unsigned>(k) & 1) {
-            // IND, INR
-            hl = dec16(hl);
-            wz = dec16(bc);
-        } else {
-            // INI, INIR
-            hl = inc16(hl);
-            wz = inc16(bc);
-        }
-
-        fast_u16 cf = get_low8(wz) + r;
-        fast_u8 pf = (get_low8(cf) & 7) ^ s;
-        f = (s & (sf_mask | yf_mask | xf_mask)) | zf_ari(s) |
-            ((r & 0x80) >> (7 - nf_bit)) | pf_log(pf) |
-            ((cf < 0x100) ? 0 : (hf_mask | cf_mask));
-
-        self().on_set_bc(bc);
-        self().on_set_wz(wz);
-        self().on_set_hl(hl);
-        self().on_set_f(f);
-
-        // INIR, INDR
-        if((static_cast<unsigned>(k) & 2) && s) {
-            self().on_5t_exec_cycle();
-            fast_u16 pc = self().get_pc_on_block_instr();
-            self().set_pc_on_block_instr(sub16(pc, 2));
-        } }
-    void on_block_out(block_out k) {
-        fast_u16 bc = self().on_get_bc();
-        fast_u16 wz = self().on_get_wz();
-        fast_u16 hl = self().on_get_hl();
-        fast_u8 f = self().on_get_f();
-
-        self().on_fetch_cycle_extra_1t();
-        fast_u8 r = self().on_read_cycle(hl);
-        bc = sub16(bc, 0x0100);
-        self().on_output_cycle(bc, r);
-        fast_u8 s = get_high8(bc);
-
-        if(static_cast<unsigned>(k) & 1) {
-            // OUTD, OTDR
-            hl = dec16(hl);
-            wz = dec16(bc);
-        } else {
-            // OUTI, OTIR
-            hl = inc16(hl);
-            wz = inc16(bc);
-        }
-
-        fast_u16 cf = get_low8(hl) + r;
-        fast_u8 pf = (get_low8(cf) & 7) ^ s;
-        f = (s & (sf_mask | yf_mask | xf_mask)) | zf_ari(s) |
-            ((r & 0x80) >> (7 - nf_bit)) | pf_log(pf) |
-            ((cf < 0x100) ? 0 : (hf_mask | cf_mask));
-
-        self().on_set_bc(bc);
-        self().on_set_wz(wz);
-        self().on_set_hl(hl);
-        self().on_set_f(f);
-
-        // OTIR, OTDR
-        if((static_cast<unsigned>(k) & 2) && s) {
-            self().on_5t_exec_cycle();
-            fast_u16 pc = self().get_pc_on_block_instr();
-            self().set_pc_on_block_instr(sub16(pc, 2));
-        } }
 
 protected:
     using base::self;
     using base::check_condition;
+    using base::do_cp;
     using base::do_sub;
     using base::get_disp_target;
 };
