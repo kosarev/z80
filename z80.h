@@ -1522,6 +1522,8 @@ public:
 
     void on_nop() {
         self().on_format("nop"); }
+    void on_ed_xnop(fast_u8 op) {
+        self().on_format("xnop W", 0xed00 | op); }
     void on_neg() {
         self().on_format("neg"); }
     void on_xneg(fast_u8 op) {
@@ -2007,9 +2009,6 @@ public:
             base::on_format_char(c, args, out);
         }
     }
-
-    void on_ed_xnop(fast_u8 op) {
-        self().on_format("xnop W", 0xed00 | op); }
 
     using base::get_reg_name;
 
