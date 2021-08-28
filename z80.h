@@ -1411,6 +1411,8 @@ public:
                              reg::at_hl, irp, d); }
     void on_call_nn(fast_u16 nn) {
         self().on_format("call W", nn); }
+    void on_xcall_nn(fast_u8 op, fast_u16 nn) {
+        self().on_format("xcall N, W", op, nn); }
     void on_ccf() {
         self().on_format(self().on_is_z80() ? "ccf" : "cmc"); }
     void on_scf() {
@@ -1957,8 +1959,6 @@ public:
 
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
-    void on_xcall_nn(fast_u8 op, fast_u16 nn) {
-        self().on_format("xcall N, W", op, nn); }
 
 protected:
     using base::self;
