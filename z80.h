@@ -1346,6 +1346,8 @@ public:
         self().on_format("im U", mode); }
 
     // Arithmetic.
+    void on_cpl() {
+        self().on_format(self().on_is_z80() ? "cpl" : "cma"); }
     void on_inc_r(reg r, fast_u8 d = 0) {
         if(!self().on_is_z80()) {
             self().on_format("inr R", r);
@@ -1676,8 +1678,6 @@ public:
         self().on_format("A R", k, r); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("cC W", cc, nn); }
-    void on_cpl() {
-        self().on_format("cma"); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1872,8 +1872,6 @@ public:
         self().on_format("T", k); }
     void on_call_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("call C, W", cc, nn); }
-    void on_cpl() {
-        self().on_format("cpl"); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -2801,6 +2799,17 @@ public:
             self().on_set_reg(r, irp, /* d= */ 0, v); }
 
     // Arithmetic.
+    void on_cpl() {
+        if(!self().on_is_z80()) {
+            self().on_set_a(self().on_get_a() ^ 0xff);
+        } else {
+            fast_u8 a = self().on_get_a();
+            fast_u8 f = self().on_get_f();
+            a ^= 0xff;
+            f = (f & (sf_mask | zf_mask | pf_mask | cf_mask)) |
+                    (a & (yf_mask | xf_mask)) | hf_mask | nf_mask;
+            self().on_set_a(a);
+            self().on_set_f(f); } }
     void on_inc_r(reg r, fast_u8 d = 0) {
         if(!self().on_is_z80()) {
             fast_u8 n = self().on_get_reg(r);
@@ -3633,8 +3642,6 @@ public:
         else
             self().on_set_wz(nn);
         }
-    void on_cpl() {
-        self().on_set_a(self().on_get_a() ^ 0xff); }
     void on_daa() {
         fast_u8 a = self().on_get_a();
         flag_set flags = get_flags();
@@ -4006,14 +4013,6 @@ public:
         }
         f |= (a & (sf_mask | xf_mask | yf_mask)) | pf_log(a) | zf_ari(a);
 
-        self().on_set_a(a);
-        self().on_set_f(f); }
-    void on_cpl() {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = self().on_get_f();
-        a ^= 0xff;
-        f = (f & (sf_mask | zf_mask | pf_mask | cf_mask)) |
-                (a & (yf_mask | xf_mask)) | hf_mask | nf_mask;
         self().on_set_a(a);
         self().on_set_f(f); }
 
