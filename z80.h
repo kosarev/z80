@@ -1359,6 +1359,8 @@ public:
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
 
     // Transfers.
+    void on_ex_af_alt_af() {
+        self().on_format("ex af, af'"); }
     void on_ex_at_sp_irp() {
         if(!self().on_is_z80()) {
             self().on_format("xthl");
@@ -1857,8 +1859,6 @@ public:
         self().on_format("djnz D", sign_extend8(d) + 2); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
-    void on_ex_af_alt_af() {
-        self().on_format("ex af, af'"); }
     void on_ex_de_hl() {
         self().on_format("ex de, hl"); }
     void on_halt() {
@@ -2828,6 +2828,8 @@ public:
             self().on_relative_jump(d); }
 
     // Transfers.
+    void on_ex_af_alt_af() {
+        self().on_ex_af_alt_af_regs(); }
     void on_ex_at_sp_irp() {
         fast_u16 sp = self().on_get_sp();
         fast_u8 lo = self().on_read_cycle(sp);
@@ -3998,8 +4000,6 @@ public:
         self().set_iff1_on_ei(true);
         self().set_iff2_on_ei(true);
         self().disable_int_on_ei(); }
-    void on_ex_af_alt_af() {
-        self().on_ex_af_alt_af_regs(); }
 
 protected:
     using base::self;
