@@ -1416,6 +1416,8 @@ public:
         self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
+    void on_xretn(fast_u8 op) {
+        self().on_format("xretn W", 0xed00 | op); }
 
     // Transfers.
     void on_ex_af_alt_af() {
@@ -2012,8 +2014,6 @@ public:
         self().on_format("xim W, U", 0xed00 | op, mode); }
     void on_xneg(fast_u8 op) {
         self().on_format("xneg W", 0xed00 | op); }
-    void on_xretn(fast_u8 op) {
-        self().on_format("xretn W", 0xed00 | op); }
 
     using base::get_reg_name;
 
