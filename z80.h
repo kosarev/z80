@@ -1328,6 +1328,8 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        self().on_format(self().on_is_z80() ? "jp C, W" : "jC W", cc, nn); }
     void on_jp_irp() {
         if(!self().on_is_z80()) {
             self().on_format("pchl");
@@ -1622,8 +1624,6 @@ public:
         self().on_format("hlt"); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jmp W", nn); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        self().on_format("jC W", cc, nn); }
     void on_in_a_n(fast_u8 n) {
         self().on_format("in N", n); }
     void on_inc_r(reg r) {
@@ -1856,8 +1856,6 @@ public:
     void on_inc_rp(regp rp) {
         iregp irp = get_iregp_kind_or_hl(rp);
         self().on_format("inc P", rp, irp); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        self().on_format("jp C, W", cc, nn); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -2777,6 +2775,11 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            self().on_jump(nn);
+        else
+            self().on_set_wz(nn); }
     void on_jp_irp() {
         fast_u16 t;
         if(!self().on_is_z80()) {
@@ -3523,11 +3526,6 @@ public:
         self().on_write_cycle_extra_2t();
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_jump(nn);
-        else
-            self().on_set_wz(nn); }
     void on_in_a_n(fast_u8 n) {
         self().on_set_a(self().on_input_cycle(n)); }
     void on_inc_r(reg r) {
@@ -3984,11 +3982,6 @@ public:
     void on_inc_rp(regp rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_set_regp(rp, irp, inc16(self().on_get_regp(rp, irp))); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_jump(nn);
-        else
-            self().on_set_wz(nn); }
 
 protected:
     using base::self;
