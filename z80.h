@@ -1296,6 +1296,11 @@ public:
             auto cc = get_arg<condition>(args);
             out.append(get_condition_name(cc));
             break; }
+        case 'D': {  // A relative address.
+            auto d = get_arg<int>(args);
+            out.append("$ ");
+            out.append_disp(d);
+            break; }
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
@@ -1999,11 +2004,6 @@ public:
         case 'U': {  // A decimal number.
             auto u = get_arg<unsigned>(args);
             out.append_u(u);
-            break; }
-        case 'D': {  // A relative address.
-            auto d = get_arg<int>(args);
-            out.append("$ ");
-            out.append_disp(d);
             break; }
         default:
             base::on_format_char(c, args, out);
