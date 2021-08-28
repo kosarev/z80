@@ -1672,6 +1672,45 @@ protected:
     }
 
 public:
+    const char *get_reg_name(reg r, iregp irp = iregp::hl) {
+        bool z80 = self().on_is_z80();
+        switch(r) {
+        case reg::b: return "b";
+        case reg::c: return "c";
+        case reg::d: return "d";
+        case reg::e: return "e";
+        case reg::a: return "a";
+        case reg::h:
+            if(!z80)
+                return "h";
+            switch(irp) {
+            case iregp::hl: return "h";
+            case iregp::ix: return "ixh";
+            case iregp::iy: return "iyh";
+            }
+            break;
+        case reg::l:
+            if(!z80)
+                return "l";
+            switch(irp) {
+            case iregp::hl: return "l";
+            case iregp::ix: return "ixl";
+            case iregp::iy: return "iyl";
+            }
+            break;
+        case reg::at_hl:
+            if(!z80)
+                return "m";
+            switch(irp) {
+            case iregp::hl: return "(hl)";
+            case iregp::ix: return "(ix)";
+            case iregp::iy: return "(iy)";
+            }
+            break;
+        }
+        unreachable("Unknown register.");
+    }
+
     const char *get_reg_name(regp rp, iregp irp = iregp::hl) {
         bool z80 = self().on_is_z80();
         switch(rp) {
@@ -1834,20 +1873,6 @@ public:
     void on_xret() {
         self().on_format("xret N", 0xd9); }
 
-    static const char *get_reg_name(reg r) {
-        switch(r) {
-        case reg::b: return "b";
-        case reg::c: return "c";
-        case reg::d: return "d";
-        case reg::e: return "e";
-        case reg::a: return "a";
-        case reg::h: return "h";
-        case reg::l: return "l";
-        case reg::at_hl: return "m";
-        }
-        unreachable("Unknown register.");
-    }
-
     static const char *get_mnemonic_r(alu k) {
         switch(k) {
         case alu::add: return "add";
@@ -1989,38 +2014,6 @@ public:
         self().on_format("xneg W", 0xed00 | op); }
     void on_xretn(fast_u8 op) {
         self().on_format("xretn W", 0xed00 | op); }
-
-    static const char *get_reg_name(reg r, iregp irp = iregp::hl) {
-        switch(r) {
-        case reg::b: return "b";
-        case reg::c: return "c";
-        case reg::d: return "d";
-        case reg::e: return "e";
-        case reg::a: return "a";
-        case reg::h:
-            switch(irp) {
-            case iregp::hl: return "h";
-            case iregp::ix: return "ixh";
-            case iregp::iy: return "iyh";
-            }
-            break;
-        case reg::l:
-            switch(irp) {
-            case iregp::hl: return "l";
-            case iregp::ix: return "ixl";
-            case iregp::iy: return "iyl";
-            }
-            break;
-        case reg::at_hl:
-            switch(irp) {
-            case iregp::hl: return "(hl)";
-            case iregp::ix: return "(ix)";
-            case iregp::iy: return "(iy)";
-            }
-            break;
-        }
-        unreachable("Unknown register.");
-    }
 
     using base::get_reg_name;
 
