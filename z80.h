@@ -1425,7 +1425,9 @@ public:
     void on_xretn(fast_u8 op) {
         self().on_format("xretn W", 0xed00 | op); }
 
-    // Transfers.
+    // Swaps.
+    void on_ex_de_hl() {
+        self().on_format(self().on_is_z80() ? "ex de, hl" : "xchg"); }
     void on_ex_af_alt_af() {
         self().on_format("ex af, af'"); }
     void on_ex_at_sp_irp() {
@@ -1436,6 +1438,8 @@ public:
             self().on_format("ex (sp), P", regp::hl, irp); } }
     void on_exx() {
         self().on_format("exx"); }
+
+    // Transfers.
     void on_ld_a_r() {
         self().on_format("ld a, r"); }
     void on_ld_r_a() {
@@ -1872,8 +1876,6 @@ public:
         }
     }
 
-    void on_ex_de_hl() {
-        self().on_format("xchg"); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
     void on_xcall_nn(fast_u8 op, fast_u16 nn) {
@@ -2008,8 +2010,6 @@ public:
 
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
-    void on_ex_de_hl() {
-        self().on_format("ex de, hl"); }
 
     using base::get_reg_name;
 
@@ -3069,7 +3069,9 @@ public:
         self().on_set_iregp(irp, r);
         self().on_set_f(f); }
 
-    // Transfers.
+    // Swaps.
+    void on_ex_de_hl() {
+        self().on_ex_de_hl_regs(); }
     void on_ex_af_alt_af() {
         self().on_ex_af_alt_af_regs(); }
     void on_ex_at_sp_irp() {
@@ -3102,6 +3104,8 @@ public:
             self().on_set_iregp(irp, i); }
     void on_exx() {
         self().on_exx_regs(); }
+
+    // Transfers.
     void on_ld_a_r() {
         fast_u8 n = self().on_get_r();
         fast_u8 f = self().on_get_f();
@@ -3360,8 +3364,6 @@ public:
         f = (f & (sf_mask | zf_mask | pf_mask)) | (a & (yf_mask | xf_mask)) |
                 cf_mask;
         self().on_set_f(f); }
-    void on_ex_de_hl() {
-        self().on_ex_de_hl_regs(); }
 
     // Interrupts.
     void on_di() {
