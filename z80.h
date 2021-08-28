@@ -1328,6 +1328,8 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_jr(fast_u8 d) {
+        self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
     void on_ld_a_r() {
@@ -1857,8 +1859,6 @@ public:
         self().on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
-    void on_jr(fast_u8 d) {
-        self().on_format("jr D", sign_extend8(d) + 2); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("ld a, (W)", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -2776,6 +2776,8 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_jr(fast_u8 d) {
+        self().on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
         if(check_condition(cc))
             self().on_relative_jump(d); }
@@ -3982,8 +3984,6 @@ public:
     void on_jp_irp() {
         iregp irp = self().on_get_iregp_kind();
         self().set_pc_on_jump(self().on_get_iregp(irp)); }
-    void on_jr(fast_u8 d) {
-        self().on_relative_jump(d); }
 
 protected:
     using base::self;
