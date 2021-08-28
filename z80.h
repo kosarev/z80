@@ -1301,6 +1301,11 @@ public:
             out.append("$ ");
             out.append_disp(d);
             break; }
+        case 'G': {  // An alternative register pair.
+            auto rp = get_arg<regp2>(args);
+            auto irp = !self().on_is_z80() ? iregp::hl : get_arg<iregp>(args);
+            out.append(get_reg_name(rp, irp));
+            break; }
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
@@ -1882,10 +1887,6 @@ public:
             auto k = get_arg<alu>(args);
             out.append(get_mnemonic_r(k));
             break; }
-        case 'G': {  // An alternative register pair.
-            auto rp = get_arg<regp2>(args);
-            out.append(get_reg_name(rp));
-            break; }
         case 'I': {  // Immediate-operand ALU mnemonic.
             auto k = get_arg<alu>(args);
             out.append(get_mnemonic_imm(k));
@@ -1993,11 +1994,6 @@ public:
             break; }
         case 'P': {  // A register pair.
             auto rp = get_arg<regp>(args);
-            auto irp = get_arg<iregp>(args);
-            out.append(get_reg_name(rp, irp));
-            break; }
-        case 'G': {  // An alternative register pair.
-            auto rp = get_arg<regp2>(args);
             auto irp = get_arg<iregp>(args);
             out.append(get_reg_name(rp, irp));
             break; }
