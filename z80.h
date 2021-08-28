@@ -1425,6 +1425,11 @@ public:
         self().on_format("nop"); }
     void on_neg() {
         self().on_format("neg"); }
+    void on_in_r_c(reg r) {
+        if(r == reg::at_hl)
+            self().on_format("in (c)");
+        else
+            self().on_format("in R, (c)", r, iregp::hl, 0); }
     void on_out_c_r(reg r) {
         if(r == reg::at_hl)
             self().on_format("out (c), N", self().on_get_out_c_r_op());
@@ -1853,11 +1858,6 @@ public:
         self().on_format("im U", mode); }
     void on_in_a_n(fast_u8 n) {
         self().on_format("in a, (N)", n); }
-    void on_in_r_c(reg r) {
-        if(r == reg::at_hl)
-            self().on_format("in (c)");
-        else
-            self().on_format("in R, (c)", r, iregp::hl, 0); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -3064,6 +3064,16 @@ public:
         do_sub(a, f, n);
         self().on_set_a(a);
         self().on_set_f(f); }
+    void on_in_r_c(reg r) {
+        fast_u16 bc = self().on_get_bc();
+        fast_u8 f = self().on_get_f();
+        self().on_set_wz(inc16(bc));
+        fast_u8 n = self().on_input_cycle(bc);
+        if(r != reg::at_hl)
+            self().on_set_reg(r, iregp::hl, /* d= */ 0, n);
+        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
+                pf_log(n);
+        self().on_set_f(f); }
     void on_out_c_r(reg r) {
         fast_u16 bc = self().on_get_bc();
         self().on_set_wz(inc16(bc));
@@ -3978,16 +3988,6 @@ public:
         fast_u16 port = make16(a, n);
         self().on_set_wz(inc16(port));
         self().on_set_a(self().on_input_cycle(port)); }
-    void on_in_r_c(reg r) {
-        fast_u16 bc = self().on_get_bc();
-        fast_u8 f = self().on_get_f();
-        self().on_set_wz(inc16(bc));
-        fast_u8 n = self().on_input_cycle(bc);
-        if(r != reg::at_hl)
-            self().on_set_reg(r, iregp::hl, /* d= */ 0, n);
-        f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
-                pf_log(n);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
