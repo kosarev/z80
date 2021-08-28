@@ -1539,7 +1539,7 @@ public:
             iregp irp = get_iregp_kind_or_hl(r);
             self().on_format("ld R, N", r, irp, d, n); } }
     void on_ld_a_at_nn(fast_u16 nn) {
-        self().on_format("ld a, (W)", nn); }
+        self().on_format(self().on_is_z80() ? "ld a, (W)" : "lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
         self().on_format(self().on_is_z80() ? "ld (W), a" : "sta W", nn); }
     void on_ld_irp_at_nn(fast_u16 nn) {
@@ -1951,19 +1951,8 @@ protected:
 
 // TODO: Split to a instructions verbalizer and a disassembler.
 template<typename D>
-class i8080_disasm : public internals::disasm_base<i8080_decoder<root<D>>> {
-public:
-    typedef internals::disasm_base<i8080_decoder<root<D>>> base;
-
-    i8080_disasm() {}
-
-    void on_ld_a_at_nn(fast_u16 nn) {
-        self().on_format("lda W", nn); }
-
-protected:
-    using base::self;
-    using base::get_mnemonic_imm;
-};
+class i8080_disasm : public internals::disasm_base<i8080_decoder<root<D>>>
+{};
 
 template<typename D>
 class z80_disasm
