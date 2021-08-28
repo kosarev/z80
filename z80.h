@@ -1671,6 +1671,10 @@ protected:
         return get_iregp_kind_or_hl(rp == regp2::hl);
     }
 
+    static bool is_two_operand_alu_instr(alu k) {
+        return k == alu::add || k == alu::adc || k == alu::sbc;
+    }
+
     static const char *get_mnemonic(alu k) {
         switch(k) {
         case alu::add: return "add";
@@ -2032,14 +2036,11 @@ public:
         unreachable("Unknown register.");
     }
 
-    static bool is_two_operand_alu_instr(alu k) {
-        return k == alu::add || k == alu::adc || k == alu::sbc;
-    }
-
 protected:
     using base::self;
     using base::is_indexable;
     using base::get_iregp_kind_or_hl;
+    using base::is_two_operand_alu_instr;
     using base::get_mnemonic;
 
     template<typename T>
