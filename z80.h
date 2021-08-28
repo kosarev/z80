@@ -1357,6 +1357,10 @@ public:
         self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
+
+    // Transfers.
+    void on_exx() {
+        self().on_format("exx"); }
     void on_ld_a_r() {
         self().on_format("ld a, r"); }
     void on_ld_r_a() {
@@ -1426,6 +1430,7 @@ public:
         } else {
             iregp irp = get_iregp_kind_or_hl(rp);
             self().on_format("ld P, W", rp, irp, nn); } }
+
     void on_nop() {
         self().on_format("nop"); }
     void on_neg() {
@@ -1855,8 +1860,6 @@ public:
     void on_ex_at_sp_irp() {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("ex (sp), P", regp::hl, irp); }
-    void on_exx() {
-        self().on_format("exx"); }
     void on_halt() {
         self().on_format("halt"); }
     void on_jp_nn(fast_u16 nn) {
@@ -2822,6 +2825,10 @@ public:
     void on_jr_cc(condition cc, fast_u8 d) {
         if(check_condition(cc))
             self().on_relative_jump(d); }
+
+    // Transfers.
+    void on_exx() {
+        self().on_exx_regs(); }
     void on_ld_a_r() {
         fast_u8 n = self().on_get_r();
         fast_u8 f = self().on_get_f();
@@ -2929,6 +2936,7 @@ public:
         } else {
             iregp irp = self().on_get_iregp_kind();
             self().on_set_regp(rp, irp, nn); } }
+
     void on_push(fast_u16 nn) {
         fast_u16 sp = self().on_get_sp();
         sp = dec16(sp);
@@ -3993,8 +4001,6 @@ public:
         self().on_write_cycle_extra_2t();
         self().on_set_wz(i);
         self().on_set_iregp(irp, i); }
-    void on_exx() {
-        self().on_exx_regs(); }
 
 protected:
     using base::self;
