@@ -1328,6 +1328,12 @@ public:
         self().on_format("di"); }
     void on_ei() {
         self().on_format("ei"); }
+    void on_jp_irp() {
+        if(!self().on_is_z80()) {
+            self().on_format("pchl");
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_format("jp (P)", regp::hl, irp); } }
     void on_jr(fast_u8 d) {
         self().on_format("jr D", sign_extend8(d) + 2); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -1614,8 +1620,6 @@ public:
         self().on_format("xthl"); }
     void on_halt() {
         self().on_format("hlt"); }
-    void on_jp_irp() {
-        self().on_format("pchl"); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jmp W", nn); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
@@ -1854,9 +1858,6 @@ public:
         self().on_format("inc P", rp, irp); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         self().on_format("jp C, W", cc, nn); }
-    void on_jp_irp() {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_format("jp (P)", regp::hl, irp); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -2776,6 +2777,15 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+    void on_jp_irp() {
+        fast_u16 t;
+        if(!self().on_is_z80()) {
+            t = self().on_get_hl();
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            t = self().on_get_iregp(irp);
+        }
+        self().set_pc_on_jump(t); }
     void on_jr(fast_u8 d) {
         self().on_relative_jump(d); }
     void on_jr_cc(condition cc, fast_u8 d) {
@@ -3518,8 +3528,6 @@ public:
             self().on_jump(nn);
         else
             self().on_set_wz(nn); }
-    void on_jp_irp() {
-        self().set_pc_on_jump(self().on_get_hl()); }
     void on_in_a_n(fast_u8 n) {
         self().on_set_a(self().on_input_cycle(n)); }
     void on_inc_r(reg r) {
@@ -3981,9 +3989,6 @@ public:
             self().on_jump(nn);
         else
             self().on_set_wz(nn); }
-    void on_jp_irp() {
-        iregp irp = self().on_get_iregp_kind();
-        self().set_pc_on_jump(self().on_get_iregp(irp)); }
 
 protected:
     using base::self;
