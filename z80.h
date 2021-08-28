@@ -1345,6 +1345,7 @@ public:
     void on_im(unsigned mode) {
         self().on_format("im U", mode); }
 
+    // Arithmetic.
     void on_inc_r(reg r, fast_u8 d = 0) {
         if(!self().on_is_z80()) {
             self().on_format("inr R", r);
@@ -1357,6 +1358,12 @@ public:
         } else {
             iregp irp = get_iregp_kind_or_hl(rp);
             self().on_format("inc P", rp, irp); } }
+    void on_dec_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_format("dcx P", rp);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(rp);
+            self().on_format("dec P", rp, irp); } }
 
     // Jumps.
     void on_djnz(fast_u8 d) {
@@ -1667,8 +1674,6 @@ public:
         self().on_format("cma"); }
     void on_dec_r(reg r) {
         self().on_format("dcr R", r); }
-    void on_dec_rp(regp rp) {
-        self().on_format("dcx P", rp); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1868,9 +1873,6 @@ public:
     void on_dec_r(reg r, fast_u8 d) {
         iregp irp = get_iregp_kind_or_hl(r);
         self().on_format("dec R", r, irp, d); }
-    void on_dec_rp(regp rp) {
-        iregp irp = get_iregp_kind_or_hl(rp);
-        self().on_format("dec P", rp, irp); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -2796,6 +2798,8 @@ public:
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
             self().on_set_reg(r, irp, /* d= */ 0, v); }
+
+    // Arithmetic.
     void on_inc_r(reg r, fast_u8 d = 0) {
         if(!self().on_is_z80()) {
             fast_u8 n = self().on_get_reg(r);
@@ -2821,6 +2825,13 @@ public:
         } else {
             iregp irp = self().on_get_iregp_kind();
             self().on_set_regp(rp, irp, inc16(self().on_get_regp(rp, irp))); } }
+    void on_dec_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_set_regp(rp, dec16(self().on_get_regp(rp)));
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_set_regp(rp, irp, dec16(self().on_get_regp(rp, irp))); } }
+
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         if(check_condition(cc))
             self().on_jump(nn);
@@ -3630,8 +3641,6 @@ public:
         self().on_set_reg(r, t);
         flags.set((n ^ t ^ hf_mask) & hf_mask, (flags.get_cf() << 8) | t);
         set_flags(flags); }
-    void on_dec_rp(regp rp) {
-        self().on_set_regp(rp, dec16(self().on_get_regp(rp))); }
 
 protected:
     using base::self;
@@ -4003,9 +4012,6 @@ public:
                 hf_dec(v) | pf_dec(v) | nf_mask;
         self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
-    void on_dec_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_set_regp(rp, irp, dec16(self().on_get_regp(rp, irp))); }
 
 protected:
     using base::self;
