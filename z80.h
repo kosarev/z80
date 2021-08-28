@@ -1382,6 +1382,12 @@ public:
             self().on_format("dec P", rp, irp); } }
     void on_adc_hl_rp(regp rp) {
         self().on_format("adc hl, P", rp, iregp::hl); }
+    void on_add_irp_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_format("dad P", rp);
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_format("add P, P", regp::hl, irp, rp, irp); } }
 
     // Jumps.
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -1692,8 +1698,6 @@ public:
         }
     }
 
-    void on_add_irp_rp(regp rp) {
-        self().on_format("dad P", rp); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1868,9 +1872,6 @@ public:
         }
     }
 
-    void on_add_irp_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_format("add P, P", regp::hl, irp, rp, irp); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -3049,7 +3050,39 @@ public:
         self().on_set_wz(inc16(hl));
         self().on_set_hl(r16);
         self().on_set_f(f); }
+    void on_add_irp_rp(regp rp) {
+        if(!self().on_is_z80()) {
+            self().on_3t_exec_cycle();
+            self().on_3t_exec_cycle();
 
+            fast_u16 i = self().on_get_hl();
+            fast_u16 n = self().on_get_regp(rp);
+            flag_set flags = get_flags();
+            fast_u32 r32 = i + n;
+            self().on_set_wz(inc16(i));
+            self().on_set_hl(mask16(r32));
+            // TODO: Should set_cf() take fast_u16?
+            flags.set_cf(static_cast<fast_u8>(r32 >> 16));
+            set_flags(flags);
+            return;
+        }
+
+        iregp irp = self().on_get_iregp_kind();
+        fast_u16 i = self().on_get_iregp(irp);
+        fast_u16 n = self().on_get_regp(rp, irp);
+        fast_u8 f = self().on_get_f();
+
+        self().on_4t_exec_cycle();
+        self().on_3t_exec_cycle();
+
+        fast_u16 r = add16(i, n);
+        f = (f & (sf_mask | zf_mask | pf_mask)) |
+                (get_high8(r) & (yf_mask | xf_mask)) |
+                hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
+
+        self().on_set_wz(inc16(i));
+        self().on_set_iregp(irp, r);
+        self().on_set_f(f); }
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         if(check_condition(cc))
             self().on_jump(nn);
@@ -3914,53 +3947,8 @@ protected:
 };
 
 template<typename B>
-class i8080_executor : public internals::executor_base<B> {
-public:
-    typedef internals::executor_base<B> base;
-
-    using base::cf_mask;
-    using base::hf_mask;
-    using base::nf_mask;
-    using base::sf_mask;
-    using base::xf_mask;
-    using base::yf_mask;
-    using base::zf_mask;
-    using base::pf_mask;
-
-    using base::cf_bit;
-    using base::sf_bit;
-    using base::zf_bit;
-    using base::pf_bit;
-
-    using base::cf_ari;
-    using base::hf_ari;
-    using base::hf_dec;
-    using base::hf_inc;
-    using base::pf_log;
-    using base::zf_ari;
-
-public:
-    void on_add_irp_rp(regp rp) {
-        self().on_3t_exec_cycle();
-        self().on_3t_exec_cycle();
-
-        fast_u16 i = self().on_get_hl();
-        fast_u16 n = self().on_get_regp(rp);
-        flag_set flags = get_flags();
-        fast_u32 r32 = i + n;
-        self().on_set_wz(inc16(i));
-        self().on_set_hl(mask16(r32));
-        // TODO: Should set_cf() take fast_u16?
-        flags.set_cf(static_cast<fast_u8>(r32 >> 16));
-        set_flags(flags); }
-
-protected:
-    using base::self;
-    using flag_set = typename base::flag_set;
-    using base::get_flags;
-    using base::set_flags;
-    using base::check_condition;
-};
+class i8080_executor : public internals::executor_base<B>
+{};
 
 template<typename B>
 class z80_executor : public internals::executor_base<B> {
@@ -4009,24 +3997,6 @@ public:
         self().on_5t_exec_cycle();
         self().on_jump(get_disp_target(self().get_pc_on_jump(), d));
     }
-
-    void on_add_irp_rp(regp rp) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 i = self().on_get_iregp(irp);
-        fast_u16 n = self().on_get_regp(rp, irp);
-        fast_u8 f = self().on_get_f();
-
-        self().on_4t_exec_cycle();
-        self().on_3t_exec_cycle();
-
-        fast_u16 r = add16(i, n);
-        f = (f & (sf_mask | zf_mask | pf_mask)) |
-                (get_high8(r) & (yf_mask | xf_mask)) |
-                hf_ari(r >> 8, i >> 8, n >> 8) | cf_ari(r < i);
-
-        self().on_set_wz(inc16(i));
-        self().on_set_iregp(irp, r);
-        self().on_set_f(f); }
 
 protected:
     using base::self;
