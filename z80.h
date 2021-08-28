@@ -2001,10 +2001,6 @@ public:
             auto irp = get_arg<iregp>(args);
             out.append(get_reg_name(rp, irp));
             break; }
-        case 'N': {  // An 8-bit immediate operand.
-            auto n = get_arg<fast_u8>(args);
-            out.append_u8(n);
-            break; }
         default:
             base::on_format_char(c, args, out);
         }
