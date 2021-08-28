@@ -1672,6 +1672,17 @@ protected:
     }
 
 public:
+    const char *get_reg_name(regp rp, iregp irp = iregp::hl) {
+        bool z80 = self().on_is_z80();
+        switch(rp) {
+        case regp::bc: return z80 ? "bc" : "b";
+        case regp::de: return z80 ? "de" : "d";
+        case regp::hl: return z80 ? get_reg_name(irp) : "h";
+        case regp::sp: return "sp";
+        }
+        unreachable("Unknown register.");
+    }
+
     const char *get_reg_name(regp2 rp, iregp irp = iregp::hl) {
         bool z80 = self().on_is_z80();
         switch(rp) {
@@ -1833,16 +1844,6 @@ public:
         case reg::h: return "h";
         case reg::l: return "l";
         case reg::at_hl: return "m";
-        }
-        unreachable("Unknown register.");
-    }
-
-    static const char *get_reg_name(regp rp) {
-        switch(rp) {
-        case regp::bc: return "b";
-        case regp::de: return "d";
-        case regp::hl: return "h";
-        case regp::sp: return "sp";
         }
         unreachable("Unknown register.");
     }
@@ -2017,16 +2018,6 @@ public:
             case iregp::iy: return "(iy)";
             }
             break;
-        }
-        unreachable("Unknown register.");
-    }
-
-    static const char *get_reg_name(regp rp, iregp irp = iregp::hl) {
-        switch(rp) {
-        case regp::bc: return "bc";
-        case regp::de: return "de";
-        case regp::hl: return get_reg_name(irp);
-        case regp::sp: return "sp";
         }
         unreachable("Unknown register.");
     }
