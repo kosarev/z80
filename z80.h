@@ -1325,6 +1325,10 @@ public:
             auto k = get_arg<block_out>(args);
             out.append(get_mnemonic(k));
             break; }
+        case 'U': {  // A decimal number.
+            auto u = get_arg<unsigned>(args);
+            out.append_u(u);
+            break; }
         default:
             out.append(c);
         }
@@ -2000,10 +2004,6 @@ public:
         case 'N': {  // An 8-bit immediate operand.
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
-            break; }
-        case 'U': {  // A decimal number.
-            auto u = get_arg<unsigned>(args);
-            out.append_u(u);
             break; }
         default:
             base::on_format_char(c, args, out);
