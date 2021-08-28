@@ -660,14 +660,6 @@ public:
         base::on_5t_exec_cycle();
     }
 
-    fast_u8 on_input_cycle(fast_u8 n) {
-        context.match("input at %02x",
-                      static_cast<unsigned>(get_ticks()),
-                      static_cast<unsigned>(n));
-        level_guard guard(context);
-        return base::on_input_cycle(n);
-    }
-
     fast_u8 on_input_cycle(fast_u16 addr) {
         context.match("input at %04x",
                       static_cast<unsigned>(get_ticks()),

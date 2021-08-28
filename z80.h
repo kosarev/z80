@@ -1425,6 +1425,8 @@ public:
         self().on_format("nop"); }
     void on_neg() {
         self().on_format("neg"); }
+    void on_in_a_n(fast_u8 n) {
+        self().on_format(self().on_is_z80() ? "in a, (N)" : "in N", n); }
     void on_in_r_c(reg r) {
         if(r == reg::at_hl)
             self().on_format("in (c)");
@@ -1641,8 +1643,6 @@ public:
         self().on_format("hlt"); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jmp W", nn); }
-    void on_in_a_n(fast_u8 n) {
-        self().on_format("in N", n); }
     void on_ld_a_at_nn(fast_u16 nn) {
         self().on_format("lda W", nn); }
     void on_ld_at_nn_a(fast_u16 nn) {
@@ -1856,8 +1856,6 @@ public:
         self().on_format("halt"); }
     void on_im(unsigned mode) {
         self().on_format("im U", mode); }
-    void on_in_a_n(fast_u8 n) {
-        self().on_format("in a, (N)", n); }
     void on_jp_nn(fast_u16 nn) {
         self().on_format("jp W", nn); }
     void on_ld_a_at_nn(fast_u16 nn) {
@@ -3064,6 +3062,16 @@ public:
         do_sub(a, f, n);
         self().on_set_a(a);
         self().on_set_f(f); }
+    void on_in_a_n(fast_u8 n) {
+        fast_u16 port;
+        if(!self().on_is_z80()) {
+            port = n;
+        } else {
+            fast_u8 a = self().on_get_a();
+            port = make16(a, n);
+            self().on_set_wz(inc16(port));
+        }
+        self().on_set_a(self().on_input_cycle(port)); }
     void on_in_r_c(reg r) {
         fast_u16 bc = self().on_get_bc();
         fast_u8 f = self().on_get_f();
@@ -3563,8 +3571,6 @@ public:
         self().on_write_cycle_extra_2t();
         self().on_set_wz(hl);
         self().on_set_hl(hl); }
-    void on_in_a_n(fast_u8 n) {
-        self().on_set_a(self().on_input_cycle(n)); }
 
 protected:
     using base::self;
@@ -3983,11 +3989,6 @@ public:
         self().on_exx_regs(); }
     void on_im(unsigned mode) {
         self().on_set_int_mode(mode); }
-    void on_in_a_n(fast_u8 n) {
-        fast_u8 a = self().on_get_a();
-        fast_u16 port = make16(a, n);
-        self().on_set_wz(inc16(port));
-        self().on_set_a(self().on_input_cycle(port)); }
 
 protected:
     using base::self;

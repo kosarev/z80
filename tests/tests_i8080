@@ -371,7 +371,7 @@ dbfe in 0xfe
  4     set_addr_bus 0000 -> 0001
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
- 7 input at fe
+ 7 input at 00fe
  9   iorq_wait 00fe
 10 set_a 00 -> ff
 10 done
