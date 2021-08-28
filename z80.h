@@ -3083,25 +3083,6 @@ public:
         self().on_set_wz(inc16(i));
         self().on_set_iregp(irp, r);
         self().on_set_f(f); }
-    void on_jp_cc_nn(condition cc, fast_u16 nn) {
-        if(check_condition(cc))
-            self().on_jump(nn);
-        else
-            self().on_set_wz(nn); }
-    void on_jp_irp() {
-        fast_u16 t;
-        if(!self().on_is_z80()) {
-            t = self().on_get_hl();
-        } else {
-            iregp irp = self().on_get_iregp_kind();
-            t = self().on_get_iregp(irp);
-        }
-        self().set_pc_on_jump(t); }
-    void on_jr(fast_u8 d) {
-        self().on_relative_jump(d); }
-    void on_jr_cc(condition cc, fast_u8 d) {
-        if(check_condition(cc))
-            self().on_relative_jump(d); }
 
     // Transfers.
     void on_ex_af_alt_af() {
@@ -3301,6 +3282,28 @@ public:
         } }
 
     // Jumps.
+    void on_jp_cc_nn(condition cc, fast_u16 nn) {
+        if(check_condition(cc))
+            self().on_jump(nn);
+        else
+            self().on_set_wz(nn); }
+    void on_jp_irp() {
+        fast_u16 t;
+        if(!self().on_is_z80()) {
+            t = self().on_get_hl();
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            t = self().on_get_iregp(irp);
+        }
+        self().set_pc_on_jump(t); }
+    void on_relative_jump(fast_u8 d) {
+        self().on_5t_exec_cycle();
+        self().on_jump(get_disp_target(self().get_pc_on_jump(), d)); }
+    void on_jr(fast_u8 d) {
+        self().on_relative_jump(d); }
+    void on_jr_cc(condition cc, fast_u8 d) {
+        if(check_condition(cc))
+            self().on_relative_jump(d); }
     void on_djnz(fast_u8 d) {
         fast_u8 b = self().on_get_b();
         b = dec8(b);
@@ -3992,11 +3995,6 @@ public:
 
     fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
-
-    void on_relative_jump(fast_u8 d) {
-        self().on_5t_exec_cycle();
-        self().on_jump(get_disp_target(self().get_pc_on_jump(), d));
-    }
 
 protected:
     using base::self;
