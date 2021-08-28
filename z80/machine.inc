@@ -68,8 +68,11 @@ class machine_object
     : public z80::machine_state<
         machine<z80::i8080_executor<
             z80::i8080_decoder<z80::root<machine_object>>>,
-        object_state>>
-{};
+        object_state>> {
+public:
+    bool on_get_iff() const { return state.iff != 0; }
+    void on_set_iff(bool f) { state.iff = f; }
+};
 
 class disasm : public disasm_base<z80::i8080_disasm<disasm>>
 {};
@@ -84,6 +87,12 @@ public:
         return static_cast<iregp>(state.irp_kind); }
     void on_set_iregp_kind(iregp irp) {
         state.irp_kind = static_cast<least_u8>(irp); }
+
+    bool on_get_iff1() const { return state.iff1 != 0; }
+    void on_set_iff1(bool f) { state.iff1 = f; }
+
+    bool on_get_iff2() const { return state.iff2 != 0; }
+    void on_set_iff2(bool f) { state.iff2 = f; }
 
     fast_u8 on_get_ixh() const { return state.ixh; }
     void on_set_ixh(fast_u8 n) { state.ixh = n; }

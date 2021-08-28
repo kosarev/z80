@@ -226,6 +226,18 @@ public:
     void on_set_int_mode(unsigned mode) { unused(mode); }
     void on_set_is_int_disabled(bool f) { unused(f); }
 
+    void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
+    void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
+
+    void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
+    void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
+    void set_iff1_on_reti_retn(bool f) { self().on_set_iff1(f); }
+
+    void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
+    void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
+
+    bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
+
     fast_u16 on_get_bc() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_c();
@@ -3084,6 +3096,14 @@ public:
         self().on_ex_de_hl_regs(); }
 
     // Interrupts.
+    void on_ei() {
+        if(!self().on_is_z80()) {
+            self().set_iff_on_ei(true);
+        } else {
+            self().set_iff1_on_ei(true);
+            self().set_iff2_on_ei(true);
+        }
+        self().disable_int_on_ei(); }
     void on_halt() {
         self().on_set_is_halted(true);
         // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
@@ -3504,9 +3524,6 @@ public:
     using base::pf_log;
     using base::zf_ari;
 
-    void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
-    void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
-
 public:
     void do_alu(alu k, fast_u8 n) {
         fast_u8 a = self().on_get_a();
@@ -3601,9 +3618,6 @@ public:
         self().on_set_regp(rp, dec16(self().on_get_regp(rp))); }
     void on_di() {
         self().set_iff_on_di(false); }
-    void on_ei() {
-        self().set_iff_on_ei(true);
-        self().disable_int_on_ei(); }
 
 protected:
     using base::self;
@@ -3655,15 +3669,6 @@ public:
 
     fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
-
-    void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
-    void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
-    void set_iff1_on_reti_retn(bool f) { self().on_set_iff1(f); }
-
-    void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
-    void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
-
-    bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
 
     void do_cp(fast_u8 a, fast_u8 &f, fast_u8 n) {
         fast_u8 t = sub8(a, n);
@@ -3996,10 +4001,6 @@ public:
         self().on_set_b(b);
         if(b)
             self().on_relative_jump(d); }
-    void on_ei() {
-        self().set_iff1_on_ei(true);
-        self().set_iff2_on_ei(true);
-        self().disable_int_on_ei(); }
 
 protected:
     using base::self;

@@ -779,24 +779,6 @@ public:
         base::set_iff_on_ei(iff);
     }
 
-    void set_iff1_on_ei(bool f) {
-        context.match("set_iff1_on_ei %u -> %u",
-                      static_cast<unsigned>(get_ticks()),
-                      static_cast<unsigned>(base::get_iff1()),
-                      static_cast<unsigned>(f));
-        level_guard guard(context);
-        base::set_iff1_on_ei(f);
-    }
-
-    void set_iff2_on_ei(bool f) {
-        context.match("set_iff2_on_ei %u -> %u",
-                      static_cast<unsigned>(get_ticks()),
-                      static_cast<unsigned>(base::get_iff2()),
-                      static_cast<unsigned>(f));
-        level_guard guard(context);
-        base::set_iff2_on_ei(f);
-    }
-
     void on_set_int_mode(unsigned mode) {
         context.match("set_int_mode %u -> %u",
                       static_cast<unsigned>(get_ticks()),
@@ -884,6 +866,24 @@ public:
                       static_cast<unsigned>(get_ticks()));
         level_guard guard(context);
         return base::on_m1_fetch_cycle();
+    }
+
+    void set_iff1_on_ei(bool f) {
+        context.match("set_iff1_on_ei %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff1()),
+                      static_cast<unsigned>(f));
+        level_guard guard(context);
+        base::set_iff1_on_ei(f);
+    }
+
+    void set_iff2_on_ei(bool f) {
+        context.match("set_iff2_on_ei %u -> %u",
+                      static_cast<unsigned>(get_ticks()),
+                      static_cast<unsigned>(base::get_iff2()),
+                      static_cast<unsigned>(f));
+        level_guard guard(context);
+        base::set_iff2_on_ei(f);
     }
 
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);

@@ -163,15 +163,6 @@ public:
     bool on_is_int_disabled() const { return state.int_disabled; }
     void on_set_is_int_disabled(bool f) { state.int_disabled = f; }
 
-    bool on_get_iff() const { return state.iff != 0; }
-    void on_set_iff(bool f) { state.iff = f; }
-
-    bool on_get_iff1() const { return state.iff1 != 0; }
-    void on_set_iff1(bool f) { state.iff1 = f; }
-
-    bool on_get_iff2() const { return state.iff2 != 0; }
-    void on_set_iff2(bool f) { state.iff2 = f; }
-
     unsigned on_get_int_mode() const { return state.int_mode; }
     void on_set_int_mode(unsigned mode) { state.int_mode = mode; }
 
