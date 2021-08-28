@@ -1504,6 +1504,8 @@ public:
         self().on_format("nop"); }
     void on_neg() {
         self().on_format("neg"); }
+    void on_xneg(fast_u8 op) {
+        self().on_format("xneg W", 0xed00 | op); }
     void on_in_a_n(fast_u8 n) {
         self().on_format(self().on_is_z80() ? "in a, (N)" : "in N", n); }
     void on_in_r_c(reg r) {
@@ -2012,8 +2014,6 @@ public:
         self().on_format("ld a, (P)", rp, iregp::hl); }
     void on_xim(fast_u8 op, fast_u8 mode) {
         self().on_format("xim W, U", 0xed00 | op, mode); }
-    void on_xneg(fast_u8 op) {
-        self().on_format("xneg W", 0xed00 | op); }
 
     using base::get_reg_name;
 
