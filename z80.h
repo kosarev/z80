@@ -226,6 +226,8 @@ public:
     void on_set_int_mode(unsigned mode) { unused(mode); }
     void on_set_is_int_disabled(bool f) { unused(f); }
 
+    void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
+
     fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
     void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
 
@@ -3960,49 +3962,8 @@ class i8080_executor : public internals::executor_base<B>
 {};
 
 template<typename B>
-class z80_executor : public internals::executor_base<B> {
-public:
-    typedef internals::executor_base<B> base;
-
-    z80_executor() {}
-
-    using base::sf_bit;
-    using base::zf_bit;
-    using base::yf_bit;
-    using base::hf_bit;
-    using base::xf_bit;
-    using base::pf_bit;
-    using base::nf_bit;
-    using base::cf_bit;
-
-    using base::sf_mask;
-    using base::zf_mask;
-    using base::yf_mask;
-    using base::hf_mask;
-    using base::xf_mask;
-    using base::pf_mask;
-    using base::nf_mask;
-    using base::cf_mask;
-
-    using base::zf_ari;
-    using base::hf_ari;
-    using base::hf_dec;
-    using base::hf_inc;
-    using base::pf_ari;
-    using base::pf_log;
-    using base::pf_dec;
-    using base::pf_inc;
-    using base::cf_ari;
-
-    void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
-
-protected:
-    using base::self;
-    using base::check_condition;
-    using base::do_cp;
-    using base::do_sub;
-    using base::get_disp_target;
-};
+class z80_executor : public internals::executor_base<B>
+{};
 
 template<typename D>
 class i8080_cpu : public i8080_executor<i8080_decoder<i8080_state<root<D>>>>
