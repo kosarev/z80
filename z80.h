@@ -226,6 +226,12 @@ public:
     void on_set_int_mode(unsigned mode) { unused(mode); }
     void on_set_is_int_disabled(bool f) { unused(f); }
 
+    fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
+    void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
+
+    fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
+    void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
+
     void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
     void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
 
@@ -3989,12 +3995,6 @@ public:
     using base::cf_ari;
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
-
-    fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
-    void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
-
-    fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
-    void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
 
 protected:
     using base::self;
