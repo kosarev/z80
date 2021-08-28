@@ -1671,6 +1671,20 @@ protected:
         return get_iregp_kind_or_hl(rp == regp2::hl);
     }
 
+    static const char *get_mnemonic(rot k) {
+        switch(k) {
+        case rot::rlc: return "rlc";
+        case rot::rrc: return "rrc";
+        case rot::rl: return "rl";
+        case rot::rr: return "rr";
+        case rot::sla: return "sla";
+        case rot::sra: return "sra";
+        case rot::sll: return "sll";
+        case rot::srl: return "srl";
+        }
+        unreachable("Unknown rotation operation.");
+    }
+
     static const char *get_mnemonic(block_ld k) {
         switch(k) {
         case block_ld::ldi: return "ldi";
@@ -2020,20 +2034,6 @@ public:
         case alu::cp: return "cp";
         }
         unreachable("Unknown ALU operation.");
-    }
-
-    static const char *get_mnemonic(rot k) {
-        switch(k) {
-        case rot::rlc: return "rlc";
-        case rot::rrc: return "rrc";
-        case rot::rl: return "rl";
-        case rot::rr: return "rr";
-        case rot::sla: return "sla";
-        case rot::sra: return "sra";
-        case rot::sll: return "sll";
-        case rot::srl: return "srl";
-        }
-        unreachable("Unknown rotation operation.");
     }
 
 protected:
