@@ -1380,6 +1380,8 @@ public:
         } else {
             iregp irp = get_iregp_kind_or_hl(rp);
             self().on_format("dec P", rp, irp); } }
+    void on_adc_hl_rp(regp rp) {
+        self().on_format("adc hl, P", rp, iregp::hl); }
 
     // Jumps.
     void on_call_cc_nn(condition cc, fast_u16 nn) {
@@ -1869,8 +1871,6 @@ public:
     void on_add_irp_rp(regp rp) {
         iregp irp = self().on_get_iregp_kind();
         self().on_format("add P, P", regp::hl, irp, rp, irp); }
-    void on_adc_hl_rp(regp rp) {
-        self().on_format("adc hl, P", rp, iregp::hl); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -3028,6 +3028,27 @@ public:
         } else {
             iregp irp = self().on_get_iregp_kind();
             self().on_set_regp(rp, irp, dec16(self().on_get_regp(rp, irp))); } }
+    void on_adc_hl_rp(regp rp) {
+        fast_u16 hl = self().on_get_hl();
+        fast_u16 n = self().on_get_regp(rp, iregp::hl);
+        bool cf = self().on_get_f() & cf_mask;
+
+        self().on_4t_exec_cycle();
+        self().on_3t_exec_cycle();
+
+        fast_u16 t = add16(n, cf);
+        bool of = cf && t == 0;
+        fast_u32 r32 = hl + t;
+        fast_u16 r16 = mask16(r32);
+        fast_u8 f = (get_high8(r16) & (sf_mask | yf_mask | xf_mask)) |
+                        zf_ari(r16) | hf_ari(r16 >> 8, hl >> 8, n >> 8) |
+                        (pf_ari(r32 >> 8, hl >> 8, n >> 8) ^
+                             (of ? pf_mask : 0)) |
+                        cf_ari(r16 < hl || of);
+
+        self().on_set_wz(inc16(hl));
+        self().on_set_hl(r16);
+        self().on_set_f(f); }
 
     void on_jp_cc_nn(condition cc, fast_u16 nn) {
         if(check_condition(cc))
@@ -4005,27 +4026,6 @@ public:
 
         self().on_set_wz(inc16(i));
         self().on_set_iregp(irp, r);
-        self().on_set_f(f); }
-    void on_adc_hl_rp(regp rp) {
-        fast_u16 hl = self().on_get_hl();
-        fast_u16 n = self().on_get_regp(rp, iregp::hl);
-        bool cf = self().on_get_f() & cf_mask;
-
-        self().on_4t_exec_cycle();
-        self().on_3t_exec_cycle();
-
-        fast_u16 t = add16(n, cf);
-        bool of = cf && t == 0;
-        fast_u32 r32 = hl + t;
-        fast_u16 r16 = mask16(r32);
-        fast_u8 f = (get_high8(r16) & (sf_mask | yf_mask | xf_mask)) |
-                        zf_ari(r16) | hf_ari(r16 >> 8, hl >> 8, n >> 8) |
-                        (pf_ari(r32 >> 8, hl >> 8, n >> 8) ^
-                             (of ? pf_mask : 0)) |
-                        cf_ari(r16 < hl || of);
-
-        self().on_set_wz(inc16(hl));
-        self().on_set_hl(r16);
         self().on_set_f(f); }
 
 protected:
