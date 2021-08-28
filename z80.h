@@ -1359,6 +1359,12 @@ public:
         self().on_format("jr C, D", cc, sign_extend8(d) + 2); }
 
     // Transfers.
+    void on_ex_at_sp_irp() {
+        if(!self().on_is_z80()) {
+            self().on_format("xthl");
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            self().on_format("ex (sp), P", regp::hl, irp); } }
     void on_exx() {
         self().on_format("exx"); }
     void on_ld_a_r() {
@@ -1647,8 +1653,6 @@ public:
         self().on_format("dcx P", rp); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
-    void on_ex_at_sp_irp() {
-        self().on_format("xthl"); }
     void on_halt() {
         self().on_format("hlt"); }
     void on_jp_nn(fast_u16 nn) {
@@ -1857,9 +1861,6 @@ public:
         self().on_format("ex af, af'"); }
     void on_ex_de_hl() {
         self().on_format("ex de, hl"); }
-    void on_ex_at_sp_irp() {
-        iregp irp = self().on_get_iregp_kind();
-        self().on_format("ex (sp), P", regp::hl, irp); }
     void on_halt() {
         self().on_format("halt"); }
     void on_jp_nn(fast_u16 nn) {
@@ -2827,6 +2828,34 @@ public:
             self().on_relative_jump(d); }
 
     // Transfers.
+    void on_ex_at_sp_irp() {
+        fast_u16 sp = self().on_get_sp();
+        fast_u8 lo = self().on_read_cycle(sp);
+        sp = inc16(sp);
+        fast_u8 hi = self().on_read_cycle(sp);
+        bool z80 = self().on_is_z80();
+        if(z80)
+            self().on_read_cycle_extra_1t();
+        fast_u16 nn = make16(hi, lo);
+        fast_u16 i;
+        iregp irp;
+        if(!z80) {
+            irp = iregp::hl;
+            i = self().on_get_hl();
+        } else {
+            irp = self().on_get_iregp_kind();
+            i = self().on_get_iregp(irp);
+        }
+        std::swap(nn, i);
+        self().on_write_cycle(sp, get_high8(nn));
+        sp = dec16(sp);
+        self().on_write_cycle(sp, get_low8(nn));
+        self().on_write_cycle_extra_2t();
+        self().on_set_wz(i);
+        if(!z80)
+            self().on_set_hl(i);
+        else
+            self().on_set_iregp(irp, i); }
     void on_exx() {
         self().on_exx_regs(); }
     void on_ld_a_r() {
@@ -3573,20 +3602,6 @@ public:
     void on_ei() {
         self().set_iff_on_ei(true);
         self().disable_int_on_ei(); }
-    void on_ex_at_sp_irp() {
-        fast_u16 sp = self().on_get_sp();
-        fast_u8 lo = self().on_read_cycle(sp);
-        sp = inc16(sp);
-        fast_u8 hi = self().on_read_cycle(sp);
-        fast_u16 nn = make16(hi, lo);
-        fast_u16 hl = self().on_get_hl();
-        std::swap(nn, hl);
-        self().on_write_cycle(sp, get_high8(nn));
-        sp = dec16(sp);
-        self().on_write_cycle(sp, get_low8(nn));
-        self().on_write_cycle_extra_2t();
-        self().on_set_wz(hl);
-        self().on_set_hl(hl); }
 
 protected:
     using base::self;
@@ -3985,22 +4000,6 @@ public:
         self().disable_int_on_ei(); }
     void on_ex_af_alt_af() {
         self().on_ex_af_alt_af_regs(); }
-    void on_ex_at_sp_irp() {
-        fast_u16 sp = self().on_get_sp();
-        fast_u8 lo = self().on_read_cycle(sp);
-        sp = inc16(sp);
-        fast_u8 hi = self().on_read_cycle(sp);
-        self().on_read_cycle_extra_1t();
-        fast_u16 nn = make16(hi, lo);
-        iregp irp = self().on_get_iregp_kind();
-        fast_u16 i = self().on_get_iregp(irp);
-        std::swap(nn, i);
-        self().on_write_cycle(sp, get_high8(nn));
-        sp = dec16(sp);
-        self().on_write_cycle(sp, get_low8(nn));
-        self().on_write_cycle_extra_2t();
-        self().on_set_wz(i);
-        self().on_set_iregp(irp, i); }
 
 protected:
     using base::self;
