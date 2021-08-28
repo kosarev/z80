@@ -1344,6 +1344,14 @@ public:
         self().on_format("im U", mode); }
 
     // Arithmetic.
+    void on_alu_r(alu k, reg r, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            self().on_format("A R", k, r);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(r);
+            self().on_format("A R", k, r, irp, d); } }
+    void on_alu_n(alu k, fast_u8 n) {
+        self().on_format(self().on_is_z80() ? "A N" : "I N", k, n); }
     void on_daa() {
         self().on_format("daa"); }
     void on_cpl() {
@@ -1684,10 +1692,6 @@ public:
 
     void on_add_irp_rp(regp rp) {
         self().on_format("dad P", rp); }
-    void on_alu_n(alu k, fast_u8 n) {
-        self().on_format("I N", k, n); }
-    void on_alu_r(alu k, reg r) {
-        self().on_format("A R", k, r); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1867,11 +1871,6 @@ public:
         self().on_format("add P, P", regp::hl, irp, rp, irp); }
     void on_adc_hl_rp(regp rp) {
         self().on_format("adc hl, P", rp, iregp::hl); }
-    void on_alu_n(alu k, fast_u8 n) {
-        self().on_format("A N", k, n); }
-    void on_alu_r(alu k, reg r, fast_u8 d) {
-        iregp irp = get_iregp_kind_or_hl(r);
-        self().on_format("A R", k, r, irp, d); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -2806,6 +2805,114 @@ public:
 
     // Arithmetic.
 private:
+    void do_i8080_alu(alu k, fast_u8 n) {
+        fast_u8 a = self().on_get_a();
+        fast_u16 t;
+        fast_u8 b;
+        bool is_lazy = self().on_is_to_use_lazy_flags();
+        if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
+            // ADD, ADC, SUB, SBC, CP
+            fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
+                get_flags(is_lazy).get_cf() : 0;
+
+            if(k <= alu::adc) {
+                t = a + n + cfv;
+                b = a ^ n ^ static_cast<fast_u8>(t);
+            } else {
+                t = a - n - cfv;
+                b = a ^ n ^ static_cast<fast_u8>(t) ^ hf_mask;
+            }
+        } else {
+            // AND, XOR, OR
+            if(k == alu::and_a) {
+                // Alexander Demin notes that the half-carry flag has
+                // its own special logic for the ANA and ANI
+                // instructions.
+                // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
+                // TODO: AMD chips do not set the flag. Support them
+                // as a variant of the original Intel chip.
+                t = a & n;
+                b = (a | n) << (hf_bit - 3);
+            } else {
+                t = (k == alu::xor_a) ? a ^ n : a | n;
+                b = 0;
+            }
+        }
+        if(k != alu::cp)
+            self().on_set_a(mask8(t));
+        flag_set flags(is_lazy);
+        flags.set(b & hf_mask, t & 0x1ff);
+        set_flags(flags);
+    }
+
+    void do_z80_alu(alu k, fast_u8 n) {
+        fast_u8 a = self().on_get_a();
+        fast_u8 f = 0;
+        switch(k) {
+        case alu::add: {
+            fast_u8 t = add8(a, n);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
+            a = t;
+            break; }
+        case alu::adc: {
+            f = self().on_get_f();
+            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
+            fast_u8 t = mask8(a + n + cfv);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
+                    cf_ari(t < a || (cfv && n == 0xff));
+            a = t;
+            break; }
+        case alu::sub: {
+            do_sub(a, f, n);
+            break; }
+        case alu::sbc: {
+            f = self().on_get_f();
+            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
+            fast_u8 t = mask8(a - n - cfv);
+            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
+                    hf_ari(t, a, n) | pf_ari(a - n - cfv, a, n) |
+                    cf_ari(t > a || (cfv && n == 0xff)) | nf_mask;
+            a = t;
+            break; }
+        case alu::and_a:
+            a &= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a) |
+                    hf_mask;
+            break;
+        case alu::xor_a:
+            a ^= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+            break;
+        case alu::or_a:
+            a |= n;
+            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
+            break;
+        case alu::cp:
+            do_cp(a, f, n);
+            break;
+        }
+        if(k != alu::cp)
+            self().on_set_a(a);
+        self().on_set_f(f);
+    }
+
+public:
+    void on_alu_r(alu k, reg r, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            do_i8080_alu(k, self().on_get_reg(r));
+        } else {
+            iregp irp = self().on_get_iregp_kind();
+            do_z80_alu(k, self().on_get_reg(r, irp, d)); } }
+
+    void on_alu_n(alu k, fast_u8 n) {
+        if(!self().on_is_z80())
+            do_i8080_alu(k, n);
+        else
+            do_z80_alu(k, n); }
+
+private:
     void do_i8080_daa() {
         fast_u8 a = self().on_get_a();
         flag_set flags = get_flags();
@@ -2853,6 +2960,7 @@ private:
 
         self().on_set_a(a);
         self().on_set_f(f); }
+
 public:
     void on_daa() {
         if(!self().on_is_z80())
@@ -3178,8 +3286,6 @@ public:
         self().on_set_wz(nn);
         self().set_pc_on_jump(nn); }
 
-    void on_alu_n(alu k, fast_u8 n) {
-        self().do_alu(k, n); }
     void on_call_nn(fast_u16 nn) {
         self().on_call(nn); }
     void on_ccf() {
@@ -3813,46 +3919,6 @@ public:
     using base::zf_ari;
 
 public:
-    void do_alu(alu k, fast_u8 n) {
-        fast_u8 a = self().on_get_a();
-        fast_u16 t;
-        fast_u8 b;
-        bool is_lazy = self().on_is_to_use_lazy_flags();
-        if(((static_cast<unsigned>(k) + 1) & 0x7) < 5) {
-            // ADD, ADC, SUB, SBC, CP
-            fast_u8 cfv = (k == alu::adc || k == alu::sbc) ?
-                get_flags(is_lazy).get_cf() : 0;
-
-            if(k <= alu::adc) {
-                t = a + n + cfv;
-                b = a ^ n ^ static_cast<fast_u8>(t);
-            } else {
-                t = a - n - cfv;
-                b = a ^ n ^ static_cast<fast_u8>(t) ^ hf_mask;
-            }
-        } else {
-            // AND, XOR, OR
-            if(k == alu::and_a) {
-                // Alexander Demin notes that the half-carry flag has
-                // its own special logic for the ANA and ANI
-                // instructions.
-                // http://demin.ws/blog/english/2012/12/24/my-i8080-collection/
-                // TODO: AMD chips do not set the flag. Support them
-                // as a variant of the original Intel chip.
-                t = a & n;
-                b = (a | n) << (base::hf_bit - 3);
-            } else {
-                t = (k == alu::xor_a) ? a ^ n : a | n;
-                b = 0;
-            }
-        }
-        if(k != alu::cp)
-            self().on_set_a(mask8(t));
-        flag_set flags(is_lazy);
-        flags.set(b & hf_mask, t & 0x1ff);
-        set_flags(flags);
-    }
-
     void on_add_irp_rp(regp rp) {
         self().on_3t_exec_cycle();
         self().on_3t_exec_cycle();
@@ -3866,8 +3932,6 @@ public:
         // TODO: Should set_cf() take fast_u16?
         flags.set_cf(static_cast<fast_u8>(r32 >> 16));
         set_flags(flags); }
-    void on_alu_r(alu k, reg r) {
-        do_alu(k, self().on_get_reg(r)); }
 
 protected:
     using base::self;
@@ -3920,59 +3984,6 @@ public:
     fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
     void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
 
-    void do_alu(alu k, fast_u8 n) {
-        fast_u8 a = self().on_get_a();
-        fast_u8 f = 0;
-        switch(k) {
-        case alu::add: {
-            fast_u8 t = add8(a, n);
-            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a + n, a, n) | cf_ari(t < a);
-            a = t;
-            break; }
-        case alu::adc: {
-            f = self().on_get_f();
-            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
-            fast_u8 t = mask8(a + n + cfv);
-            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a + n + cfv, a, n) |
-                    cf_ari(t < a || (cfv && n == 0xff));
-            a = t;
-            break; }
-        case alu::sub: {
-            do_sub(a, f, n);
-            break; }
-        case alu::sbc: {
-            f = self().on_get_f();
-            fast_u8 cfv = (f & cf_mask) ? 1 : 0;
-            fast_u8 t = mask8(a - n - cfv);
-            f = (t & (sf_mask | yf_mask | xf_mask)) | zf_ari(t) |
-                    hf_ari(t, a, n) | pf_ari(a - n - cfv, a, n) |
-                    cf_ari(t > a || (cfv && n == 0xff)) | nf_mask;
-            a = t;
-            break; }
-        case alu::and_a:
-            a &= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a) |
-                    hf_mask;
-            break;
-        case alu::xor_a:
-            a ^= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
-            break;
-        case alu::or_a:
-            a |= n;
-            f = (a & (sf_mask | yf_mask | xf_mask)) | zf_ari(a) | pf_log(a);
-            break;
-        case alu::cp:
-            do_cp(a, f, n);
-            break;
-        }
-        if(k != alu::cp)
-            self().on_set_a(a);
-        self().on_set_f(f);
-    }
-
     void on_relative_jump(fast_u8 d) {
         self().on_5t_exec_cycle();
         self().on_jump(get_disp_target(self().get_pc_on_jump(), d));
@@ -4016,9 +4027,6 @@ public:
         self().on_set_wz(inc16(hl));
         self().on_set_hl(r16);
         self().on_set_f(f); }
-    void on_alu_r(alu k, reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        do_alu(k, self().on_get_reg(r, irp, d)); }
 
 protected:
     using base::self;
