@@ -1352,6 +1352,12 @@ public:
         } else {
             iregp irp = get_iregp_kind_or_hl(r);
             self().on_format("inc R", r, irp, d); } }
+    void on_dec_r(reg r, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            self().on_format("dcr R", r);
+        } else {
+            iregp irp = get_iregp_kind_or_hl(r);
+            self().on_format("dec R", r, irp, d); } }
     void on_inc_rp(regp rp) {
         if(!self().on_is_z80()) {
             self().on_format("inx P", rp);
@@ -1672,8 +1678,6 @@ public:
         self().on_format("cC W", cc, nn); }
     void on_cpl() {
         self().on_format("cma"); }
-    void on_dec_r(reg r) {
-        self().on_format("dcr R", r); }
     void on_ex_de_hl() {
         self().on_format("xchg"); }
     void on_halt() {
@@ -1870,9 +1874,6 @@ public:
         self().on_format("call C, W", cc, nn); }
     void on_cpl() {
         self().on_format("cpl"); }
-    void on_dec_r(reg r, fast_u8 d) {
-        iregp irp = get_iregp_kind_or_hl(r);
-        self().on_format("dec R", r, irp, d); }
     void on_ed_xnop(fast_u8 op) {
         self().on_format("xnop W", 0xed00 | op); }
     void on_ex_de_hl() {
@@ -2819,6 +2820,25 @@ public:
                 hf_inc(v) | pf_inc(v);
         self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
+    void on_dec_r(reg r, fast_u8 d = 0) {
+        if(!self().on_is_z80()) {
+            fast_u8 n = self().on_get_reg(r);
+            flag_set flags = get_flags();
+            fast_u8 t = mask8(n - 1);
+            self().on_set_reg(r, t);
+            flags.set((n ^ t ^ hf_mask) & hf_mask, (flags.get_cf() << 8) | t);
+            set_flags(flags);
+            return;
+        }
+
+        iregp irp = self().on_get_iregp_kind();
+        fast_u8 v = self().on_get_reg(r, irp, d, /* long_read_cycle= */ true);
+        fast_u8 f = self().on_get_f();
+        v = dec8(v);
+        f = (f & cf_mask) | (v & (sf_mask | yf_mask | xf_mask)) | zf_ari(v) |
+                hf_dec(v) | pf_dec(v) | nf_mask;
+        self().on_set_reg(r, irp, d, v);
+        self().on_set_f(f); }
     void on_inc_rp(regp rp) {
         if(!self().on_is_z80()) {
             self().on_set_regp(rp, inc16(self().on_get_regp(rp)));
@@ -3634,13 +3654,6 @@ public:
         self().on_set_a(r);
         flags.set(hfv & hf_mask, (w | r) & 0x1ff);
         set_flags(flags); }
-    void on_dec_r(reg r) {
-        fast_u8 n = self().on_get_reg(r);
-        flag_set flags = get_flags();
-        fast_u8 t = mask8(n - 1);
-        self().on_set_reg(r, t);
-        flags.set((n ^ t ^ hf_mask) & hf_mask, (flags.get_cf() << 8) | t);
-        set_flags(flags); }
 
 protected:
     using base::self;
@@ -4002,15 +4015,6 @@ public:
         f = (f & (sf_mask | zf_mask | pf_mask | cf_mask)) |
                 (a & (yf_mask | xf_mask)) | hf_mask | nf_mask;
         self().on_set_a(a);
-        self().on_set_f(f); }
-    void on_dec_r(reg r, fast_u8 d) {
-        iregp irp = self().on_get_iregp_kind();
-        fast_u8 v = self().on_get_reg(r, irp, d, /* long_read_cycle= */ true);
-        fast_u8 f = self().on_get_f();
-        v = dec8(v);
-        f = (f & cf_mask) | (v & (sf_mask | yf_mask | xf_mask)) | zf_ari(v) |
-                hf_dec(v) | pf_dec(v) | nf_mask;
-        self().on_set_reg(r, irp, d, v);
         self().on_set_f(f); }
 
 protected:
