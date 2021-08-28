@@ -1310,6 +1310,11 @@ public:
             auto n = get_arg<fast_u8>(args);
             out.append_u8(n);
             break; }
+        case 'P': {  // A register pair.
+            auto rp = get_arg<regp>(args);
+            auto irp = !self().on_is_z80() ? iregp::hl : get_arg<iregp>(args);
+            out.append(get_reg_name(rp, irp));
+            break; }
         case 'W': {  // A 16-bit immediate operand.
             auto nn = get_arg<fast_u16>(args);
             out.append_u16(nn);
@@ -1895,10 +1900,6 @@ public:
             auto r = get_arg<reg>(args);
             out.append(get_reg_name(r));
             break; }
-        case 'P': {  // A register pair.
-            auto rp = get_arg<regp>(args);
-            out.append(get_reg_name(rp));
-            break; }
         default:
             base::on_format_char(c, args, out);
         }
@@ -1991,11 +1992,6 @@ public:
                 out.append_disp(sign_extend8(d));
                 out.append(')');
             }
-            break; }
-        case 'P': {  // A register pair.
-            auto rp = get_arg<regp>(args);
-            auto irp = get_arg<iregp>(args);
-            out.append(get_reg_name(rp, irp));
             break; }
         default:
             base::on_format_char(c, args, out);
