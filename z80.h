@@ -657,6 +657,10 @@ public:
         self().on_ld_sp_irp(); }
 
     // Swaps.
+    void on_decode_ex_de_hl() {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        self().on_ex_de_hl(); }
     void on_decode_exx() {
         if(!self().on_is_z80())
             return self().on_xret();
@@ -1215,9 +1219,6 @@ public:
         self().on_xnop(/* op= */ 0x10); }
     void on_decode_ex_af_alt_af() {
         self().on_xnop(/* op= */ 0x08); }
-    void on_decode_ex_de_hl() {
-        self().on_fetch_cycle_extra_1t();
-        self().on_ex_de_hl(); }
 
 protected:
     using base::self;
@@ -1258,8 +1259,6 @@ public:
         self().on_djnz(self().on_disp_read()); }
     void on_decode_ex_af_alt_af() {
         self().on_ex_af_alt_af(); }
-    void on_decode_ex_de_hl() {
-        self().on_ex_de_hl(); }
 
 protected:
     using base::self;
