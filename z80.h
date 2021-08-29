@@ -612,6 +612,15 @@ class internals::decoder_base : public B {
 public:
     typedef B base;
 
+    // Transfers.
+    void on_decode_ld_sp_irp() {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        else
+            self().on_fetch_cycle_extra_2t();
+        self().on_ld_sp_irp(); }
+
+    // Jumps.
     void on_decode_xcall_nn(fast_u8 op) {
         fast_u16 nn = self().on_imm16_read();
         self().on_read_cycle_extra_1t();
@@ -1153,9 +1162,6 @@ public:
         self().on_ld_r_n(r, /* d= */ 0, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs); }
-    void on_decode_ld_sp_irp() {
-        self().on_fetch_cycle_extra_1t();
-        self().on_ld_sp_irp(); }
 
 protected:
     using base::self;
@@ -1226,9 +1232,6 @@ public:
         self().on_ld_r_n(r, d, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
         self().on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
-    void on_decode_ld_sp_irp() {
-        self().on_fetch_cycle_extra_2t();
-        self().on_ld_sp_irp(); }
 
 protected:
     using base::self;
