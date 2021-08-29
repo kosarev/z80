@@ -683,11 +683,15 @@ public:
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
         self().on_jp_irp(); }
+    void on_decode_jr() {
+        if(!self().on_is_z80())
+            return self().on_xnop(/* op= */ 0x18);
+        self().on_jr(self().on_disp_read()); }
     void on_decode_jr_cc(fast_u8 op) {
         if(!self().on_is_z80())
             return self().on_xnop(op);
         auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
-        return self().on_jr_cc(cc, self().on_disp_read()); }
+        self().on_jr_cc(cc, self().on_disp_read()); }
 
     // Interrupts.
     void on_decode_halt() {
@@ -1209,8 +1213,6 @@ public:
         self().on_ex_de_hl(); }
     void on_decode_exx() {
         self().on_xret(); }
-    void on_decode_jr() {
-        self().on_xnop(/* op= */ 0x18); }
 
 protected:
     using base::self;
@@ -1254,8 +1256,6 @@ public:
         self().on_ex_de_hl(); }
     void on_decode_exx() {
         self().on_exx(); }
-    void on_decode_jr() {
-        self().on_jr(self().on_disp_read()); }
 
 protected:
     using base::self;
