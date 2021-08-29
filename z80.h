@@ -612,6 +612,13 @@ class internals::decoder_base : public B {
 public:
     typedef B base;
 
+    void disable_int_on_index_prefix() {
+        self().on_set_is_int_disabled(true); }
+
+    void on_instr_prefix(iregp irp) {
+        self().on_set_iregp_kind(irp);
+        self().disable_int_on_index_prefix(); }
+
 protected:
     bool is_hl_iregp() {
         return self().on_get_iregp_kind() == iregp::hl;
@@ -733,6 +740,16 @@ public:
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_3t();
         self().on_halt(); }
+
+    // Prefixes.
+    void on_decode_dd_prefix() {
+        if(!self().on_is_z80())
+            return self().on_decode_xcall_nn(0xdd);
+        self().on_instr_prefix(iregp::ix); }
+    void on_decode_fd_prefix() {
+        if(!self().on_is_z80())
+            return self().on_decode_xcall_nn(0xfd);
+        self().on_instr_prefix(iregp::iy); }
 
     void on_decode_cb_prefix() {
         if(!self().on_is_z80())
@@ -1229,10 +1246,6 @@ public:
     void on_decode_call_cc_nn(condition cc) {
         self().on_fetch_cycle_extra_1t();
         self().on_call_cc_nn(cc, self().on_imm16_read()); }
-    void on_decode_dd_prefix() {
-        self().on_decode_xcall_nn(0xdd); }
-    void on_decode_fd_prefix() {
-        self().on_decode_xcall_nn(0xfd); }
 
 protected:
     using base::self;
@@ -1248,21 +1261,10 @@ public:
     static const bool z80_enabled = true;
     bool on_is_z80() { return true; }
 
-    void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
-
-    void on_instr_prefix(iregp irp) {
-        self().on_set_iregp_kind(irp);
-        self().disable_int_on_index_prefix();
-    }
-
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r, read_disp_or_null(r)); }
     void on_decode_call_cc_nn(condition cc) {
         self().on_call_cc_nn(cc, self().on_imm16_read()); }
-    void on_decode_dd_prefix() {
-        self().on_instr_prefix(iregp::ix); }
-    void on_decode_fd_prefix() {
-        self().on_instr_prefix(iregp::iy); }
 
 protected:
     using base::self;
