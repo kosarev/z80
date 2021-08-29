@@ -474,8 +474,8 @@ public:
         static_assert(internals::get_false<derived>(),
         "on_ex_af_alt_af_regs() has to be implemented!"); }
     void on_exx_regs() {
-        static_assert(internals::get_false<derived>(),
-        "on_exx_regs() has to be implemented!"); }
+        static_assert(!derived::z80_enabled,
+                      "on_exx_regs() has to be implemented!"); }
 
     fast_u8 on_read(fast_u16 addr) {
         unused(addr);
@@ -655,6 +655,12 @@ public:
         else
             self().on_fetch_cycle_extra_2t();
         self().on_ld_sp_irp(); }
+
+    // Swaps.
+    void on_decode_exx() {
+        if(!self().on_is_z80())
+            return self().on_xret();
+        self().on_exx(); }
 
     // Arithmetic.
     void on_decode_inc_r(reg r) {
@@ -1186,6 +1192,7 @@ class i8080_decoder : public internals::decoder_base<B> {
 public:
     typedef internals::decoder_base<B> base;
 
+    static const bool z80_enabled = false;
     bool on_is_z80() { return false; }
 
     void on_decode_alu_r(alu k, reg r) {
@@ -1211,8 +1218,6 @@ public:
     void on_decode_ex_de_hl() {
         self().on_fetch_cycle_extra_1t();
         self().on_ex_de_hl(); }
-    void on_decode_exx() {
-        self().on_xret(); }
 
 protected:
     using base::self;
@@ -1225,6 +1230,7 @@ public:
 
     z80_decoder() {}
 
+    static const bool z80_enabled = true;
     bool on_is_z80() { return true; }
 
     void disable_int_on_index_prefix() { self().on_set_is_int_disabled(true); }
@@ -1254,8 +1260,6 @@ public:
         self().on_ex_af_alt_af(); }
     void on_decode_ex_de_hl() {
         self().on_ex_de_hl(); }
-    void on_decode_exx() {
-        self().on_exx(); }
 
 protected:
     using base::self;

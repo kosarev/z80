@@ -122,6 +122,17 @@ public:
     void on_set_iy(fast_u16 n) { split16(state.iyh, state.iyl, n); }
 
     fast_u16 on_get_ir() const { return make16(state.i, state.r); }
+
+    void on_exx_regs() {
+        std::swap(state.b, state.alt_b);
+        std::swap(state.c, state.alt_c);
+
+        std::swap(state.d, state.alt_d);
+        std::swap(state.e, state.alt_e);
+
+        std::swap(state.h, state.alt_h);
+        std::swap(state.l, state.alt_l);
+    }
 };
 
 class disasm : public disasm_base<z80::z80_disasm<disasm>> {

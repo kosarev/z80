@@ -176,17 +176,6 @@ public:
         std::swap(state.e, state.l);
     }
 
-    void on_exx_regs() {
-        std::swap(state.b, state.alt_b);
-        std::swap(state.c, state.alt_c);
-
-        std::swap(state.d, state.alt_d);
-        std::swap(state.e, state.alt_e);
-
-        std::swap(state.h, state.alt_h);
-        std::swap(state.l, state.alt_l);
-    }
-
     void on_tick(unsigned t) {
         base::on_tick(t);
 
