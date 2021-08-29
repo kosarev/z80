@@ -656,6 +656,14 @@ public:
             self().on_fetch_cycle_extra_2t();
         self().on_ld_sp_irp(); }
 
+    // Arithmetic.
+    void on_decode_inc_rp(regp rp) {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        else
+            self().on_fetch_cycle_extra_2t();
+        self().on_inc_rp(rp); }
+
     // Jumps.
     void on_decode_xcall_nn(fast_u8 op) {
         fast_u16 nn = self().on_imm16_read();
@@ -1187,9 +1195,6 @@ public:
         if(r != reg::at_hl)
             self().on_fetch_cycle_extra_1t();
         self().on_inc_r(r); }
-    void on_decode_inc_rp(regp rp) {
-        self().on_fetch_cycle_extra_1t();
-        self().on_inc_rp(rp); }
     void on_decode_jp_irp() {
         self().on_fetch_cycle_extra_1t();
         self().on_jp_irp(); }
@@ -1247,9 +1252,6 @@ public:
         self().on_jp_irp(); }
     void on_decode_inc_r(reg r) {
         self().on_inc_r(r, read_disp_or_null(r)); }
-    void on_decode_inc_rp(regp rp) {
-        self().on_fetch_cycle_extra_2t();
-        self().on_inc_rp(rp); }
 
 protected:
     using base::self;
