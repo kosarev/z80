@@ -678,6 +678,9 @@ public:
         self().on_exx(); }
 
     // Arithmetic.
+    void on_decode_alu_r(alu k, reg r) {
+        fast_u8 d = !self().on_is_z80() ? 0 : read_disp_or_null(r);
+        self().on_alu_r(k, r, d); }
     void on_decode_inc_r(reg r) {
         fast_u8 d;
         if(!self().on_is_z80()) {
@@ -1240,46 +1243,15 @@ protected:
 template<typename B>
 class i8080_decoder : public internals::decoder_base<B> {
 public:
-    typedef internals::decoder_base<B> base;
-
     static const bool z80_enabled = false;
     bool on_is_z80() { return false; }
-
-    void on_decode_alu_r(alu k, reg r) {
-        self().on_alu_r(k, r); }
-
-protected:
-    using base::self;
 };
 
 template<typename B>
 class z80_decoder : public internals::decoder_base<B> {
 public:
-    typedef internals::decoder_base<B> base;
-
-    z80_decoder() {}
-
     static const bool z80_enabled = true;
     bool on_is_z80() { return true; }
-
-    void on_decode_alu_r(alu k, reg r) {
-        self().on_alu_r(k, r, read_disp_or_null(r)); }
-
-protected:
-    using base::self;
-
-    using base::x_mask;
-    using base::y_mask;
-    using base::z_mask;
-    using base::p_mask;
-    using base::q_mask;
-
-    using base::get_y_part;
-    using base::get_z_part;
-    using base::get_p_part;
-
-    using base::is_hl_iregp;
-    using base::read_disp_or_null;
 };
 
 template<typename B>
