@@ -166,11 +166,6 @@ public:
     bool on_is_halted() const { return state.halted; }
     void on_set_is_halted(bool f) { state.halted = f; }
 
-    void on_ex_af_alt_af_regs() {
-        std::swap(state.a, state.alt_a);
-        std::swap(state.f, state.alt_f);
-    }
-
     void on_ex_de_hl_regs() {
         std::swap(state.d, state.h);
         std::swap(state.e, state.l);

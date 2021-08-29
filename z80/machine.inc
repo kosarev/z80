@@ -123,6 +123,11 @@ public:
 
     fast_u16 on_get_ir() const { return make16(state.i, state.r); }
 
+    void on_ex_af_alt_af_regs() {
+        std::swap(state.a, state.alt_a);
+        std::swap(state.f, state.alt_f);
+    }
+
     void on_exx_regs() {
         std::swap(state.b, state.alt_b);
         std::swap(state.c, state.alt_c);

@@ -469,10 +469,10 @@ public:
     // problems that are hard to diagnose.
     void on_ex_de_hl_regs() {
         static_assert(internals::get_false<derived>(),
-        "on_ex_de_hl_regs() has to be implemented!"); }
+                      "on_ex_de_hl_regs() has to be implemented!"); }
     void on_ex_af_alt_af_regs() {
-        static_assert(internals::get_false<derived>(),
-        "on_ex_af_alt_af_regs() has to be implemented!"); }
+        static_assert(!derived::z80_enabled,
+                      "on_ex_af_alt_af_regs() has to be implemented!"); }
     void on_exx_regs() {
         static_assert(!derived::z80_enabled,
                       "on_exx_regs() has to be implemented!"); }
@@ -657,6 +657,10 @@ public:
         self().on_ld_sp_irp(); }
 
     // Swaps.
+    void on_decode_ex_af_alt_af() {
+        if(!self().on_is_z80())
+            return self().on_xnop(/* op= */ 0x08);
+        self().on_ex_af_alt_af(); }
     void on_decode_ex_de_hl() {
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
@@ -1217,8 +1221,6 @@ public:
         self().on_dec_rp(rp); }
     void on_decode_djnz() {
         self().on_xnop(/* op= */ 0x10); }
-    void on_decode_ex_af_alt_af() {
-        self().on_xnop(/* op= */ 0x08); }
 
 protected:
     using base::self;
@@ -1257,8 +1259,6 @@ public:
     void on_decode_djnz() {
         self().on_fetch_cycle_extra_1t();
         self().on_djnz(self().on_disp_read()); }
-    void on_decode_ex_af_alt_af() {
-        self().on_ex_af_alt_af(); }
 
 protected:
     using base::self;
