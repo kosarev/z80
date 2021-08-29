@@ -716,6 +716,10 @@ public:
         fast_u16 nn = self().on_imm16_read();
         self().on_read_cycle_extra_1t();
         self().on_xcall_nn(op, nn); }
+    void on_decode_call_cc_nn(condition cc) {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        self().on_call_cc_nn(cc, self().on_imm16_read()); }
     void on_decode_jp_irp() {
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
@@ -1243,9 +1247,6 @@ public:
 
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r); }
-    void on_decode_call_cc_nn(condition cc) {
-        self().on_fetch_cycle_extra_1t();
-        self().on_call_cc_nn(cc, self().on_imm16_read()); }
 
 protected:
     using base::self;
@@ -1263,8 +1264,6 @@ public:
 
     void on_decode_alu_r(alu k, reg r) {
         self().on_alu_r(k, r, read_disp_or_null(r)); }
-    void on_decode_call_cc_nn(condition cc) {
-        self().on_call_cc_nn(cc, self().on_imm16_read()); }
 
 protected:
     using base::self;
