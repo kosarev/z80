@@ -612,7 +612,8 @@ class internals::decoder_base : public B {
 public:
     typedef B base;
 
-    void on_decode(fast_u8 op) {
+private:
+    void do_decode(fast_u8 op) {
         fast_u8 y = get_y_part(op);
         fast_u8 z = get_z_part(op);
         fast_u8 p = get_p_part(op);
@@ -894,6 +895,15 @@ public:
         }
 
         unreachable("Unknown opcode encountered!");
+    }
+
+public:
+    void on_decode(fast_u8 op) {
+        do_decode(op);
+
+        // Reset current index register.
+        if(self().on_is_z80() && op != 0xdd && op != 0xfd)
+            self().on_set_iregp_kind(iregp::hl);
     }
 
     void on_fetch_and_decode() {
@@ -1215,14 +1225,6 @@ public:
         }
 
         return self().on_ed_xnop(op);
-    }
-
-    void on_decode(fast_u8 op) {
-        base::on_decode(op);
-
-        // Reset current index register.
-        if(op != 0xdd && op != 0xfd)
-            self().on_set_iregp_kind(iregp::hl);
     }
 
 protected:
