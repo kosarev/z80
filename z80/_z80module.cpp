@@ -163,9 +163,6 @@ public:
     bool on_is_int_disabled() const { return state.int_disabled; }
     void on_set_is_int_disabled(bool f) { state.int_disabled = f; }
 
-    unsigned on_get_int_mode() const { return state.int_mode; }
-    void on_set_int_mode(unsigned mode) { state.int_mode = mode; }
-
     bool on_is_halted() const { return state.halted; }
     void on_set_is_halted(bool f) { state.halted = f; }
 

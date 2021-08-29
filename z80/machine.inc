@@ -94,6 +94,9 @@ public:
     bool on_get_iff2() const { return state.iff2 != 0; }
     void on_set_iff2(bool f) { state.iff2 = f; }
 
+    unsigned on_get_int_mode() const { return state.int_mode; }
+    void on_set_int_mode(unsigned mode) { state.int_mode = mode; }
+
     fast_u8 on_get_ixh() const { return state.ixh; }
     void on_set_ixh(fast_u8 n) { state.ixh = n; }
 
