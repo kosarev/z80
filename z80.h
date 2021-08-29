@@ -706,6 +706,11 @@ public:
             return self().on_xnop(op);
         auto cc = static_cast<condition>((op & (y_mask - 0040)) >> 3);
         self().on_jr_cc(cc, self().on_disp_read()); }
+    void on_decode_djnz() {
+        if(!self().on_is_z80())
+            return self().on_xnop(/* op= */ 0x10);
+        self().on_fetch_cycle_extra_1t();
+        self().on_djnz(self().on_disp_read()); }
 
     // Interrupts.
     void on_decode_halt() {
@@ -1219,8 +1224,6 @@ public:
     void on_decode_dec_rp(regp rp) {
         self().on_fetch_cycle_extra_1t();
         self().on_dec_rp(rp); }
-    void on_decode_djnz() {
-        self().on_xnop(/* op= */ 0x10); }
 
 protected:
     using base::self;
@@ -1256,9 +1259,6 @@ public:
     void on_decode_dec_rp(regp rp) {
         self().on_fetch_cycle_extra_2t();
         self().on_dec_rp(rp); }
-    void on_decode_djnz() {
-        self().on_fetch_cycle_extra_1t();
-        self().on_djnz(self().on_disp_read()); }
 
 protected:
     using base::self;
