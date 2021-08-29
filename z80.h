@@ -612,7 +612,32 @@ class internals::decoder_base : public B {
 public:
     typedef B base;
 
+protected:
+    bool is_hl_iregp() {
+        return self().on_get_iregp_kind() == iregp::hl;
+    }
+
+    fast_u8 read_disp_or_null(bool may_need_disp) {
+        if(!may_need_disp || is_hl_iregp())
+            return 0;
+        fast_u8 d = self().on_disp_read();
+        self().on_5t_exec_cycle();
+        return d;
+    }
+
+    fast_u8 read_disp_or_null(reg r) {
+        return read_disp_or_null(r == reg::at_hl);
+    }
+
+    fast_u8 read_disp_or_null(reg r1, reg r2) {
+        return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
+    }
+
     // Transfers.
+public:
+    void on_decode_ld_r_r(reg rd, reg rs) {
+        fast_u8 d = !self().on_is_z80() ? 0 : read_disp_or_null(rd, rs);
+        self().on_ld_r_r(rd, rs, d); }
     void on_decode_ld_sp_irp() {
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
@@ -1160,8 +1185,6 @@ public:
     void on_decode_ld_r_n(reg r) {
         fast_u8 n = self().on_imm8_read();
         self().on_ld_r_n(r, /* d= */ 0, n); }
-    void on_decode_ld_r_r(reg rd, reg rs) {
-        self().on_ld_r_r(rd, rs); }
 
 protected:
     using base::self;
@@ -1230,8 +1253,6 @@ public:
             self().on_read_cycle_extra_2t();
         }
         self().on_ld_r_n(r, d, n); }
-    void on_decode_ld_r_r(reg rd, reg rs) {
-        self().on_ld_r_r(rd, rs, read_disp_or_null(rd, rs)); }
 
 protected:
     using base::self;
@@ -1246,26 +1267,8 @@ protected:
     using base::get_z_part;
     using base::get_p_part;
 
-    bool is_hl_iregp() {
-        return self().on_get_iregp_kind() == iregp::hl;
-    }
-
-private:
-    fast_u8 read_disp_or_null(bool may_need_disp) {
-        if(!may_need_disp || is_hl_iregp())
-            return 0;
-        fast_u8 d = self().on_disp_read();
-        self().on_5t_exec_cycle();
-        return d;
-    }
-
-    fast_u8 read_disp_or_null(reg r) {
-        return read_disp_or_null(r == reg::at_hl);
-    }
-
-    fast_u8 read_disp_or_null(reg r1, reg r2) {
-        return read_disp_or_null(r1 == reg::at_hl || r2 == reg::at_hl);
-    }
+    using base::is_hl_iregp;
+    using base::read_disp_or_null;
 };
 
 template<typename B>
