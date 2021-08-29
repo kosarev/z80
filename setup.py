@@ -23,7 +23,7 @@ for var in ['OPT']:
         opts = config_vars[var].split()
         if opt_to_remove in opts:
             opts.remove(opt_to_remove)
-    config_vars[var] = ' '.join(opts)
+        config_vars[var] = ' '.join(opts)
 
 
 z80_emulator_module = Extension(
