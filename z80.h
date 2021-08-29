@@ -635,6 +635,17 @@ protected:
 
     // Transfers.
 public:
+    void on_decode_ld_r_n(reg r) {
+        fast_u8 d, n;
+        if(!self().on_is_z80() || r != reg::at_hl || is_hl_iregp()) {
+            d = 0;
+            n = self().on_imm8_read();
+        } else {
+            d = self().on_disp_read();
+            n = self().on_imm8_read();
+            self().on_read_cycle_extra_2t();
+        }
+        self().on_ld_r_n(r, d, n); }
     void on_decode_ld_r_r(reg rd, reg rs) {
         fast_u8 d = !self().on_is_z80() ? 0 : read_disp_or_null(rd, rs);
         self().on_ld_r_r(rd, rs, d); }
@@ -1182,9 +1193,6 @@ public:
     void on_decode_jp_irp() {
         self().on_fetch_cycle_extra_1t();
         self().on_jp_irp(); }
-    void on_decode_ld_r_n(reg r) {
-        fast_u8 n = self().on_imm8_read();
-        self().on_ld_r_n(r, /* d= */ 0, n); }
 
 protected:
     using base::self;
@@ -1242,17 +1250,6 @@ public:
     void on_decode_inc_rp(regp rp) {
         self().on_fetch_cycle_extra_2t();
         self().on_inc_rp(rp); }
-    void on_decode_ld_r_n(reg r) {
-        fast_u8 d, n;
-        if(r != reg::at_hl || is_hl_iregp()) {
-            d = 0;
-            n = self().on_imm8_read();
-        } else {
-            d = self().on_disp_read();
-            n = self().on_imm8_read();
-            self().on_read_cycle_extra_2t();
-        }
-        self().on_ld_r_n(r, d, n); }
 
 protected:
     using base::self;
