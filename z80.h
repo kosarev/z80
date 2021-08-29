@@ -657,6 +657,16 @@ public:
         self().on_ld_sp_irp(); }
 
     // Arithmetic.
+    void on_decode_inc_r(reg r) {
+        fast_u8 d;
+        if(!self().on_is_z80()) {
+            d = 0;
+            if(r != reg::at_hl)
+                self().on_fetch_cycle_extra_1t();
+        } else {
+            d = read_disp_or_null(r);
+        }
+        self().on_inc_r(r, d); }
     void on_decode_inc_rp(regp rp) {
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
@@ -1191,10 +1201,6 @@ public:
     void on_decode_halt() {
         self().on_fetch_cycle_extra_3t();
         self().on_halt(); }
-    void on_decode_inc_r(reg r) {
-        if(r != reg::at_hl)
-            self().on_fetch_cycle_extra_1t();
-        self().on_inc_r(r); }
     void on_decode_jp_irp() {
         self().on_fetch_cycle_extra_1t();
         self().on_jp_irp(); }
@@ -1250,8 +1256,6 @@ public:
         self().on_halt(); }
     void on_decode_jp_irp() {
         self().on_jp_irp(); }
-    void on_decode_inc_r(reg r) {
-        self().on_inc_r(r, read_disp_or_null(r)); }
 
 protected:
     using base::self;
