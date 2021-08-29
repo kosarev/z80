@@ -687,6 +687,12 @@ public:
         else
             self().on_fetch_cycle_extra_2t();
         self().on_inc_rp(rp); }
+    void on_decode_dec_rp(regp rp) {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        else
+            self().on_fetch_cycle_extra_2t();
+        self().on_dec_rp(rp); }
 
     // Jumps.
     void on_decode_xcall_nn(fast_u8 op) {
@@ -1221,9 +1227,6 @@ public:
         if(r != reg::at_hl)
             self().on_fetch_cycle_extra_1t();
         self().on_dec_r(r); }
-    void on_decode_dec_rp(regp rp) {
-        self().on_fetch_cycle_extra_1t();
-        self().on_dec_rp(rp); }
 
 protected:
     using base::self;
@@ -1256,9 +1259,6 @@ public:
         self().on_instr_prefix(iregp::iy); }
     void on_decode_dec_r(reg r) {
         self().on_dec_r(r, read_disp_or_null(r)); }
-    void on_decode_dec_rp(regp rp) {
-        self().on_fetch_cycle_extra_2t();
-        self().on_dec_rp(rp); }
 
 protected:
     using base::self;
