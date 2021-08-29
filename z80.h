@@ -681,6 +681,16 @@ public:
             d = read_disp_or_null(r);
         }
         self().on_inc_r(r, d); }
+    void on_decode_dec_r(reg r) {
+        fast_u8 d;
+        if(!self().on_is_z80()) {
+            d = 0;
+            if(r != reg::at_hl)
+                self().on_fetch_cycle_extra_1t();
+        } else {
+            d = read_disp_or_null(r);
+        }
+        self().on_dec_r(r, d); }
     void on_decode_inc_rp(regp rp) {
         if(!self().on_is_z80())
             self().on_fetch_cycle_extra_1t();
@@ -1223,10 +1233,6 @@ public:
         self().on_decode_xcall_nn(0xdd); }
     void on_decode_fd_prefix() {
         self().on_decode_xcall_nn(0xfd); }
-    void on_decode_dec_r(reg r) {
-        if(r != reg::at_hl)
-            self().on_fetch_cycle_extra_1t();
-        self().on_dec_r(r); }
 
 protected:
     using base::self;
@@ -1257,8 +1263,6 @@ public:
         self().on_instr_prefix(iregp::ix); }
     void on_decode_fd_prefix() {
         self().on_instr_prefix(iregp::iy); }
-    void on_decode_dec_r(reg r) {
-        self().on_dec_r(r, read_disp_or_null(r)); }
 
 protected:
     using base::self;
