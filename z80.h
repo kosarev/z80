@@ -617,6 +617,64 @@ public:
         self().on_read_cycle_extra_1t();
         self().on_xcall_nn(op, nn); }
 
+    void on_decode_cb_prefix() {
+        if(!self().on_is_z80())
+            return self().on_xjp_nn(self().on_imm16_read());
+
+        fast_u8 d = 0;
+        iregp irp = self().on_get_iregp_kind();
+        if(irp != iregp::hl)
+            d = self().on_disp_read();
+
+        fast_u8 op;
+        if(irp == iregp::hl) {
+            op = self().on_m1_fetch_cycle();
+        } else {
+            // In ddcb- and fdcb-prefixed instructions the
+            // reading of the 3rd opcode is not an M1 cycle.
+            op = self().on_fetch_cycle();
+            self().on_fetch_cycle_extra_1t();
+        }
+
+        fast_u8 y = get_y_part(op);
+        fast_u8 z = get_z_part(op);
+
+        auto r = static_cast<reg>(z);
+
+        switch(op & x_mask) {
+        case 0000: {
+            // rot[y] r[z]
+            // rot r                f(4)      f(4)
+            // rot (HL)             f(4)      f(4) r(4) w(3)
+            // rot (i+d)       f(4) f(4) r(3) f(5) r(4) w(3)
+            auto k = static_cast<rot>(y);
+            return self().on_rot(k, r, d); }
+        case 0100: {
+            // BIT y, r[z]
+            // BIT b, r             f(4)      f(4)
+            // BIT b, (HL)          f(4)      f(4) r(4)
+            // BIT b, (i+d)    f(4) f(4) r(3) f(5) r(4)
+            auto b = static_cast<unsigned>(y);
+            return self().on_bit(b, r, d); }
+        case 0200: {
+            // RES y, r[z]
+            // RES b, r             f(4)      f(4)
+            // RES b, (HL)          f(4)      f(4) r(4) w(3)
+            // RES b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
+            auto b = static_cast<unsigned>(y);
+            return self().on_res(b, r, d); }
+        case 0300: {
+            // SET y, r[z]
+            // SET b, r             f(4)      f(4)
+            // SET b, (HL)          f(4)      f(4) r(4) w(3)
+            // SET b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
+            auto b = static_cast<unsigned>(y);
+            return self().on_set(b, r, d); }
+        }
+
+        unreachable("Unknown opcode encountered!");
+    }
+
     void on_decode_ed_prefix() {
         if(!self().on_is_z80())
             return self().on_decode_xcall_nn(0xed);
@@ -1053,8 +1111,6 @@ public:
     void on_decode_call_cc_nn(condition cc) {
         self().on_fetch_cycle_extra_1t();
         self().on_call_cc_nn(cc, self().on_imm16_read()); }
-    void on_decode_cb_prefix() {
-        self().on_xjp_nn(self().on_imm16_read()); }
     void on_decode_dd_prefix() {
         self().on_decode_xcall_nn(0xdd); }
     void on_decode_fd_prefix() {
@@ -1173,61 +1229,6 @@ public:
     void on_decode_ld_sp_irp() {
         self().on_fetch_cycle_extra_2t();
         self().on_ld_sp_irp(); }
-
-    void on_decode_cb_prefix() {
-        fast_u8 d = 0;
-        iregp irp = self().on_get_iregp_kind();
-        if(irp != iregp::hl)
-            d = self().on_disp_read();
-
-        fast_u8 op;
-        if(irp == iregp::hl) {
-            op = self().on_m1_fetch_cycle();
-        } else {
-            // In ddcb- and fdcb-prefixed instructions the
-            // reading of the 3rd opcode is not an M1 cycle.
-            op = self().on_fetch_cycle();
-            self().on_fetch_cycle_extra_1t();
-        }
-
-        fast_u8 y = get_y_part(op);
-        fast_u8 z = get_z_part(op);
-
-        auto r = static_cast<reg>(z);
-
-        switch(op & x_mask) {
-        case 0000: {
-            // rot[y] r[z]
-            // rot r                f(4)      f(4)
-            // rot (HL)             f(4)      f(4) r(4) w(3)
-            // rot (i+d)       f(4) f(4) r(3) f(5) r(4) w(3)
-            auto k = static_cast<rot>(y);
-            return self().on_rot(k, r, d); }
-        case 0100: {
-            // BIT y, r[z]
-            // BIT b, r             f(4)      f(4)
-            // BIT b, (HL)          f(4)      f(4) r(4)
-            // BIT b, (i+d)    f(4) f(4) r(3) f(5) r(4)
-            auto b = static_cast<unsigned>(y);
-            return self().on_bit(b, r, d); }
-        case 0200: {
-            // RES y, r[z]
-            // RES b, r             f(4)      f(4)
-            // RES b, (HL)          f(4)      f(4) r(4) w(3)
-            // RES b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            auto b = static_cast<unsigned>(y);
-            return self().on_res(b, r, d); }
-        case 0300: {
-            // SET y, r[z]
-            // SET b, r             f(4)      f(4)
-            // SET b, (HL)          f(4)      f(4) r(4) w(3)
-            // SET b, (i+d)    f(4) f(4) r(3) f(5) r(4) w(3)
-            auto b = static_cast<unsigned>(y);
-            return self().on_set(b, r, d); }
-        }
-
-        unreachable("Unknown opcode encountered!");
-    }
 
 protected:
     using base::self;
