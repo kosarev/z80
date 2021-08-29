@@ -679,6 +679,10 @@ public:
         fast_u16 nn = self().on_imm16_read();
         self().on_read_cycle_extra_1t();
         self().on_xcall_nn(op, nn); }
+    void on_decode_jp_irp() {
+        if(!self().on_is_z80())
+            self().on_fetch_cycle_extra_1t();
+        self().on_jp_irp(); }
 
     void on_decode_cb_prefix() {
         if(!self().on_is_z80())
@@ -1201,9 +1205,6 @@ public:
     void on_decode_halt() {
         self().on_fetch_cycle_extra_3t();
         self().on_halt(); }
-    void on_decode_jp_irp() {
-        self().on_fetch_cycle_extra_1t();
-        self().on_jp_irp(); }
 
 protected:
     using base::self;
@@ -1254,8 +1255,6 @@ public:
         return self().on_jr_cc(cc, self().on_disp_read()); }
     void on_decode_halt() {
         self().on_halt(); }
-    void on_decode_jp_irp() {
-        self().on_jp_irp(); }
 
 protected:
     using base::self;
