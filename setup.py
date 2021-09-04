@@ -47,7 +47,7 @@ z80_emulator_module = Extension(
 # TODO: Update the URL once we have a published documentation.
 # TODO: Do we have a name for the emulator?
 setup(name='z80',
-      version='1.0b1',
+      version='1.0b2',
       description='Fast and flexible Z80/i8080 Emulator',
       long_description=long_description,
       long_description_content_type='text/markdown',
