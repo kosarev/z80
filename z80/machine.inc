@@ -8,7 +8,12 @@
     Published under the MIT license.
 */
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+struct object_state {
+#else
 struct __attribute__((packed)) object_state {
+#endif
     least_u8 c = 0;
     least_u8 b = 0;
     least_u8 e = 0;
@@ -62,6 +67,9 @@ struct __attribute__((packed)) object_state {
 
     least_u8 memory[z80::address_space_size] = {};
 };
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 #if defined(I8080_MACHINE)
 class machine_object
@@ -223,7 +231,7 @@ static PyObject *disasm_func(PyObject *self, PyObject *args) {
 
     disasm dis;
     dis.set_instr_code(reinterpret_cast<const least_u8*>(image_bytes),
-                       image_size);
+                       static_cast<unsigned>(image_size));
     dis.on_disassemble();
 
     decref_guard output(PyUnicode_FromString(dis.get_output()));

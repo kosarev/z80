@@ -4,6 +4,7 @@
 import distutils.sysconfig
 import inspect
 import os
+import platform
 # from distutils.core import Extension
 from setuptools import Extension, setup
 
@@ -26,12 +27,19 @@ for var in ['OPT']:
         config_vars[var] = ' '.join(opts)
 
 
+cxx_flags = []
+if platform.system() == 'Windows':
+    pass
+else:
+    cxx_flags.extend([
+        '-std=c++11', '-Wall', '-fno-exceptions', '-fno-rtti',
+        '-O3',
+        # '-S', '-fverbose-asm',  # TODO
+    ])
+
 z80_emulator_module = Extension(
     name='z80._z80',
-    extra_compile_args=['-std=c++11', '-Wall', '-fno-exceptions', '-fno-rtti',
-                        '-O3',
-                        # '-S', '-fverbose-asm',  # TODO
-                        ],
+    extra_compile_args=cxx_flags,
     sources=['z80/_z80module.cpp'],
     language='c++')
 
