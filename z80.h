@@ -1959,7 +1959,8 @@ class reg16_value {
 public:
     reg16_value() {}
     reg16_value(fast_u16 v) : v(v) {}
-    reg16_value(const reg16_value &other) = delete;
+    reg16_value(const reg16_value &other) = default;
+    reg16_value &operator = (const reg16_value &other) = default;
 
     fast_u16 get() const { return v; }
     void set(fast_u16 n) { v = n; }
@@ -1978,7 +1979,8 @@ class regp_value : public reg16_value {
 public:
     regp_value() {}
     regp_value(fast_u16 v) : reg16_value(v) {}
-    regp_value(const regp_value &other) = delete;
+    regp_value(const regp_value &other) = default;
+    regp_value &operator = (const regp_value &other) = default;
 
     fast_u8 get_low() const { return get_low8(v); }
     void set_low(fast_u8 n) { v = make16(get_high(), n); }
@@ -1991,7 +1993,8 @@ public:
 class flipflop {
 public:
     flipflop() {}
-    flipflop(const flipflop &other) = delete;
+    flipflop(const flipflop &other) = default;
+    flipflop &operator = (const flipflop &other) = default;
 
     bool get() const { return v; }
     void set(bool n) { v = n; }
@@ -2205,7 +2208,8 @@ private:
 class int_mode {
 public:
     int_mode() {}
-    int_mode(const int_mode &other) = delete;
+    int_mode(const int_mode &other) = default;
+    int_mode &operator = (const int_mode &other) = default;
 
     unsigned get() const { return v; }
 
