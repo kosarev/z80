@@ -45,9 +45,9 @@ public:
 
 private:
     least_u8 memory[z80::address_space_size] = {
-        0xdb,        // in a, (0xfe)
+        0xdb, 0xfe,  // in a, (0xfe)
         0xee, 0x07,  // xor 7
-        0xd3,        // out (0xfe), a
+        0xd3, 0xfe,  // out (0xfe), a
     };
 };
 
