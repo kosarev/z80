@@ -123,6 +123,10 @@ class Z80Simulator(object):
         self.__ngnd = self.__node_ids['vss']
         self.__npwr = self.__node_ids['vcc']
 
+        self.__nm1 = self.__node_ids['~m1']
+        self.__nrd = self.__node_ids['~rd']
+        self.__nmreq = self.__node_ids['~mreq']
+
         self.__load_transistors()
 
     def __all_nodes(self):
@@ -297,6 +301,9 @@ class Z80Simulator(object):
             res += (1 if self.__is_node_high(nn) else 0) << i
         return res
 
+    def __read_abus(self):
+        return self.__read_bits('ab', 16)
+
     def __read_a(self):
         return self.__read_bits('reg_a')
 
@@ -311,10 +318,14 @@ class Z80Simulator(object):
     # TODO
     def do_something(self):
         for _ in range(20):
-            print(f'{self.__read_pc():04x} '
-                  f'{self.__read_a():02x} '
-                  f'{self.__read_r():02x}')
             self.__tick()
+            print(f'PC {self.__read_pc():04x}, '
+                  f'A {self.__read_a():02x}, '
+                  f'R, {self.__read_r():02x}, '
+                  f'abus {self.__read_abus():04x}, '
+                  f'~m1 {int(self.__is_node_high(self.__nm1))}, '
+                  f'~rd {int(self.__is_node_high(self.__nrd))}, '
+                  f'~mreq {int(self.__is_node_high(self.__nmreq))}')
 
 
 def main():
