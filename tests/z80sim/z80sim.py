@@ -124,10 +124,174 @@ class Z80Simulator(object):
         self.__npwr = self.__node_ids['vcc']
 
         self.__load_transistors()
-        assert 0
+
+    def __all_nodes(self):
+        res = []
+        for i in self.__nodes:
+            if i != self.__npwr and i != self.__ngnd:
+                res.append(i)
+        return res
+
+    def __add_node_to_group(self, i):
+        if i in self.__group:
+            return
+
+        self.__group.append(i)
+        if i == self.__ngnd:
+            return
+        if i == self.__npwr:
+            return
+        for t in self.__nodes[i].c1c2s:
+            if not t.on:
+                continue
+
+            if t.c1 == i:
+                other = t.c2
+            if t.c2 == i:
+                other = t.c1
+            self.__add_node_to_group(other)
+
+    def __get_node_group(self, i):
+        self.__group = []
+        self.__add_node_to_group(i)
+
+    def __get_node_value(self):
+        if self.__ngnd in self.__group:
+            return False
+        if self.__npwr in self.__group:
+            return True
+        for i in self.__group:
+            n = self.__nodes[i]
+            if n.pullup:
+                return True
+            if n.pulldown:
+                return False
+            if n.state:
+                return True
+        return False
+
+    def __add_recalc_node(self, nn):
+        if nn == self.__ngnd:
+            return
+        if nn == self.__npwr:
+            return
+        '''
+        if nn in self.__recalc_hash:
+            return
+        '''
+        self.__recalc_list.append(nn)
+        self.__recalc_hash.add(nn)
+
+    def __turn_transistor_on(self, t):
+        if t.on:
+            return
+        t.on = True
+        self.__add_recalc_node(t.c1)
+        # TODO: Why don't we do self.__add_recalc_node(t.c2)?
+
+    def __turn_transistor_off(self, t):
+        if not t.on:
+            return
+        t.on = False
+        self.__add_recalc_node(t.c1)
+        self.__add_recalc_node(t.c2)
+
+    def __recalc_node(self, node):
+        if node == self.__ngnd:
+            return
+        if node == self.__npwr:
+            return
+
+        self.__get_node_group(node)
+
+        new_state = self.__get_node_value()
+
+        x = self.__group[:]
+
+        for i in self.__group:
+            n = self.__nodes[i]
+            if n.state == new_state:
+                continue
+            n.state = new_state
+            for t in n.gates:
+                if n.state:
+                    self.__turn_transistor_on(t)
+                else:
+                    self.__turn_transistor_off(t)
+
+        # TODO
+        assert self.__group == x
+
+    def __recalc_node_list(self, list):
+        self.__recalc_list = []
+        self.__recalc_hash = set()
+        for j in range(100):  # Loop limiter.
+            if len(list) == 0:
+                return
+
+            for i in list:
+                self.__recalc_node(i)
+
+            list = self.__recalc_list
+            self.__recalc_list = []
+            self.__recalc_hash = set()
+
+    def __set_low(self, id):
+        i = self.__node_ids[id]
+        self.__nodes[i].pullup = False
+        self.__nodes[i].pulldown = True
+        self.__recalc_node_list([i])
+
+    def __set_high(self, id):
+        i = self.__node_ids[id]
+        self.__nodes[i].pullup = True
+        self.__nodes[i].pulldown = False
+        self.__recalc_node_list([i])
+
+    def __is_node_high(self, nn):
+        return self.__nodes[nn].state
+
+    def __half_step(self):
+        clk = self.__is_node_high(self.__node_ids['clk'])
+        print(f'__half_step(): clk {clk}')
+        if clk:
+            self.__set_low('clk')
+        else:
+            self.__set_high('clk')
+
+        # A comment from the original source:
+        # DMB: It's almost certainly wrong to execute these on both clock edges
+        # TODO: handleBusRead();
+        # TODO: handleBusWrite();
+
+    def __init_chip(self):
+        for n in self.__nodes.values():
+            n.state = False
+
+        self.__nodes[self.__ngnd].state = False
+        self.__nodes[self.__npwr].state = True
+
+        for t in self.__trans.values():
+            t.on = False
+
+        self.__set_low('~reset')
+        self.__set_high('clk')
+        self.__set_high('~busrq')
+        self.__set_high('~int')
+        self.__set_high('~nmi')
+        self.__set_high('~wait')
+
+        self.__recalc_node_list(self.__all_nodes())
+
+        # Propagate the reset signal.
+        for _ in range(31):
+            self.__half_step()
+
+        self.__set_high('~reset')
 
     def __init__(self):
         self.__load_defs()
+        self.__init_chip()
 
 
 def main():
