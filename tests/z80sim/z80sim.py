@@ -204,8 +204,6 @@ class Z80Simulator(object):
 
         new_state = self.__get_node_value()
 
-        x = self.__group[:]
-
         for i in self.__group:
             n = self.__nodes[i]
             if n.state == new_state:
@@ -216,9 +214,6 @@ class Z80Simulator(object):
                     self.__turn_transistor_on(t)
                 else:
                     self.__turn_transistor_off(t)
-
-        # TODO
-        assert self.__group == x
 
     def __recalc_node_list(self, list):
         self.__recalc_list = []
