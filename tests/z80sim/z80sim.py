@@ -175,10 +175,8 @@ class Z80Simulator(object):
             return
         if nn == self.__npwr:
             return
-        '''
         if nn in self.__recalc_hash:
             return
-        '''
         self.__recalc_list.append(nn)
         self.__recalc_hash.add(nn)
 
