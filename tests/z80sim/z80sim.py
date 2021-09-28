@@ -251,9 +251,9 @@ class Z80Simulator(object):
     def __is_node_high(self, nn):
         return self.__nodes[nn].state
 
-    def __half_step(self):
+    def __half_tick(self):
         clk = self.__is_node_high(self.__node_ids['clk'])
-        print(f'__half_step(): clk {clk}')
+        # print(f'__half_tick(): clk {clk}')
         if clk:
             self.__set_low('clk')
         else:
@@ -263,6 +263,10 @@ class Z80Simulator(object):
         # DMB: It's almost certainly wrong to execute these on both clock edges
         # TODO: handleBusRead();
         # TODO: handleBusWrite();
+
+    def __tick(self):
+        self.__half_tick()
+        self.__half_tick()
 
     def __init_chip(self):
         for n in self.__nodes.values():
@@ -285,7 +289,7 @@ class Z80Simulator(object):
 
         # Propagate the reset signal.
         for _ in range(31):
-            self.__half_step()
+            self.__half_tick()
 
         self.__set_high('~reset')
 
@@ -293,9 +297,36 @@ class Z80Simulator(object):
         self.__load_defs()
         self.__init_chip()
 
+    def __read_bits(self, name, n=8):
+        res = 0
+        for i in range(n):
+            nn = self.__node_ids[name + str(i)]
+            res += (1 if self.__is_node_high(nn) else 0) << i
+        return res
+
+    def __read_a(self):
+        return self.__read_bits('reg_a')
+
+    def __read_r(self):
+        return self.__read_bits('reg_r')
+
+    def __read_pc(self):
+        lo = self.__read_bits('reg_pcl')
+        hi = self.__read_bits('reg_pch')
+        return (hi << 8) | lo
+
+    # TODO
+    def do_something(self):
+        for _ in range(20):
+            print(f'{self.__read_pc():04x} '
+                  f'{self.__read_a():02x} '
+                  f'{self.__read_r():02x}')
+            self.__tick()
+
 
 def main():
-    Z80Simulator()
+    s = Z80Simulator()
+    s.do_something()
 
 
 if __name__ == "__main__":
