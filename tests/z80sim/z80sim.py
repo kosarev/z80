@@ -268,11 +268,8 @@ class Z80Simulator(object):
         n.pulldown = False
         self.__recalc_node_list([n])
 
-    def __is_node_high(self, nn):
-        return self.__nodes[nn].state
-
     def half_tick(self):
-        nclk = self.__is_node_high(self.__node_ids['~clk'])
+        nclk = self.__nodes[self.__node_ids['~clk']].state
         # print(f'half_tick(): nclk {nclk}')
         if nclk:
             self.__set_low('~clk')
@@ -315,7 +312,7 @@ class Z80Simulator(object):
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
-        while self.__is_node_high(self.__nm1):
+        while self.__nodes[self.__nm1].state:
             self.half_tick()
 
     def __init__(self):
@@ -326,7 +323,7 @@ class Z80Simulator(object):
         res = 0
         for i in range(n):
             nn = self.__node_ids[name + str(i)]
-            res += (1 if self.__is_node_high(nn) else 0) << i
+            res |= int(self.__nodes[nn].state) << i
         return res
 
     def read_abus(self):
@@ -346,14 +343,14 @@ class Z80Simulator(object):
     # TODO
     def do_something(self):
         for i in range(30):
-            nclk = self.__is_node_high(self.__nclk)
-            nm1 = self.__is_node_high(self.__nm1)
-            t1 = self.__is_node_high(self.__t1)
-            t2 = self.__is_node_high(self.__t2)
-            t3 = self.__is_node_high(self.__t3)
-            t4 = self.__is_node_high(self.__t4)
-            t5 = self.__is_node_high(self.__t5)
-            t6 = self.__is_node_high(self.__t6)
+            nclk = self.__nodes[self.__nclk].state
+            nm1 = self.__nodes[self.__nm1].state
+            t1 = self.__nodes[self.__t1].state
+            t2 = self.__nodes[self.__t2].state
+            t3 = self.__nodes[self.__t3].state
+            t4 = self.__nodes[self.__t4].state
+            t5 = self.__nodes[self.__t5].state
+            t6 = self.__nodes[self.__t6].state
             if i > 0 and not nm1 and t1:
                 print()
 
@@ -369,9 +366,9 @@ class Z80Simulator(object):
                   f't4 {int(t4)}, '
                   f't5 {int(t5)}, '
                   f't6 {int(t6)}, '
-                  f'~rfsh {int(self.__is_node_high(self.__nrfsh))}, '
-                  f'~rd {int(self.__is_node_high(self.__nrd))}, '
-                  f'~mreq {int(self.__is_node_high(self.__nmreq))}')
+                  f'~rfsh {int(self.__nodes[self.__nrfsh].state)}, '
+                  f'~rd {int(self.__nodes[self.__nrd].state)}, '
+                  f'~mreq {int(self.__nodes[self.__nmreq].state)}')
 
             self.half_tick()
 
