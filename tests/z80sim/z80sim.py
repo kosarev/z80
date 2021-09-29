@@ -264,23 +264,13 @@ class Z80Simulator(object):
             self.__recalc_list = []
             self.__recalc_hash = set()
 
-    def __set_low(self, n):
-        n.pullup = False
-        n.pulldown = True
-        self.__recalc_node_list([n])
-
-    def __set_high(self, n):
-        n.pullup = True
-        n.pulldown = False
+    def __set_node(self, n, state):
+        n.pullup = state
+        n.pulldown = not state
         self.__recalc_node_list([n])
 
     def half_tick(self):
-        nclk = self.__nclk.state
-        # print(f'half_tick(): nclk {nclk}')
-        if nclk:
-            self.__set_low(self.__nclk)
-        else:
-            self.__set_high(self.__nclk)
+        self.__set_node(self.__nclk, not self.__nclk.state)
 
         # A comment from the original source:
         # DMB: It's almost certainly wrong to execute these on both clock edges
@@ -301,12 +291,12 @@ class Z80Simulator(object):
         for t in self.__trans.values():
             t.on = False
 
-        self.__set_low(self.__nreset)
-        self.__set_high(self.__nclk)
-        self.__set_high(self.__nbusrq)
-        self.__set_high(self.__nint)
-        self.__set_high(self.__nnmi)
-        self.__set_high(self.__nwait)
+        self.__set_node(self.__nreset, False)
+        self.__set_node(self.__nclk, True)
+        self.__set_node(self.__nbusrq, True)
+        self.__set_node(self.__nint, True)
+        self.__set_node(self.__nnmi, True)
+        self.__set_node(self.__nwait, True)
 
         self.__recalc_node_list(self.__all_nodes())
 
@@ -314,7 +304,7 @@ class Z80Simulator(object):
         for _ in range(31):
             self.half_tick()
 
-        self.__set_high(self.__nreset)
+        self.__set_node(self.__nreset, True)
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
