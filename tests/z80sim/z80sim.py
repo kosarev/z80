@@ -146,7 +146,7 @@ class Z80Simulator(object):
         self.__load_transistors()
 
     def __all_nodes(self):
-        return [n.id for n in self.__nodes.values()
+        return [n for n in self.__nodes.values()
                 if n not in (self.__gnd, self.__pwr)]
 
     def __add_node_to_group(self, n):
@@ -242,31 +242,31 @@ class Z80Simulator(object):
                 else:
                     self.__turn_transistor_off(t)
 
-    def __recalc_node_list(self, list):
+    def __recalc_node_list(self, nodes):
         self.__recalc_list = []
         self.__recalc_hash = set()
         for j in range(100):  # Loop limiter.
-            if len(list) == 0:
+            if len(nodes) == 0:
                 return
 
-            for i in list:
-                self.__recalc_node(self.__nodes[i])
+            for n in nodes:
+                self.__recalc_node(n)
 
-            list = self.__recalc_list
+            nodes = [self.__nodes[i] for i in self.__recalc_list]
             self.__recalc_list = []
             self.__recalc_hash = set()
 
     def __set_low(self, id):
-        i = self.__node_ids[id]
-        self.__nodes[i].pullup = False
-        self.__nodes[i].pulldown = True
-        self.__recalc_node_list([i])
+        n = self.__nodes[self.__node_ids[id]]
+        n.pullup = False
+        n.pulldown = True
+        self.__recalc_node_list([n])
 
     def __set_high(self, id):
-        i = self.__node_ids[id]
-        self.__nodes[i].pullup = True
-        self.__nodes[i].pulldown = False
-        self.__recalc_node_list([i])
+        n = self.__nodes[self.__node_ids[id]]
+        n.pullup = True
+        n.pulldown = False
+        self.__recalc_node_list([n])
 
     def __is_node_high(self, nn):
         return self.__nodes[nn].state
