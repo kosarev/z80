@@ -202,27 +202,27 @@ class Z80Simulator(object):
 
         return max_state
 
-    def __add_recalc_node(self, nn):
-        if self.__nodes[nn] in (self.__gnd, self.__pwr):
+    def __add_recalc_node(self, n):
+        if n in (self.__gnd, self.__pwr):
             return
-        if nn in self.__recalc_hash:
+        if n.id in self.__recalc_hash:
             return
-        self.__recalc_list.append(nn)
-        self.__recalc_hash.add(nn)
+        self.__recalc_list.append(n.id)
+        self.__recalc_hash.add(n.id)
 
     def __turn_transistor_on(self, t):
         if t.on:
             return
         t.on = True
-        self.__add_recalc_node(t.c1.id)
-        # TODO: Why don't we do self.__add_recalc_node(t.c2.id)?
+        self.__add_recalc_node(t.c1)
+        # TODO: Why don't we do self.__add_recalc_node(t.c2)?
 
     def __turn_transistor_off(self, t):
         if not t.on:
             return
         t.on = False
-        self.__add_recalc_node(t.c1.id)
-        self.__add_recalc_node(t.c2.id)
+        self.__add_recalc_node(t.c1)
+        self.__add_recalc_node(t.c2)
 
     def __recalc_node(self, node):
         if self.__nodes[node] in (self.__gnd, self.__pwr):
