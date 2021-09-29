@@ -107,7 +107,7 @@ class Z80Simulator(object):
                     continue
 
                 # TODO: Why the original source does this?
-                if c1 in (self.__ngnd, self.__npwr):
+                if self.__nodes[c1] in (self.__gnd, self.__pwr):
                     c1, c2 = c2, c1
 
                 t = Transistor(id, gate, c1, c2)
@@ -123,8 +123,8 @@ class Z80Simulator(object):
         self.__load_node_names()
         self.__load_nodes()
 
-        self.__ngnd = self.__node_ids['vss']
-        self.__npwr = self.__node_ids['vcc']
+        self.__gnd = self.__nodes[self.__node_ids['vss']]
+        self.__pwr = self.__nodes[self.__node_ids['vcc']]
 
         self.__nclk = self.__node_ids['~clk']
 
@@ -144,7 +144,7 @@ class Z80Simulator(object):
     def __all_nodes(self):
         res = []
         for i in self.__nodes:
-            if i != self.__npwr and i != self.__ngnd:
+            if i != self.__pwr.id and i != self.__gnd.id:
                 res.append(i)
         return res
 
@@ -153,9 +153,7 @@ class Z80Simulator(object):
             return
 
         self.__group.append(i)
-        if i == self.__ngnd:
-            return
-        if i == self.__npwr:
+        if self.__nodes[i] in (self.__gnd, self.__pwr):
             return
         for t in self.__nodes[i].c1c2s:
             if not t.on:
@@ -173,9 +171,9 @@ class Z80Simulator(object):
 
     def __get_node_value(self):
         # 1. deal with power connections first
-        if self.__ngnd in self.__group:
+        if self.__gnd.id in self.__group:
             return False
-        if self.__npwr in self.__group:
+        if self.__pwr.id in self.__group:
             return True
 
         # 2. deal with pullup/pulldowns next
@@ -206,9 +204,7 @@ class Z80Simulator(object):
         return max_state
 
     def __add_recalc_node(self, nn):
-        if nn == self.__ngnd:
-            return
-        if nn == self.__npwr:
+        if self.__nodes[nn] in (self.__gnd, self.__pwr):
             return
         if nn in self.__recalc_hash:
             return
@@ -230,9 +226,7 @@ class Z80Simulator(object):
         self.__add_recalc_node(t.c2)
 
     def __recalc_node(self, node):
-        if node == self.__ngnd:
-            return
-        if node == self.__npwr:
+        if self.__nodes[node] in (self.__gnd, self.__pwr):
             return
 
         self.__get_node_group(node)
@@ -300,8 +294,8 @@ class Z80Simulator(object):
         for n in self.__nodes.values():
             n.state = False
 
-        self.__nodes[self.__ngnd].state = False
-        self.__nodes[self.__npwr].state = True
+        self.__gnd.state = False
+        self.__pwr.state = True
 
         for t in self.__trans.values():
             t.on = False
