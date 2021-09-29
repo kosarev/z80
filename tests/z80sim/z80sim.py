@@ -27,7 +27,7 @@ class Node(object):
 class Transistor(object):
     def __init__(self, id, gate, c1, c2):
         self.id, self.gate, self.c1, self.c2 = id, gate, c1, c2
-        self.on = False
+        self.state = False
 
 
 class Z80Simulator(object):
@@ -165,7 +165,7 @@ class Z80Simulator(object):
         if n in (self.__gnd, self.__pwr):
             return
         for t in n.c1c2s:
-            if not t.on:
+            if not t.state:
                 continue
 
             if t.c1 is n:
@@ -218,19 +218,16 @@ class Z80Simulator(object):
         self.__recalc_list.append(n)
         self.__recalc_hash.add(n)
 
-    def __turn_transistor_on(self, t):
-        if t.on:
+    def __set_transistor(self, t, state):
+        if t.state == state:
             return
-        t.on = True
+        t.state = state
         self.__add_recalc_node(t.c1)
-        # TODO: Why don't we do self.__add_recalc_node(t.c2)?
-
-    def __turn_transistor_off(self, t):
-        if not t.on:
-            return
-        t.on = False
-        self.__add_recalc_node(t.c1)
-        self.__add_recalc_node(t.c2)
+        if state:
+            # TODO: Why don't we do self.__add_recalc_node(t.c2)?
+            pass
+        else:
+            self.__add_recalc_node(t.c2)
 
     def __recalc_node(self, n):
         if n in (self.__gnd, self.__pwr):
@@ -245,10 +242,7 @@ class Z80Simulator(object):
                 continue
             n.state = new_state
             for t in n.gates:
-                if n.state:
-                    self.__turn_transistor_on(t)
-                else:
-                    self.__turn_transistor_off(t)
+                self.__set_transistor(t, n.state)
 
     def __recalc_node_list(self, nodes):
         self.__recalc_list = []
@@ -289,7 +283,7 @@ class Z80Simulator(object):
         self.__pwr.state = True
 
         for t in self.__trans.values():
-            t.on = False
+            t.state = False
 
         self.__set_node(self.__nreset, False)
         self.__set_node(self.__nclk, True)
