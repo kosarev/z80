@@ -149,26 +149,26 @@ class Z80Simulator(object):
         return [n.id for n in self.__nodes.values()
                 if n not in (self.__gnd, self.__pwr)]
 
-    def __add_node_to_group(self, i):
-        if self.__nodes[i] in self.__group:
+    def __add_node_to_group(self, n):
+        if n in self.__group:
             return
 
-        self.__group.append(self.__nodes[i])
-        if self.__nodes[i] in (self.__gnd, self.__pwr):
+        self.__group.append(n)
+        if n in (self.__gnd, self.__pwr):
             return
-        for t in self.__nodes[i].c1c2s:
+        for t in n.c1c2s:
             if not t.on:
                 continue
 
-            if t.c1.id == i:
-                other = t.c2.id
-            if t.c2.id == i:
-                other = t.c1.id
+            if t.c1 is n:
+                other = t.c2
+            if t.c2 is n:
+                other = t.c1
             self.__add_node_to_group(other)
 
     def __get_node_group(self, i):
         self.__group = []
-        self.__add_node_to_group(i)
+        self.__add_node_to_group(self.__nodes[i])
 
     def __get_node_value(self):
         # 1. deal with power connections first
