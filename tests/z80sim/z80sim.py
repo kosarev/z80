@@ -101,13 +101,17 @@ class Z80Simulator(object):
                 assert isinstance(c2, int)
                 assert isinstance(weak, bool)
 
+                gate = self.__nodes[gate]
+                c1 = self.__nodes[c1]
+                c2 = self.__nodes[c2]
+
                 # TODO: The comment in the original source says to
                 # 'ignore all the 'weak' transistors for now'.
                 if weak:
                     continue
 
                 # TODO: Why the original source does this?
-                if self.__nodes[c1] in (self.__gnd, self.__pwr):
+                if c1 in (self.__gnd, self.__pwr):
                     c1, c2 = c2, c1
 
                 t = Transistor(id, gate, c1, c2)
@@ -115,9 +119,9 @@ class Z80Simulator(object):
                 assert id not in self.__trans
                 self.__trans[id] = t
 
-                self.__nodes[gate].gates.append(t)
-                self.__nodes[c1].c1c2s.append(t)
-                self.__nodes[c2].c1c2s.append(t)
+                gate.gates.append(t)
+                c1.c1c2s.append(t)
+                c2.c1c2s.append(t)
 
     def __load_defs(self):
         self.__load_node_names()
@@ -159,10 +163,10 @@ class Z80Simulator(object):
             if not t.on:
                 continue
 
-            if t.c1 == i:
-                other = t.c2
-            if t.c2 == i:
-                other = t.c1
+            if t.c1.id == i:
+                other = t.c2.id
+            if t.c2.id == i:
+                other = t.c1.id
             self.__add_node_to_group(other)
 
     def __get_node_group(self, i):
@@ -213,15 +217,15 @@ class Z80Simulator(object):
         if t.on:
             return
         t.on = True
-        self.__add_recalc_node(t.c1)
-        # TODO: Why don't we do self.__add_recalc_node(t.c2)?
+        self.__add_recalc_node(t.c1.id)
+        # TODO: Why don't we do self.__add_recalc_node(t.c2.id)?
 
     def __turn_transistor_off(self, t):
         if not t.on:
             return
         t.on = False
-        self.__add_recalc_node(t.c1)
-        self.__add_recalc_node(t.c2)
+        self.__add_recalc_node(t.c1.id)
+        self.__add_recalc_node(t.c2.id)
 
     def __recalc_node(self, node):
         if self.__nodes[node] in (self.__gnd, self.__pwr):
