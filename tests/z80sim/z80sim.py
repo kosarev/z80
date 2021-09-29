@@ -144,6 +144,7 @@ class Z80Simulator(object):
         self.__nreset = self.__nodes['~reset']
         self.__nrfsh = self.__nodes['~rfsh']
         self.__nwait = self.__nodes['~wait']
+
         self.__t1 = self.__nodes['t1']
         self.__t2 = self.__nodes['t2']
         self.__t3 = self.__nodes['t3']
@@ -264,7 +265,7 @@ class Z80Simulator(object):
         self.__recalc_node_list([n])
 
     def half_tick(self):
-        self.__set_node(self.__nclk, not self.__nclk.state)
+        self.nclk ^= True
 
         # A comment from the original source:
         # DMB: It's almost certainly wrong to execute these on both clock edges
@@ -285,12 +286,12 @@ class Z80Simulator(object):
         for t in self.__trans.values():
             t.state = False
 
-        self.__set_node(self.__nreset, False)
-        self.__set_node(self.__nclk, True)
-        self.__set_node(self.__nbusrq, True)
-        self.__set_node(self.__nint, True)
-        self.__set_node(self.__nnmi, True)
-        self.__set_node(self.__nwait, True)
+        self.nreset = False
+        self.nclk = True
+        self.nbusrq = True
+        self.nint = True
+        self.nnmi = True
+        self.nwait = True
 
         self.__recalc_node_list(self.__all_nodes())
 
@@ -298,7 +299,7 @@ class Z80Simulator(object):
         for _ in range(31):
             self.half_tick()
 
-        self.__set_node(self.__nreset, True)
+        self.nreset = True
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
@@ -309,22 +310,118 @@ class Z80Simulator(object):
         self.__load_defs()
         self.__init_chip()
 
+    @property
+    def nclk(self):
+        return self.__nclk.state
+
+    @nclk.setter
+    def nclk(self, state):
+        self.__set_node(self.__nclk, state)
+
+    @property
+    def nm1(self):
+        return self.__nm1.state
+
+    @property
+    def m1(self):
+        return not self.__nm1.state
+
+    @property
+    def nmreq(self):
+        return self.__nmreq.state
+
+    @property
+    def nreset(self):
+        return self.__nreset.state
+
+    @nreset.setter
+    def nreset(self, state):
+        self.__set_node(self.__nreset, state)
+
+    @property
+    def nrfsh(self):
+        return self.__nrfsh.state
+
+    @property
+    def nbusrq(self):
+        return self.__nbusrq.state
+
+    @nbusrq.setter
+    def nbusrq(self, state):
+        self.__set_node(self.__nbusrq, state)
+
+    @property
+    def nint(self):
+        return self.__nint.state
+
+    @nint.setter
+    def nint(self, state):
+        self.__set_node(self.__nint, state)
+
+    @property
+    def nnmi(self):
+        return self.__nnmi.state
+
+    @nnmi.setter
+    def nnmi(self, state):
+        self.__set_node(self.__nnmi, state)
+
+    @property
+    def nrd(self):
+        return self.__nrd.state
+
+    @property
+    def nwait(self):
+        return self.__nwait.state
+
+    @nwait.setter
+    def nwait(self, state):
+        self.__set_node(self.__nwait, state)
+
+    @property
+    def t1(self):
+        return self.__t1.state
+
+    @property
+    def t2(self):
+        return self.__t2.state
+
+    @property
+    def t3(self):
+        return self.__t3.state
+
+    @property
+    def t4(self):
+        return self.__t4.state
+
+    @property
+    def t5(self):
+        return self.__t5.state
+
+    @property
+    def t6(self):
+        return self.__t6.state
+
     def __read_bits(self, name, n=8):
         res = 0
         for i in range(n):
             res |= int(self.__nodes[name + str(i)].state) << i
         return res
 
-    def read_abus(self):
+    @property
+    def abus(self):
         return self.__read_bits('ab', 16)
 
-    def __read_a(self):
+    @property
+    def a(self):
         return self.__read_bits('reg_a')
 
-    def __read_r(self):
+    @property
+    def r(self):
         return self.__read_bits('reg_r')
 
-    def __read_pc(self):
+    @property
+    def pc(self):
         lo = self.__read_bits('reg_pcl')
         hi = self.__read_bits('reg_pch')
         return (hi << 8) | lo
@@ -332,32 +429,24 @@ class Z80Simulator(object):
     # TODO
     def do_something(self):
         for i in range(30):
-            nclk = self.__nclk.state
-            nm1 = self.__nm1.state
-            t1 = self.__t1.state
-            t2 = self.__t2.state
-            t3 = self.__t3.state
-            t4 = self.__t4.state
-            t5 = self.__t5.state
-            t6 = self.__t6.state
-            if i > 0 and not nm1 and t1:
+            if i > 0 and self.m1 and self.t1:
                 print()
 
-            print(f'PC {self.__read_pc():04x}, '
-                  f'A {self.__read_a():02x}, '
-                  f'R {self.__read_r():02x}, '
-                  f'~clk {int(nclk)}, '
-                  f'abus {self.read_abus():04x}, '
-                  f'~m1 {int(nm1)}, '
-                  f't1 {int(t1)}, '
-                  f't2 {int(t2)}, '
-                  f't3 {int(t3)}, '
-                  f't4 {int(t4)}, '
-                  f't5 {int(t5)}, '
-                  f't6 {int(t6)}, '
-                  f'~rfsh {int(self.__nrfsh.state)}, '
-                  f'~rd {int(self.__nrd.state)}, '
-                  f'~mreq {int(self.__nmreq.state)}')
+            print(f'PC {self.pc:04x}, '
+                  f'A {self.a:02x}, '
+                  f'R {self.r:02x}, '
+                  f'~clk {int(self.nclk)}, '
+                  f'abus {self.abus:04x}, '
+                  f'~m1 {int(self.nm1)}, '
+                  f't1 {int(self.t1)}, '
+                  f't2 {int(self.t2)}, '
+                  f't3 {int(self.t3)}, '
+                  f't4 {int(self.t4)}, '
+                  f't5 {int(self.t5)}, '
+                  f't6 {int(self.t6)}, '
+                  f'~rfsh {int(self.nrfsh)}, '
+                  f'~rd {int(self.nrd)}, '
+                  f'~mreq {int(self.nmreq)}')
 
             self.half_tick()
 
@@ -368,11 +457,11 @@ def test_computing_node_values():
     # fetch cycles. Make sure with the new logic the address bus
     # maintains the right value.
     s = Z80Simulator()
-    while s.read_abus() == 0x0000:
+    while s.abus == 0x0000:
         s.half_tick()
-    while s.read_abus() == 0x0001:
+    while s.abus == 0x0001:
         s.half_tick()
-    assert s.read_abus() == 0x0002
+    assert s.abus == 0x0002
 
 
 def main():
