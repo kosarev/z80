@@ -182,11 +182,6 @@ class Z80Simulator(object):
             if n.pulldown:
                 return False
 
-            # TODO: Do not look at the state until all pullups
-            # and pulldowns are considered.
-            # if n.state:
-            #     return True
-
         # 3. resolve connected set of floating nodes
         # based on state of largest (by #connections) node
         # (previously this was any node with state true wins)
