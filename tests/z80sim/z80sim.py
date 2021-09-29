@@ -135,10 +135,15 @@ class Z80Simulator(object):
 
         self.__nclk = self.__nodes['~clk']
 
+        self.__nbusrq = self.__nodes['~busrq']
+        self.__nint = self.__nodes['~int']
         self.__nm1 = self.__nodes['~m1']
         self.__nmreq = self.__nodes['~mreq']
+        self.__nnmi = self.__nodes['~nmi']
         self.__nrd = self.__nodes['~rd']
+        self.__nreset = self.__nodes['~reset']
         self.__nrfsh = self.__nodes['~rfsh']
+        self.__nwait = self.__nodes['~wait']
         self.__t1 = self.__nodes['t1']
         self.__t2 = self.__nodes['t2']
         self.__t3 = self.__nodes['t3']
@@ -259,14 +264,12 @@ class Z80Simulator(object):
             self.__recalc_list = []
             self.__recalc_hash = set()
 
-    def __set_low(self, id):
-        n = self.__nodes[id]
+    def __set_low(self, n):
         n.pullup = False
         n.pulldown = True
         self.__recalc_node_list([n])
 
-    def __set_high(self, id):
-        n = self.__nodes[id]
+    def __set_high(self, n):
         n.pullup = True
         n.pulldown = False
         self.__recalc_node_list([n])
@@ -275,9 +278,9 @@ class Z80Simulator(object):
         nclk = self.__nclk.state
         # print(f'half_tick(): nclk {nclk}')
         if nclk:
-            self.__set_low('~clk')
+            self.__set_low(self.__nclk)
         else:
-            self.__set_high('~clk')
+            self.__set_high(self.__nclk)
 
         # A comment from the original source:
         # DMB: It's almost certainly wrong to execute these on both clock edges
@@ -298,12 +301,12 @@ class Z80Simulator(object):
         for t in self.__trans.values():
             t.on = False
 
-        self.__set_low('~reset')
-        self.__set_high('~clk')
-        self.__set_high('~busrq')
-        self.__set_high('~int')
-        self.__set_high('~nmi')
-        self.__set_high('~wait')
+        self.__set_low(self.__nreset)
+        self.__set_high(self.__nclk)
+        self.__set_high(self.__nbusrq)
+        self.__set_high(self.__nint)
+        self.__set_high(self.__nnmi)
+        self.__set_high(self.__nwait)
 
         self.__recalc_node_list(self.__all_nodes())
 
@@ -311,7 +314,7 @@ class Z80Simulator(object):
         for _ in range(31):
             self.half_tick()
 
-        self.__set_high('~reset')
+        self.__set_high(self.__nreset)
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
