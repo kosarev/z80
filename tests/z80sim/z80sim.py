@@ -32,7 +32,7 @@ class Transistor(object):
 
 class Z80Simulator(object):
     def __load_node_names(self):
-        self.__node_ids = {}
+        self.__nodes = {}
         with open('nodenames.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -56,8 +56,11 @@ class Z80Simulator(object):
                 assert isinstance(i, str)
                 i = int(i)
 
-                assert id not in self.__node_ids
-                self.__node_ids[id] = i
+                n = self.__indexes_to_nodes[i]
+
+                assert id not in self.__nodes
+                self.__nodes[id] = n
+                n.id = id
 
     def __load_nodes(self):
         self.__indexes_to_nodes = {}
@@ -124,24 +127,24 @@ class Z80Simulator(object):
                 c2.c1c2s.append(t)
 
     def __load_defs(self):
-        self.__load_node_names()
         self.__load_nodes()
+        self.__load_node_names()
 
-        self.__gnd = self.__indexes_to_nodes[self.__node_ids['vss']]
-        self.__pwr = self.__indexes_to_nodes[self.__node_ids['vcc']]
+        self.__gnd = self.__nodes['vss']
+        self.__pwr = self.__nodes['vcc']
 
-        self.__nclk = self.__node_ids['~clk']
+        self.__nclk = self.__nodes['~clk']
 
-        self.__nm1 = self.__node_ids['~m1']
-        self.__nmreq = self.__node_ids['~mreq']
-        self.__nrd = self.__node_ids['~rd']
-        self.__nrfsh = self.__node_ids['~rfsh']
-        self.__t1 = self.__node_ids['t1']
-        self.__t2 = self.__node_ids['t2']
-        self.__t3 = self.__node_ids['t3']
-        self.__t4 = self.__node_ids['t4']
-        self.__t5 = self.__node_ids['t5']
-        self.__t6 = self.__node_ids['t6']
+        self.__nm1 = self.__nodes['~m1']
+        self.__nmreq = self.__nodes['~mreq']
+        self.__nrd = self.__nodes['~rd']
+        self.__nrfsh = self.__nodes['~rfsh']
+        self.__t1 = self.__nodes['t1']
+        self.__t2 = self.__nodes['t2']
+        self.__t3 = self.__nodes['t3']
+        self.__t4 = self.__nodes['t4']
+        self.__t5 = self.__nodes['t5']
+        self.__t6 = self.__nodes['t6']
 
         self.__load_transistors()
 
@@ -257,19 +260,19 @@ class Z80Simulator(object):
             self.__recalc_hash = set()
 
     def __set_low(self, id):
-        n = self.__indexes_to_nodes[self.__node_ids[id]]
+        n = self.__nodes[id]
         n.pullup = False
         n.pulldown = True
         self.__recalc_node_list([n])
 
     def __set_high(self, id):
-        n = self.__indexes_to_nodes[self.__node_ids[id]]
+        n = self.__nodes[id]
         n.pullup = True
         n.pulldown = False
         self.__recalc_node_list([n])
 
     def half_tick(self):
-        nclk = self.__indexes_to_nodes[self.__node_ids['~clk']].state
+        nclk = self.__nclk.state
         # print(f'half_tick(): nclk {nclk}')
         if nclk:
             self.__set_low('~clk')
@@ -312,7 +315,7 @@ class Z80Simulator(object):
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
-        while self.__indexes_to_nodes[self.__nm1].state:
+        while self.__nm1.state:
             self.half_tick()
 
     def __init__(self):
@@ -322,8 +325,7 @@ class Z80Simulator(object):
     def __read_bits(self, name, n=8):
         res = 0
         for i in range(n):
-            nn = self.__node_ids[name + str(i)]
-            res |= int(self.__indexes_to_nodes[nn].state) << i
+            res |= int(self.__nodes[name + str(i)].state) << i
         return res
 
     def read_abus(self):
@@ -343,14 +345,14 @@ class Z80Simulator(object):
     # TODO
     def do_something(self):
         for i in range(30):
-            nclk = self.__indexes_to_nodes[self.__nclk].state
-            nm1 = self.__indexes_to_nodes[self.__nm1].state
-            t1 = self.__indexes_to_nodes[self.__t1].state
-            t2 = self.__indexes_to_nodes[self.__t2].state
-            t3 = self.__indexes_to_nodes[self.__t3].state
-            t4 = self.__indexes_to_nodes[self.__t4].state
-            t5 = self.__indexes_to_nodes[self.__t5].state
-            t6 = self.__indexes_to_nodes[self.__t6].state
+            nclk = self.__nclk.state
+            nm1 = self.__nm1.state
+            t1 = self.__t1.state
+            t2 = self.__t2.state
+            t3 = self.__t3.state
+            t4 = self.__t4.state
+            t5 = self.__t5.state
+            t6 = self.__t6.state
             if i > 0 and not nm1 and t1:
                 print()
 
@@ -366,9 +368,9 @@ class Z80Simulator(object):
                   f't4 {int(t4)}, '
                   f't5 {int(t5)}, '
                   f't6 {int(t6)}, '
-                  f'~rfsh {int(self.__indexes_to_nodes[self.__nrfsh].state)}, '
-                  f'~rd {int(self.__indexes_to_nodes[self.__nrd].state)}, '
-                  f'~mreq {int(self.__indexes_to_nodes[self.__nmreq].state)}')
+                  f'~rfsh {int(self.__nrfsh.state)}, '
+                  f'~rd {int(self.__nrd.state)}, '
+                  f'~mreq {int(self.__nmreq.state)}')
 
             self.half_tick()
 
