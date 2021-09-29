@@ -207,7 +207,7 @@ class Z80Simulator(object):
             return
         if n.id in self.__recalc_hash:
             return
-        self.__recalc_list.append(n.id)
+        self.__recalc_list.append(n)
         self.__recalc_hash.add(n.id)
 
     def __turn_transistor_on(self, t):
@@ -252,7 +252,7 @@ class Z80Simulator(object):
             for n in nodes:
                 self.__recalc_node(n)
 
-            nodes = [self.__nodes[i] for i in self.__recalc_list]
+            nodes = self.__recalc_list
             self.__recalc_list = []
             self.__recalc_hash = set()
 
