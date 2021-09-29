@@ -154,10 +154,6 @@ class Z80Simulator(object):
 
         self.__load_transistors()
 
-    def __all_nodes(self):
-        return [n for n in self.__indexes_to_nodes.values()
-                if n not in (self.__gnd, self.__pwr)]
-
     def __add_node_to_group(self, n):
         if n in self.__group:
             return
@@ -293,7 +289,9 @@ class Z80Simulator(object):
         self.nnmi = True
         self.nwait = True
 
-        self.__recalc_node_list(self.__all_nodes())
+        self.__recalc_node_list(
+            [n for n in self.__indexes_to_nodes.values()
+             if n not in (self.__gnd, self.__pwr)])
 
         # Propagate the reset signal.
         for _ in range(31):
