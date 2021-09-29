@@ -146,11 +146,8 @@ class Z80Simulator(object):
         self.__load_transistors()
 
     def __all_nodes(self):
-        res = []
-        for i in self.__nodes:
-            if i != self.__pwr.id and i != self.__gnd.id:
-                res.append(i)
-        return res
+        return [n.id for n in self.__nodes.values()
+                if n not in (self.__gnd, self.__pwr)]
 
     def __add_node_to_group(self, i):
         if self.__nodes[i] in self.__group:
