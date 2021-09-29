@@ -168,7 +168,7 @@ class Z80Simulator(object):
                 other = t.c1 if n is t.c2 else t.c2
                 self.__add_node_to_group(other)
 
-    def __get_node_value(self):
+    def __get_group_state(self):
         # 1. deal with power connections first
         if self.__gnd in self.__group:
             return False
@@ -221,7 +221,7 @@ class Z80Simulator(object):
         self.__group = []
         self.__add_node_to_group(n)
 
-        new_state = self.__get_node_value()
+        new_state = self.__get_group_state()
 
         for n in self.__group:
             if n.state == new_state:
