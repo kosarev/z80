@@ -16,8 +16,8 @@ import ast
 
 
 class Node(object):
-    def __init__(self, id, pullup):
-        self.id, self.pullup = id, pullup
+    def __init__(self, index, pullup):
+        self.index, self.pullup = index, pullup
         self.pulldown = False  # TODO: Correct?
         self.state = False
         self.gates = []
@@ -205,10 +205,10 @@ class Z80Simulator(object):
     def __add_recalc_node(self, n):
         if n in (self.__gnd, self.__pwr):
             return
-        if n.id in self.__recalc_hash:
+        if n in self.__recalc_hash:
             return
         self.__recalc_list.append(n)
-        self.__recalc_hash.add(n.id)
+        self.__recalc_hash.add(n)
 
     def __turn_transistor_on(self, t):
         if t.on:
