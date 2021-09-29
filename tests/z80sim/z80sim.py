@@ -49,6 +49,9 @@ class Z80Simulator(object):
                 assert isinstance(id, str)
                 if id[0] == '_':
                     id = '~' + id[1:]
+                if id == 'clk':
+                    # CLK is an active-low pin.
+                    id = '~clk'
 
                 assert isinstance(i, str)
                 i = int(i)
@@ -123,9 +126,18 @@ class Z80Simulator(object):
         self.__ngnd = self.__node_ids['vss']
         self.__npwr = self.__node_ids['vcc']
 
+        self.__nclk = self.__node_ids['~clk']
+
         self.__nm1 = self.__node_ids['~m1']
-        self.__nrd = self.__node_ids['~rd']
         self.__nmreq = self.__node_ids['~mreq']
+        self.__nrd = self.__node_ids['~rd']
+        self.__nrfsh = self.__node_ids['~rfsh']
+        self.__t1 = self.__node_ids['t1']
+        self.__t2 = self.__node_ids['t2']
+        self.__t3 = self.__node_ids['t3']
+        self.__t4 = self.__node_ids['t4']
+        self.__t5 = self.__node_ids['t5']
+        self.__t6 = self.__node_ids['t6']
 
         self.__load_transistors()
 
@@ -249,12 +261,12 @@ class Z80Simulator(object):
         return self.__nodes[nn].state
 
     def __half_tick(self):
-        clk = self.__is_node_high(self.__node_ids['clk'])
-        # print(f'__half_tick(): clk {clk}')
-        if clk:
-            self.__set_low('clk')
+        nclk = self.__is_node_high(self.__node_ids['~clk'])
+        # print(f'__half_tick(): nclk {nclk}')
+        if nclk:
+            self.__set_low('~clk')
         else:
-            self.__set_high('clk')
+            self.__set_high('~clk')
 
         # A comment from the original source:
         # DMB: It's almost certainly wrong to execute these on both clock edges
@@ -276,7 +288,7 @@ class Z80Simulator(object):
             t.on = False
 
         self.__set_low('~reset')
-        self.__set_high('clk')
+        self.__set_high('~clk')
         self.__set_high('~busrq')
         self.__set_high('~int')
         self.__set_high('~nmi')
@@ -317,13 +329,35 @@ class Z80Simulator(object):
 
     # TODO
     def do_something(self):
-        for _ in range(20):
-            self.__tick()
+        self.__set_high('reg_r3')
+
+        for _ in range(30):
+            self.__half_tick()
+
+            nclk = self.__is_node_high(self.__nclk)
+            nm1 = self.__is_node_high(self.__nm1)
+            t1 = self.__is_node_high(self.__t1)
+            t2 = self.__is_node_high(self.__t2)
+            t3 = self.__is_node_high(self.__t3)
+            t4 = self.__is_node_high(self.__t4)
+            t5 = self.__is_node_high(self.__t5)
+            t6 = self.__is_node_high(self.__t6)
+            if not nm1 and t1:
+                print()
+
             print(f'PC {self.__read_pc():04x}, '
                   f'A {self.__read_a():02x}, '
-                  f'R, {self.__read_r():02x}, '
+                  f'R {self.__read_r():02x}, '
+                  f'~clk {int(nclk)}, '
                   f'abus {self.__read_abus():04x}, '
-                  f'~m1 {int(self.__is_node_high(self.__nm1))}, '
+                  f'~m1 {int(nm1)}, '
+                  f't1 {int(t1)}, '
+                  f't2 {int(t2)}, '
+                  f't3 {int(t3)}, '
+                  f't4 {int(t4)}, '
+                  f't5 {int(t5)}, '
+                  f't6 {int(t6)}, '
+                  f'~rfsh {int(self.__is_node_high(self.__nrfsh))}, '
                   f'~rd {int(self.__is_node_high(self.__nrd))}, '
                   f'~mreq {int(self.__is_node_high(self.__nmreq))}')
 
