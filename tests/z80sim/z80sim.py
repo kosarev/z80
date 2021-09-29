@@ -224,11 +224,11 @@ class Z80Simulator(object):
         self.__add_recalc_node(t.c1)
         self.__add_recalc_node(t.c2)
 
-    def __recalc_node(self, node):
-        if self.__nodes[node] in (self.__gnd, self.__pwr):
+    def __recalc_node(self, n):
+        if n in (self.__gnd, self.__pwr):
             return
 
-        self.__get_node_group(self.__nodes[node])
+        self.__get_node_group(n)
 
         new_state = self.__get_node_value()
 
@@ -250,7 +250,7 @@ class Z80Simulator(object):
                 return
 
             for i in list:
-                self.__recalc_node(i)
+                self.__recalc_node(self.__nodes[i])
 
             list = self.__recalc_list
             self.__recalc_list = []
