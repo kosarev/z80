@@ -149,10 +149,10 @@ class Z80Simulator(object):
         return res
 
     def __add_node_to_group(self, i):
-        if i in self.__group:
+        if self.__nodes[i] in self.__group:
             return
 
-        self.__group.append(i)
+        self.__group.append(self.__nodes[i])
         if self.__nodes[i] in (self.__gnd, self.__pwr):
             return
         for t in self.__nodes[i].c1c2s:
@@ -171,14 +171,13 @@ class Z80Simulator(object):
 
     def __get_node_value(self):
         # 1. deal with power connections first
-        if self.__gnd.id in self.__group:
+        if self.__gnd in self.__group:
             return False
-        if self.__pwr.id in self.__group:
+        if self.__pwr in self.__group:
             return True
 
         # 2. deal with pullup/pulldowns next
-        for i in self.__group:
-            n = self.__nodes[i]
+        for n in self.__group:
             if n.pullup:
                 return True
             if n.pulldown:
@@ -194,8 +193,7 @@ class Z80Simulator(object):
         # (previously this was any node with state true wins)
         max_state = False
         max_connections = 0
-        for nn in self.__group:
-            n = self.__nodes[nn]
+        for n in self.__group:
             connections = len(n.gates) + len(n.c1c2s)
             if max_connections < connections:
                 max_connections = connections
@@ -233,8 +231,7 @@ class Z80Simulator(object):
 
         new_state = self.__get_node_value()
 
-        for i in self.__group:
-            n = self.__nodes[i]
+        for n in self.__group:
             if n.state == new_state:
                 continue
             n.state = new_state
