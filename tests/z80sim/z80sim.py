@@ -172,19 +172,38 @@ class Z80Simulator(object):
         self.__add_node_to_group(i)
 
     def __get_node_value(self):
+        # 1. deal with power connections first
         if self.__ngnd in self.__group:
             return False
         if self.__npwr in self.__group:
             return True
+
+        # 2. deal with pullup/pulldowns next
         for i in self.__group:
             n = self.__nodes[i]
             if n.pullup:
                 return True
             if n.pulldown:
                 return False
-            if n.state:
-                return True
-        return False
+
+            # TODO: Do not look at the state until all pullups
+            # and pulldowns are considered.
+            # if n.state:
+            #     return True
+
+        # 3. resolve connected set of floating nodes
+        # based on state of largest (by #connections) node
+        # (previously this was any node with state true wins)
+        max_state = False
+        max_connections = 0
+        for nn in self.__group:
+            n = self.__nodes[nn]
+            connections = len(n.gates) + len(n.c1c2s)
+            if max_connections < connections:
+                max_connections = connections
+                max_state = n.state
+
+        return max_state
 
     def __add_recalc_node(self, nn):
         if nn == self.__ngnd:
@@ -260,9 +279,9 @@ class Z80Simulator(object):
     def __is_node_high(self, nn):
         return self.__nodes[nn].state
 
-    def __half_tick(self):
+    def half_tick(self):
         nclk = self.__is_node_high(self.__node_ids['~clk'])
-        # print(f'__half_tick(): nclk {nclk}')
+        # print(f'half_tick(): nclk {nclk}')
         if nclk:
             self.__set_low('~clk')
         else:
@@ -274,8 +293,8 @@ class Z80Simulator(object):
         # TODO: handleBusWrite();
 
     def __tick(self):
-        self.__half_tick()
-        self.__half_tick()
+        self.half_tick()
+        self.half_tick()
 
     def __init_chip(self):
         for n in self.__nodes.values():
@@ -298,9 +317,14 @@ class Z80Simulator(object):
 
         # Propagate the reset signal.
         for _ in range(31):
-            self.__half_tick()
+            self.half_tick()
 
         self.__set_high('~reset')
+
+        # Wait for the first active ~m1, which is essentially an
+        # indication that the reset process is completed.
+        while self.__is_node_high(self.__nm1):
+            self.half_tick()
 
     def __init__(self):
         self.__load_defs()
@@ -313,7 +337,7 @@ class Z80Simulator(object):
             res += (1 if self.__is_node_high(nn) else 0) << i
         return res
 
-    def __read_abus(self):
+    def read_abus(self):
         return self.__read_bits('ab', 16)
 
     def __read_a(self):
@@ -329,11 +353,7 @@ class Z80Simulator(object):
 
     # TODO
     def do_something(self):
-        self.__set_high('reg_r3')
-
-        for _ in range(30):
-            self.__half_tick()
-
+        for i in range(30):
             nclk = self.__is_node_high(self.__nclk)
             nm1 = self.__is_node_high(self.__nm1)
             t1 = self.__is_node_high(self.__t1)
@@ -342,14 +362,14 @@ class Z80Simulator(object):
             t4 = self.__is_node_high(self.__t4)
             t5 = self.__is_node_high(self.__t5)
             t6 = self.__is_node_high(self.__t6)
-            if not nm1 and t1:
+            if i > 0 and not nm1 and t1:
                 print()
 
             print(f'PC {self.__read_pc():04x}, '
                   f'A {self.__read_a():02x}, '
                   f'R {self.__read_r():02x}, '
                   f'~clk {int(nclk)}, '
-                  f'abus {self.__read_abus():04x}, '
+                  f'abus {self.read_abus():04x}, '
                   f'~m1 {int(nm1)}, '
                   f't1 {int(t1)}, '
                   f't2 {int(t2)}, '
@@ -361,8 +381,25 @@ class Z80Simulator(object):
                   f'~rd {int(self.__is_node_high(self.__nrd))}, '
                   f'~mreq {int(self.__is_node_high(self.__nmreq))}')
 
+            self.half_tick()
+
+
+def test_computing_node_values():
+    # With the old function computing node values the LSB of the
+    # address bus was always to 0 at the fourth half-tick of
+    # fetch cycles. Make sure with the new logic the address bus
+    # maintains the right value.
+    s = Z80Simulator()
+    while s.read_abus() == 0x0000:
+        s.half_tick()
+    while s.read_abus() == 0x0001:
+        s.half_tick()
+    assert s.read_abus() == 0x0002
+
 
 def main():
+    test_computing_node_values()
+
     s = Z80Simulator()
     s.do_something()
 
