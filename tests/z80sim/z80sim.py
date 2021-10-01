@@ -16,9 +16,8 @@ import ast
 
 
 class Node(object):
-    def __init__(self, index, pullup):
-        self.index, self.pullup = index, pullup
-        self.pulldown = False  # TODO: Correct?
+    def __init__(self, index, pull):
+        self.index, self.pull = index, pull
         self.state = False
         self.gates = []
         self.c1c2s = []
@@ -75,15 +74,15 @@ class Z80Simulator(object):
 
                 (i, pull, _) = fields[:3]
                 assert isinstance(i, int)
-                pullup = {'+': True, '-': False}[pull]
+                pull = {'+': True, '-': None}[pull]
 
                 if i in self.__indexes_to_nodes:
                     n = self.__indexes_to_nodes[i]
                 else:
-                    n = Node(i, pullup)
+                    n = Node(i, pull)
                     self.__indexes_to_nodes[i] = n
 
-                assert n.pullup == pullup
+                assert n.pull == pull
 
     def __load_transistors(self):
         self.__trans = {}
@@ -177,10 +176,8 @@ class Z80Simulator(object):
 
         # 2. deal with pullup/pulldowns next
         for n in self.__group:
-            if n.pullup:
-                return True
-            if n.pulldown:
-                return False
+            if n.pull is not None:
+                return n.pull
 
         # 3. resolve connected set of floating nodes
         # based on state of largest (by #connections) node
@@ -244,9 +241,8 @@ class Z80Simulator(object):
             self.__recalc_list = []
             self.__recalc_hash = set()
 
-    def __set_node(self, n, state):
-        n.pullup = state
-        n.pulldown = not state
+    def __set_node(self, n, pull):
+        n.pull = pull
         self.__recalc_node_list([n])
 
     def half_tick(self):
