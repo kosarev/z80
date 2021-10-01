@@ -206,26 +206,25 @@ class Z80Simulator(object):
 
         return max_state
 
-    def __add_recalc_node(self, n, recalc_list, recalc_hash):
+    def __add_recalc_node(self, n, recalc_nodes):
         if n.id in ('gnd', 'pwr'):
             return
-        if n in recalc_hash:
+        if n in recalc_nodes:
             return
-        recalc_list.append(n)
-        recalc_hash.add(n)
+        recalc_nodes.append(n)
 
-    def __set_transistor(self, t, state, recalc_list, recalc_hash):
+    def __set_transistor(self, t, state, recalc_nodes):
         if t.state == state:
             return
         t.state = state
-        self.__add_recalc_node(t.c1, recalc_list, recalc_hash)
+        self.__add_recalc_node(t.c1, recalc_nodes)
         if state:
             # TODO: Why don't we do self.__add_recalc_node(t.c2)?
             pass
         else:
-            self.__add_recalc_node(t.c2, recalc_list, recalc_hash)
+            self.__add_recalc_node(t.c2, recalc_nodes)
 
-    def __recalc_node(self, n, recalc_list, recalc_hash):
+    def __recalc_node(self, n, recalc_nodes):
         if n.id in ('gnd', 'pwr'):
             return
 
@@ -239,21 +238,19 @@ class Z80Simulator(object):
                 continue
             n.state = new_state
             for t in n.gates:
-                self.__set_transistor(t, n.state, recalc_list, recalc_hash)
+                self.__set_transistor(t, n.state, recalc_nodes)
 
     def __recalc_node_list(self, nodes):
-        recalc_list = []
-        recalc_hash = set()
+        recalc_nodes = []
         for j in range(100):  # Loop limiter.
             if len(nodes) == 0:
                 return
 
             for n in nodes:
-                self.__recalc_node(n, recalc_list, recalc_hash)
+                self.__recalc_node(n, recalc_nodes)
 
-            nodes = recalc_list
-            recalc_list = []
-            recalc_hash = set()
+            nodes = recalc_nodes
+            recalc_nodes = []
 
     def __set_node(self, n, pull):
         n.pull = pull
