@@ -153,11 +153,11 @@ class Z80Simulator(object):
 
         self.__load_transistors()
 
-    def __add_node_to_group(self, n):
-        if n in self.__group:
+    def __add_node_to_group(self, n, group):
+        if n in group:
             return
 
-        self.__group.append(n)
+        group.append(n)
 
         if n in (self.__gnd, self.__pwr):
             return
@@ -165,17 +165,17 @@ class Z80Simulator(object):
         for t in n.c1c2s:
             if t.state:
                 other = t.c1 if n is t.c2 else t.c2
-                self.__add_node_to_group(other)
+                self.__add_node_to_group(other, group)
 
-    def __get_group_state(self):
+    def __get_group_state(self, group):
         # 1. deal with power connections first
-        if self.__gnd in self.__group:
+        if self.__gnd in group:
             return False
-        if self.__pwr in self.__group:
+        if self.__pwr in group:
             return True
 
         # 2. deal with pullup/pulldowns next
-        for n in self.__group:
+        for n in group:
             if n.pull is not None:
                 return n.pull
 
@@ -184,7 +184,7 @@ class Z80Simulator(object):
         # (previously this was any node with state true wins)
         max_state = False
         max_connections = 0
-        for n in self.__group:
+        for n in group:
             connections = len(n.gates) + len(n.c1c2s)
             if max_connections < connections:
                 max_connections = connections
@@ -215,12 +215,12 @@ class Z80Simulator(object):
         if n in (self.__gnd, self.__pwr):
             return
 
-        self.__group = []
-        self.__add_node_to_group(n)
+        group = []
+        self.__add_node_to_group(n, group)
 
-        new_state = self.__get_group_state()
+        new_state = self.__get_group_state(group)
 
-        for n in self.__group:
+        for n in group:
             if n.state == new_state:
                 continue
             n.state = new_state
