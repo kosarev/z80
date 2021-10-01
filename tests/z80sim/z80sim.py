@@ -206,26 +206,26 @@ class Z80Simulator(object):
 
         return max_state
 
-    def __add_recalc_node(self, n):
+    def __add_recalc_node(self, n, recalc_list, recalc_hash):
         if n.id in ('gnd', 'pwr'):
             return
-        if n in self.__recalc_hash:
+        if n in recalc_hash:
             return
-        self.__recalc_list.append(n)
-        self.__recalc_hash.add(n)
+        recalc_list.append(n)
+        recalc_hash.add(n)
 
-    def __set_transistor(self, t, state):
+    def __set_transistor(self, t, state, recalc_list, recalc_hash):
         if t.state == state:
             return
         t.state = state
-        self.__add_recalc_node(t.c1)
+        self.__add_recalc_node(t.c1, recalc_list, recalc_hash)
         if state:
             # TODO: Why don't we do self.__add_recalc_node(t.c2)?
             pass
         else:
-            self.__add_recalc_node(t.c2)
+            self.__add_recalc_node(t.c2, recalc_list, recalc_hash)
 
-    def __recalc_node(self, n):
+    def __recalc_node(self, n, recalc_list, recalc_hash):
         if n.id in ('gnd', 'pwr'):
             return
 
@@ -239,21 +239,21 @@ class Z80Simulator(object):
                 continue
             n.state = new_state
             for t in n.gates:
-                self.__set_transistor(t, n.state)
+                self.__set_transistor(t, n.state, recalc_list, recalc_hash)
 
     def __recalc_node_list(self, nodes):
-        self.__recalc_list = []
-        self.__recalc_hash = set()
+        recalc_list = []
+        recalc_hash = set()
         for j in range(100):  # Loop limiter.
             if len(nodes) == 0:
                 return
 
             for n in nodes:
-                self.__recalc_node(n)
+                self.__recalc_node(n, recalc_list, recalc_hash)
 
-            nodes = self.__recalc_list
-            self.__recalc_list = []
-            self.__recalc_hash = set()
+            nodes = recalc_list
+            recalc_list = []
+            recalc_hash = set()
 
     def __set_node(self, n, pull):
         n.pull = pull
