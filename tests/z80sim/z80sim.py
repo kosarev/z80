@@ -240,17 +240,18 @@ class Z80Simulator(object):
             for t in n.gates:
                 self.__set_transistor(t, n.state, recalc_nodes)
 
-    def __recalc_node_list(self, nodes):
-        recalc_nodes = []
-        for j in range(100):  # Loop limiter.
-            if len(nodes) == 0:
-                return
-
-            for n in nodes:
-                self.__recalc_node(n, recalc_nodes)
+    def __recalc_node_list(self, recalc_nodes):
+        attempt = 0
+        while recalc_nodes:
+            # Loop limiter.
+            attempt += 1
+            if attempt > 100:
+                break
 
             nodes = recalc_nodes
             recalc_nodes = []
+            for n in nodes:
+                self.__recalc_node(n, recalc_nodes)
 
     def __set_node(self, n, pull):
         n.pull = pull
