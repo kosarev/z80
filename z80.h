@@ -2439,6 +2439,8 @@ public:
         if(self().on_is_z80())
             self().on_set_addr_bus(self().get_ir_on_refresh());
         self().on_tick(2);
+        if (self().on_is_halted())
+            return 0; // nop
         self().set_pc_on_fetch(inc16(addr));
         return n; }
 
@@ -3312,9 +3314,7 @@ public:
         }
         self().disable_int_on_ei(); }
     void on_halt() {
-        self().on_set_is_halted(true);
-        // TODO: It seems 'HLT' doesn't really reset PC? Does 'HALT' do?
-        self().set_pc_on_halt(dec16(self().get_pc_on_halt())); }
+        self().on_set_is_halted(true); }
     void on_im(unsigned mode) {
         self().on_set_int_mode(mode); }
 
@@ -3741,15 +3741,8 @@ private:
 
         fast_u16 pc = self().on_get_pc();
 
-        // Get past the HALT instruction, if halted. Note that
-        // HALT instructions need to be executed at least once to
-        // be skipped on an interrupt, so checking if the PC is
-        // at a HALT instruction is not enough here.
-        if(self().on_is_halted()) {
-            pc = inc16(pc);
-            self().on_set_pc(pc);
+        if(self().on_is_halted())
             self().on_set_is_halted(false);
-        }
 
         self().on_inc_r_reg();
         self().on_tick(is_nmi ? 5 : 7);
