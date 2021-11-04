@@ -150,6 +150,7 @@ class Z80Simulator(object):
 
         self.__nbusrq = self.__nodes['~busrq']
         self.__nint = self.__nodes['~int']
+        self.__niorq = self.__nodes['~iorq']
         self.__nm1 = self.__nodes['~m1']
         self.__nmreq = self.__nodes['~mreq']
         self.__nnmi = self.__nodes['~nmi']
@@ -258,12 +259,12 @@ class Z80Simulator(object):
         self.__recalc_node_list([n])
 
     def half_tick(self):
-        self.nclk ^= True
+        if self.clk:
+            if self.mreq and not self.rfsh and not self.iorq:
+                if self.m1 and self.rd and self.t2:
+                    self.dbus = self.__memory[self.abus]
 
-        # A comment from the original source:
-        # DMB: It's almost certainly wrong to execute these on both clock edges
-        # TODO: handleBusRead();
-        # TODO: handleBusWrite();
+        self.nclk ^= True
 
     def __tick(self):
         self.half_tick()
@@ -301,9 +302,14 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init__(self):
+    def __init__(self, memory=None):
         self.__load_defs()
         self.__init_chip()
+
+        if memory is None:
+            memory = []
+        self.__memory = memory[:]
+        self.__memory.extend([0] * (0x10000 - len(self.__memory)))
 
     @property
     def nclk(self):
@@ -312,6 +318,18 @@ class Z80Simulator(object):
     @nclk.setter
     def nclk(self, state):
         self.__set_node(self.__nclk, state)
+
+    @property
+    def clk(self):
+        return not self.nclk
+
+    @property
+    def niorq(self):
+        return self.__niorq.state
+
+    @property
+    def iorq(self):
+        return not self.niorq
 
     @property
     def nm1(self):
@@ -326,6 +344,10 @@ class Z80Simulator(object):
         return self.__nmreq.state
 
     @property
+    def mreq(self):
+        return not self.nmreq
+
+    @property
     def nreset(self):
         return self.__nreset.state
 
@@ -336,6 +358,10 @@ class Z80Simulator(object):
     @property
     def nrfsh(self):
         return self.__nrfsh.state
+
+    @property
+    def rfsh(self):
+        return not self.nrfsh
 
     @property
     def nbusrq(self):
@@ -364,6 +390,10 @@ class Z80Simulator(object):
     @property
     def nrd(self):
         return self.__nrd.state
+
+    @property
+    def rd(self):
+        return not self.nrd
 
     @property
     def nwait(self):
@@ -397,15 +427,28 @@ class Z80Simulator(object):
     def t6(self):
         return self.__t6.state
 
-    def __read_bits(self, name, n=8):
+    def __read_bits(self, name, width=8):
         res = 0
-        for i in range(n):
+        for i in range(width):
             res |= int(self.__nodes[name + str(i)].state) << i
         return res
+
+    def __write_bits(self, name, value, width=8):
+        for i in range(width):
+            self.__set_node(self.__nodes[name + str(i)],
+                            (value >> i) & 0x1)
 
     @property
     def abus(self):
         return self.__read_bits('ab', 16)
+
+    @property
+    def dbus(self):
+        return self.__read_bits('db')
+
+    @dbus.setter
+    def dbus(self, n):
+        self.__write_bits('db', n)
 
     @property
     def a(self):
@@ -430,18 +473,19 @@ class Z80Simulator(object):
             print(f'PC {self.pc:04x}, '
                   f'A {self.a:02x}, '
                   f'R {self.r:02x}, '
-                  f'~clk {int(self.nclk)}, '
+                  f'clk {int(self.clk)}, '
                   f'abus {self.abus:04x}, '
-                  f'~m1 {int(self.nm1)}, '
+                  f'dbus {self.dbus:02x}, '
+                  f'm1 {int(self.m1)}, '
                   f't1 {int(self.t1)}, '
                   f't2 {int(self.t2)}, '
                   f't3 {int(self.t3)}, '
                   f't4 {int(self.t4)}, '
                   f't5 {int(self.t5)}, '
                   f't6 {int(self.t6)}, '
-                  f'~rfsh {int(self.nrfsh)}, '
-                  f'~rd {int(self.nrd)}, '
-                  f'~mreq {int(self.nmreq)}')
+                  f'rfsh {int(self.rfsh)}, '
+                  f'rd {int(self.rd)}, '
+                  f'mreq {int(self.mreq)}')
 
             self.half_tick()
 
@@ -462,7 +506,11 @@ def test_computing_node_values():
 def main():
     test_computing_node_values()
 
-    s = Z80Simulator()
+    memory = [
+        0x76,  # halt
+        0xc5,  # nop
+    ]
+    s = Z80Simulator(memory)
     s.do_something()
 
 
