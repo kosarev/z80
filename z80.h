@@ -2708,7 +2708,7 @@ public:
         v &= ~(1u << b);
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, v); }
+            self().on_set_reg(r, iregp::hl, /* d= */ 0, v); }
     void on_set(unsigned b, reg r, fast_u8 d) {
         iregp irp = self().on_get_iregp_kind();
         reg access_r = irp == iregp::hl ? r : reg::at_hl;
@@ -2717,7 +2717,7 @@ public:
         v |= 1u << b;
         self().on_set_reg(access_r, irp, d, v);
         if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, v); }
+            self().on_set_reg(r, iregp::hl, /* d= */ 0, v); }
 
     // Arithmetic.
 private:
