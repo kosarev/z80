@@ -2579,6 +2579,60 @@ cb18 rr b
  8 set_f 00 -> 44
  8 done
 
+ddcb051c rr (ix + 5), h
+ 0 m1_fetch
+ 0   fetch dd at 0000
+ 0     get_pc_on_fetch 0000
+ 0     set_addr_bus 0000 -> 0000
+ 2     mreq_wait 0000
+ 2     get_ir_on_refresh 0000
+ 2     set_addr_bus 0000 -> 0000
+ 4     set_pc_on_fetch 0000 -> 0001
+ 4   set_r 00 -> 01
+ 4 set_index_rp hl -> ix
+ 4 disable_int
+ 4 m1_fetch
+ 4   fetch cb at 0001
+ 4     get_pc_on_fetch 0001
+ 4     set_addr_bus 0000 -> 0001
+ 6     mreq_wait 0001
+ 6     get_ir_on_refresh 0001
+ 6     set_addr_bus 0001 -> 0001
+ 8     set_pc_on_fetch 0001 -> 0002
+ 8   set_r 01 -> 02
+ 8 disp_read 05 at 0002
+ 8   get_pc_on_disp_read 0002
+ 8   read 05 at 0002
+ 8     set_addr_bus 0001 -> 0002
+10     mreq_wait 0002
+11   set_pc_on_disp_read 0002 -> 0003
+11 fetch 1c at 0003
+11   get_pc_on_fetch 0003
+11   set_addr_bus 0002 -> 0003
+13   mreq_wait 0003
+13   get_ir_on_refresh 0002
+13   set_addr_bus 0003 -> 0002
+15   set_pc_on_fetch 0003 -> 0004
+15 fetch_cycle_extra_1t
+16 get_ixl 00
+16 get_ixh 00
+16 read 00 at 0005
+16   set_addr_bus 0002 -> 0005
+18   mreq_wait 0005
+19 read_cycle_extra_1t
+20 set_wz 0000 -> 0005
+20 get_f 00
+20 get_ixl 00
+20 get_ixh 00
+20 write 00 -> 00 at 0005
+20   set_addr_bus 0005 -> 0005
+22   mreq_wait 0005
+23 set_wz 0005 -> 0005
+23 set_h 00 -> 00
+23 set_f 00 -> 44
+23 set_index_rp ix -> hl
+23 done
+
 # SBC r
 9f sbc a, a
  0 m1_fetch

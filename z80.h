@@ -3378,7 +3378,7 @@ public:
         do_rot(k, n, f);
         self().on_set_reg(access_r, irp, d, n);
         if(irp != iregp::hl && r != reg::at_hl)
-            self().on_set_reg(r, irp, /* d= */ 0, n);
+            self().on_set_reg(r, iregp::hl, /* d= */ 0, n);
         self().on_set_f(f); }
     void on_rla() {
         if(!self().on_is_z80()) {
