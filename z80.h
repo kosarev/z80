@@ -2479,9 +2479,6 @@ public:
     fast_u16 get_pc_on_imm16_read() { return self().on_get_pc(); }
     void set_pc_on_imm16_read(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_halt() { return self().on_get_pc(); }
-    void set_pc_on_halt(fast_u16 pc) { self().on_set_pc(pc); }
-
     void set_pc_on_call(fast_u16 pc) { self().on_set_pc(pc); }
     void set_pc_on_return(fast_u16 pc) { self().on_set_pc(pc); }
 

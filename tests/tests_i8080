@@ -311,8 +311,6 @@ fb ei
  2   mreq_wait 0000
  4   set_pc_on_fetch 0000 -> 0001
  4 fetch_cycle_extra_3t
- 7 get_pc_on_halt 0001
- 7 set_pc_on_halt 0001 -> 0000
  7 done
 
 # JMP nn

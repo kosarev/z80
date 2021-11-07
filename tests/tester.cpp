@@ -541,13 +541,6 @@ public:
         match_set_pc("return", pc);
         base::set_pc_on_return(pc); }
 
-    fast_u16 get_pc_on_halt() {
-        match_get_pc("halt");
-        return base::get_pc_on_halt(); }
-    void set_pc_on_halt(fast_u16 pc) {
-        match_set_pc("halt", pc);
-        base::set_pc_on_halt(pc); }
-
     void match_get_ir(const char *name) const {
         context.match("get_ir_on_%s %04x",
                       static_cast<unsigned>(get_ticks()), name,
