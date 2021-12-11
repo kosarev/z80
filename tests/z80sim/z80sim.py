@@ -17,11 +17,16 @@ import ast
 
 class Node(object):
     def __init__(self, index, pull):
-        self.id = None
+        self.custom_id = None
         self.index, self.pull = index, pull
         self.state = False
         self.gates = []
         self.c1c2s = []
+
+    @property
+    def id(self):
+        return (self.custom_id if self.custom_id is not None
+                else f'n{self.index}')
 
 
 class Transistor(object):
@@ -75,8 +80,8 @@ class Z80Simulator(object):
                 assert id not in self.__nodes or self.__nodes[id] is n
                 self.__nodes[id] = n
 
-                assert n.id is None or n.id == id, id
-                n.id = id
+                assert n.custom_id is None or n.custom_id == id, id
+                n.custom_id = id
 
     def __load_nodes(self):
         self.__indexes_to_nodes = {}
@@ -464,6 +469,11 @@ class Z80Simulator(object):
         hi = self.__read_bits('reg_pch')
         return (hi << 8) | lo
 
+    def dump(self):
+        with open('z80.dump', mode='w') as f:
+            for t in sorted(self.__trans.values(), key=lambda t: t.id):
+                print(f'{t.id}({t.c1.id}, {t.gate.id}, {t.c2.id})', file=f)
+
     # TODO
     def do_something(self):
         for i in range(30):
@@ -511,7 +521,8 @@ def main():
         0xc5,  # nop
     ]
     s = Z80Simulator(memory)
-    s.do_something()
+    # s.do_something()
+    s.dump()
 
 
 if __name__ == "__main__":
