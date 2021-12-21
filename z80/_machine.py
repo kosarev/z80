@@ -69,7 +69,7 @@ class _StateBase(object):
         self.__last_read_addr = parser.parse_word()
         self.__ticks_to_stop = parser.parse_u32()
 
-        self.__a = self.__af[0:1]
+        self.__a = self.__af[1:2]
         self.__b = self.__bc[1:2]
         self.__c = self.__bc[0:1]
         self.__d = self.__de[1:2]
@@ -82,6 +82,22 @@ class _StateBase(object):
         block = parser.parse_rest()
         assert len(block) == 0x10000, len(block)
         self.memory = block
+
+    @property
+    def af(self):
+        return _get_u16(self.__af)
+
+    @af.setter
+    def af(self, value):
+        _set_u16(self.__af, value)
+
+    @property
+    def a(self):
+        return self.__a[0]
+
+    @a.setter
+    def a(self, value):
+        self.__a[0] = value
 
     @property
     def b(self):
