@@ -188,6 +188,18 @@ static PyObject *mark_addrs(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *unmark_addrs(PyObject *self, PyObject *args) {
+    unsigned addr, size, marks;
+    if(!PyArg_ParseTuple(args, "III", &addr, &size, &marks))
+        return nullptr;
+
+    while(size--) {
+        cast_machine(self).unmark_addr(addr, marks);
+        addr++;
+    }
+    Py_RETURN_NONE;
+}
+
 static PyObject *set_input_callback(PyObject *self, PyObject *args) {
     PyObject *new_callback;
     if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
@@ -251,6 +263,9 @@ static PyMethodDef methods[] = {
      "emulated machine."},
     {"mark_addrs", mark_addrs, METH_VARARGS,
      "Mark a range of memory bytes as ones that require custom "
+     "processing on reading, writing or executing them."},
+    {"unmark_addrs", unmark_addrs, METH_VARARGS,
+     "Clear the marking on a range of memory bytes that indicates it requires custom "
      "processing on reading, writing or executing them."},
     {"set_input_callback", set_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},

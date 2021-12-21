@@ -231,9 +231,14 @@ class _MachineBase(object):
     def mark_addr(self, addr, marks):
         self.mark_addrs(addr, 1, marks)
 
+    def unmark_addr(self, addr, marks):
+        self.unmark_addrs(addr, 1, marks)
+
     def set_breakpoint(self, addr):
         self.mark_addr(addr, self._BREAKPOINT_MARK)
 
+    def clear_breakpoint(self, addr):
+        self.unmark_addr(addr, self._BREAKPOINT_MARK)
 
 class I8080Machine(_MachineBase, _I8080Machine, I8080State):
     def __init__(self):
