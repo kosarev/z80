@@ -132,6 +132,30 @@ class _StateBase(object):
         self.__e[0] = value
 
     @property
+    def f(self):
+        return self.__f[0]
+
+    @f.setter
+    def f(self, value):
+        self.__f[0] = value
+
+    @property
+    def h(self):
+        return self.__h[0]
+
+    @h.setter
+    def h(self, value):
+        self.__h[0] = value
+
+    @property
+    def l(self):
+        return self.__l[0]
+
+    @h.setter
+    def l(self, value):
+        self.__l[0] = value
+
+    @property
     def bc(self):
         return _get_u16(self.__bc)
 
@@ -217,6 +241,45 @@ class Z80State(_StateBase):
         self.__index_rp_kind = parser.parse_byte()
         self._StateBase__parse_memory(parser)
 
+    @property
+    def ix(self):
+        return _get_u16(self.__ix)
+
+    @ix.setter
+    def ix(self, value):
+        _set_u16(self.__ix, value)
+
+    @property
+    def iy(self):
+        return _get_u16(self.__iy)
+
+    @iy.setter
+    def iy(self, value):
+        _set_u16(self.__iy, value)
+
+    @property
+    def alt_bc(self):
+        return _get_u16(self.__alt_bc)
+
+    @alt_bc.setter
+    def alt_bc(self, value):
+        _set_u16(self.__alt_bc, value)
+
+    @property
+    def alt_de(self):
+        return _get_u16(self.__alt_de)
+
+    @alt_de.setter
+    def alt_de(self, value):
+        _set_u16(self.__alt_de, value)
+
+    @property
+    def alt_hl(self):
+        return _get_u16(self.__alt_hl)
+
+    @alt_hl.setter
+    def alt_hl(self, value):
+        _set_u16(self.__alt_hl, value)
 
 class _MachineBase(object):
     # Events.
