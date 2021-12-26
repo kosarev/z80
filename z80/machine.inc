@@ -193,10 +193,7 @@ static PyObject *unmark_addrs(PyObject *self, PyObject *args) {
     if(!PyArg_ParseTuple(args, "III", &addr, &size, &marks))
         return nullptr;
 
-    while(size--) {
-        cast_machine(self).unmark_addr(addr, marks);
-        addr++;
-    }
+    cast_machine(self).unmark_addrs(addr, size, marks);
     Py_RETURN_NONE;
 }
 

@@ -3954,6 +3954,11 @@ public:
         fields.address_marks[addr] &= ~marks;
     }
 
+    void unmark_addrs(fast_u16 addr, fast_u16 size, fast_u8 marks) {
+        for(fast_u16 i = 0; i != size; ++i)
+            unmark_addr(addr + i, marks);
+    }
+
     bool is_breakpoint_addr(fast_u16 addr) const {
         return is_marked_addr(addr, state_fields::breakpoint_mark);
     }
