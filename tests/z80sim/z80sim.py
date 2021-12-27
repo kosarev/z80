@@ -311,10 +311,9 @@ class Z80Simulator(object):
         self.__load_defs()
         self.__init_chip()
 
-        if memory is None:
-            memory = []
-        self.__memory = memory[:]
-        self.__memory.extend([0] * (0x10000 - len(self.__memory)))
+        self.__memory = bytearray(0x10000)
+        if memory is not None:
+            self.__memory[:len(memory)] = memory
 
     @property
     def nclk(self):
