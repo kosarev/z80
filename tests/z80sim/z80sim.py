@@ -46,6 +46,9 @@ class Transistor(object):
         self.id, self.gate, self.c1, self.c2 = id, gate, c1, c2
         self.state = False
 
+    def __repr__(self):
+        return f'{self.id}({self.c1}, {self.gate}, {self.c2})'
+
 
 class Z80Simulator(object):
     def __load_node_names(self):
@@ -490,7 +493,7 @@ class Z80Simulator(object):
     def dump(self):
         with open('z80.dump', mode='w') as f:
             for t in sorted(self.__trans.values(), key=lambda t: t.id):
-                print(f'{t.id}({t.c1}, {t.gate}, {t.c2})', file=f)
+                print(t, file=f)
 
     # TODO
     def do_something(self):
