@@ -160,8 +160,14 @@ class Z80Simulator(object):
                 if weak:
                     continue
 
+                # Skip meaningless transistors, e.g., t251(gnd, gnd, gnd).
+                if c1 is c2:
+                    assert c1 is self.__gnd
+                    continue
+
                 # TODO: Why the original source does this?
                 if c1 in self.__gnd_pwr:
+                    assert c2 not in self.__gnd_pwr, (c1, c2)
                     c1, c2 = c2, c1
 
                 t = Transistor(index, gate, c1, c2)
