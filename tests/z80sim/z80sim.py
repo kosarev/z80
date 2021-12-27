@@ -23,6 +23,9 @@ class Node(object):
         self.gates = []
         self.c1c2s = []
 
+    def __repr__(self):
+        return self.id
+
     @property
     def id(self):
         return (self.custom_id if self.custom_id is not None
@@ -478,7 +481,7 @@ class Z80Simulator(object):
     def dump(self):
         with open('z80.dump', mode='w') as f:
             for t in sorted(self.__trans.values(), key=lambda t: t.id):
-                print(f'{t.id}({t.c1.id}, {t.gate.id}, {t.c2.id})', file=f)
+                print(f'{t.id}({t.c1}, {t.gate}, {t.c2})', file=f)
 
     # TODO
     def do_something(self):
@@ -522,7 +525,7 @@ def test_computing_node_values():
 def main():
     test_computing_node_values()
 
-    if 1:
+    if 0:
         memory = [
             0x76,  # halt
             0xc5,  # nop
