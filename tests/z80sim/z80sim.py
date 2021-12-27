@@ -135,7 +135,7 @@ class Z80Simulator(object):
                     continue
 
                 # TODO: Why the original source does this?
-                if c1.id in ('gnd', 'pwr'):
+                if c1 in self.__gnd_pwr:
                     c1, c2 = c2, c1
 
                 t = Transistor(id, gate, c1, c2)
@@ -150,6 +150,10 @@ class Z80Simulator(object):
     def __load_defs(self):
         self.__load_nodes()
         self.__load_node_names()
+
+        self.__gnd = self.__nodes['gnd']
+        self.__pwr = self.__nodes['pwr']
+        self.__gnd_pwr = self.__gnd, self.__pwr
 
         self.__nclk = self.__nodes['~clk']
 
@@ -179,7 +183,7 @@ class Z80Simulator(object):
 
         group.append(n)
 
-        if n.id in ('gnd', 'pwr'):
+        if n in self.__gnd_pwr:
             return
 
         for t in n.c1c2s:
@@ -189,9 +193,9 @@ class Z80Simulator(object):
 
     def __get_group_state(self, group):
         # 1. deal with power connections first
-        if self.__nodes['gnd'] in group:
+        if self.__gnd in group:
             return False
-        if self.__nodes['pwr'] in group:
+        if self.__pwr in group:
             return True
 
         # 2. deal with pullup/pulldowns next
@@ -213,7 +217,7 @@ class Z80Simulator(object):
         return max_state
 
     def __add_recalc_node(self, n, recalc_nodes):
-        if n.id in ('gnd', 'pwr'):
+        if n in self.__gnd_pwr:
             return
         if n in recalc_nodes:
             return
@@ -231,7 +235,7 @@ class Z80Simulator(object):
             self.__add_recalc_node(t.c2, recalc_nodes)
 
     def __recalc_node(self, n, recalc_nodes):
-        if n.id in ('gnd', 'pwr'):
+        if n in self.__gnd_pwr:
             return
 
         group = []
@@ -279,8 +283,8 @@ class Z80Simulator(object):
         for n in self.__indexes_to_nodes.values():
             n.state = False
 
-        self.__nodes['gnd'].state = False
-        self.__nodes['pwr'].state = True
+        self.__gnd.state = False
+        self.__pwr.state = True
 
         for t in self.__trans.values():
             t.state = False
@@ -297,7 +301,7 @@ class Z80Simulator(object):
 
         self.__recalc_node_list(
             [n for n in self.__indexes_to_nodes.values()
-             if n.id not in ('gnd', 'pwr')])
+             if n not in self.__gnd_pwr])
 
         # Propagate the reset signal.
         for _ in range(31):
