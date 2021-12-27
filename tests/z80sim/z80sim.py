@@ -16,6 +16,8 @@ import ast
 
 
 class Node(object):
+    __PULL_SIGNS = {None: 'n', False: 'm', True: 'p'}
+
     def __init__(self, index, pull):
         self.custom_id = None
         self.index, self.pull = index, pull
@@ -28,8 +30,15 @@ class Node(object):
 
     @property
     def id(self):
-        return (self.custom_id if self.custom_id is not None
-                else f'n{self.index}')
+        pull = self.__PULL_SIGNS[self.pull]
+
+        if self.custom_id is None:
+            return f'{pull}{self.index}'
+
+        if self.pull is None:
+            return f'{self.custom_id}'
+
+        return f'{pull}.{self.custom_id}'
 
 
 class Transistor(object):
