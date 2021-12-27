@@ -42,12 +42,19 @@ class Node(object):
 
 
 class Transistor(object):
-    def __init__(self, id, gate, c1, c2):
-        self.id, self.gate, self.c1, self.c2 = id, gate, c1, c2
+    def __init__(self, index, gate, c1, c2):
+        self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
         self.state = False
 
     def __repr__(self):
         return f'{self.id}({self.c1}, {self.gate}, {self.c2})'
+
+    def __lt__(self, other):
+        return self.index < other.index
+
+    @property
+    def id(self):
+        return f't{self.index}'
 
 
 class Z80Simulator(object):
@@ -140,6 +147,10 @@ class Z80Simulator(object):
                 assert isinstance(c2, int)
                 assert isinstance(weak, bool)
 
+                assert id[0] == 't'
+                index = int(id[1:])
+                del id
+
                 gate = self.__indexes_to_nodes[gate]
                 c1 = self.__indexes_to_nodes[c1]
                 c2 = self.__indexes_to_nodes[c2]
@@ -153,10 +164,10 @@ class Z80Simulator(object):
                 if c1 in self.__gnd_pwr:
                     c1, c2 = c2, c1
 
-                t = Transistor(id, gate, c1, c2)
+                t = Transistor(index, gate, c1, c2)
 
-                assert id not in self.__trans
-                self.__trans[id] = t
+                assert index not in self.__trans
+                self.__trans[index] = t
 
                 gate.gates.append(t)
                 c1.c1c2s.append(t)
@@ -492,7 +503,7 @@ class Z80Simulator(object):
 
     def dump(self):
         with open('z80.dump', mode='w') as f:
-            for t in sorted(self.__trans.values(), key=lambda t: t.id):
+            for t in sorted(self.__trans.values()):
                 print(t, file=f)
 
     # TODO
