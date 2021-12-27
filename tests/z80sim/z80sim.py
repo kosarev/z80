@@ -275,7 +275,7 @@ class Z80Simulator(object):
         self.half_tick()
         self.half_tick()
 
-    def __init_chip(self):
+    def __init_chip(self, skip_reset):
         for n in self.__indexes_to_nodes.values():
             n.state = False
 
@@ -284,6 +284,9 @@ class Z80Simulator(object):
 
         for t in self.__trans.values():
             t.state = False
+
+        if skip_reset:
+            return
 
         self.nreset = False
         self.nclk = True
@@ -307,9 +310,9 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init__(self, memory=None):
+    def __init__(self, *, memory=None, skip_reset=False):
         self.__load_defs()
-        self.__init_chip()
+        self.__init_chip(skip_reset)
 
         self.__memory = bytearray(0x10000)
         if memory is not None:
@@ -515,13 +518,16 @@ def test_computing_node_values():
 def main():
     test_computing_node_values()
 
-    memory = [
-        0x76,  # halt
-        0xc5,  # nop
-    ]
-    s = Z80Simulator(memory)
-    # s.do_something()
-    s.dump()
+    if 1:
+        memory = [
+            0x76,  # halt
+            0xc5,  # nop
+        ]
+        s = Z80Simulator(memory=memory)
+        s.do_something()
+    else:
+        s = Z80Simulator(skip_reset=True)
+        s.dump()
 
 
 if __name__ == "__main__":
