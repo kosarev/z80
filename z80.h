@@ -178,135 +178,135 @@ class root {
 public:
     typedef D derived;
 
-    iregp on_get_iregp_kind() const { return iregp::hl; }
-    void on_set_iregp_kind(iregp r) { unused(r); }
-    fast_u8 on_get_b() const { return 0; }
-    void on_set_b(fast_u8 n) { unused(n); }
-    fast_u8 on_get_c() const { return 0; }
-    void on_set_c(fast_u8 n) { unused(n); }
-    fast_u8 on_get_d() const { return 0; }
-    void on_set_d(fast_u8 n) { unused(n); }
-    fast_u8 on_get_e() const { return 0; }
-    void on_set_e(fast_u8 n) { unused(n); }
-    fast_u8 on_get_h() const { return 0; }
-    void on_set_h(fast_u8 n) { unused(n); }
-    fast_u8 on_get_l() const { return 0; }
-    void on_set_l(fast_u8 n) { unused(n); }
-    fast_u8 on_get_a() const { return 0; }
-    void on_set_a(fast_u8 n) { unused(n); }
-    fast_u8 on_get_f() const { return 0; }
-    void on_set_f(fast_u8 n) { unused(n); }
-    fast_u8 on_get_ixh() const { return 0; }
-    void on_set_ixh(fast_u8 n) { unused(n); }
-    fast_u8 on_get_ixl() const { return 0; }
-    void on_set_ixl(fast_u8 n) { unused(n); }
-    fast_u8 on_get_iyh() const { return 0; }
-    void on_set_iyh(fast_u8 n) { unused(n); }
-    fast_u8 on_get_iyl() const { return 0; }
-    void on_set_iyl(fast_u8 n) { unused(n); }
-    fast_u8 on_get_i() const { return 0; }
-    void on_set_i(fast_u8 n) { unused(n); }
-    fast_u8 on_get_r() const { return 0; }
-    void on_set_r(fast_u8 n) { unused(n); }
-    fast_u16 on_get_pc() const { return 0; }
-    void on_set_pc(fast_u16 n) { unused(n); }
-    fast_u16 on_get_sp() const { return 0; }
-    void on_set_sp(fast_u16 n) { unused(n); }
-    fast_u16 on_get_wz() const { return 0; }
-    void on_set_wz(fast_u16 n) { unused(n); }
-    bool on_is_halted() const { return false; }
-    void on_set_is_halted(bool f) { unused(f); }
-    bool on_get_iff() const { return false; }
-    void on_set_iff(bool f) { unused(f); }
-    bool on_get_iff1() const { return false; }
-    void on_set_iff1(bool f) { unused(f); }
-    bool on_get_iff2() const { return false; }
-    void on_set_iff2(bool f) { unused(f); }
-    unsigned on_get_int_mode() const { return 0; }
-    void on_set_int_mode(unsigned mode) { unused(mode); }
-    void on_set_is_int_disabled(bool f) { unused(f); }
+    virtual iregp on_get_iregp_kind() const { return iregp::hl; }
+    virtual void on_set_iregp_kind(iregp r) { unused(r); }
+    virtual fast_u8 on_get_b() const { return 0; }
+    virtual void on_set_b(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_c() const { return 0; }
+    virtual void on_set_c(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_d() const { return 0; }
+    virtual void on_set_d(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_e() const { return 0; }
+    virtual void on_set_e(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_h() const { return 0; }
+    virtual void on_set_h(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_l() const { return 0; }
+    virtual void on_set_l(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_a() const { return 0; }
+    virtual void on_set_a(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_f() const { return 0; }
+    virtual void on_set_f(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_ixh() const { return 0; }
+    virtual void on_set_ixh(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_ixl() const { return 0; }
+    virtual void on_set_ixl(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_iyh() const { return 0; }
+    virtual void on_set_iyh(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_iyl() const { return 0; }
+    virtual void on_set_iyl(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_i() const { return 0; }
+    virtual void on_set_i(fast_u8 n) { unused(n); }
+    virtual fast_u8 on_get_r() const { return 0; }
+    virtual void on_set_r(fast_u8 n) { unused(n); }
+    virtual fast_u16 on_get_pc() const { return 0; }
+    virtual void on_set_pc(fast_u16 n) { unused(n); }
+    virtual fast_u16 on_get_sp() const { return 0; }
+    virtual void on_set_sp(fast_u16 n) { unused(n); }
+    virtual fast_u16 on_get_wz() const { return 0; }
+    virtual void on_set_wz(fast_u16 n) { unused(n); }
+    virtual bool on_is_halted() const { return false; }
+    virtual void on_set_is_halted(bool f) { unused(f); }
+    virtual bool on_get_iff() const { return false; }
+    virtual void on_set_iff(bool f) { unused(f); }
+    virtual bool on_get_iff1() const { return false; }
+    virtual void on_set_iff1(bool f) { unused(f); }
+    virtual bool on_get_iff2() const { return false; }
+    virtual void on_set_iff2(bool f) { unused(f); }
+    virtual unsigned on_get_int_mode() const { return 0; }
+    virtual void on_set_int_mode(unsigned mode) { unused(mode); }
+    virtual void on_set_is_int_disabled(bool f) { unused(f); }
 
-    void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
+    virtual void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
 
-    fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
-    void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
+    virtual fast_u16 get_pc_on_disp_read() { return self().on_get_pc(); }
+    virtual void set_pc_on_disp_read(fast_u16 pc) { self().on_set_pc(pc); }
 
-    fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
-    void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
+    virtual fast_u16 get_pc_on_block_instr() { return self().on_get_pc(); }
+    virtual void set_pc_on_block_instr(fast_u16 pc) { self().on_set_pc(pc); }
 
-    void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
-    void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
+    virtual void set_iff_on_di(bool iff) { self().on_set_iff(iff); }
+    virtual void set_iff_on_ei(bool iff) { self().on_set_iff(iff); }
 
-    void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
-    void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
-    void set_iff1_on_reti_retn(bool f) { self().on_set_iff1(f); }
+    virtual void set_iff1_on_di(bool f) { self().on_set_iff1(f); }
+    virtual void set_iff1_on_ei(bool f) { self().on_set_iff1(f); }
+    virtual void set_iff1_on_reti_retn(bool f) { self().on_set_iff1(f); }
 
-    void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
-    void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
+    virtual void set_iff2_on_di(bool f) { self().on_set_iff2(f); }
+    virtual void set_iff2_on_ei(bool f) { self().on_set_iff2(f); }
 
-    bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
+    virtual bool get_iff2_on_reti_retn() { return self().on_get_iff2(); }
 
-    fast_u16 on_get_bc() {
+    virtual fast_u16 on_get_bc() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_c();
         fast_u8 h = self().on_get_b();
         return make16(h, l); }
-    void on_set_bc(fast_u16 n) {
+    virtual void on_set_bc(fast_u16 n) {
         // Always set the low byte first.
         self().on_set_c(get_low8(n));
         self().on_set_b(get_high8(n)); }
-    fast_u16 on_get_de() {
+    virtual fast_u16 on_get_de() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_e();
         fast_u8 h = self().on_get_d();
         return make16(h, l); }
-    void on_set_de(fast_u16 n) {
+    virtual void on_set_de(fast_u16 n) {
         // Always set the low byte first.
         self().on_set_e(get_low8(n));
         self().on_set_d(get_high8(n)); }
-    fast_u16 on_get_hl() {
+    virtual fast_u16 on_get_hl() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_l();
         fast_u8 h = self().on_get_h();
         return make16(h, l); }
-    void on_set_hl(fast_u16 n) {
+    virtual void on_set_hl(fast_u16 n) {
         // Always set the low byte first.
         self().on_set_l(get_low8(n));
         self().on_set_h(get_high8(n)); }
-    fast_u16 on_get_af() {
+    virtual fast_u16 on_get_af() {
         // Always get the low byte first.
         fast_u8 f = self().on_get_f();
         fast_u8 a = self().on_get_a();
         return make16(a, f); }
-    void on_set_af(fast_u16 n) {
+    virtual void on_set_af(fast_u16 n) {
         // Always set the low byte first.
         self().on_set_f(get_low8(n));
         self().on_set_a(get_high8(n)); }
-    fast_u16 on_get_ix() {
+    virtual fast_u16 on_get_ix() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_ixl();
         fast_u8 h = self().on_get_ixh();
         return make16(h, l); }
-    void on_set_ix(fast_u16 ix) {
+    virtual void on_set_ix(fast_u16 ix) {
         // Always set the low byte first.
         self().on_set_ixl(get_low8(ix));
         self().on_set_ixh(get_high8(ix)); }
-    fast_u16 on_get_iy() {
+    virtual fast_u16 on_get_iy() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_iyl();
         fast_u8 h = self().on_get_iyh();
         return make16(h, l); }
-    void on_set_iy(fast_u16 iy) {
+    virtual void on_set_iy(fast_u16 iy) {
         // Always set the low byte first.
         self().on_set_iyl(get_low8(iy));
         self().on_set_iyh(get_high8(iy)); }
-    fast_u16 on_get_ir() {
+    virtual fast_u16 on_get_ir() {
         // Always get the low byte first.
         fast_u8 l = self().on_get_i();
         fast_u8 h = self().on_get_r();
         return make16(h, l); }
 
-    fast_u8 on_get_reg(reg r) {
+    virtual fast_u8 on_get_reg(reg r) {
         switch(r) {
         case reg::b: return self().on_get_b();
         case reg::c: return self().on_get_c();
@@ -320,7 +320,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_reg(reg r, fast_u8 n) {
+    virtual void on_set_reg(reg r, fast_u8 n) {
         switch(r) {
         case reg::b: return self().on_set_b(n);
         case reg::c: return self().on_set_c(n);
@@ -334,7 +334,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u8 on_get_reg(reg r, iregp irp) {
+    virtual fast_u8 on_get_reg(reg r, iregp irp) {
         switch(r) {
         case reg::b: return self().on_get_b();
         case reg::c: return self().on_get_c();
@@ -360,7 +360,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_reg(reg r, iregp irp, fast_u8 n) {
+    virtual void on_set_reg(reg r, iregp irp, fast_u8 n) {
         switch(r) {
         case reg::b: return self().on_set_b(n);
         case reg::c: return self().on_set_c(n);
@@ -386,7 +386,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_iregp(iregp irp) {
+    virtual fast_u16 on_get_iregp(iregp irp) {
         switch(irp) {
         case iregp::hl: return self().on_get_hl();
         case iregp::ix: return self().on_get_ix();
@@ -395,7 +395,7 @@ public:
         unreachable("Unknown index register.");
     }
 
-    void on_set_iregp(iregp irp, fast_u16 nn) {
+    virtual void on_set_iregp(iregp irp, fast_u16 nn) {
         switch(irp) {
         case iregp::hl: return self().on_set_hl(nn);
         case iregp::ix: return self().on_set_ix(nn);
@@ -404,7 +404,7 @@ public:
         unreachable("Unknown index register.");
     }
 
-    fast_u16 on_get_regp(regp rp) {
+    virtual fast_u16 on_get_regp(regp rp) {
         switch(rp) {
         case regp::bc: return self().on_get_bc();
         case regp::de: return self().on_get_de();
@@ -414,7 +414,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_regp(regp rp, fast_u16 nn) {
+    virtual void on_set_regp(regp rp, fast_u16 nn) {
         switch(rp) {
         case regp::bc: return self().on_set_bc(nn);
         case regp::de: return self().on_set_de(nn);
@@ -424,17 +424,17 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_regp(regp rp, iregp irp) {
+    virtual fast_u16 on_get_regp(regp rp, iregp irp) {
         return rp == regp::hl ? self().on_get_iregp(irp) :
                                 self().on_get_regp(rp);
     }
 
-    void on_set_regp(regp rp, iregp irp, fast_u16 nn) {
+    virtual void on_set_regp(regp rp, iregp irp, fast_u16 nn) {
         return rp == regp::hl ? self().on_set_iregp(irp, nn) :
                                 self().on_set_regp(rp, nn);
     }
 
-    fast_u16 on_get_regp2(regp2 rp) {
+    virtual fast_u16 on_get_regp2(regp2 rp) {
         switch(rp) {
         case regp2::bc: return self().on_get_bc();
         case regp2::de: return self().on_get_de();
@@ -444,7 +444,7 @@ public:
         unreachable("Unknown register.");
     }
 
-    void on_set_regp2(regp2 rp, fast_u16 nn) {
+    virtual void on_set_regp2(regp2 rp, fast_u16 nn) {
         switch(rp) {
         case regp2::bc: return self().on_set_bc(nn);
         case regp2::de: return self().on_set_de(nn);
@@ -454,12 +454,12 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 on_get_regp2(regp2 rp, iregp irp) {
+    virtual fast_u16 on_get_regp2(regp2 rp, iregp irp) {
         return rp == regp2::hl ? self().on_get_iregp(irp) :
                                  self().on_get_regp2(rp);
     }
 
-    void on_set_regp2(regp2 rp, iregp irp, fast_u16 nn) {
+    virtual void on_set_regp2(regp2 rp, iregp irp, fast_u16 nn) {
         return rp == regp2::hl ? self().on_set_iregp(irp, nn) :
                                  self().on_set_regp2(rp, nn);
     }
@@ -467,109 +467,103 @@ public:
     // No dummy implementations for the following handlers as
     // being forgotten to be implemented, they would lead to
     // problems that are hard to diagnose.
-    void on_ex_de_hl_regs() {
-        static_assert(internals::get_false<derived>(),
-                      "on_ex_de_hl_regs() has to be implemented!"); }
-    void on_ex_af_alt_af_regs() {
-        static_assert(!derived::z80_enabled,
-                      "on_ex_af_alt_af_regs() has to be implemented!"); }
-    void on_exx_regs() {
-        static_assert(!derived::z80_enabled,
-                      "on_exx_regs() has to be implemented!"); }
+    virtual void on_ex_de_hl_regs() = 0;
+    virtual void on_ex_af_alt_af_regs()  = 0;
+    virtual void on_exx_regs() = 0;
 
-    fast_u8 on_read(fast_u16 addr) {
+    virtual fast_u8 on_read(fast_u16 addr) {
         unused(addr);
         return 0x00; }
-    void on_write(fast_u16 addr, fast_u8 n) {
+    virtual void on_write(fast_u16 addr, fast_u8 n) {
         unused(addr, n); }
     // TODO: Should we provide separate 8-bit and 16-bit versions
     //       of these?
-    fast_u8 on_input(fast_u16 port) {
+    virtual fast_u8 on_input(fast_u16 port) {
         unused(port);
         return 0xff; }
-    void on_output(fast_u16 port, fast_u8 n) {
+    virtual void on_output(fast_u16 port, fast_u8 n) {
         unused(port, n); }
 
-    void on_tick(unsigned t) {
+    virtual void on_tick(unsigned t) {
         unused(t); }
 
-    void on_reset_decoder() {}
-    void on_reset_cpu(bool soft = false) {
+    virtual void on_reset_decoder() {}
+    virtual void on_reset_cpu(bool soft = false) {
         unused(soft);
         self().on_reset_decoder(); }
-    void on_reset_memory() {}
-    void on_reset(bool soft = false) {
+    virtual void on_reset_memory() {}
+    virtual void on_reset(bool soft = false) {
         self().on_reset_cpu(soft);
         if (!soft)
             self().on_reset_memory(); }
 
-    fast_u8 on_m1_fetch_cycle() {
+    virtual fast_u8 on_m1_fetch_cycle() {
         fast_u8 n = self().on_fetch_cycle();
         return n; }
-    void on_fetch_cycle_extra_1t() {
+    virtual void on_fetch_cycle_extra_1t() {
         self().on_tick(1); }
-    void on_fetch_cycle_extra_2t() {
+    virtual void on_fetch_cycle_extra_2t() {
         self().on_tick(2); }
-    void on_fetch_cycle_extra_3t() {
+    virtual void on_fetch_cycle_extra_3t() {
         self().on_tick(3); }
-    fast_u8 on_read_cycle(fast_u16 addr) {
+    virtual fast_u8 on_read_cycle(fast_u16 addr) {
         self().on_set_addr_bus(addr);
         fast_u8 n = self().on_read(addr);
         self().on_tick(2);
         self().on_mreq_wait(addr);
         self().on_tick(1);
         return n; }
-    void on_read_cycle_extra_1t() {
+    virtual void on_read_cycle_extra_1t() {
         self().on_tick(1); }
-    void on_read_cycle_extra_2t() {
+    virtual void on_read_cycle_extra_2t() {
         self().on_tick(2); }
-    void on_write_cycle(fast_u16 addr, fast_u8 n) {
+    virtual void on_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_set_addr_bus(addr);
         self().on_write(addr, n);
         self().on_tick(2);
         self().on_mreq_wait(addr);
         self().on_tick(1); }
-    void on_write_cycle_extra_2t() {
+    virtual void on_write_cycle_extra_2t() {
         self().on_tick(2); }
-    void on_3t_exec_cycle() {
+    virtual void on_3t_exec_cycle() {
         self().on_tick(3); }
-    void on_4t_exec_cycle() {
+    virtual void on_4t_exec_cycle() {
         self().on_tick(4); }
-    void on_5t_exec_cycle() {
+    virtual void on_5t_exec_cycle() {
         self().on_tick(5); }
 
-    void on_mreq_wait(fast_u16 addr) {
+    virtual void on_mreq_wait(fast_u16 addr) {
         unused(addr); }
-    void on_iorq_wait(fast_u16 port) {
+    virtual void on_iorq_wait(fast_u16 port) {
         unused(port); }
 
-    void on_ed_xnop(fast_u8 op) {
+    virtual void on_ed_xnop(fast_u8 op) {
         unused(op);
         self().on_nop(); }
-    void on_xcall_nn(fast_u8 op, fast_u16 nn) {
+    virtual void on_xcall_nn(fast_u8 op, fast_u16 nn) {
         unused(op);
         self().on_call_nn(nn); }
-    void on_xim(fast_u8 op, fast_u8 mode) {
+    virtual void on_xim(fast_u8 op, fast_u8 mode) {
         unused(op);
         self().on_im(mode); }
-    void on_xjp_nn(fast_u16 nn) {
+    virtual void on_xjp_nn(fast_u16 nn) {
         self().on_jp_nn(nn); }
-    void on_xneg(fast_u8 op) {
+    virtual void on_xneg(fast_u8 op) {
         unused(op);
         self().on_neg(); }
-    void on_xnop(fast_u8 op) {
+    virtual void on_xnop(fast_u8 op) {
         unused(op);
         self().on_nop(); }
-    void on_xret() {
+    virtual void on_xret() {
         self().on_ret(); }
-    void on_xretn(fast_u8 op) {
+    virtual void on_xretn(fast_u8 op) {
         unused(op);
         self().on_retn(); }
 
     z80_variant on_get_z80_variant() {
         return z80_variant::common; }
 
-    fast_u8 on_get_out_c_r_op() {
+    virtual fast_u8 on_get_out_c_r_op() {
         switch(self().on_get_z80_variant()) {
         case z80_variant::common: return 0;
         case z80_variant::cmos: return 0xff;
@@ -2008,31 +2002,31 @@ class internals::cpu_state_base : public B {
 public:
     typedef B base;
 
-    fast_u8 get_b() const { return fields.ref(regp2::bc).get_high(); }
-    void set_b(fast_u8 n) { fields.ref(regp2::bc).set_high(n); }
+    virtual fast_u8 get_b() const { return fields.ref(regp2::bc).get_high(); }
+    virtual void set_b(fast_u8 n) { fields.ref(regp2::bc).set_high(n); }
 
-    fast_u8 get_c() const { return fields.ref(regp2::bc).get_low(); }
-    void set_c(fast_u8 n) { fields.ref(regp2::bc).set_low(n); }
+    virtual fast_u8 get_c() const { return fields.ref(regp2::bc).get_low(); }
+    virtual void set_c(fast_u8 n) { fields.ref(regp2::bc).set_low(n); }
 
-    fast_u8 get_d() const { return fields.ref(regp2::de).get_high(); }
-    void set_d(fast_u8 n) { fields.ref(regp2::de).set_high(n); }
+    virtual fast_u8 get_d() const { return fields.ref(regp2::de).get_high(); }
+    virtual void set_d(fast_u8 n) { fields.ref(regp2::de).set_high(n); }
 
-    fast_u8 get_e() const { return fields.ref(regp2::de).get_low(); }
-    void set_e(fast_u8 n) { fields.ref(regp2::de).set_low(n); }
+    virtual fast_u8 get_e() const { return fields.ref(regp2::de).get_low(); }
+    virtual void set_e(fast_u8 n) { fields.ref(regp2::de).set_low(n); }
 
-    fast_u8 get_h() const { return fields.ref(regp2::hl).get_high(); }
-    void set_h(fast_u8 n) { fields.ref(regp2::hl).set_high(n); }
+    virtual fast_u8 get_h() const { return fields.ref(regp2::hl).get_high(); }
+    virtual void set_h(fast_u8 n) { fields.ref(regp2::hl).set_high(n); }
 
-    fast_u8 get_l() const { return fields.ref(regp2::hl).get_low(); }
-    void set_l(fast_u8 n) { fields.ref(regp2::hl).set_low(n); }
+    virtual fast_u8 get_l() const { return fields.ref(regp2::hl).get_low(); }
+    virtual void set_l(fast_u8 n) { fields.ref(regp2::hl).set_low(n); }
 
-    fast_u8 get_a() const { return fields.ref(regp2::af).get_high(); }
-    void set_a(fast_u8 n) { fields.ref(regp2::af).set_high(n); }
+    virtual fast_u8 get_a() const { return fields.ref(regp2::af).get_high(); }
+    virtual void set_a(fast_u8 n) { fields.ref(regp2::af).set_high(n); }
 
-    fast_u8 get_f() const { return fields.ref(regp2::af).get_low(); }
-    void set_f(fast_u8 n) { fields.ref(regp2::af).set_low(n); }
+    virtual fast_u8 get_f() const { return fields.ref(regp2::af).get_low(); }
+    virtual void set_f(fast_u8 n) { fields.ref(regp2::af).set_low(n); }
 
-    fast_u8 get_reg(reg r) {
+    virtual fast_u8 get_reg(reg r) {
         switch(r) {
         case reg::b: return get_b();
         case reg::c: return get_c();
@@ -2046,64 +2040,64 @@ public:
         unreachable("Unknown register.");
     }
 
-    fast_u16 get_bc() const { return fields.ref(regp2::bc).get(); }
-    void set_bc(fast_u16 n) { fields.ref(regp2::bc).set(n); }
+    virtual fast_u16 get_bc() const { return fields.ref(regp2::bc).get(); }
+    virtual void set_bc(fast_u16 n) { fields.ref(regp2::bc).set(n); }
 
-    fast_u16 get_de() const { return fields.ref(regp2::de).get(); }
-    void set_de(fast_u16 n) { fields.ref(regp2::de).set(n); }
+    virtual fast_u16 get_de() const { return fields.ref(regp2::de).get(); }
+    virtual void set_de(fast_u16 n) { fields.ref(regp2::de).set(n); }
 
-    fast_u16 get_hl() const { return fields.ref(regp2::hl).get(); }
-    void set_hl(fast_u16 n) { fields.ref(regp2::hl).set(n); }
+    virtual fast_u16 get_hl() const { return fields.ref(regp2::hl).get(); }
+    virtual void set_hl(fast_u16 n) { fields.ref(regp2::hl).set(n); }
 
-    fast_u16 get_af() const { return fields.ref(regp2::af).get(); }
-    void set_af(fast_u16 n) { fields.ref(regp2::af).set(n); }
+    virtual fast_u16 get_af() const { return fields.ref(regp2::af).get(); }
+    virtual void set_af(fast_u16 n) { fields.ref(regp2::af).set(n); }
 
-    fast_u16 get_pc() const { return fields.pc.get(); }
-    void set_pc(fast_u16 n) { fields.pc.set(n); }
+    virtual fast_u16 get_pc() const { return fields.pc.get(); }
+    virtual void set_pc(fast_u16 n) { fields.pc.set(n); }
 
-    fast_u16 get_sp() const { return fields.ref(regp::sp).get(); }
-    void set_sp(fast_u16 n) { fields.ref(regp::sp).set(n); }
+    virtual fast_u16 get_sp() const { return fields.ref(regp::sp).get(); }
+    virtual void set_sp(fast_u16 n) { fields.ref(regp::sp).set(n); }
 
-    bool is_int_disabled() const {
+    virtual bool is_int_disabled() const {
         return fields.int_disabled.get(); }
-    void set_is_int_disabled(bool disabled) {
+    virtual void set_is_int_disabled(bool disabled) {
         fields.int_disabled.set(disabled); }
 
-    bool is_halted() const { return fields.halted.get(); }
-    void set_is_halted(bool is_halted) { fields.halted.set(is_halted); }
+    virtual bool is_halted() const { return fields.halted.get(); }
+    virtual void set_is_halted(bool is_halted) { fields.halted.set(is_halted); }
 
-    void on_ex_de_hl_regs() {
+    virtual void on_ex_de_hl_regs() {
         fields.ref(regp2::de).swap(fields.ref(regp2::hl)); }
 
-    fast_u8 on_get_b() const { return get_b(); }
-    void on_set_b(fast_u8 b) { set_b(b); }
+    virtual fast_u8 on_get_b() const { return get_b(); }
+    virtual void on_set_b(fast_u8 b) { set_b(b); }
 
-    fast_u8 on_get_c() const { return get_c(); }
-    void on_set_c(fast_u8 c) { set_c(c); }
+    virtual fast_u8 on_get_c() const { return get_c(); }
+    virtual void on_set_c(fast_u8 c) { set_c(c); }
 
-    fast_u8 on_get_d() const { return get_d(); }
-    void on_set_d(fast_u8 d) { set_d(d); }
+    virtual fast_u8 on_get_d() const { return get_d(); }
+    virtual void on_set_d(fast_u8 d) { set_d(d); }
 
-    fast_u8 on_get_e() const { return get_e(); }
-    void on_set_e(fast_u8 e) { set_e(e); }
+    virtual fast_u8 on_get_e() const { return get_e(); }
+    virtual void on_set_e(fast_u8 e) { set_e(e); }
 
-    fast_u8 on_get_h() const { return get_h(); }
-    void on_set_h(fast_u8 h) { set_h(h); }
+    virtual fast_u8 on_get_h() const { return get_h(); }
+    virtual void on_set_h(fast_u8 h) { set_h(h); }
 
-    fast_u8 on_get_l() const { return get_l(); }
-    void on_set_l(fast_u8 l) { set_l(l); }
+    virtual fast_u8 on_get_l() const { return get_l(); }
+    virtual void on_set_l(fast_u8 l) { set_l(l); }
 
-    fast_u8 on_get_a() const { return get_a(); }
-    void on_set_a(fast_u8 a) { set_a(a); }
+    virtual fast_u8 on_get_a() const { return get_a(); }
+    virtual void on_set_a(fast_u8 a) { set_a(a); }
 
-    fast_u8 on_get_f() const { return get_f(); }
-    void on_set_f(fast_u8 f) { set_f(f); }
+    virtual fast_u8 on_get_f() const { return get_f(); }
+    virtual void on_set_f(fast_u8 f) { set_f(f); }
 
-    fast_u16 on_get_pc() const { return get_pc(); }
-    void on_set_pc(fast_u16 n) { set_pc(n); }
+    virtual fast_u16 on_get_pc() const { return get_pc(); }
+    virtual void on_set_pc(fast_u16 n) { set_pc(n); }
 
-    fast_u16 on_get_sp() { return get_sp(); }
-    void on_set_sp(fast_u16 n) { set_sp(n); }
+    virtual fast_u16 on_get_sp() { return get_sp(); }
+    virtual void on_set_sp(fast_u16 n) { set_sp(n); }
 
     // Returns true if generic register accessors like
     // on_get_regp2() are required to operate via specific
@@ -2111,10 +2105,10 @@ public:
     // return false allows such generic accessors to avoid
     // calling register-specific handlers, thus potentially
     // increasing performance.
-    bool on_dispatch_register_accesses() { return true; }
+    virtual bool on_dispatch_register_accesses() { return true; }
 
     using base::on_get_regp;
-    fast_u16 on_get_regp(regp rp) {
+    virtual fast_u16 on_get_regp(regp rp) {
         return self().on_dispatch_register_accesses() ?
             base::on_get_regp(rp) : fields.ref(rp).get(); }
 
@@ -2133,13 +2127,13 @@ public:
         return self().on_dispatch_register_accesses() ?
             base::on_set_regp2(rp, nn) : fields.ref(rp).set(nn); }
 
-    bool on_is_int_disabled() const { return is_int_disabled(); }
-    void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
+    virtual bool on_is_int_disabled() const { return is_int_disabled(); }
+    virtual void on_set_is_int_disabled(bool f) { set_is_int_disabled(f); }
 
-    bool on_is_halted() const { return is_halted(); }
-    void on_set_is_halted(bool f) { set_is_halted(f); }
+    virtual bool on_is_halted() const { return is_halted(); }
+    virtual void on_set_is_halted(bool f) { set_is_halted(f); }
 
-    void on_reset_cpu(bool soft = false) {
+    virtual void on_reset_cpu(bool soft = false) {
         base::on_reset_cpu(soft);
 
         state_fields power_on_state;
@@ -2229,58 +2223,58 @@ public:
 
     z80_state() {}
 
-    fast_u8 get_ixh() const { return fields.ix.get_high(); }
-    void set_ixh(fast_u8 n) { fields.ix.set_high(n); }
+    virtual fast_u8 get_ixh() const { return fields.ix.get_high(); }
+    virtual void set_ixh(fast_u8 n) { fields.ix.set_high(n); }
 
-    fast_u8 get_ixl() const { return fields.ix.get_low(); }
-    void set_ixl(fast_u8 n) { fields.ix.set_low(n); }
+    virtual fast_u8 get_ixl() const { return fields.ix.get_low(); }
+    virtual void set_ixl(fast_u8 n) { fields.ix.set_low(n); }
 
-    fast_u8 get_iyh() const { return fields.iy.get_high(); }
-    void set_iyh(fast_u8 n) { fields.iy.set_high(n); }
+    virtual fast_u8 get_iyh() const { return fields.iy.get_high(); }
+    virtual void set_iyh(fast_u8 n) { fields.iy.set_high(n); }
 
-    fast_u8 get_iyl() const { return fields.iy.get_low(); }
-    void set_iyl(fast_u8 n) { fields.iy.set_low(n); }
+    virtual fast_u8 get_iyl() const { return fields.iy.get_low(); }
+    virtual void set_iyl(fast_u8 n) { fields.iy.set_low(n); }
 
-    fast_u8 get_i() const { return fields.ir.get_high(); }
-    void set_i(fast_u8 n) { fields.ir.set_high(n); }
+    virtual fast_u8 get_i() const { return fields.ir.get_high(); }
+    virtual void set_i(fast_u8 n) { fields.ir.set_high(n); }
 
-    fast_u8 get_r() const { return fields.ir.get_low(); }
-    void set_r(fast_u8 n) { fields.ir.set_low(n); }
+    virtual fast_u8 get_r() const { return fields.ir.get_low(); }
+    virtual void set_r(fast_u8 n) { fields.ir.set_low(n); }
 
-    fast_u16 get_alt_af() const { return fields.alt_af.get(); }
-    void set_alt_af(fast_u16 n) { fields.alt_af.set(n); }
+    virtual fast_u16 get_alt_af() const { return fields.alt_af.get(); }
+    virtual void set_alt_af(fast_u16 n) { fields.alt_af.set(n); }
 
-    fast_u16 get_alt_hl() const { return fields.alt_hl.get(); }
-    void set_alt_hl(fast_u16 n) { fields.alt_hl.set(n); }
+    virtual fast_u16 get_alt_hl() const { return fields.alt_hl.get(); }
+    virtual void set_alt_hl(fast_u16 n) { fields.alt_hl.set(n); }
 
-    fast_u16 get_alt_bc() const { return fields.alt_bc.get(); }
-    void set_alt_bc(fast_u16 n) { fields.alt_bc.set(n); }
+    virtual fast_u16 get_alt_bc() const { return fields.alt_bc.get(); }
+    virtual void set_alt_bc(fast_u16 n) { fields.alt_bc.set(n); }
 
-    fast_u16 get_alt_de() const { return fields.alt_de.get(); }
-    void set_alt_de(fast_u16 n) { fields.alt_de.set(n); }
+    virtual fast_u16 get_alt_de() const { return fields.alt_de.get(); }
+    virtual void set_alt_de(fast_u16 n) { fields.alt_de.set(n); }
 
-    fast_u16 get_ix() const { return fields.ix.get(); }
-    void set_ix(fast_u16 n) { fields.ix.set(n); }
+    virtual fast_u16 get_ix() const { return fields.ix.get(); }
+    virtual void set_ix(fast_u16 n) { fields.ix.set(n); }
 
-    fast_u16 get_iy() const { return fields.iy.get(); }
-    void set_iy(fast_u16 n) { fields.iy.set(n); }
+    virtual fast_u16 get_iy() const { return fields.iy.get(); }
+    virtual void set_iy(fast_u16 n) { fields.iy.set(n); }
 
-    fast_u16 get_ir() const { return fields.ir.get(); }
-    void set_ir(fast_u16 n) { fields.ir.set(n); }
+    virtual fast_u16 get_ir() const { return fields.ir.get(); }
+    virtual void set_ir(fast_u16 n) { fields.ir.set(n); }
 
-    fast_u16 on_get_wz() const { return get_wz(); }
-    void on_set_wz(fast_u16 n) { set_wz(n); }
+    virtual fast_u16 on_get_wz() const { return get_wz(); }
+    virtual void on_set_wz(fast_u16 n) { set_wz(n); }
 
-    bool get_iff1() const { return fields.iff1.get(); }
-    void set_iff1(bool f) { fields.iff1.set(f); }
+    virtual bool get_iff1() const { return fields.iff1.get(); }
+    virtual void set_iff1(bool f) { fields.iff1.set(f); }
 
-    bool get_iff2() const { return fields.iff2.get(); }
-    void set_iff2(bool f) { fields.iff2.set(f); }
+    virtual bool get_iff2() const { return fields.iff2.get(); }
+    virtual void set_iff2(bool f) { fields.iff2.set(f); }
 
-    unsigned get_int_mode() const { return fields.im.get(); }
-    void set_int_mode(unsigned mode) { fields.im.set(mode); }
+    virtual unsigned get_int_mode() const { return fields.im.get(); }
+    virtual void set_int_mode(unsigned mode) { fields.im.set(mode); }
 
-    fast_u16 get_index_rp(iregp irp) {
+    virtual fast_u16 get_index_rp(iregp irp) {
         switch(irp) {
         case iregp::hl: return base::get_hl();
         case iregp::ix: return get_ix();
@@ -2289,51 +2283,51 @@ public:
         unreachable("Unknown index register.");
     }
 
-    void ex_af_alt_af_regs() {
+    virtual void ex_af_alt_af_regs() {
         base::fields.ref(regp2::af).swap(fields.alt_af);
     }
 
-    void exx_regs() {
+    virtual void exx_regs() {
         base::fields.ref(regp2::bc).swap(fields.alt_bc);
         base::fields.ref(regp2::de).swap(fields.alt_de);
         base::fields.ref(regp2::hl).swap(fields.alt_hl);
     }
 
-    fast_u8 on_get_ixh() const { return get_ixh(); }
-    void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
+    virtual fast_u8 on_get_ixh() const { return get_ixh(); }
+    virtual void on_set_ixh(fast_u8 ixh) { set_ixh(ixh); }
 
-    fast_u8 on_get_ixl() const { return get_ixl(); }
-    void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
+    virtual fast_u8 on_get_ixl() const { return get_ixl(); }
+    virtual void on_set_ixl(fast_u8 ixl) { set_ixl(ixl); }
 
-    fast_u8 on_get_iyh() const { return get_iyh(); }
-    void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
+    virtual fast_u8 on_get_iyh() const { return get_iyh(); }
+    virtual void on_set_iyh(fast_u8 iyh) { set_iyh(iyh); }
 
-    fast_u8 on_get_iyl() const { return get_iyl(); }
-    void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
+    virtual fast_u8 on_get_iyl() const { return get_iyl(); }
+    virtual void on_set_iyl(fast_u8 iyl) { set_iyl(iyl); }
 
-    fast_u8 on_get_i() const { return get_i(); }
-    void on_set_i(fast_u8 i) { set_i(i); }
+    virtual fast_u8 on_get_i() const { return get_i(); }
+    virtual void on_set_i(fast_u8 i) { set_i(i); }
 
-    fast_u8 on_get_r() const { return get_r(); }
-    void on_set_r(fast_u8 r) { set_r(r); }
+    virtual fast_u8 on_get_r() const { return get_r(); }
+    virtual void on_set_r(fast_u8 r) { set_r(r); }
 
     // TODO: on_get_i() + on_get_r() ?
-    fast_u16 on_get_ir() const { return get_ir(); }
+    virtual fast_u16 on_get_ir() const { return get_ir(); }
 
-    fast_u16 get_wz() const { return fields.wz.get(); }
-    void set_wz(fast_u16 n) { fields.wz.set(n); }
+    virtual fast_u16 get_wz() const { return fields.wz.get(); }
+    virtual void set_wz(fast_u16 n) { fields.wz.set(n); }
 
-    bool on_get_iff1() const { return get_iff1(); }
-    void on_set_iff1(bool f) { set_iff1(f); }
+    virtual bool on_get_iff1() const { return get_iff1(); }
+    virtual void on_set_iff1(bool f) { set_iff1(f); }
 
-    bool on_get_iff2() const { return get_iff2(); }
-    void on_set_iff2(bool f) { set_iff2(f); }
+    virtual bool on_get_iff2() const { return get_iff2(); }
+    virtual void on_set_iff2(bool f) { set_iff2(f); }
 
-    unsigned on_get_int_mode() const { return get_int_mode(); }
-    void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
+    virtual unsigned on_get_int_mode() const { return get_int_mode(); }
+    virtual void on_set_int_mode(unsigned mode) { set_int_mode(mode); }
 
-    void on_ex_af_alt_af_regs() { ex_af_alt_af_regs(); }
-    void on_exx_regs() { exx_regs(); }
+    virtual void on_ex_af_alt_af_regs() { ex_af_alt_af_regs(); }
+    virtual void on_exx_regs() { exx_regs(); }
 
     void on_reset_cpu(bool soft = false) {
         base::on_reset_cpu(soft);
@@ -2366,11 +2360,11 @@ class generic_cpu_state : public z80_state<B> {
     using base = z80_state<B>;
 
 public:
-    bool get_iff() { return base::get_iff1(); }
-    void set_iff(bool f) { base::set_iff1(f); }
+    virtual bool get_iff() { return base::get_iff1(); }
+    virtual void set_iff(bool f) { base::set_iff1(f); }
 
-    bool on_get_iff() { return get_iff(); }
-    void on_set_iff(bool f) { set_iff(f); }
+    virtual bool on_get_iff() { return get_iff(); }
+    virtual void on_set_iff(bool f) { set_iff(f); }
 };
 
 template<typename B>
