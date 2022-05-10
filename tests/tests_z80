@@ -1850,11 +1850,11 @@ edb2 inir
  8 get_h 00
  8 get_f 00
  8 fetch_cycle_extra_1t
- 9 input at ff00
- 9   set_addr_bus 0001 -> ff00
-12   iorq_wait ff00
+ 9 input at 0000
+ 9   set_addr_bus 0001 -> 0000
+12   iorq_wait 0000
 13 write ed -> ff at 0000
-13   set_addr_bus ff00 -> 0000
+13   set_addr_bus 0000 -> 0000
 15   mreq_wait 0000
 16 set_c 00 -> 00
 16 set_b 00 -> ff

@@ -3598,8 +3598,8 @@ public:
         fast_u8 f = self().on_get_f();
 
         self().on_fetch_cycle_extra_1t();
-        bc = sub16(bc, 0x0100);
         fast_u8 r = self().on_input_cycle(bc);
+        bc = sub16(bc, 0x0100);
         self().on_write_cycle(hl, r);
         fast_u8 s = get_high8(bc);
 
