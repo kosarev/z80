@@ -7,6 +7,7 @@
 #
 #   Published under the MIT license.
 
+from ._instr import HL, IX, IY
 from ._z80 import _I8080Machine, _Z80Machine
 
 
@@ -280,6 +281,11 @@ class Z80State(_StateBase):
     @alt_hl.setter
     def alt_hl(self, value):
         _set_u16(self.__alt_hl, value)
+
+    @property
+    def index_rp_kind(self):
+        IREGPS = {0: HL, 1: IX, 2: IY}
+        return IREGPS[self.__index_rp_kind[0]]
 
 class _MachineBase(object):
     # Events.
