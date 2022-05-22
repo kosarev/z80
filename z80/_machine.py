@@ -21,8 +21,8 @@ def _set_u16(image, value):
 
 
 def _get_u32(image):
-    return (self.__image[0] + self.__image[1] * 0x100 +
-            self.__image[2] * 0x10000 + self.__image[2] * 0x1000000)
+    return (image[0] + image[1] * 0x100 +
+            image[2] * 0x10000 + image[2] * 0x1000000)
 
 
 def _set_u32(image, value):
@@ -55,6 +55,15 @@ class _ImageParser(object):
         return self.parse_block(4)
 
 
+def _rename_attr_to_silence_pip8_e741(old, new):
+    def rename(cls):
+        setattr(cls, new, getattr(cls, old))
+        delattr(cls, old)
+        return cls
+    return rename
+
+
+@_rename_attr_to_silence_pip8_e741('plain_l', 'l')
 class _StateBase(object):
     def __init__(self, image):
         self._image = image
@@ -148,12 +157,13 @@ class _StateBase(object):
     def h(self, value):
         self.__h[0] = value
 
+    # The class decorator above renames this to just 'l'.
     @property
-    def l(self):
+    def plain_l(self):
         return self.__l[0]
 
-    @l.setter
-    def l(self, value):
+    @plain_l.setter
+    def plain_l(self, value):
         self.__l[0] = value
 
     @property
@@ -287,6 +297,7 @@ class Z80State(_StateBase):
         IREGPS = {0: HL, 1: IX, 2: IY}
         return IREGPS[self.__index_rp_kind[0]]
 
+
 class _MachineBase(object):
     # Events.
     _NO_EVENTS = 0
@@ -308,6 +319,7 @@ class _MachineBase(object):
 
     def clear_breakpoint(self, addr):
         self.unmark_addr(addr, self._BREAKPOINT_MARK)
+
 
 class I8080Machine(_MachineBase, _I8080Machine, I8080State):
     def __init__(self):
