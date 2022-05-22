@@ -152,7 +152,7 @@ class _StateBase(object):
     def l(self):
         return self.__l[0]
 
-    @h.setter
+    @l.setter
     def l(self, value):
         self.__l[0] = value
 
