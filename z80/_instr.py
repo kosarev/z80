@@ -10,19 +10,24 @@
 #   Published under the MIT license.
 
 
-class CondFlag(type):
+class _InstrElement(type):
+    def __new__(cls, name, bases, attrs):
+        attrs.setdefault('_str', name.lower())
+        return super().__new__(cls, name, bases, attrs)
+
     def __repr__(cls):
         return cls.__name__
 
     def __str__(cls):
-        s = cls.__name__
-        if s == 'CF':
-            s = 'C'
-        return s.lower()
+        return cls._str
+
+
+class CondFlag(_InstrElement):
+    pass
 
 
 class CF(metaclass=CondFlag):
-    pass
+    _str = 'c'
 
 
 class NC(metaclass=CondFlag):
@@ -49,18 +54,8 @@ class NZ(metaclass=CondFlag):
     pass
 
 
-class Reg(type):
-    __STR_NAMES = {
-        'AF2': "af'",
-        'IReg': 'I',
-    }
-
-    def __repr__(cls):
-        return cls.__name__
-
-    def __str__(cls):
-        n = cls.__name__
-        return cls.__STR_NAMES.get(n, n).lower()
+class Reg(_InstrElement):
+    pass
 
 
 class IndexReg(Reg):
@@ -96,7 +91,7 @@ class L(metaclass=Reg):
 
 
 class IReg(metaclass=Reg):
-    pass
+    _str = 'i'
 
 
 class AF(metaclass=Reg):
@@ -104,7 +99,7 @@ class AF(metaclass=Reg):
 
 
 class AF2(metaclass=Reg):
-    pass
+    _str = "af'"
 
 
 class BC(metaclass=Reg):
