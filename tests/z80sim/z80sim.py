@@ -42,6 +42,10 @@ class Node(object):
 
         return f'{pull}.{self.custom_id}'
 
+    @property
+    def used_in(self):
+        return self.conn_of + self.gate_of
+
 
 class Transistor(object):
     def __init__(self, index, gate, c1, c2):
@@ -132,6 +136,25 @@ class Z80Simulator(object):
 
     def __load_transistors(self):
         self.__trans = {}
+
+        def add(t):
+            assert index not in self.__trans
+            self.__trans[index] = t
+
+            if t not in gate.gate_of:
+                t.gate.gate_of.append(t)
+            if t not in c1.conn_of:
+                t.c1.conn_of.append(t)
+            if t not in c2.conn_of:
+                t.c2.conn_of.append(t)
+
+        def remove(t):
+            del self.__trans[t.index]
+
+            t.gate.gate_of.remove(t)
+            t.c1.conn_of.remove(t)
+            t.c2.conn_of.remove(t)
+
         with open('transdefs.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -172,14 +195,12 @@ class Z80Simulator(object):
                     assert c2 not in self.__gnd_pwr, (c1, c2)
                     c1, c2 = c2, c1
 
-                t = Transistor(index, gate, c1, c2)
+                add(Transistor(index, gate, c1, c2))
 
-                assert index not in self.__trans
-                self.__trans[index] = t
-
-                gate.gate_of.append(t)
-                c1.conn_of.append(t)
-                c2.conn_of.append(t)
+        # Remove meaningless transistors.
+        for n in self.__indexes_to_nodes.values():
+            if len(n.used_in) == 1:
+                remove(*n.used_in)
 
     def __load_defs(self):
         self.__load_nodes()
