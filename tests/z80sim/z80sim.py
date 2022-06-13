@@ -324,20 +324,6 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes['t5']
         self.__t6 = self.__nodes['t6']
 
-    def __get_group_state(self, group):
-        # 1. deal with power connections first
-        if self.__gnd in group:
-            return False
-        if self.__pwr in group:
-            return True
-
-        # 2. deal with pullup/pulldowns next
-        for n in group:
-            if n.pull is not None:
-                return n.pull
-
-        return None
-
     def __set_transistor(self, t, state, recalc_nodes):
         if t.state == state:
             return
@@ -370,15 +356,25 @@ class Z80Simulator(object):
                     if t.state:
                         worklist.append(t.get_other_conn(n))
 
-        new_state = self.__get_group_state(group)
+        state = None
+        if self.__gnd in group:
+            state = False
+        elif self.__pwr in group:
+            state = True
+        else:
+            for n in group:
+                if n.pull is not None:
+                    state = n.pull
+                    break
 
-        if new_state is None:
+        if state is None:
+            # Floating group.
             return
 
         for n in group:
-            if n.state == new_state:
+            if n.state == state:
                 continue
-            n.state = new_state
+            n.state = state
             for t in n.gate_of:
                 self.__set_transistor(t, n.state, recalc_nodes)
 
