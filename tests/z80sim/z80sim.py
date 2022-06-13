@@ -62,6 +62,10 @@ class Transistor(object):
     def id(self):
         return f't{self.index}'
 
+    def get_other_conn(self, n):
+        assert n in (self.c1, self.c2)
+        return self.c1 if n is self.c2 else self.c2
+
 
 class Z80Simulator(object):
     def __load_node_names(self):
@@ -248,8 +252,7 @@ class Z80Simulator(object):
 
         for t in n.conn_of:
             if t.state:
-                other = t.c1 if n is t.c2 else t.c2
-                self.__add_node_to_group(other, group)
+                self.__add_node_to_group(t.get_other_conn(n), group)
 
     def __get_group_state(self, group):
         # 1. deal with power connections first
