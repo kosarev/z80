@@ -76,6 +76,11 @@ class Node(object):
     def is_gnd_or_pwr(self):
         return self.custom_id in (_GND_ID, _PWR_ID)
 
+    @property
+    def is_pin(self):
+        # TODO: Mark pins explicitly.
+        return self.custom_id is not None
+
 
 class Transistor(object):
     def __init__(self, index, gate, c1, c2):
@@ -221,6 +226,7 @@ class Z80Simulator(object):
             t.c2.conn_of.remove(t)
 
         with open('transdefs.js') as f:
+            known = set()
             for line in f:
                 line = line.rstrip()
                 if line in ('var transdefs = [', ']'):
@@ -245,6 +251,16 @@ class Z80Simulator(object):
                 c1 = self.__indexes_to_nodes[c1]
                 c2 = self.__indexes_to_nodes[c2]
 
+                # Skip duplicate transistors. Now that the
+                # simulation code does not rely on counting the
+                # number of connections, duplicate transistors
+                # can be ignored.
+                key = gate, c1, c2
+                if key in known:
+                    continue
+
+                known.add(key)
+
                 # TODO: The comment in the original source says to
                 # 'ignore all the 'weak' transistors for now'.
                 if weak:
@@ -264,7 +280,7 @@ class Z80Simulator(object):
 
         # Remove meaningless transistors.
         for n in self.__indexes_to_nodes.values():
-            if len(n.used_in) == 1:
+            if len(n.used_in) == 1 and not n.is_pin:
                 remove(*n.used_in)
 
     def __get_transistors_cache(self):
@@ -653,23 +669,20 @@ def main():
     if '--no-tests' not in sys.argv:
         test_computing_node_values()
 
-    if 1:
-        memory = [
-            # 0x76,  # halt
-            0xd3,  # di
-            # 0xc5,  # nop
-            0x05,  # dec b
-            0x0f,  # rrca
-            0xf6, 0x40,  # or 0x40
-            0xc5,  # push bc
-            0x7e,  # ld a, (hl)
-            0xfe, 0x0d,  # cp 0x0d
-        ]
-        s = Z80Simulator(memory=memory)
-        s.do_something()
-    else:
-        s = Z80Simulator(skip_reset=True)
-        s.dump()
+    memory = [
+        # 0x76,  # halt
+        0xd3,  # di
+        # 0xc5,  # nop
+        0x05,  # dec b
+        0x0f,  # rrca
+        0xf6, 0x40,  # or 0x40
+        0xc5,  # push bc
+        0x7e,  # ld a, (hl)
+        0xfe, 0x0d,  # cp 0x0d
+    ]
+    s = Z80Simulator(memory=memory)
+    s.dump()
+    # s.do_something()
 
 
 if __name__ == "__main__":
