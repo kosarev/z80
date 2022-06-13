@@ -324,20 +324,6 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes['t5']
         self.__t6 = self.__nodes['t6']
 
-    def __set_transistor(self, t, state, recalc_nodes):
-        if t.state == state:
-            return
-        t.state = state
-
-        if t.c1 not in self.__gnd_pwr and t.c1 not in recalc_nodes:
-            recalc_nodes.append(t.c1)
-
-        # It only makes sense to update the group of the second
-        # connection if the trasistor became closed.
-        if not state:
-            if t.c2 not in self.__gnd_pwr and t.c2 not in recalc_nodes:
-                recalc_nodes.append(t.c2)
-
     def __recalc_node(self, n, recalc_nodes):
         if n in self.__gnd_pwr:
             return
@@ -374,9 +360,23 @@ class Z80Simulator(object):
         for n in group:
             if n.state == state:
                 continue
+
             n.state = state
+
             for t in n.gate_of:
-                self.__set_transistor(t, n.state, recalc_nodes)
+                if t.state == state:
+                    continue
+
+                t.state = state
+
+                if t.c1 not in self.__gnd_pwr and t.c1 not in recalc_nodes:
+                    recalc_nodes.append(t.c1)
+
+                # It only makes sense to update the group of the second
+                # connection if the trasistor became closed.
+                if not state:
+                    if t.c2 not in self.__gnd_pwr and t.c2 not in recalc_nodes:
+                        recalc_nodes.append(t.c2)
 
     def __recalc_node_list(self, recalc_nodes):
         attempt = 0
