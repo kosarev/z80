@@ -83,7 +83,7 @@ class Transistor(object):
         self.state = False
 
     def __repr__(self):
-        return f'{self.id}({self.c1}, {self.gate}, {self.c2})'
+        return f'{self.c1} = {self.c2} [{self.gate}]  # {self.id}'
 
     def __lt__(self, other):
         return self.index < other.index
