@@ -211,6 +211,11 @@ class Z80Simulator(object):
 
         self.__load_transistors()
 
+        # Remove unused nodes.
+        self.__indexes_to_nodes = {
+            i: n for i, n in self.__indexes_to_nodes.items()
+            if len(n.conn_of) > 0 or len(n.gate_of) > 0}
+
     def __add_node_to_group(self, n, group):
         if n in group:
             return
