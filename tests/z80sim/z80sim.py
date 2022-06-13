@@ -324,7 +324,7 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes['t5']
         self.__t6 = self.__nodes['t6']
 
-    def __recalc_node(self, n, recalc_nodes):
+    def __update_group_of(self, n, more):
         if n in self.__gnd_pwr:
             return
 
@@ -369,31 +369,31 @@ class Z80Simulator(object):
 
                 t.state = state
 
-                if t.c1 not in self.__gnd_pwr and t.c1 not in recalc_nodes:
-                    recalc_nodes.append(t.c1)
+                if t.c1 not in self.__gnd_pwr and t.c1 not in more:
+                    more.append(t.c1)
 
                 # It only makes sense to update the group of the second
                 # connection if the trasistor became closed.
                 if not state:
-                    if t.c2 not in self.__gnd_pwr and t.c2 not in recalc_nodes:
-                        recalc_nodes.append(t.c2)
+                    if t.c2 not in self.__gnd_pwr and t.c2 not in more:
+                        more.append(t.c2)
 
-    def __recalc_node_list(self, recalc_nodes):
+    def __update_nodes(self, nodes):
         attempt = 0
-        while recalc_nodes:
+        while nodes:
             # Loop limiter.
             attempt += 1
             if attempt > 100:
                 break
 
-            nodes = recalc_nodes
-            recalc_nodes = []
+            more = []
             for n in nodes:
-                self.__recalc_node(n, recalc_nodes)
+                self.__update_group_of(n, more)
+            nodes = more
 
     def __set_node(self, n, pull):
         n.pull = pull
-        self.__recalc_node_list([n])
+        self.__update_nodes([n])
 
     def half_tick(self):
         if self.clk:
@@ -429,9 +429,8 @@ class Z80Simulator(object):
         self.nnmi = True
         self.nwait = True
 
-        self.__recalc_node_list(
-            [n for n in self.__indexes_to_nodes.values()
-             if n not in self.__gnd_pwr])
+        self.__update_nodes([n for n in self.__indexes_to_nodes.values()
+                             if n not in self.__gnd_pwr])
 
         # Propagate the reset signal.
         for _ in range(31):
