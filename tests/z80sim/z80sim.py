@@ -325,17 +325,18 @@ class Z80Simulator(object):
         self.__t6 = self.__nodes['t6']
 
     def __add_node_to_group(self, n, group):
-        if n in group:
-            return
+        worklist = [n]
+        while worklist:
+            n = worklist.pop()
+            if n in group:
+                continue
 
-        group.append(n)
+            group.append(n)
 
-        if n in self.__gnd_pwr:
-            return
-
-        for t in n.conn_of:
-            if t.state:
-                self.__add_node_to_group(t.get_other_conn(n), group)
+            if n not in self.__gnd_pwr:
+                for t in n.conn_of:
+                    if t.state:
+                        worklist.append(t.get_other_conn(n))
 
     def __get_group_state(self, group):
         # 1. deal with power connections first
