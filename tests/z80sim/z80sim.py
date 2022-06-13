@@ -114,6 +114,8 @@ class Transistor(object):
 
 
 class Z80Simulator(object):
+    __cache = None
+
     def __load_node_names(self):
         self.__nodes = {}
         with open('nodenames.js') as f:
@@ -276,9 +278,10 @@ class Z80Simulator(object):
     def __load_defs(self):
         CACHE_FILENAME = 'z80.cache'
         try:
-            with open(CACHE_FILENAME) as f:
-                cache = ast.literal_eval(f.read())
-            nodes, trans = cache
+            if Z80Simulator.__cache is None:
+                with open(CACHE_FILENAME) as f:
+                    Z80Simulator.__cache = ast.literal_eval(f.read())
+            nodes, trans = Z80Simulator.__cache
             self.__restore_nodes_from_cache(nodes)
             self.__restore_transistors_from_cache(trans)
         except FileNotFoundError:
@@ -292,9 +295,9 @@ class Z80Simulator(object):
                 if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
             with open(CACHE_FILENAME, 'w') as f:
-                cache = (tuple(self.__get_nodes_cache()),
-                         tuple(self.__get_transistors_cache()))
-                pprint.pp(cache, compact=True, stream=f)
+                Z80Simulator.__cache = (tuple(self.__get_nodes_cache()),
+                                        tuple(self.__get_transistors_cache()))
+                pprint.pp(Z80Simulator.__cache, compact=True, stream=f)
 
         self.__gnd = self.__nodes[_GND_ID]
         self.__pwr = self.__nodes[_PWR_ID]
