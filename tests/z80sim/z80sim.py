@@ -14,6 +14,7 @@
 
 import ast
 import pprint
+import sys
 
 
 _GND_ID = 'gnd'
@@ -665,7 +666,8 @@ def test_computing_node_values():
 
 
 def main():
-    test_computing_node_values()
+    if '--no-tests' not in sys.argv:
+        test_computing_node_values()
 
     if 0:
         memory = [
