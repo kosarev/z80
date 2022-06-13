@@ -22,8 +22,10 @@ class Node(object):
         self.custom_id = None
         self.index, self.pull = index, pull
         self.state = False
-        self.gates = []
-        self.c1c2s = []
+
+        # These are not sets as we want reproducible behaviour.
+        self.gate_of = []
+        self.conn_of = []
 
     def __repr__(self):
         return self.id
@@ -175,9 +177,9 @@ class Z80Simulator(object):
                 assert index not in self.__trans
                 self.__trans[index] = t
 
-                gate.gates.append(t)
-                c1.c1c2s.append(t)
-                c2.c1c2s.append(t)
+                gate.gate_of.append(t)
+                c1.conn_of.append(t)
+                c2.conn_of.append(t)
 
     def __load_defs(self):
         self.__load_nodes()
@@ -218,7 +220,7 @@ class Z80Simulator(object):
         if n in self.__gnd_pwr:
             return
 
-        for t in n.c1c2s:
+        for t in n.conn_of:
             if t.state:
                 other = t.c1 if n is t.c2 else t.c2
                 self.__add_node_to_group(other, group)
@@ -241,7 +243,7 @@ class Z80Simulator(object):
         max_state = False
         max_connections = 0
         for n in group:
-            connections = len(n.gates) + len(n.c1c2s)
+            connections = len(n.gate_of) + len(n.conn_of)
             if max_connections < connections:
                 max_connections = connections
                 max_state = n.state
@@ -279,7 +281,7 @@ class Z80Simulator(object):
             if n.state == new_state:
                 continue
             n.state = new_state
-            for t in n.gates:
+            for t in n.gate_of:
                 self.__set_transistor(t, n.state, recalc_nodes)
 
     def __recalc_node_list(self, recalc_nodes):
