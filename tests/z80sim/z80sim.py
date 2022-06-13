@@ -13,13 +13,18 @@
 
 
 import ast
+import pprint
+
+
+_GND_ID = 'gnd'
+_PWR_ID = 'pwr'
 
 
 class Node(object):
     __PULL_SIGNS = {None: 'n', False: 'm', True: 'p'}
 
-    def __init__(self, index, pull):
-        self.custom_id = None
+    def __init__(self, index, pull, custom_id=None):
+        self.custom_id = custom_id
         self.index, self.pull = index, pull
         self.state = False
 
@@ -29,6 +34,18 @@ class Node(object):
 
     def __repr__(self):
         return self.id
+
+    def __lt__(self, other):
+        return self.index < other.index
+
+    @property
+    def fields(self):
+        return self.index, self.custom_id, self.pull
+
+    @staticmethod
+    def by_fields(fields):
+        index, custom_id, pull = fields
+        return Node(index, pull, custom_id)
 
     @property
     def id(self):
@@ -46,6 +63,18 @@ class Node(object):
     def used_in(self):
         return self.conn_of + self.gate_of
 
+    @property
+    def is_gnd(self):
+        return self.custom_id == _GND_ID
+
+    @property
+    def is_pwr(self):
+        return self.custom_id == _PWR_ID
+
+    @property
+    def is_gnd_or_pwr(self):
+        return self.custom_id in (_GND_ID, _PWR_ID)
+
 
 class Transistor(object):
     def __init__(self, index, gate, c1, c2):
@@ -61,6 +90,23 @@ class Transistor(object):
     @property
     def id(self):
         return f't{self.index}'
+
+    @property
+    def fields(self):
+        return self.index, self.gate.index, self.c1.index, self.c2.index
+
+    @staticmethod
+    def by_fields(fields, nodes):
+        index, gate, c1, c2 = fields
+        gate = nodes[gate]
+        c1 = nodes[c1]
+        c2 = nodes[c2]
+
+        t = Transistor(index, gate, c1, c2)
+        gate.gate_of.append(t)
+        c1.conn_of.append(t)
+        c2.conn_of.append(t)
+        return t
 
     def get_other_conn(self, n):
         assert n in (self.c1, self.c2)
@@ -94,8 +140,8 @@ class Z80Simulator(object):
                     'pla33': 'pla33?',
                     'pla37': 'pla33?',
 
-                    'vss': 'gnd',
-                    'vcc': 'pwr',
+                    'vss': _GND_ID,
+                    'vcc': _PWR_ID,
                     'wait': '~wait',
                     'int': '~int',
                     'irq': '~int',
@@ -137,6 +183,18 @@ class Z80Simulator(object):
                     self.__indexes_to_nodes[i] = n
 
                 assert n.pull == pull
+
+    def __get_nodes_cache(self):
+        return (n.fields for n in sorted(self.__indexes_to_nodes.values()))
+
+    def __restore_nodes_from_cache(self, cache):
+        self.__nodes = {}
+        self.__indexes_to_nodes = {}
+        for fields in cache:
+            n = Node.by_fields(fields)
+            if n.custom_id is not None:
+                self.__nodes[n.custom_id] = n
+            self.__indexes_to_nodes[n.index] = n
 
     def __load_transistors(self):
         self.__trans = {}
@@ -191,12 +249,12 @@ class Z80Simulator(object):
 
                 # Skip meaningless transistors, e.g., t251(gnd, gnd, gnd).
                 if c1 is c2:
-                    assert c1 is self.__gnd
+                    assert c1.is_gnd
                     continue
 
                 # TODO: Why the original source does this?
-                if c1 in self.__gnd_pwr:
-                    assert c2 not in self.__gnd_pwr, (c1, c2)
+                if c1.is_gnd_or_pwr:
+                    assert not c2.is_gnd_or_pwr, (c1, c2)
                     c1, c2 = c2, c1
 
                 add(Transistor(index, gate, c1, c2))
@@ -206,12 +264,40 @@ class Z80Simulator(object):
             if len(n.used_in) == 1:
                 remove(*n.used_in)
 
-    def __load_defs(self):
-        self.__load_nodes()
-        self.__load_node_names()
+    def __get_transistors_cache(self):
+        return (t.fields for t in sorted(self.__trans.values()))
 
-        self.__gnd = self.__nodes['gnd']
-        self.__pwr = self.__nodes['pwr']
+    def __restore_transistors_from_cache(self, cache):
+        self.__trans = {}
+        for fields in cache:
+            t = Transistor.by_fields(fields, self.__indexes_to_nodes)
+            self.__trans[t.index] = t
+
+    def __load_defs(self):
+        CACHE_FILENAME = 'z80.cache'
+        try:
+            with open(CACHE_FILENAME) as f:
+                cache = ast.literal_eval(f.read())
+            nodes, trans = cache
+            self.__restore_nodes_from_cache(nodes)
+            self.__restore_transistors_from_cache(trans)
+        except FileNotFoundError:
+            self.__load_nodes()
+            self.__load_node_names()
+            self.__load_transistors()
+
+            # Remove unused nodes.
+            self.__indexes_to_nodes = {
+                i: n for i, n in self.__indexes_to_nodes.items()
+                if len(n.conn_of) > 0 or len(n.gate_of) > 0}
+
+            with open(CACHE_FILENAME, 'w') as f:
+                cache = (tuple(self.__get_nodes_cache()),
+                         tuple(self.__get_transistors_cache()))
+                pprint.pp(cache, compact=True, stream=f)
+
+        self.__gnd = self.__nodes[_GND_ID]
+        self.__pwr = self.__nodes[_PWR_ID]
         self.__gnd_pwr = self.__gnd, self.__pwr
 
         self.__nclk = self.__nodes['~clk']
@@ -233,13 +319,6 @@ class Z80Simulator(object):
         self.__t4 = self.__nodes['t4']
         self.__t5 = self.__nodes['t5']
         self.__t6 = self.__nodes['t6']
-
-        self.__load_transistors()
-
-        # Remove unused nodes.
-        self.__indexes_to_nodes = {
-            i: n for i, n in self.__indexes_to_nodes.items()
-            if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
     def __add_node_to_group(self, n, group):
         if n in group:
