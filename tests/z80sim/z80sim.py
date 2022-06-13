@@ -381,10 +381,8 @@ class Z80Simulator(object):
     def __update_nodes(self, nodes):
         attempt = 0
         while nodes:
-            # Loop limiter.
             attempt += 1
-            if attempt > 100:
-                break
+            assert attempt < 100, 'Loop encountered!'
 
             more = []
             for n in nodes:
