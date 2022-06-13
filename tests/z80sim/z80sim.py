@@ -349,18 +349,7 @@ class Z80Simulator(object):
             if n.pull is not None:
                 return n.pull
 
-        # 3. resolve connected set of floating nodes
-        # based on state of largest (by #connections) node
-        # (previously this was any node with state true wins)
-        max_state = False
-        max_connections = 0
-        for n in group:
-            connections = len(n.gate_of) + len(n.conn_of)
-            if max_connections < connections:
-                max_connections = connections
-                max_state = n.state
-
-        return max_state
+        return None
 
     def __add_recalc_node(self, n, recalc_nodes):
         if n in self.__gnd_pwr:
@@ -388,6 +377,9 @@ class Z80Simulator(object):
         self.__add_node_to_group(n, group)
 
         new_state = self.__get_group_state(group)
+
+        if new_state is None:
+            return
 
         for n in group:
             if n.state == new_state:
@@ -420,6 +412,8 @@ class Z80Simulator(object):
                     self.dbus = self.__memory[self.abus]
 
         self.nclk ^= True
+
+        self.__print_state()
 
     def __tick(self):
         self.half_tick()
@@ -626,28 +620,29 @@ class Z80Simulator(object):
             for t in sorted(self.__trans.values()):
                 print(t, file=f)
 
+    def __print_state(self):
+        print(f'PC {self.pc:04x}, '
+              f'A {self.a:02x}, '
+              f'R {self.r:02x}, '
+              f'clk {int(self.clk)}, '
+              f'abus {self.abus:04x}, '
+              f'dbus {self.dbus:02x}, '
+              f'm1 {int(self.m1)}, '
+              f't1 {int(self.t1)}, '
+              f't2 {int(self.t2)}, '
+              f't3 {int(self.t3)}, '
+              f't4 {int(self.t4)}, '
+              f't5 {int(self.t5)}, '
+              f't6 {int(self.t6)}, '
+              f'rfsh {int(self.rfsh)}, '
+              f'rd {int(self.rd)}, '
+              f'mreq {int(self.mreq)}')
+
     # TODO
     def do_something(self):
-        for i in range(30):
+        for i in range(30 * 10):
             if i > 0 and self.m1 and self.t1:
                 print()
-
-            print(f'PC {self.pc:04x}, '
-                  f'A {self.a:02x}, '
-                  f'R {self.r:02x}, '
-                  f'clk {int(self.clk)}, '
-                  f'abus {self.abus:04x}, '
-                  f'dbus {self.dbus:02x}, '
-                  f'm1 {int(self.m1)}, '
-                  f't1 {int(self.t1)}, '
-                  f't2 {int(self.t2)}, '
-                  f't3 {int(self.t3)}, '
-                  f't4 {int(self.t4)}, '
-                  f't5 {int(self.t5)}, '
-                  f't6 {int(self.t6)}, '
-                  f'rfsh {int(self.rfsh)}, '
-                  f'rd {int(self.rd)}, '
-                  f'mreq {int(self.mreq)}')
 
             self.half_tick()
 
@@ -664,15 +659,24 @@ def test_computing_node_values():
         s.half_tick()
     assert s.abus == 0x0002
 
+    print('Tests passed.')
+
 
 def main():
     if '--no-tests' not in sys.argv:
         test_computing_node_values()
 
-    if 0:
+    if 1:
         memory = [
-            0x76,  # halt
-            0xc5,  # nop
+            # 0x76,  # halt
+            0xd3,  # di
+            # 0xc5,  # nop
+            0x05,  # dec b
+            0x0f,  # rrca
+            0xf6, 0x40,  # or 0x40
+            0xc5,  # push bc
+            0x7e,  # ld a, (hl)
+            0xfe, 0x0d,  # cp 0x0d
         ]
         s = Z80Simulator(memory=memory)
         s.do_something()
