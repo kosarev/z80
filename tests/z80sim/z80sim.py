@@ -389,7 +389,7 @@ class Z80Simulator(object):
                     more.append(t.c1)
 
                 # It only makes sense to update the group of the second
-                # connection if the trasistor became closed.
+                # connection if the transistor became closed.
                 if not state:
                     if t.c2 not in self.__gnd_pwr and t.c2 not in more:
                         more.append(t.c2)
