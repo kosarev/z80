@@ -13,10 +13,15 @@
 
 
 import ast
+import hashlib
+import pathlib
 import pprint
 import sys
 import z3
 
+
+_CACHE_ROOT = pathlib.Path('__z80sim_cache')
+assert _CACHE_ROOT.exists()
 
 _GND_ID = 'gnd'
 _PWR_ID = 'pwr'
@@ -63,13 +68,43 @@ class BoolExpr(object):
     def ifelse(cond, a, b):
         return BoolExpr(z3.If(cond.__e, a.__e, b.__e))
 
+    __equiv0_cache = set()
+    __equiv1_cache = set()
+
     @staticmethod
     def __is_equiv(a, b):
+        key = a.sexpr() + ':' + b.sexpr()
+        h = hashlib.sha256(key.encode()).hexdigest()
+
+        if h in __class__.__equiv0_cache:
+            return False
+        if h in __class__.__equiv1_cache:
+            return True
+
+        path0 = _CACHE_ROOT / 'equiv0' / h[:3] / h[3:6] / h[6:]
+        if path0.exists():
+            __class__.__equiv0_cache.add(h)
+            return False
+        path1 = _CACHE_ROOT / 'equiv1' / h[:3] / h[3:6] / h[6:]
+        if path1.exists():
+            __class__.__equiv1_cache.add(h)
+            return True
+
         s = z3.Solver()
         s.add(a != b)
         res = s.check()
         assert res in (z3.sat, z3.unsat)
-        return res == z3.unsat
+        equiv = (res == z3.unsat)
+
+        cache = __class__.__equiv1_cache if equiv else __class__.__equiv0_cache
+        cache.add(h)
+
+        path = path1 if equiv else path0
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('w') as f:
+            pass
+
+        return equiv
 
     def is_equiv(self, other):
         return __class__.__is_equiv(self.__e, other.__e)
