@@ -15,10 +15,76 @@
 import ast
 import pprint
 import sys
+import z3
 
 
 _GND_ID = 'gnd'
 _PWR_ID = 'pwr'
+
+
+class BoolExpr(object):
+    def __init__(self, term):
+        if isinstance(term, z3.BoolRef):
+            self.__e = term
+        elif isinstance(term, str):
+            self.__e = z3.Bool(term)
+        else:
+            assert term is False or term is True
+            self.__e = z3.BoolVal(term)
+
+    def __repr__(self):
+        return self.__e.sexpr()
+
+    @property
+    def value(self):
+        if z3.is_false(self.__e):
+            return False
+        if z3.is_true(self.__e):
+            return True
+        return None
+
+    def is_trivially_false(self):
+        return self.value is False
+
+    @property
+    def size(self):
+        return len(str(self))
+
+    def __or__(self, other):
+        return BoolExpr(z3.Or(self.__e, other.__e))
+
+    def __and__(self, other):
+        return BoolExpr(z3.And(self.__e, other.__e))
+
+    def __invert__(self):
+        return BoolExpr(z3.Not(self.__e))
+
+    @staticmethod
+    def ifelse(cond, a, b):
+        return BoolExpr(z3.If(cond.__e, a.__e, b.__e))
+
+    @staticmethod
+    def __is_equiv(a, b):
+        s = z3.Solver()
+        s.add(a != b)
+        res = s.check()
+        assert res in (z3.sat, z3.unsat)
+        return res == z3.unsat
+
+    def is_equiv(self, other):
+        return __class__.__is_equiv(self.__e, other.__e)
+
+    def reduced(self):
+        simplified = z3.simplify(self.__e)
+        for c in (FALSE, TRUE):
+            if __class__.__is_equiv(simplified, c.__e):
+                return c
+
+        return BoolExpr(simplified)
+
+
+FALSE = BoolExpr(False)
+TRUE = BoolExpr(True)
 
 
 class Node(object):
@@ -27,7 +93,7 @@ class Node(object):
     def __init__(self, index, pull, custom_id=None):
         self.custom_id = custom_id
         self.index, self.pull = index, pull
-        self.state = False
+        self.state = None
 
         # These are not sets as we want reproducible behaviour.
         self.gate_of = []
@@ -50,7 +116,10 @@ class Node(object):
 
     @property
     def id(self):
-        pull = self.__PULL_SIGNS[self.pull]
+        if isinstance(self.pull, BoolExpr):
+            pull = 'x'
+        else:
+            pull = self.__PULL_SIGNS[self.pull]
 
         if self.custom_id is None:
             return f'{pull}{self.index}'
@@ -85,7 +154,7 @@ class Node(object):
 class Transistor(object):
     def __init__(self, index, gate, c1, c2):
         self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
-        self.state = False
+        self.state = None
 
     def __repr__(self):
         return f'{self.c1} = {self.c2} [{self.gate}]  # {self.id}'
@@ -114,8 +183,12 @@ class Transistor(object):
         c2.conn_of.append(t)
         return t
 
+    @property
+    def conns(self):
+        return self.c1, self.c2
+
     def get_other_conn(self, n):
-        assert n in (self.c1, self.c2)
+        assert n in self.conns
         return self.c1 if n is self.c2 else self.c2
 
 
@@ -340,7 +413,95 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes['t5']
         self.__t6 = self.__nodes['t6']
 
+    def __evaluate_state_predicates(self, n, stack):
+        gnd = pwr = pullup = pulldown = FALSE
+
+        if n in stack:
+            pass
+        elif n.is_gnd:
+            gnd = TRUE
+        elif n.is_pwr:
+            pwr = TRUE
+        else:
+            if n.pull is None:
+                pass
+            elif n.pull is True:
+                pullup = TRUE
+            elif n.pull is False:
+                assert 0  # There are no pull-downs in the net itself.
+                pulldown = TRUE
+            elif isinstance(n.pull, BoolExpr):
+                pullup = n.pull
+                pulldown = ~n.pull
+            else:
+                assert 0, n.pull
+
+            stack.append(n)
+
+            for t in n.conn_of:
+                if not t.state.is_trivially_false():
+                    g, p, u, d = self.__evaluate_state_predicates(
+                        t.get_other_conn(n), stack)
+
+                    gnd |= t.state & g
+                    pwr |= t.state & p
+                    pullup |= t.state & u
+                    pulldown |= t.state & d
+
+            assert stack.pop() == n
+
+        return gnd, pwr, pullup, pulldown
+
+    __predicate_sizes = {}
+
+    def __symbolically_update_group_of(self, n, more):
+        # Identify nodes of the group.
+        group = []
+        worklist = [n]
+        while worklist:
+            n = worklist.pop()
+            if n in group or n.is_gnd_or_pwr:
+                continue
+
+            group.append(n)
+
+            for t in n.conn_of:
+                if not t.state.is_trivially_false():
+                    worklist.append(t.get_other_conn(n))
+
+        # Compute state predicates.
+        group = {n: self.__evaluate_state_predicates(n, [])
+                 for n in group}
+
+        # Update node and transistor states.
+        for n, preds in group.items():
+            gnd, pwr, pullup, pulldown = preds
+
+            if 0:
+                size = sum(p.size for p in preds)
+                sizes = __class__.__predicate_sizes.setdefault(n, [])
+                sizes.append(size)
+                print(n, sizes)
+
+            floating = n.state
+            pull = BoolExpr.ifelse(pulldown | pullup, ~pulldown, floating)
+            n.state = BoolExpr.ifelse(gnd | pwr, ~gnd, pull).reduced()
+            # print(n, n.state)
+
+            # No further propagation is necessary if the state of
+            # the transistor is known to be same. This includes
+            # the case of a floating gate.
+            for t in n.gate_of:
+                if not t.state.is_equiv(n.state):
+                    # print(t, t.state)
+                    t.state = n.state
+                    more.extend(t.conns)
+
     def __update_group_of(self, n, more):
+        if self.__symbolic:
+            self.__symbolically_update_group_of(n, more)
+            return
+
         if n in self.__gnd_pwr:
             return
 
@@ -395,10 +556,11 @@ class Z80Simulator(object):
                         more.append(t.c2)
 
     def __update_nodes(self, nodes):
-        attempt = 0
+        round = 0
         while nodes:
-            attempt += 1
-            assert attempt < 100, 'Loop encountered!'
+            round += 1
+            assert round < 100, 'Loop encountered!'
+            print(f'Round {round}, {len(nodes)} nodes.')
 
             more = []
             for n in nodes:
@@ -424,6 +586,17 @@ class Z80Simulator(object):
         self.half_tick()
 
     def __init_chip(self, skip_reset):
+        if self.__symbolic:
+            assert skip_reset is None
+
+            for n in self.__indexes_to_nodes.values():
+                if not n.is_gnd_or_pwr:
+                    n.state = FALSE
+
+            for t in self.__trans.values():
+                t.state = FALSE
+            return
+
         for n in self.__indexes_to_nodes.values():
             n.state = False
 
@@ -457,13 +630,18 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init__(self, *, memory=None, skip_reset=False):
+    def __init__(self, *, memory=None, skip_reset=None, symbolic=False):
+        self.__symbolic = symbolic
+
         self.__load_defs()
         self.__init_chip(skip_reset)
 
-        self.__memory = bytearray(0x10000)
-        if memory is not None:
-            self.__memory[:len(memory)] = memory
+        if self.__symbolic:
+            assert memory is None
+        else:
+            self.__memory = bytearray(0x10000)
+            if memory is not None:
+                self.__memory[:len(memory)] = memory
 
     @property
     def nclk(self):
@@ -584,7 +762,12 @@ class Z80Simulator(object):
     def __read_bits(self, name, width=8):
         res = 0
         for i in range(width):
-            res |= int(self.__nodes[name + str(i)].state) << i
+            state = self.__nodes[name + str(i)].state
+            if isinstance(state, BoolExpr):
+                state = state.value
+
+            assert isinstance(state, bool)
+            res |= int(state) << i
         return res
 
     def __write_bits(self, name, value, width=8):
@@ -649,6 +832,24 @@ class Z80Simulator(object):
 
             self.half_tick()
 
+    # TODO
+    def do_something_symbolically(self):
+        PINS = (
+            'ab0', 'ab1', 'ab2', 'ab3', 'ab4', 'ab5', 'ab6', 'ab7',
+            'ab8', 'ab9', 'ab10', 'ab11', 'ab12', 'ab13', 'ab14', 'ab15',
+            'db0', 'db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7',
+            '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
+            '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
+        for pin in PINS:
+            n = self.__nodes[pin]
+            n.state = BoolExpr(f'init.{n.id}')
+            n.pull = BoolExpr(f'pull.{n.id}')
+
+        self.__update_nodes([n for n in self.__indexes_to_nodes.values()
+                             if n not in self.__gnd_pwr])
+
+        print(f'a: {self.a:#04x}')
+
 
 def test_computing_node_values():
     # With the old function computing node values the LSB of the
@@ -668,6 +869,11 @@ def test_computing_node_values():
 def main():
     if '--no-tests' not in sys.argv:
         test_computing_node_values()
+
+    if '--symbolic' in sys.argv:
+        s = Z80Simulator(symbolic=True)
+        s.do_something_symbolically()
+        return
 
     memory = [
         # 0x76,  # halt
