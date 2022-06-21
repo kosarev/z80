@@ -14,6 +14,7 @@
 
 import ast
 import hashlib
+import os
 import pathlib
 import pprint
 import sys
@@ -45,6 +46,17 @@ class Bool(object):
     def __repr__(self):
         return (repr(self.__e) if isinstance(self.__e, bool)
                 else self.__e.sexpr())
+
+    @property
+    def image(self):
+        return (self.__e if isinstance(self.__e, bool)
+                else self.__e.serialize())
+
+    @staticmethod
+    def from_image(image):
+        if isinstance(image, bool):
+            return TRUE if image else FALSE
+        return Bool(z3.deserialize(image))
 
     @staticmethod
     def boolify(x):
@@ -159,11 +171,11 @@ TRUE = Bool(True)
 
 
 class Node(object):
-    def __init__(self, index, pull, custom_id=None):
+    def __init__(self, index, pull, custom_id=None, state=None):
         self.custom_id = custom_id
         assert pull is None or isinstance(pull, Bool)
         self.index, self.pull = index, pull
-        self.state = None
+        self.state = state
 
         # These are not sets as we want reproducible behaviour.
         self.gate_of = []
@@ -176,15 +188,17 @@ class Node(object):
         return self.index < other.index
 
     @property
-    def fields(self):
-        return self.index, self.custom_id, self.pull
+    def image(self):
+        pull = None if self.pull is None else self.pull.image
+        state = None if self.state is None else self.state.image
+        return self.index, self.custom_id, pull, state
 
     @staticmethod
-    def by_fields(fields):
-        index, custom_id, pull = fields
-        if pull is not None:
-            pull = Bool(pull)
-        return Node(index, pull, custom_id)
+    def from_image(image):
+        index, custom_id, pull, state = image
+        pull = None if pull is None else Bool.from_image(pull)
+        state = None if state is None else Bool.from_image(state)
+        return Node(index, pull, custom_id, state)
 
     @property
     def id(self):
@@ -340,14 +354,11 @@ class Z80Simulator(object):
                 assert ((n.pull is None and pull is None) or
                         n.pull.is_equiv(pull))
 
-    def __get_nodes_cache(self):
-        return (n.fields for n in sorted(self.__nodes.values()))
-
-    def __restore_nodes_from_cache(self, cache):
+    def __restore_nodes_from_image(self, image):
         self.__nodes_by_name = {}
         self.__nodes = {}
-        for fields in cache:
-            n = Node.by_fields(fields)
+        for i in image:
+            n = Node.from_image(i)
             if n.custom_id is not None:
                 self.__nodes_by_name[n.custom_id] = n
             self.__nodes[n.index] = n
@@ -447,7 +458,7 @@ class Z80Simulator(object):
                 with open(CACHE_FILENAME) as f:
                     Z80Simulator.__cache = ast.literal_eval(f.read())
             nodes, trans = Z80Simulator.__cache
-            self.__restore_nodes_from_cache(nodes)
+            self.__restore_nodes_from_image(nodes)
             self.__restore_transistors_from_cache(trans)
         except FileNotFoundError:
             self.__load_nodes()
@@ -459,10 +470,14 @@ class Z80Simulator(object):
                 i: n for i, n in self.__nodes.items()
                 if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
-            with open(CACHE_FILENAME, 'w') as f:
-                Z80Simulator.__cache = (tuple(self.__get_nodes_cache()),
+            TEMP_FILENAME = CACHE_FILENAME + '.tmp'
+            nodes_image = tuple(n.image for n in sorted(self.__nodes.values()))
+            with open(TEMP_FILENAME, 'w') as f:
+                Z80Simulator.__cache = (nodes_image,
                                         tuple(self.__get_transistors_cache()))
                 pprint.pp(Z80Simulator.__cache, compact=True, stream=f)
+
+            os.rename(TEMP_FILENAME, CACHE_FILENAME)
 
         self.__gnd = self.__nodes_by_name[_GND_ID]
         self.__pwr = self.__nodes_by_name[_PWR_ID]
