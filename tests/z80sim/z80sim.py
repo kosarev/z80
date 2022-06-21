@@ -282,11 +282,12 @@ class Transistor(object):
         return self.c1 if n is self.c2 else self.c2
 
 
-class Z80Simulator(object):
-    __cache = None
+def _load_initial_image():
+    __nodes_by_name = {}
+    __nodes = {}
+    __trans = {}
 
-    def __load_node_names(self):
-        self.__nodes_by_name = {}
+    def load_node_names():
         with open('nodenames.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -324,17 +325,16 @@ class Z80Simulator(object):
                 assert isinstance(i, str)
                 i = int(i)
 
-                n = self.__nodes[i]
+                n = __nodes[i]
 
-                assert (id not in self.__nodes_by_name or
-                        self.__nodes_by_name[id] is n)
-                self.__nodes_by_name[id] = n
+                assert (id not in __nodes_by_name or
+                        __nodes_by_name[id] is n)
+                __nodes_by_name[id] = n
 
                 assert n.custom_id is None or n.custom_id == id, id
                 n.custom_id = id
 
-    def __load_nodes(self):
-        self.__nodes = {}
+    def load_nodes():
         with open('segdefs.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -348,30 +348,19 @@ class Z80Simulator(object):
                 assert isinstance(i, int)
                 pull = {'+': TRUE, '-': None}[pull]
 
-                if i in self.__nodes:
-                    n = self.__nodes[i]
+                if i in __nodes:
+                    n = __nodes[i]
                 else:
                     n = Node(i, pull)
-                    self.__nodes[i] = n
+                    __nodes[i] = n
 
                 assert ((n.pull is None and pull is None) or
                         n.pull.is_equiv(pull))
 
-    def __restore_nodes_from_image(self, image):
-        self.__nodes_by_name = {}
-        self.__nodes = {}
-        for i in image:
-            n = Node.from_image(i)
-            if n.custom_id is not None:
-                self.__nodes_by_name[n.custom_id] = n
-            self.__nodes[n.index] = n
-
-    def __load_transistors(self):
-        self.__trans = {}
-
+    def load_transistors():
         def add(t):
-            assert index not in self.__trans
-            self.__trans[index] = t
+            assert index not in __trans
+            __trans[index] = t
 
             if t not in gate.gate_of:
                 t.gate.gate_of.append(t)
@@ -381,7 +370,7 @@ class Z80Simulator(object):
                 t.c2.conn_of.append(t)
 
         def remove(t):
-            del self.__trans[t.index]
+            del __trans[t.index]
 
             t.gate.gate_of.remove(t)
             t.c1.conn_of.remove(t)
@@ -409,9 +398,9 @@ class Z80Simulator(object):
                 index = int(id[1:])
                 del id
 
-                gate = self.__nodes[gate]
-                c1 = self.__nodes[c1]
-                c2 = self.__nodes[c2]
+                gate = __nodes[gate]
+                c1 = __nodes[c1]
+                c2 = __nodes[c2]
 
                 # Skip duplicate transistors. Now that the
                 # simulation code does not rely on counting the
@@ -441,67 +430,56 @@ class Z80Simulator(object):
                 add(Transistor(index, gate, c1, c2))
 
         # Remove meaningless transistors.
-        for n in self.__nodes.values():
+        for n in __nodes.values():
             if len(n.used_in) == 1 and not n.is_pin:
                 remove(*n.used_in)
+
+    def load_defs():
+        CACHE_FILENAME = 'z80.cache'
+        try:
+            with open(CACHE_FILENAME) as f:
+                return ast.literal_eval(f.read())
+        except FileNotFoundError:
+            load_nodes()
+            load_node_names()
+            load_transistors()
+
+            # Remove unused nodes.
+            nodes = {
+                i: n for i, n in __nodes.items()
+                if len(n.conn_of) > 0 or len(n.gate_of) > 0}
+
+            image = (tuple(n.image for n in sorted(nodes.values())),
+                     tuple(t.image for t in sorted(__trans.values())))
+            TEMP_FILENAME = CACHE_FILENAME + '.tmp'
+            with open(TEMP_FILENAME, 'w') as f:
+                pprint.pp(image, compact=True, stream=f)
+
+            os.rename(TEMP_FILENAME, CACHE_FILENAME)
+
+            return image
+
+    return load_defs()
+
+
+INITIAL_IMAGE = _load_initial_image()
+
+
+class Z80Simulator(object):
+    def __restore_nodes_from_image(self, image):
+        self.__nodes_by_name = {}
+        self.__nodes = {}
+        for i in image:
+            n = Node.from_image(i)
+            if n.custom_id is not None:
+                self.__nodes_by_name[n.custom_id] = n
+            self.__nodes[n.index] = n
 
     def __restore_transistors_from_image(self, image):
         self.__trans = {}
         for i in image:
             t = Transistor.from_image(i, self.__nodes)
             self.__trans[t.index] = t
-
-    def __load_defs(self):
-        CACHE_FILENAME = 'z80.cache'
-        try:
-            if Z80Simulator.__cache is None:
-                with open(CACHE_FILENAME) as f:
-                    Z80Simulator.__cache = ast.literal_eval(f.read())
-            nodes, trans = Z80Simulator.__cache
-            self.__restore_nodes_from_image(nodes)
-            self.__restore_transistors_from_image(trans)
-        except FileNotFoundError:
-            self.__load_nodes()
-            self.__load_node_names()
-            self.__load_transistors()
-
-            # Remove unused nodes.
-            self.__nodes = {
-                i: n for i, n in self.__nodes.items()
-                if len(n.conn_of) > 0 or len(n.gate_of) > 0}
-
-            Z80Simulator.__cache = (
-                tuple(n.image for n in sorted(self.__nodes.values())),
-                tuple(t.image for t in sorted(self.__trans.values())))
-            TEMP_FILENAME = CACHE_FILENAME + '.tmp'
-            with open(TEMP_FILENAME, 'w') as f:
-                pprint.pp(Z80Simulator.__cache, compact=True, stream=f)
-
-            os.rename(TEMP_FILENAME, CACHE_FILENAME)
-
-        self.__gnd = self.__nodes_by_name[_GND_ID]
-        self.__pwr = self.__nodes_by_name[_PWR_ID]
-        self.__gnd_pwr = self.__gnd, self.__pwr
-
-        self.__nclk = self.__nodes_by_name['~clk']
-
-        self.__nbusrq = self.__nodes_by_name['~busrq']
-        self.__nint = self.__nodes_by_name['~int']
-        self.__niorq = self.__nodes_by_name['~iorq']
-        self.__nm1 = self.__nodes_by_name['~m1']
-        self.__nmreq = self.__nodes_by_name['~mreq']
-        self.__nnmi = self.__nodes_by_name['~nmi']
-        self.__nrd = self.__nodes_by_name['~rd']
-        self.__nreset = self.__nodes_by_name['~reset']
-        self.__nrfsh = self.__nodes_by_name['~rfsh']
-        self.__nwait = self.__nodes_by_name['~wait']
-
-        self.__t1 = self.__nodes_by_name['t1']
-        self.__t2 = self.__nodes_by_name['t2']
-        self.__t3 = self.__nodes_by_name['t3']
-        self.__t4 = self.__nodes_by_name['t4']
-        self.__t5 = self.__nodes_by_name['t5']
-        self.__t6 = self.__nodes_by_name['t6']
 
     def __evaluate_state_predicates(self, n, stack):
         gnd = pwr = pullup = pulldown = FALSE
@@ -649,7 +627,34 @@ class Z80Simulator(object):
             self.half_tick()
 
     def __init__(self, *, memory=None, skip_reset=None):
-        self.__load_defs()
+        nodes, trans = INITIAL_IMAGE
+        self.__restore_nodes_from_image(nodes)
+        self.__restore_transistors_from_image(trans)
+
+        self.__gnd = self.__nodes_by_name[_GND_ID]
+        self.__pwr = self.__nodes_by_name[_PWR_ID]
+        self.__gnd_pwr = self.__gnd, self.__pwr
+
+        self.__nclk = self.__nodes_by_name['~clk']
+
+        self.__nbusrq = self.__nodes_by_name['~busrq']
+        self.__nint = self.__nodes_by_name['~int']
+        self.__niorq = self.__nodes_by_name['~iorq']
+        self.__nm1 = self.__nodes_by_name['~m1']
+        self.__nmreq = self.__nodes_by_name['~mreq']
+        self.__nnmi = self.__nodes_by_name['~nmi']
+        self.__nrd = self.__nodes_by_name['~rd']
+        self.__nreset = self.__nodes_by_name['~reset']
+        self.__nrfsh = self.__nodes_by_name['~rfsh']
+        self.__nwait = self.__nodes_by_name['~wait']
+
+        self.__t1 = self.__nodes_by_name['t1']
+        self.__t2 = self.__nodes_by_name['t2']
+        self.__t3 = self.__nodes_by_name['t3']
+        self.__t4 = self.__nodes_by_name['t4']
+        self.__t5 = self.__nodes_by_name['t5']
+        self.__t6 = self.__nodes_by_name['t6']
+
         self.__init_chip(skip_reset)
 
         self.__memory = bytearray(0x10000)
