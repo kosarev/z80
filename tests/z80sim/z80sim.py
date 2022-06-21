@@ -27,52 +27,83 @@ _GND_ID = 'gnd'
 _PWR_ID = 'pwr'
 
 
-class BoolExpr(object):
-    def __init__(self, term):
-        if isinstance(term, z3.BoolRef):
-            self.__e = term
-        elif isinstance(term, str):
-            self.__e = z3.Bool(term)
+class Bool(object):
+    def __init__(self, e):
+        if isinstance(e, z3.BoolRef):
+            if z3.is_false(e):
+                self.__e = False
+            elif z3.is_true(e):
+                self.__e = True
+            else:
+                self.__e = e
+        elif isinstance(e, bool):
+            self.__e = e
         else:
-            assert term is False or term is True
-            self.__e = z3.BoolVal(term)
+            assert isinstance(e, str)
+            self.__e = z3.Bool(e)
 
     def __repr__(self):
-        return self.__e.sexpr()
+        return (repr(self.__e) if isinstance(self.__e, bool)
+                else self.__e.sexpr())
+
+    @staticmethod
+    def boolify(x):
+        return x if isinstance(x, Bool) else Bool(x)
 
     @property
     def value(self):
-        if z3.is_false(self.__e):
-            return False
-        if z3.is_true(self.__e):
-            return True
-        return None
+        return self.__e if isinstance(self.__e, bool) else None
 
     def is_trivially_false(self):
-        return self.value is False
+        return self.__e is False
+
+    def __bool__(self):
+        assert isinstance(self.__e, bool)
+        return self.__e
+
+    def __int__(self):
+        return int(bool(self))
 
     @property
     def size(self):
         return len(str(self))
 
+    def __eq__(self, other):
+        assert 0, "Bool's should not be compared; use is_equiv() instead."
+
     def __or__(self, other):
-        return BoolExpr(z3.Or(self.__e, other.__e))
+        if isinstance(self.__e, bool) and isinstance(other.__e, bool):
+            return TRUE if self.__e or other.__e else FALSE
+        return Bool(z3.Or(self.__e, other.__e))
 
     def __and__(self, other):
-        return BoolExpr(z3.And(self.__e, other.__e))
+        if isinstance(self.__e, bool) and isinstance(other.__e, bool):
+            return TRUE if self.__e and other.__e else FALSE
+        return Bool(z3.And(self.__e, other.__e))
 
     def __invert__(self):
-        return BoolExpr(z3.Not(self.__e))
+        if isinstance(self.__e, bool):
+            return FALSE if self.__e else TRUE
+        return Bool(z3.Not(self.__e))
 
     @staticmethod
     def ifelse(cond, a, b):
-        return BoolExpr(z3.If(cond.__e, a.__e, b.__e))
+        if isinstance(cond.__e, bool):
+            return a if cond.__e else b
+        return Bool(z3.If(cond.__e, a.__e, b.__e))
 
     __equiv0_cache = set()
     __equiv1_cache = set()
 
     @staticmethod
     def __is_equiv(a, b):
+        if isinstance(a, bool):
+            if isinstance(b, bool):
+                return a == b
+            a = z3.BoolVal(a)
+        elif isinstance(b, bool):
+            b = z3.BoolVal(b)
+
         key = a.sexpr() + ':' + b.sexpr()
         h = hashlib.sha256(key.encode()).hexdigest()
 
@@ -110,21 +141,25 @@ class BoolExpr(object):
         return __class__.__is_equiv(self.__e, other.__e)
 
     def reduced(self):
+        if isinstance(self.__e, bool):
+            return self
+
         simplified = z3.simplify(self.__e)
         for c in (FALSE, TRUE):
             if __class__.__is_equiv(simplified, c.__e):
                 return c
 
-        return BoolExpr(simplified)
+        return Bool(simplified)
 
 
-FALSE = BoolExpr(False)
-TRUE = BoolExpr(True)
+FALSE = Bool(False)
+TRUE = Bool(True)
 
 
 class Node(object):
     def __init__(self, index, pull, custom_id=None):
         self.custom_id = custom_id
+        assert pull is None or isinstance(pull, Bool)
         self.index, self.pull = index, pull
         self.state = None
 
@@ -145,15 +180,17 @@ class Node(object):
     @staticmethod
     def by_fields(fields):
         index, custom_id, pull = fields
+        if pull is not None:
+            pull = Bool(pull)
         return Node(index, pull, custom_id)
 
     @property
     def id(self):
-        if isinstance(self.pull, BoolExpr):
-            pull = 'x'
+        if self.pull is None:
+            pull = 'n'
         else:
-            PULL_SIGNS = {None: 'n', False: 'm', True: 'p'}
-            pull = PULL_SIGNS[self.pull]
+            PULL_SIGNS = {None: 'x', False: 'm', True: 'p'}
+            pull = PULL_SIGNS[self.pull.value]
 
         if self.custom_id is None:
             return f'{pull}{self.index}'
@@ -290,7 +327,7 @@ class Z80Simulator(object):
 
                 (i, pull, _) = fields[:3]
                 assert isinstance(i, int)
-                pull = {'+': True, '-': None}[pull]
+                pull = {'+': TRUE, '-': None}[pull]
 
                 if i in self.__nodes:
                     n = self.__nodes[i]
@@ -298,7 +335,8 @@ class Z80Simulator(object):
                     n = Node(i, pull)
                     self.__nodes[i] = n
 
-                assert n.pull == pull
+                assert ((n.pull is None and pull is None) or
+                        n.pull.is_equiv(pull))
 
     def __get_nodes_cache(self):
         return (n.fields for n in sorted(self.__nodes.values()))
@@ -460,12 +498,7 @@ class Z80Simulator(object):
         else:
             if n.pull is None:
                 pass
-            elif n.pull is True:
-                pullup = TRUE
-            elif n.pull is False:
-                assert 0  # There are no pull-downs in the net itself.
-                pulldown = TRUE
-            elif isinstance(n.pull, BoolExpr):
+            elif isinstance(n.pull, Bool):
                 pullup = n.pull
                 pulldown = ~n.pull
             else:
@@ -519,8 +552,8 @@ class Z80Simulator(object):
                 print(n, sizes)
 
             floating = n.state
-            pull = BoolExpr.ifelse(pulldown | pullup, ~pulldown, floating)
-            n.state = BoolExpr.ifelse(gnd | pwr, ~gnd, pull).reduced()
+            pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
+            n.state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
             # print(n, n.state)
 
             # No further propagation is necessary if the state of
@@ -556,9 +589,9 @@ class Z80Simulator(object):
 
         state = None
         if self.__gnd in group:
-            state = False
+            state = FALSE
         elif self.__pwr in group:
-            state = True
+            state = TRUE
         else:
             for n in group:
                 if n.pull is not None:
@@ -570,13 +603,13 @@ class Z80Simulator(object):
             return
 
         for n in group:
-            if n.state == state:
+            if n.state.is_equiv(state):
                 continue
 
             n.state = state
 
             for t in n.gate_of:
-                if t.state == state:
+                if t.state.is_equiv(state):
                     continue
 
                 t.state = state
@@ -595,7 +628,9 @@ class Z80Simulator(object):
         while nodes:
             round += 1
             assert round < 100, 'Loop encountered!'
-            print(f'Round {round}, {len(nodes)} nodes.')
+
+            if '--no-rounds' not in sys.argv:
+                print(f'Round {round}, {len(nodes)} nodes.')
 
             more = []
             for n in nodes:
@@ -603,7 +638,7 @@ class Z80Simulator(object):
             nodes = more
 
     def __set_node(self, n, pull):
-        n.pull = pull
+        n.pull = Bool.boolify(pull)
         self.__update_nodes([n])
 
     def half_tick(self):
@@ -612,7 +647,7 @@ class Z80Simulator(object):
                 if self.m1 and self.rd and self.t2:
                     self.dbus = self.__memory[self.abus]
 
-        self.nclk ^= True
+        self.nclk = ~self.nclk
 
         self.__print_state()
 
@@ -621,35 +656,28 @@ class Z80Simulator(object):
         self.half_tick()
 
     def __init_chip(self, skip_reset):
-        if self.__symbolic:
-            assert skip_reset is None
-
-            for n in self.__nodes.values():
-                if not n.is_gnd_or_pwr:
-                    n.state = FALSE
-
-            for t in self.__trans.values():
-                t.state = FALSE
-            return
-
         for n in self.__nodes.values():
-            n.state = False
-
-        self.__gnd.state = False
-        self.__pwr.state = True
+            n.state = FALSE
 
         for t in self.__trans.values():
-            t.state = False
+            t.state = FALSE
+
+        self.__gnd.state = FALSE
+        self.__pwr.state = TRUE
+
+        if self.__symbolic:
+            assert skip_reset is None
+            return
 
         if skip_reset:
             return
 
-        self.nreset = False
-        self.nclk = True
-        self.nbusrq = True
-        self.nint = True
-        self.nnmi = True
-        self.nwait = True
+        self.nreset = FALSE
+        self.nclk = TRUE
+        self.nbusrq = TRUE
+        self.nint = TRUE
+        self.nnmi = TRUE
+        self.nwait = TRUE
 
         self.__update_nodes([n for n in self.__nodes.values()
                              if n not in self.__gnd_pwr])
@@ -658,7 +686,7 @@ class Z80Simulator(object):
         for _ in range(31):
             self.half_tick()
 
-        self.nreset = True
+        self.nreset = TRUE
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
@@ -688,7 +716,7 @@ class Z80Simulator(object):
 
     @property
     def clk(self):
-        return not self.nclk
+        return ~self.nclk
 
     @property
     def niorq(self):
@@ -696,7 +724,7 @@ class Z80Simulator(object):
 
     @property
     def iorq(self):
-        return not self.niorq
+        return ~self.niorq
 
     @property
     def nm1(self):
@@ -704,7 +732,7 @@ class Z80Simulator(object):
 
     @property
     def m1(self):
-        return not self.__nm1.state
+        return ~self.__nm1.state
 
     @property
     def nmreq(self):
@@ -712,7 +740,7 @@ class Z80Simulator(object):
 
     @property
     def mreq(self):
-        return not self.nmreq
+        return ~self.nmreq
 
     @property
     def nreset(self):
@@ -728,7 +756,7 @@ class Z80Simulator(object):
 
     @property
     def rfsh(self):
-        return not self.nrfsh
+        return ~self.nrfsh
 
     @property
     def nbusrq(self):
@@ -760,7 +788,7 @@ class Z80Simulator(object):
 
     @property
     def rd(self):
-        return not self.nrd
+        return ~self.nrd
 
     @property
     def nwait(self):
@@ -798,17 +826,13 @@ class Z80Simulator(object):
         res = 0
         for i in range(width):
             state = self.__nodes_by_name[name + str(i)].state
-            if isinstance(state, BoolExpr):
-                state = state.value
-
-            assert isinstance(state, bool)
-            res |= int(state) << i
+            res |= int(state.value) << i
         return res
 
     def __write_bits(self, name, value, width=8):
         for i in range(width):
             self.__set_node(self.__nodes_by_name[name + str(i)],
-                            (value >> i) & 0x1)
+                            bool((value >> i) & 0x1))
 
     @property
     def abus(self):
@@ -877,8 +901,8 @@ class Z80Simulator(object):
             '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
         for pin in PINS:
             n = self.__nodes_by_name[pin]
-            n.state = BoolExpr(f'init.{n.id}')
-            n.pull = BoolExpr(f'pull.{n.id}')
+            n.state = Bool(f'init.{n.id}')
+            n.pull = Bool(f'pull.{n.id}')
 
         self.__update_nodes([n for n in self.__nodes.values()
                              if n not in self.__gnd_pwr])
@@ -923,7 +947,7 @@ def main():
     ]
     s = Z80Simulator(memory=memory)
     s.dump()
-    # s.do_something()
+    s.do_something()
 
 
 if __name__ == "__main__":
