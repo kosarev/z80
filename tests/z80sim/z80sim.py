@@ -239,9 +239,10 @@ class Node(object):
 
 
 class Transistor(object):
-    def __init__(self, index, gate, c1, c2):
+    def __init__(self, index, gate, c1, c2, state=None):
         self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
-        self.state = None
+        assert state is None or isinstance(state, Bool)
+        self.state = state
 
     def __repr__(self):
         return f'{self.c1} = {self.c2} [{self.gate}]  # {self.id}'
@@ -254,17 +255,19 @@ class Transistor(object):
         return f't{self.index}'
 
     @property
-    def fields(self):
-        return self.index, self.gate.index, self.c1.index, self.c2.index
+    def image(self):
+        state = None if self.state is None else self.state.image
+        return self.index, self.gate.index, self.c1.index, self.c2.index, state
 
     @staticmethod
-    def by_fields(fields, nodes):
-        index, gate, c1, c2 = fields
+    def from_image(image, nodes):
+        index, gate, c1, c2, state = image
         gate = nodes[gate]
         c1 = nodes[c1]
         c2 = nodes[c2]
+        state = None if state is None else Bool.from_image(state)
 
-        t = Transistor(index, gate, c1, c2)
+        t = Transistor(index, gate, c1, c2, state)
         gate.gate_of.append(t)
         c1.conn_of.append(t)
         c2.conn_of.append(t)
@@ -442,13 +445,10 @@ class Z80Simulator(object):
             if len(n.used_in) == 1 and not n.is_pin:
                 remove(*n.used_in)
 
-    def __get_transistors_cache(self):
-        return (t.fields for t in sorted(self.__trans.values()))
-
-    def __restore_transistors_from_cache(self, cache):
+    def __restore_transistors_from_image(self, image):
         self.__trans = {}
-        for fields in cache:
-            t = Transistor.by_fields(fields, self.__nodes)
+        for i in image:
+            t = Transistor.from_image(i, self.__nodes)
             self.__trans[t.index] = t
 
     def __load_defs(self):
@@ -459,7 +459,7 @@ class Z80Simulator(object):
                     Z80Simulator.__cache = ast.literal_eval(f.read())
             nodes, trans = Z80Simulator.__cache
             self.__restore_nodes_from_image(nodes)
-            self.__restore_transistors_from_cache(trans)
+            self.__restore_transistors_from_image(trans)
         except FileNotFoundError:
             self.__load_nodes()
             self.__load_node_names()
@@ -470,11 +470,11 @@ class Z80Simulator(object):
                 i: n for i, n in self.__nodes.items()
                 if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
+            Z80Simulator.__cache = (
+                tuple(n.image for n in sorted(self.__nodes.values())),
+                tuple(t.image for t in sorted(self.__trans.values())))
             TEMP_FILENAME = CACHE_FILENAME + '.tmp'
-            nodes_image = tuple(n.image for n in sorted(self.__nodes.values()))
             with open(TEMP_FILENAME, 'w') as f:
-                Z80Simulator.__cache = (nodes_image,
-                                        tuple(self.__get_transistors_cache()))
                 pprint.pp(Z80Simulator.__cache, compact=True, stream=f)
 
             os.rename(TEMP_FILENAME, CACHE_FILENAME)
