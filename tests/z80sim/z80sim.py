@@ -269,7 +269,7 @@ class Z80Simulator(object):
                 assert isinstance(i, str)
                 i = int(i)
 
-                n = self.__indexes_to_nodes[i]
+                n = self.__nodes[i]
 
                 assert (id not in self.__nodes_by_name or
                         self.__nodes_by_name[id] is n)
@@ -279,7 +279,7 @@ class Z80Simulator(object):
                 n.custom_id = id
 
     def __load_nodes(self):
-        self.__indexes_to_nodes = {}
+        self.__nodes = {}
         with open('segdefs.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -293,25 +293,25 @@ class Z80Simulator(object):
                 assert isinstance(i, int)
                 pull = {'+': True, '-': None}[pull]
 
-                if i in self.__indexes_to_nodes:
-                    n = self.__indexes_to_nodes[i]
+                if i in self.__nodes:
+                    n = self.__nodes[i]
                 else:
                     n = Node(i, pull)
-                    self.__indexes_to_nodes[i] = n
+                    self.__nodes[i] = n
 
                 assert n.pull == pull
 
     def __get_nodes_cache(self):
-        return (n.fields for n in sorted(self.__indexes_to_nodes.values()))
+        return (n.fields for n in sorted(self.__nodes.values()))
 
     def __restore_nodes_from_cache(self, cache):
         self.__nodes_by_name = {}
-        self.__indexes_to_nodes = {}
+        self.__nodes = {}
         for fields in cache:
             n = Node.by_fields(fields)
             if n.custom_id is not None:
                 self.__nodes_by_name[n.custom_id] = n
-            self.__indexes_to_nodes[n.index] = n
+            self.__nodes[n.index] = n
 
     def __load_transistors(self):
         self.__trans = {}
@@ -356,9 +356,9 @@ class Z80Simulator(object):
                 index = int(id[1:])
                 del id
 
-                gate = self.__indexes_to_nodes[gate]
-                c1 = self.__indexes_to_nodes[c1]
-                c2 = self.__indexes_to_nodes[c2]
+                gate = self.__nodes[gate]
+                c1 = self.__nodes[c1]
+                c2 = self.__nodes[c2]
 
                 # Skip duplicate transistors. Now that the
                 # simulation code does not rely on counting the
@@ -388,7 +388,7 @@ class Z80Simulator(object):
                 add(Transistor(index, gate, c1, c2))
 
         # Remove meaningless transistors.
-        for n in self.__indexes_to_nodes.values():
+        for n in self.__nodes.values():
             if len(n.used_in) == 1 and not n.is_pin:
                 remove(*n.used_in)
 
@@ -398,7 +398,7 @@ class Z80Simulator(object):
     def __restore_transistors_from_cache(self, cache):
         self.__trans = {}
         for fields in cache:
-            t = Transistor.by_fields(fields, self.__indexes_to_nodes)
+            t = Transistor.by_fields(fields, self.__nodes)
             self.__trans[t.index] = t
 
     def __load_defs(self):
@@ -416,8 +416,8 @@ class Z80Simulator(object):
             self.__load_transistors()
 
             # Remove unused nodes.
-            self.__indexes_to_nodes = {
-                i: n for i, n in self.__indexes_to_nodes.items()
+            self.__nodes = {
+                i: n for i, n in self.__nodes.items()
                 if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
             with open(CACHE_FILENAME, 'w') as f:
@@ -625,7 +625,7 @@ class Z80Simulator(object):
         if self.__symbolic:
             assert skip_reset is None
 
-            for n in self.__indexes_to_nodes.values():
+            for n in self.__nodes.values():
                 if not n.is_gnd_or_pwr:
                     n.state = FALSE
 
@@ -633,7 +633,7 @@ class Z80Simulator(object):
                 t.state = FALSE
             return
 
-        for n in self.__indexes_to_nodes.values():
+        for n in self.__nodes.values():
             n.state = False
 
         self.__gnd.state = False
@@ -652,7 +652,7 @@ class Z80Simulator(object):
         self.nnmi = True
         self.nwait = True
 
-        self.__update_nodes([n for n in self.__indexes_to_nodes.values()
+        self.__update_nodes([n for n in self.__nodes.values()
                              if n not in self.__gnd_pwr])
 
         # Propagate the reset signal.
@@ -881,7 +881,7 @@ class Z80Simulator(object):
             n.state = BoolExpr(f'init.{n.id}')
             n.pull = BoolExpr(f'pull.{n.id}')
 
-        self.__update_nodes([n for n in self.__indexes_to_nodes.values()
+        self.__update_nodes([n for n in self.__nodes.values()
                              if n not in self.__gnd_pwr])
 
         print(f'a: {self.a:#04x}')
