@@ -14,7 +14,6 @@
 
 import ast
 import hashlib
-import os
 import pathlib
 import pprint
 import sys
@@ -435,9 +434,9 @@ def _load_initial_image():
                 remove(*n.used_in)
 
     def load_defs():
-        CACHE_FILENAME = 'z80.cache'
+        path = _CACHE_ROOT / 'initial_image'
         try:
-            with open(CACHE_FILENAME) as f:
+            with path.open() as f:
                 return ast.literal_eval(f.read())
         except FileNotFoundError:
             load_nodes()
@@ -451,11 +450,11 @@ def _load_initial_image():
 
             image = (tuple(n.image for n in sorted(nodes.values())),
                      tuple(t.image for t in sorted(__trans.values())))
-            TEMP_FILENAME = CACHE_FILENAME + '.tmp'
-            with open(TEMP_FILENAME, 'w') as f:
+            temp_path = path.parent / (path.name + '.tmp')
+            with temp_path.open('w') as f:
                 pprint.pp(image, compact=True, stream=f)
 
-            os.rename(TEMP_FILENAME, CACHE_FILENAME)
+            temp_path.rename(path)
 
             return image
 
