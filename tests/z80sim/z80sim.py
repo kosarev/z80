@@ -452,7 +452,7 @@ def _load_initial_image():
                      tuple(t.image for t in sorted(__trans.values())))
             temp_path = path.parent / (path.name + '.tmp')
             with temp_path.open('w') as f:
-                pprint.pp(image, compact=True, stream=f)
+                pprint.pprint(image, compact=True, stream=f)
 
             temp_path.rename(path)
 
@@ -465,6 +465,11 @@ INITIAL_IMAGE = _load_initial_image()
 
 
 class Z80Simulator(object):
+    @property
+    def image(self):
+        return (tuple(n.image for n in sorted(self.__nodes.values())),
+                tuple(t.image for t in sorted(self.__trans.values())))
+
     def __restore_nodes_from_image(self, image):
         self.__nodes_by_name = {}
         self.__nodes = {}
@@ -625,8 +630,16 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init__(self, *, memory=None, skip_reset=None):
-        nodes, trans = INITIAL_IMAGE
+    def __init__(self, *, memory=None, skip_reset=None, image=None):
+        if image is None:
+            image = INITIAL_IMAGE
+            skip_init = False
+        else:
+            # For custom images, leave them as-is.
+            assert skip_reset is None
+            skip_init = True
+
+        nodes, trans = image
         self.__restore_nodes_from_image(nodes)
         self.__restore_transistors_from_image(trans)
 
@@ -654,7 +667,8 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes_by_name['t5']
         self.__t6 = self.__nodes_by_name['t6']
 
-        self.__init_chip(skip_reset)
+        if not skip_init:
+            self.__init_chip(skip_reset)
 
         self.__memory = bytearray(0x10000)
         if memory is not None:
@@ -861,8 +875,6 @@ class Z80Simulator(object):
         self.__update_nodes([n for n in self.__nodes.values()
                              if n not in self.__gnd_pwr])
 
-        print(f'a: {self.a:#04x}')
-
 
 def test_computing_node_values():
     # With the old function computing node values the LSB of the
@@ -884,8 +896,20 @@ def main():
         test_computing_node_values()
 
     if '--symbolic' in sys.argv:
-        s = Z80Simulator(skip_reset=True)
-        s.do_something_symbolically()
+        path = _CACHE_ROOT / 'resulting_image'
+        try:
+            with path.open() as f:
+                image = ast.literal_eval(f.read())
+            s = Z80Simulator(image=image)
+        except FileNotFoundError:
+            s = Z80Simulator(skip_reset=True)
+            s.do_something_symbolically()
+
+            with path.open('w') as f:
+                pprint.pprint(s.image, compact=True, stream=f)
+
+        print(f'a: {s.a:#04x}')
+
         return
 
     memory = [
