@@ -231,7 +231,7 @@ class Z80Simulator(object):
     __cache = None
 
     def __load_node_names(self):
-        self.__nodes = {}
+        self.__nodes_by_name = {}
         with open('nodenames.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -271,8 +271,9 @@ class Z80Simulator(object):
 
                 n = self.__indexes_to_nodes[i]
 
-                assert id not in self.__nodes or self.__nodes[id] is n
-                self.__nodes[id] = n
+                assert (id not in self.__nodes_by_name or
+                        self.__nodes_by_name[id] is n)
+                self.__nodes_by_name[id] = n
 
                 assert n.custom_id is None or n.custom_id == id, id
                 n.custom_id = id
@@ -304,12 +305,12 @@ class Z80Simulator(object):
         return (n.fields for n in sorted(self.__indexes_to_nodes.values()))
 
     def __restore_nodes_from_cache(self, cache):
-        self.__nodes = {}
+        self.__nodes_by_name = {}
         self.__indexes_to_nodes = {}
         for fields in cache:
             n = Node.by_fields(fields)
             if n.custom_id is not None:
-                self.__nodes[n.custom_id] = n
+                self.__nodes_by_name[n.custom_id] = n
             self.__indexes_to_nodes[n.index] = n
 
     def __load_transistors(self):
@@ -424,29 +425,29 @@ class Z80Simulator(object):
                                         tuple(self.__get_transistors_cache()))
                 pprint.pp(Z80Simulator.__cache, compact=True, stream=f)
 
-        self.__gnd = self.__nodes[_GND_ID]
-        self.__pwr = self.__nodes[_PWR_ID]
+        self.__gnd = self.__nodes_by_name[_GND_ID]
+        self.__pwr = self.__nodes_by_name[_PWR_ID]
         self.__gnd_pwr = self.__gnd, self.__pwr
 
-        self.__nclk = self.__nodes['~clk']
+        self.__nclk = self.__nodes_by_name['~clk']
 
-        self.__nbusrq = self.__nodes['~busrq']
-        self.__nint = self.__nodes['~int']
-        self.__niorq = self.__nodes['~iorq']
-        self.__nm1 = self.__nodes['~m1']
-        self.__nmreq = self.__nodes['~mreq']
-        self.__nnmi = self.__nodes['~nmi']
-        self.__nrd = self.__nodes['~rd']
-        self.__nreset = self.__nodes['~reset']
-        self.__nrfsh = self.__nodes['~rfsh']
-        self.__nwait = self.__nodes['~wait']
+        self.__nbusrq = self.__nodes_by_name['~busrq']
+        self.__nint = self.__nodes_by_name['~int']
+        self.__niorq = self.__nodes_by_name['~iorq']
+        self.__nm1 = self.__nodes_by_name['~m1']
+        self.__nmreq = self.__nodes_by_name['~mreq']
+        self.__nnmi = self.__nodes_by_name['~nmi']
+        self.__nrd = self.__nodes_by_name['~rd']
+        self.__nreset = self.__nodes_by_name['~reset']
+        self.__nrfsh = self.__nodes_by_name['~rfsh']
+        self.__nwait = self.__nodes_by_name['~wait']
 
-        self.__t1 = self.__nodes['t1']
-        self.__t2 = self.__nodes['t2']
-        self.__t3 = self.__nodes['t3']
-        self.__t4 = self.__nodes['t4']
-        self.__t5 = self.__nodes['t5']
-        self.__t6 = self.__nodes['t6']
+        self.__t1 = self.__nodes_by_name['t1']
+        self.__t2 = self.__nodes_by_name['t2']
+        self.__t3 = self.__nodes_by_name['t3']
+        self.__t4 = self.__nodes_by_name['t4']
+        self.__t5 = self.__nodes_by_name['t5']
+        self.__t6 = self.__nodes_by_name['t6']
 
     def __evaluate_state_predicates(self, n, stack):
         gnd = pwr = pullup = pulldown = FALSE
@@ -797,7 +798,7 @@ class Z80Simulator(object):
     def __read_bits(self, name, width=8):
         res = 0
         for i in range(width):
-            state = self.__nodes[name + str(i)].state
+            state = self.__nodes_by_name[name + str(i)].state
             if isinstance(state, BoolExpr):
                 state = state.value
 
@@ -807,7 +808,7 @@ class Z80Simulator(object):
 
     def __write_bits(self, name, value, width=8):
         for i in range(width):
-            self.__set_node(self.__nodes[name + str(i)],
+            self.__set_node(self.__nodes_by_name[name + str(i)],
                             (value >> i) & 0x1)
 
     @property
@@ -876,7 +877,7 @@ class Z80Simulator(object):
             '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
             '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
         for pin in PINS:
-            n = self.__nodes[pin]
+            n = self.__nodes_by_name[pin]
             n.state = BoolExpr(f'init.{n.id}')
             n.pull = BoolExpr(f'pull.{n.id}')
 
