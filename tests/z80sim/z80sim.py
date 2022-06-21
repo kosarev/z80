@@ -522,7 +522,7 @@ class Z80Simulator(object):
 
     __predicate_sizes = {}
 
-    def __symbolically_update_group_of(self, n, more):
+    def __update_group_of(self, n, more):
         # Identify nodes of the group.
         group = []
         worklist = [n]
@@ -564,64 +564,6 @@ class Z80Simulator(object):
                     # print(t, t.state)
                     t.state = n.state
                     more.extend(t.conns)
-
-    def __update_group_of(self, n, more):
-        if self.__symbolic:
-            self.__symbolically_update_group_of(n, more)
-            return
-
-        if n in self.__gnd_pwr:
-            return
-
-        group = []
-        worklist = [n]
-        while worklist:
-            n = worklist.pop()
-            if n in group:
-                continue
-
-            group.append(n)
-
-            if n not in self.__gnd_pwr:
-                for t in n.conn_of:
-                    if t.state:
-                        worklist.append(t.get_other_conn(n))
-
-        state = None
-        if self.__gnd in group:
-            state = FALSE
-        elif self.__pwr in group:
-            state = TRUE
-        else:
-            for n in group:
-                if n.pull is not None:
-                    state = n.pull
-                    break
-
-        if state is None:
-            # Floating group.
-            return
-
-        for n in group:
-            if n.state.is_equiv(state):
-                continue
-
-            n.state = state
-
-            for t in n.gate_of:
-                if t.state.is_equiv(state):
-                    continue
-
-                t.state = state
-
-                if t.c1 not in self.__gnd_pwr and t.c1 not in more:
-                    more.append(t.c1)
-
-                # It only makes sense to update the group of the second
-                # connection if the transistor became closed.
-                if not state:
-                    if t.c2 not in self.__gnd_pwr and t.c2 not in more:
-                        more.append(t.c2)
 
     def __update_nodes(self, nodes):
         round = 0
@@ -665,10 +607,6 @@ class Z80Simulator(object):
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
 
-        if self.__symbolic:
-            assert skip_reset is None
-            return
-
         if skip_reset:
             return
 
@@ -693,18 +631,13 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init__(self, *, memory=None, skip_reset=None, symbolic=False):
-        self.__symbolic = symbolic
-
+    def __init__(self, *, memory=None, skip_reset=None):
         self.__load_defs()
         self.__init_chip(skip_reset)
 
-        if self.__symbolic:
-            assert memory is None
-        else:
-            self.__memory = bytearray(0x10000)
-            if memory is not None:
-                self.__memory[:len(memory)] = memory
+        self.__memory = bytearray(0x10000)
+        if memory is not None:
+            self.__memory[:len(memory)] = memory
 
     @property
     def nclk(self):
@@ -930,7 +863,7 @@ def main():
         test_computing_node_values()
 
     if '--symbolic' in sys.argv:
-        s = Z80Simulator(symbolic=True)
+        s = Z80Simulator(skip_reset=True)
         s.do_something_symbolically()
         return
 
