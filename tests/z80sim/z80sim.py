@@ -48,6 +48,8 @@ class Bool(object):
 
     @staticmethod
     def boolify(x):
+        if isinstance(x, bool):
+            return TRUE if x else FALSE
         return x if isinstance(x, Bool) else Bool(x)
 
     @property
