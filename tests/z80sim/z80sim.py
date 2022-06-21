@@ -123,8 +123,6 @@ TRUE = BoolExpr(True)
 
 
 class Node(object):
-    __PULL_SIGNS = {None: 'n', False: 'm', True: 'p'}
-
     def __init__(self, index, pull, custom_id=None):
         self.custom_id = custom_id
         self.index, self.pull = index, pull
@@ -154,7 +152,8 @@ class Node(object):
         if isinstance(self.pull, BoolExpr):
             pull = 'x'
         else:
-            pull = self.__PULL_SIGNS[self.pull]
+            PULL_SIGNS = {None: 'n', False: 'm', True: 'p'}
+            pull = PULL_SIGNS[self.pull]
 
         if self.custom_id is None:
             return f'{pull}{self.index}'
