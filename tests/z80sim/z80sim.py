@@ -46,16 +46,81 @@ class Bool(object):
         return (repr(self.__e) if isinstance(self.__e, bool)
                 else self.__e.sexpr())
 
+    class __Key(object):
+        def __init__(self, n):
+            self.n = n
+
+        @staticmethod
+        def is_less(a, b):
+            if isinstance(a, bool):
+                if isinstance(b, bool):
+                    return a < b
+                return True
+            if isinstance(b, bool):
+                return False
+
+            if isinstance(a, str):
+                if isinstance(b, str):
+                    return a < b
+                return True
+            if isinstance(b, str):
+                return False
+
+            for x, y in zip(a, b):
+                if __class__.is_less(x, y):
+                    return True
+                if x != y:
+                    return False
+
+            return len(a) < len(b)
+
+        def __lt__(self, other):
+            return __class__.is_less(self.n, other.n)
+
+    @staticmethod
+    def __get_image(e):
+        d = e.decl()
+        k = d.kind()
+        if k == z3.Z3_OP_FALSE:
+            return False
+        if k == z3.Z3_OP_TRUE:
+            return True
+        if k == z3.Z3_OP_UNINTERPRETED:
+            return str(d)
+
+        args = [__class__.__get_image(e.arg(i))
+                for i in range(e.num_args())]
+
+        # For convenience, enforce a particular order of
+        # arguments of commutative operations.
+        if k != z3.Z3_OP_ITE:
+            args.sort(key=__class__.__Key)
+
+        OPS = {z3.Z3_OP_OR: 'or', z3.Z3_OP_AND: 'and',
+               z3.Z3_OP_NOT: 'not', z3.Z3_OP_ITE: 'if'}
+        return (OPS[k],) + tuple(args)
+
     @property
     def image(self):
         return (self.__e if isinstance(self.__e, bool)
-                else self.__e.serialize())
+                else __class__.__get_image(self.__e))
+
+    @staticmethod
+    def __from_image(i):
+        if not isinstance(i, tuple):
+            if isinstance(i, bool):
+                return z3.BoolVal(i)
+            assert isinstance(i, str)
+            return z3.Bool(i)
+
+        OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not, 'if': z3.If}
+        return OPS[i[0]](*(__class__.__from_image(a) for a in i[1:]))
 
     @staticmethod
     def from_image(image):
         if isinstance(image, bool):
             return TRUE if image else FALSE
-        return Bool(z3.deserialize(image))
+        return Bool(__class__.__from_image(image))
 
     @staticmethod
     def boolify(x):
@@ -167,6 +232,9 @@ class Bool(object):
 
 FALSE = Bool(False)
 TRUE = Bool(True)
+
+# print((Bool('a') & ~Bool('b') & (Bool('c') & TRUE)).image)
+# assert 0
 
 
 class Node(object):
