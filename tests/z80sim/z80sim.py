@@ -238,7 +238,7 @@ TRUE = Bool(True)
 
 
 class Node(object):
-    def __init__(self, index, pull, custom_id=None, state=None):
+    def __init__(self, index, pull, *, custom_id=None, state=None):
         self.custom_id = custom_id
         assert pull is None or isinstance(pull, Bool)
         self.index, self.pull = index, pull
@@ -258,14 +258,14 @@ class Node(object):
     def image(self):
         pull = None if self.pull is None else self.pull.image
         state = None if self.state is None else self.state.image
-        return self.index, self.custom_id, pull, state
+        return pull, state
 
     @staticmethod
-    def from_image(image):
-        index, custom_id, pull, state = image
+    def from_image(index, image):
+        pull, state = image
         pull = None if pull is None else Bool.from_image(pull)
         state = None if state is None else Bool.from_image(state)
-        return Node(index, pull, custom_id, state)
+        return Node(index, pull, state=state)
 
     @property
     def id(self):
@@ -324,11 +324,11 @@ class Transistor(object):
     @property
     def image(self):
         state = None if self.state is None else self.state.image
-        return self.index, self.gate.index, self.c1.index, self.c2.index, state
+        return self.gate.index, self.c1.index, self.c2.index, state
 
     @staticmethod
-    def from_image(image, nodes):
-        index, gate, c1, c2, state = image
+    def from_image(index, image, nodes):
+        gate, c1, c2, state = image
         gate = nodes[gate]
         c1 = nodes[c1]
         c2 = nodes[c2]
@@ -347,6 +347,15 @@ class Transistor(object):
     def get_other_conn(self, n):
         assert n in self.conns
         return self.c1 if n is self.c2 else self.c2
+
+
+def _make_image(nodes, trans):
+    nodes, trans = sorted(nodes), sorted(trans)
+    node_names = tuple((n.index, n.custom_id) for n in nodes
+                       if n.custom_id is not None)
+    nodes = tuple((n.index,) + n.image for n in nodes)
+    trans = tuple((t.index,) + t.image for t in trans)
+    return node_names, nodes, trans
 
 
 def _load_initial_image():
@@ -516,8 +525,7 @@ def _load_initial_image():
                 i: n for i, n in __nodes.items()
                 if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
-            image = (tuple(n.image for n in sorted(nodes.values())),
-                     tuple(t.image for t in sorted(__trans.values())))
+            image = _make_image(nodes.values(), __trans.values())
             temp_path = path.parent / (path.name + '.tmp')
             with temp_path.open('w') as f:
                 pprint.pprint(image, compact=True, stream=f)
@@ -535,23 +543,27 @@ INITIAL_IMAGE = _load_initial_image()
 class Z80Simulator(object):
     @property
     def image(self):
-        return (tuple(n.image for n in sorted(self.__nodes.values())),
-                tuple(t.image for t in sorted(self.__trans.values())))
+        return _make_image(self.__nodes.values(), self.__trans.values())
 
-    def __restore_nodes_from_image(self, image):
-        self.__nodes_by_name = {}
+    def __restore_nodes_from_image(self, names, image):
         self.__nodes = {}
         for i in image:
-            n = Node.from_image(i)
-            if n.custom_id is not None:
-                self.__nodes_by_name[n.custom_id] = n
+            n = Node.from_image(i[0], i[1:])
             self.__nodes[n.index] = n
+
+        self.__nodes_by_name = {}
+        for index, name in names:
+            assert name is not None
+            n = self.__nodes[index]
+            n.custom_id = name
+            self.__nodes_by_name[name] = n
 
     def __restore_transistors_from_image(self, image):
         self.__trans = {}
         for i in image:
-            t = Transistor.from_image(i, self.__nodes)
-            self.__trans[t.index] = t
+            index, i = i[0], i[1:]
+            t = Transistor.from_image(index, i, self.__nodes)
+            self.__trans[index] = t
 
     def __evaluate_state_predicates(self, n, stack):
         gnd = pwr = pullup = pulldown = FALSE
@@ -707,8 +719,8 @@ class Z80Simulator(object):
             assert skip_reset is None
             skip_init = True
 
-        nodes, trans = image
-        self.__restore_nodes_from_image(nodes)
+        node_names, nodes, trans = image
+        self.__restore_nodes_from_image(node_names, nodes)
         self.__restore_transistors_from_image(trans)
 
         self.__gnd = self.__nodes_by_name[_GND_ID]
