@@ -1146,6 +1146,21 @@ class State(object):
         print(f'a: {s.a}')
 
 
+def build_symbolic_states():
+    initial = State()
+    initial.clear_state()
+    initial.cache()
+    initial.report()
+
+    propagated = State(initial)
+    for pin in _PINS:
+        propagated.set_pin_state(pin, f'init.{pin}')
+        propagated.set_pin_pull(pin, f'pull.{pin}')
+    propagated.update_all_nodes()
+    propagated.cache()
+    propagated.report()
+
+
 def test_computing_node_values():
     # With the old function computing node values the LSB of the
     # address bus was always to 0 at the fourth half-tick of
@@ -1161,26 +1176,7 @@ def test_computing_node_values():
     print('Tests passed.')
 
 
-def main():
-    if '--no-tests' not in sys.argv:
-        test_computing_node_values()
-
-    if '--symbolic' in sys.argv:
-        initial = State()
-        initial.clear_state()
-        initial.cache()
-        initial.report()
-
-        propagated = State(initial)
-        for pin in _PINS:
-            propagated.set_pin_state(pin, f'init.{pin}')
-            propagated.set_pin_pull(pin, f'pull.{pin}')
-        propagated.update_all_nodes()
-        propagated.cache()
-        propagated.report()
-
-        return
-
+def play_sandbox():
     memory = [
         # 0x76,  # halt
         0xd3,  # di
@@ -1195,6 +1191,17 @@ def main():
     s = Z80Simulator(memory=memory)
     s.dump()
     s.do_something()
+
+
+def main():
+    if '--test' in sys.argv:
+        test_computing_node_values()
+
+    if '--play-sandbox' in sys.argv:
+        play_sandbox()
+        return
+
+    build_symbolic_states()
 
 
 if __name__ == "__main__":
