@@ -772,14 +772,6 @@ class Z80Simulator(object):
         while self.__nm1.state:
             self.half_tick()
 
-    def __init_chip(self, skip_reset):
-        self.clear_state()
-
-        self.update_all_nodes()
-
-        if not skip_reset:
-            self.__reset()
-
     def __init__(self, *, memory=None, skip_reset=None, image=None):
         if image is None:
             image = State().image
@@ -818,7 +810,12 @@ class Z80Simulator(object):
         self.__t6 = self.__nodes_by_name['t6']
 
         if not skip_init:
-            self.__init_chip(skip_reset)
+            self.clear_state()
+
+            self.update_all_nodes()
+
+            if not skip_reset:
+                self.__reset()
 
         self.__memory = bytearray(0x10000)
         if memory is not None:
