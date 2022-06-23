@@ -40,6 +40,8 @@ def _ceil_div(a, b):
 
 
 class Bool(object):
+    __decls = {}
+
     def __init__(self, e):
         if isinstance(e, z3.BoolRef):
             if z3.is_false(e):
@@ -52,109 +54,33 @@ class Bool(object):
             self.__e = e
         else:
             assert isinstance(e, str)
+            self.__e = __class__.__decls.get(e)
+            if self.__e is not None:
+                return
+
             assert e not in ('0', '1')
             self.__e = z3.Bool(e)
+            __class__.__decls[e] = self.__e
 
     def __repr__(self):
         return (repr(self.__e) if isinstance(self.__e, bool)
                 else self.__e.sexpr())
 
-    @staticmethod
-    def __str(e):
-        d = e.decl()
-        k = d.kind()
-        if k == z3.Z3_OP_FALSE:
-            return '0'
-        if k == z3.Z3_OP_TRUE:
-            return '1'
-        if k == z3.Z3_OP_UNINTERPRETED:
-            return str(d)
-
-        OPS = {z3.Z3_OP_OR: 'or', z3.Z3_OP_AND: 'and',
-               z3.Z3_OP_NOT: 'not', z3.Z3_OP_ITE: 'if'}
-        args = ', '.join(__class__.__str(e.arg(i))
-                         for i in range(e.num_args()))
-        return f'{OPS[k]}({args})'
-
     def __str__(self):
         return (str(int(self.__e)) if isinstance(self.__e, bool)
-                else __class__.__str(self.__e))
-
-    class __Key(object):
-        def __init__(self, n):
-            self.n = n
-
-        @staticmethod
-        def is_less(a, b):
-            if isinstance(a, bool):
-                if isinstance(b, bool):
-                    return a < b
-                return True
-            if isinstance(b, bool):
-                return False
-
-            if isinstance(a, str):
-                if isinstance(b, str):
-                    return a < b
-                return True
-            if isinstance(b, str):
-                return False
-
-            for x, y in zip(a, b):
-                if __class__.is_less(x, y):
-                    return True
-                if x != y:
-                    return False
-
-            return len(a) < len(b)
-
-        def __lt__(self, other):
-            return __class__.is_less(self.n, other.n)
-
-    @staticmethod
-    def __get_image(e):
-        d = e.decl()
-        k = d.kind()
-        if k == z3.Z3_OP_FALSE:
-            return False
-        if k == z3.Z3_OP_TRUE:
-            return True
-        if k == z3.Z3_OP_UNINTERPRETED:
-            return str(d)
-
-        args = [__class__.__get_image(e.arg(i))
-                for i in range(e.num_args())]
-
-        # For convenience, enforce a particular order of
-        # arguments of commutative operations.
-        if k != z3.Z3_OP_ITE:
-            args.sort(key=__class__.__Key)
-
-        OPS = {z3.Z3_OP_OR: 'or', z3.Z3_OP_AND: 'and',
-               z3.Z3_OP_NOT: 'not', z3.Z3_OP_ITE: 'if'}
-        return (OPS[k],) + tuple(args)
+                else self.__e.sexpr())
 
     @property
     def image(self):
         return (self.__e if isinstance(self.__e, bool)
-                else __class__.__get_image(self.__e))
-
-    @staticmethod
-    def __from_image(i):
-        if not isinstance(i, tuple):
-            if isinstance(i, bool):
-                return z3.BoolVal(i)
-            assert isinstance(i, str)
-            return z3.Bool(i)
-
-        OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not, 'if': z3.If}
-        return OPS[i[0]](*(__class__.__from_image(a) for a in i[1:]))
+                else self.__e.sexpr())
 
     @staticmethod
     def from_image(image):
         if isinstance(image, bool):
             return TRUE if image else FALSE
-        return Bool(__class__.__from_image(image))
+        return Bool(z3.parse_smt2_string(f'(assert {image})',
+                                         decls=__class__.__decls)[0])
 
     @staticmethod
     def boolify(x):
@@ -348,7 +274,7 @@ class Bits(object):
 class Node(object):
     def __init__(self, index, pull, *, custom_id=None, state=None):
         self.custom_id = custom_id
-        assert pull is None or isinstance(pull, Bool)
+        assert pull is None or isinstance(pull, Bool), pull
         self.index, self.pull = index, pull
         self.state = state
 
@@ -744,7 +670,7 @@ class Z80Simulator(object):
             assert round < 100, 'Loop encountered!'
 
             if '--show-rounds' in sys.argv:
-                print(f'Round {round}: {len(nodes)} nodes.')
+                print(f'Round {round}: {len(nodes):,} nodes.')
 
             more = []
             for n in nodes:
@@ -752,6 +678,8 @@ class Z80Simulator(object):
             nodes = more
 
     def __set_node(self, n, pull):
+        if '--show-set-nodes' in sys.argv:
+            print(n, pull)
         n.pull = Bool.boolify(pull)
         self.__update_nodes([n])
 
@@ -763,7 +691,7 @@ class Z80Simulator(object):
 
         self.nclk = ~self.nclk
 
-        self.__print_state()
+        # self.__print_state()
 
     def __tick(self):
         self.half_tick()
@@ -779,24 +707,36 @@ class Z80Simulator(object):
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
 
-    def reset(self):
-        self.nreset = FALSE
+    __DEFAULT_RESET_PROPAGATION_DELAY = 31
+
+    def reset(self, propagation_delay=__DEFAULT_RESET_PROPAGATION_DELAY,
+              waiting_for_m1_delay=None):
         self.nclk = TRUE
+
+        self.nreset = FALSE
         self.nbusrq = TRUE
         self.nint = TRUE
         self.nnmi = TRUE
         self.nwait = TRUE
 
         # Propagate the reset signal.
-        for _ in range(31):
+        for _ in range(propagation_delay):
             self.half_tick()
 
         self.nreset = TRUE
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
-        while self.__nm1.state:
-            self.half_tick()
+        if waiting_for_m1_delay is None:
+            count = 0
+            while self.__nm1.state:
+                self.half_tick()
+                count += 1
+            if '--show-waiting-for-m1-delay' in sys.argv:
+                print('waiting-for-m1 delay:', count)
+        else:
+            for _ in range(waiting_for_m1_delay):
+                self.half_tick()
 
     def __init__(self, *, memory=None, skip_reset=None, image=None):
         if image is None:
@@ -805,7 +745,8 @@ class Z80Simulator(object):
             s.update_all_nodes()
 
             if not skip_reset:
-                s.reset()
+                s.reset(__class__.__DEFAULT_RESET_PROPAGATION_DELAY,
+                        waiting_for_m1_delay=None)
 
             s.cache()
             image = s.image
@@ -963,8 +904,11 @@ class Z80Simulator(object):
     def t6(self):
         return self.__t6.state
 
-    def read_bits(self, name, width=8):
-        return Bits(self.__nodes_by_name[f'{name}{i}'].state
+    def get_node(self, id):
+        return self.__nodes_by_name[id]
+
+    def read_nodes(self, id, width=8):
+        return Bits(self.__nodes_by_name[f'{id}{i}'].state
                     for i in range(width))
 
     def __write_bits(self, name, value, width=8):
@@ -974,11 +918,11 @@ class Z80Simulator(object):
 
     @property
     def abus(self):
-        return self.read_bits('ab', 16)
+        return self.read_nodes('ab', 16)
 
     @property
     def dbus(self):
-        return self.read_bits('db')
+        return self.read_nodes('db')
 
     @dbus.setter
     def dbus(self, n):
@@ -986,16 +930,16 @@ class Z80Simulator(object):
 
     @property
     def a(self):
-        return self.read_bits('reg_a')
+        return self.read_nodes('reg_a')
 
     @property
     def r(self):
-        return self.read_bits('reg_r')
+        return self.read_nodes('reg_r')
 
     @property
     def pc(self):
-        lo = self.read_bits('reg_pcl')
-        hi = self.read_bits('reg_pch')
+        lo = self.read_nodes('reg_pcl')
+        hi = self.read_nodes('reg_pch')
         return (hi << 8) | lo
 
     def set_pin_state(self, pin, state):
@@ -1005,6 +949,10 @@ class Z80Simulator(object):
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
         self.__nodes_by_name[pin].pull = Bool.boolify(pull)
+
+    def update_pin(self, pin):
+        n = self.__nodes_by_name[pin]
+        self.__update_nodes([n])
 
     def update_all_nodes(self):
         self.__update_nodes([n for n in self.__nodes.values()
@@ -1083,8 +1031,11 @@ class State(object):
     @staticmethod
     def __try_load_state(steps):
         try:
-            with __class__.__get_path(steps).open() as f:
+            path = __class__.__get_path(steps)
+            with path.open() as f:
                 state = ast.literal_eval(f.read())
+            if '--show-loaded-state' in sys.argv:
+                print(path)
             stored_steps, image = state
             assert stored_steps == tuple(steps)
             return image
@@ -1092,18 +1043,6 @@ class State(object):
             return None
 
     def __apply_new_steps(self):
-        if self.__current_image is None:
-            assert not self.__current_steps
-            self.__current_image = (
-                __class__.__try_load_state(self.__current_steps))
-
-            if self.__current_image is None:
-                self.__current_image = _load_initial_image()
-
-                # Always store the initial image.
-                __class__.__cache_state(self.__current_steps,
-                                        self.__current_image)
-
         missing_steps = []
         while self.__new_steps:
             steps = self.__current_steps + self.__new_steps
@@ -1115,6 +1054,18 @@ class State(object):
             self.__current_image = image
             self.__current_steps.extend(self.__new_steps)
             self.__new_steps = []
+
+        if self.__current_image is None:
+            assert not self.__current_steps
+            self.__current_image = (
+                __class__.__try_load_state(self.__current_steps))
+
+            if self.__current_image is None:
+                self.__current_image = _load_initial_image()
+
+                # Always store the initial image.
+                __class__.__cache_state(self.__current_steps,
+                                        self.__current_image)
 
         if not missing_steps:
             return
@@ -1144,13 +1095,19 @@ class State(object):
             sim.set_pin_state(pin, Bool.from_image(state))
         elif kind == 'set_pin_pull':
             _, pin, pull = step
-            sim.set_pin_state(pin, Bool.from_image(pull))
+            sim.set_pin_pull(pin, Bool.from_image(pull))
+        elif kind == 'update_pin':
+            _, pin = step
+            sim.update_pin(pin)
         elif kind == 'update_all_nodes':
             _, = step
             sim.update_all_nodes()
         elif kind == 'reset':
+            _, propagation_delay, waiting_for_m1_delay = step
+            sim.reset(propagation_delay, waiting_for_m1_delay)
+        elif kind == 'half_tick':
             _, = step
-            sim.reset()
+            sim.half_tick()
         else:
             assert 0, step
 
@@ -1165,11 +1122,26 @@ class State(object):
         step = 'set_pin_pull', pin, Bool.boolify(pull).image
         self.__new_steps.append(step)
 
+    def update_pin(self, pin):
+        self.__new_steps.append(('update_pin', pin))
+
+    def set_pin_and_update(self, pin, pull):
+        self.set_pin_pull(pin, pull)
+        self.update_pin(pin)
+
     def update_all_nodes(self):
         self.__new_steps.append(('update_all_nodes',))
 
-    def reset(self):
-        self.__new_steps.append(('reset',))
+    def reset(self, propagation_delay, waiting_for_m1_delay):
+        self.__new_steps.append(('reset', propagation_delay,
+                                 waiting_for_m1_delay))
+
+    def half_tick(self):
+        self.__new_steps.append(('half_tick',))
+
+    def tick(self):
+        self.half_tick()
+        self.half_tick()
 
     def cache(self):
         steps = self.__current_steps + self.__new_steps
@@ -1178,20 +1150,38 @@ class State(object):
             __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
 
-    def report(self, title):
-        print(title)
+    def report(self, id):
+        # Cache reported images.
+        self.cache()
+
+        if f'--{id}' not in sys.argv:
+            return
+
+        # Generate image before printing results.
+        image = self.image
+
+        print(id)
         print(self.hash)
 
-        s = Z80Simulator(image=self.image)
+        s = Z80Simulator(image=image)
+
+        def print_bit(id, with_pull=False):
+            n = s.get_node(id)
+            print(f'  {id}: {n.state}')
+            if with_pull:
+                print(f'  {id} pull: {n.pull}')
 
         def print_bits(id, width):
-            bits = s.read_bits(id, width)
+            bits = s.read_nodes(id, width)
             if not isinstance(bits.value, tuple):
                 print(f'  {id}: {bits}')
                 return
 
             for i in reversed(range(bits.width)):
                 print(f'  {id}{i}: {bits[i]}')
+
+        for pin in _PINS:
+            print_bit(pin, with_pull=True)
 
         for r in ('reg_pch', 'reg_pcl',
                   'reg_b', 'reg_c', 'reg_d', 'reg_e',
@@ -1210,25 +1200,33 @@ class State(object):
         # TODO: The SCF/SCC flag discovered by Patrik Rak, see
         #       https://github.com/kosarev/z80/issues/42
 
-        print()
+        sys.exit()
 
 
 def build_symbolic_states():
     s = State()
     s.clear_state()
-    s.cache()
-    # s.report('Initial state.')
+    s.report('after-clearing-state')
 
     for pin in _PINS:
         s.set_pin_state(pin, f'init.{pin}')
         s.set_pin_pull(pin, f'pull.{pin}')
     s.update_all_nodes()
-    s.cache()
-    # s.report('All signals propagated.')
+    s.report('after-updating-all-nodes')
 
-    s.reset()
-    s.cache()
-    s.report('Reset sequence performed.')
+    s.reset(propagation_delay=31, waiting_for_m1_delay=5)
+    s.report('after-reset')
+
+    # Feed it a nop.
+    nop = State(s)
+    for i in range(8):
+        nop.set_pin_and_update(f'db{i}', FALSE)
+    nop.tick()
+    nop.tick()
+    nop.tick()
+    nop.tick()
+    nop.report('after-reset-and-nop')
+    del nop
 
 
 def test_computing_node_values():
