@@ -233,8 +233,15 @@ class Bool(object):
 FALSE = Bool(False)
 TRUE = Bool(True)
 
-# print((Bool('a') & ~Bool('b') & (Bool('c') & TRUE)).image)
-# assert 0
+
+class Bits(object):
+    def __init__(self, bits):
+        self.__bits = tuple(bits)
+
+    def __repr__(self):
+        if all(b is None for b in self.__bits):
+            return repr(None)
+        assert 0  # TODO
 
 
 class Node(object):
@@ -511,33 +518,18 @@ def _load_initial_image():
                 remove(*n.used_in)
 
     def load_defs():
-        path = _CACHE_ROOT / 'initial_image'
-        try:
-            with path.open() as f:
-                return ast.literal_eval(f.read())
-        except FileNotFoundError:
-            load_nodes()
-            load_node_names()
-            load_transistors()
+        load_nodes()
+        load_node_names()
+        load_transistors()
 
-            # Remove unused nodes.
-            nodes = {
-                i: n for i, n in __nodes.items()
-                if len(n.conn_of) > 0 or len(n.gate_of) > 0}
+        # Remove unused nodes.
+        nodes = {
+            i: n for i, n in __nodes.items()
+            if len(n.conn_of) > 0 or len(n.gate_of) > 0}
 
-            image = _make_image(nodes.values(), __trans.values())
-            temp_path = path.parent / (path.name + '.tmp')
-            with temp_path.open('w') as f:
-                pprint.pprint(image, compact=True, stream=f)
-
-            temp_path.rename(path)
-
-            return image
+        return _make_image(nodes.values(), __trans.values())
 
     return load_defs()
-
-
-INITIAL_IMAGE = _load_initial_image()
 
 
 class Z80Simulator(object):
@@ -871,11 +863,8 @@ class Z80Simulator(object):
         return self.__t6.state
 
     def __read_bits(self, name, width=8):
-        res = 0
-        for i in range(width):
-            state = self.__nodes_by_name[name + str(i)].state
-            res |= int(state.value) << i
-        return res
+        return Bits(self.__nodes_by_name[f'{name}{i}'].state
+                    for i in range(width))
 
     def __write_bits(self, name, value, width=8):
         for i in range(width):
@@ -956,6 +945,66 @@ class Z80Simulator(object):
                              if n not in self.__gnd_pwr])
 
 
+class State(object):
+    def __init__(self, base=None):
+        self.__steps = []
+
+    @staticmethod
+    def __get_path(steps):
+        key = str(tuple(steps)).encode()
+        h = hashlib.sha256(key).hexdigest()
+        return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h[6:]
+
+    @staticmethod
+    def __store_state(steps, image):
+        state = tuple(steps), image
+
+        path = __class__.__get_path(steps)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        temp_path = path.parent / (path.name + '.tmp')
+        with temp_path.open('w') as f:
+            pprint.pprint(state, compact=True, stream=f)
+
+        temp_path.rename(path)
+
+    def __get_or_build_image(self):
+        steps = list(self.__steps)
+        missing_steps = []
+        while True:
+            try:
+                with __class__.__get_path(steps).open() as f:
+                    _, image = ast.literal_eval(f.read())
+                break
+            except FileNotFoundError:
+                if steps:
+                    missing_steps.insert(0, steps.pop())
+                    continue
+
+                image = _load_initial_image()
+                __class__.__store_state(steps, image)
+                break
+
+        if not missing_steps:
+            return image
+
+        sim = Z80Simulator(image=image)
+
+        while missing_steps:
+            step = missing_steps.pop(0)
+            __class__.__apply_step(sim, step)
+
+            steps.append(step)
+            image = sim.image
+            __class__.__store_state(steps, image)
+
+        return image
+
+    def report(self):
+        s = Z80Simulator(image=self.__get_or_build_image())
+        print(f'a: {s.a}')
+
+
 def test_computing_node_values():
     # With the old function computing node values the LSB of the
     # address bus was always to 0 at the fourth half-tick of
@@ -976,20 +1025,8 @@ def main():
         test_computing_node_values()
 
     if '--symbolic' in sys.argv:
-        path = _CACHE_ROOT / 'resulting_image'
-        try:
-            with path.open() as f:
-                image = ast.literal_eval(f.read())
-            s = Z80Simulator(image=image)
-        except FileNotFoundError:
-            s = Z80Simulator(skip_reset=True)
-            s.do_something_symbolically()
-
-            with path.open('w') as f:
-                pprint.pprint(s.image, compact=True, stream=f)
-
-        print(f'a: {s.a:#04x}')
-
+        s = State()
+        s.report()
         return
 
     memory = [
