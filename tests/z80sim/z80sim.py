@@ -756,6 +756,8 @@ class Z80Simulator(object):
     def __init_chip(self, skip_reset):
         self.clear_state()
 
+        self.update_all_nodes()
+
         if skip_reset:
             return
 
@@ -765,9 +767,6 @@ class Z80Simulator(object):
         self.nint = TRUE
         self.nnmi = TRUE
         self.nwait = TRUE
-
-        self.__update_nodes([n for n in self.__nodes.values()
-                             if n not in self.__gnd_pwr])
 
         # Propagate the reset signal.
         for _ in range(31):
