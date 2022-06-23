@@ -280,7 +280,7 @@ class Bits(object):
 
     def __int__(self):
         v = self.value
-        assert isinstance(v, int)  # TODO
+        assert isinstance(v, int), v  # TODO
         return v
 
     def __repr__(self):
@@ -753,7 +753,7 @@ class Z80Simulator(object):
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
 
-    def __reset(self):
+    def reset(self):
         self.nreset = FALSE
         self.nclk = TRUE
         self.nbusrq = TRUE
@@ -774,12 +774,18 @@ class Z80Simulator(object):
 
     def __init__(self, *, memory=None, skip_reset=None, image=None):
         if image is None:
-            image = State().image
-            skip_init = False
+            s = State()
+            s.clear_state()
+            s.update_all_nodes()
+
+            if not skip_reset:
+                s.reset()
+
+            s.cache()
+            image = s.image
         else:
             # For custom images, leave them as-is.
             assert skip_reset is None
-            skip_init = True
 
         node_names, nodes, trans = image
         self.__restore_nodes_from_image(node_names, nodes)
@@ -808,14 +814,6 @@ class Z80Simulator(object):
         self.__t4 = self.__nodes_by_name['t4']
         self.__t5 = self.__nodes_by_name['t5']
         self.__t6 = self.__nodes_by_name['t6']
-
-        if not skip_init:
-            self.clear_state()
-
-            self.update_all_nodes()
-
-            if not skip_reset:
-                self.__reset()
 
         self.__memory = bytearray(0x10000)
         if memory is not None:
@@ -1034,7 +1032,7 @@ class State(object):
         return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h
 
     @staticmethod
-    def __store_state(steps, image):
+    def __cache_state(steps, image):
         state = tuple(steps), image
 
         path = __class__.__get_path(steps)
@@ -1067,7 +1065,7 @@ class State(object):
                 self.__current_image = _load_initial_image()
 
                 # Always store the initial image.
-                __class__.__store_state(self.__current_steps,
+                __class__.__cache_state(self.__current_steps,
                                         self.__current_image)
 
         missing_steps = []
@@ -1114,6 +1112,9 @@ class State(object):
         elif kind == 'update_all_nodes':
             _, = step
             sim.update_all_nodes()
+        elif kind == 'reset':
+            _, = step
+            sim.reset()
         else:
             assert 0, step
 
@@ -1131,10 +1132,13 @@ class State(object):
     def update_all_nodes(self):
         self.__new_steps.append(('update_all_nodes',))
 
-    def store(self):
+    def reset(self):
+        self.__new_steps.append(('reset',))
+
+    def cache(self):
         self.__apply_new_steps()
         if not self.__get_path(self.__current_steps).exists():
-            __class__.__store_state(self.__current_steps,
+            __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
 
     def report(self):
@@ -1164,7 +1168,7 @@ def main():
     if '--symbolic' in sys.argv:
         initial = State()
         initial.clear_state()
-        initial.store()
+        initial.cache()
         initial.report()
 
         propagated = State(initial)
@@ -1172,7 +1176,7 @@ def main():
             propagated.set_pin_state(pin, f'init.{pin}')
             propagated.set_pin_pull(pin, f'pull.{pin}')
         propagated.update_all_nodes()
-        propagated.store()
+        propagated.cache()
         propagated.report()
 
         return
