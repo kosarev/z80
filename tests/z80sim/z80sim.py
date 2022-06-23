@@ -52,6 +52,7 @@ class Bool(object):
             self.__e = e
         else:
             assert isinstance(e, str)
+            assert e not in ('0', '1')
             self.__e = z3.Bool(e)
 
     def __repr__(self):
@@ -63,9 +64,9 @@ class Bool(object):
         d = e.decl()
         k = d.kind()
         if k == z3.Z3_OP_FALSE:
-            return str(False)
+            return '0'
         if k == z3.Z3_OP_TRUE:
-            return str(True)
+            return '1'
         if k == z3.Z3_OP_UNINTERPRETED:
             return str(d)
 
@@ -76,7 +77,7 @@ class Bool(object):
         return f'{OPS[k]}({args})'
 
     def __str__(self):
-        return (str(self.__e) if isinstance(self.__e, bool)
+        return (str(int(self.__e)) if isinstance(self.__e, bool)
                 else __class__.__str(self.__e))
 
     class __Key(object):
@@ -743,7 +744,7 @@ class Z80Simulator(object):
             assert round < 100, 'Loop encountered!'
 
             if '--show-rounds' in sys.argv:
-                print(f'Round {round}, {len(nodes)} nodes.')
+                print(f'Round {round}: {len(nodes)} nodes.')
 
             more = []
             for n in nodes:
@@ -755,7 +756,7 @@ class Z80Simulator(object):
         self.__update_nodes([n])
 
     def half_tick(self):
-        if self.clk:
+        if self.__memory is not None and self.clk:
             if self.mreq and not self.rfsh and not self.iorq:
                 if self.m1 and self.rd and self.t2:
                     self.dbus = self.__memory[int(self.abus)]
@@ -840,8 +841,10 @@ class Z80Simulator(object):
         self.__t5 = self.__nodes_by_name['t5']
         self.__t6 = self.__nodes_by_name['t6']
 
-        self.__memory = bytearray(0x10000)
-        if memory is not None:
+        if memory is None:
+            self.__memory = None
+        else:
+            self.__memory = bytearray(0x10000)
             self.__memory[:len(memory)] = memory
 
     @property
@@ -1016,19 +1019,19 @@ class Z80Simulator(object):
         print(f'PC {self.pc}, '
               f'A {self.a}, '
               f'R {self.r}, '
-              f'clk {int(self.clk)}, '
+              f'clk {self.clk}, '
               f'abus {self.abus}, '
               f'dbus {self.dbus}, '
-              f'm1 {int(self.m1)}, '
-              f't1 {int(self.t1)}, '
-              f't2 {int(self.t2)}, '
-              f't3 {int(self.t3)}, '
-              f't4 {int(self.t4)}, '
-              f't5 {int(self.t5)}, '
-              f't6 {int(self.t6)}, '
-              f'rfsh {int(self.rfsh)}, '
-              f'rd {int(self.rd)}, '
-              f'mreq {int(self.mreq)}')
+              f'm1 {self.m1}, '
+              f't1 {self.t1}, '
+              f't2 {self.t2}, '
+              f't3 {self.t3}, '
+              f't4 {self.t4}, '
+              f't5 {self.t5}, '
+              f't6 {self.t6}, '
+              f'rfsh {self.rfsh}, '
+              f'rd {self.rd}, '
+              f'mreq {self.mreq}')
 
     # TODO
     def do_something(self):
@@ -1183,9 +1186,8 @@ class State(object):
 
         def print_bits(id, width):
             bits = s.read_bits(id, width)
-            v = bits.value
-            if not isinstance(v, tuple):
-                print(f'  {id}: {v}')
+            if not isinstance(bits.value, tuple):
+                print(f'  {id}: {bits}')
                 return
 
             for i in reversed(range(bits.width)):
@@ -1212,18 +1214,21 @@ class State(object):
 
 
 def build_symbolic_states():
-    initial = State()
-    initial.clear_state()
-    initial.cache()
-    # initial.report('Initial state.')
+    s = State()
+    s.clear_state()
+    s.cache()
+    # s.report('Initial state.')
 
-    propagated = State(initial)
     for pin in _PINS:
-        propagated.set_pin_state(pin, f'init.{pin}')
-        propagated.set_pin_pull(pin, f'pull.{pin}')
-    propagated.update_all_nodes()
-    propagated.cache()
-    propagated.report('All signals propagated.')
+        s.set_pin_state(pin, f'init.{pin}')
+        s.set_pin_pull(pin, f'pull.{pin}')
+    s.update_all_nodes()
+    s.cache()
+    # s.report('All signals propagated.')
+
+    s.reset()
+    s.cache()
+    s.report('Reset sequence performed.')
 
 
 def test_computing_node_values():
@@ -1231,7 +1236,7 @@ def test_computing_node_values():
     # address bus was always to 0 at the fourth half-tick of
     # fetch cycles. Make sure with the new logic the address bus
     # maintains the right value.
-    s = Z80Simulator()
+    s = Z80Simulator(memory=[])
     while s.abus == 0x0000:
         s.half_tick()
     while s.abus == 0x0001:
