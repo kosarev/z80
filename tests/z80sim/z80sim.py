@@ -23,8 +23,20 @@ import z3
 _CACHE_ROOT = pathlib.Path('__z80sim_cache')
 assert _CACHE_ROOT.exists()
 
+HASH = hashlib.sha256
+
 _GND_ID = 'gnd'
 _PWR_ID = 'pwr'
+_PINS = (
+    'ab0', 'ab1', 'ab2', 'ab3', 'ab4', 'ab5', 'ab6', 'ab7',
+    'ab8', 'ab9', 'ab10', 'ab11', 'ab12', 'ab13', 'ab14', 'ab15',
+    'db0', 'db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7',
+    '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
+    '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
+
+
+def _ceil_div(a, b):
+    return -(a // -b)
 
 
 class Bool(object):
@@ -183,18 +195,18 @@ class Bool(object):
             b = z3.BoolVal(b)
 
         key = a.sexpr() + ':' + b.sexpr()
-        h = hashlib.sha256(key.encode()).hexdigest()
+        h = HASH(key.encode()).hexdigest()
 
         if h in __class__.__equiv0_cache:
             return False
         if h in __class__.__equiv1_cache:
             return True
 
-        path0 = _CACHE_ROOT / 'equiv0' / h[:3] / h[3:6] / h[6:]
+        path0 = _CACHE_ROOT / 'equiv0' / h[:3] / h[3:6] / h
         if path0.exists():
             __class__.__equiv0_cache.add(h)
             return False
-        path1 = _CACHE_ROOT / 'equiv1' / h[:3] / h[3:6] / h[6:]
+        path1 = _CACHE_ROOT / 'equiv1' / h[:3] / h[3:6] / h
         if path1.exists():
             __class__.__equiv1_cache.add(h)
             return True
@@ -218,16 +230,22 @@ class Bool(object):
     def is_equiv(self, other):
         return __class__.__is_equiv(self.__e, other.__e)
 
+    def simplified(self):
+        if isinstance(self.__e, bool):
+            return self
+
+        return Bool(z3.simplify(self.__e))
+
     def reduced(self):
         if isinstance(self.__e, bool):
             return self
 
-        simplified = z3.simplify(self.__e)
+        simplified = self.simplified()
         for c in (FALSE, TRUE):
-            if __class__.__is_equiv(simplified, c.__e):
+            if __class__.__is_equiv(simplified.__e, c.__e):
                 return c
 
-        return Bool(simplified)
+        return simplified
 
 
 FALSE = Bool(False)
@@ -238,10 +256,67 @@ class Bits(object):
     def __init__(self, bits):
         self.__bits = tuple(bits)
 
-    def __repr__(self):
+    @property
+    def width(self):
+        return len(self.__bits)
+
+    @property
+    def size_in_bytes(self):
+        return _ceil_div(self.width, 8)
+
+    @property
+    def value(self):
         if all(b is None for b in self.__bits):
-            return repr(None)
+            return None
+
+        values = tuple(b.value for b in self.__bits)
+        if all(v is not None for v in values):
+            n = 0
+            for i, v in enumerate(values):
+                n |= int(v) << i
+            return n
+
         assert 0  # TODO
+
+    def __int__(self):
+        v = self.value
+        assert isinstance(v, int)  # TODO
+        return v
+
+    def __repr__(self):
+        return repr(self.__bits)
+
+    def __str__(self):
+        v = self.value
+        if v is None:
+            return str(None)
+
+        if isinstance(v, int):
+            return '{:0{}x}'.format(v, self.size_in_bytes * 2)
+
+        assert 0  # TODO
+
+    def zero_extended(self, width):
+        if self.width >= width:
+            return self
+        return Bits(self.__bits + (FALSE,) * (width - self.width))
+
+    @staticmethod
+    def zero_extend_to_same_width(*args):
+        w = max(a.width for a in args)
+        return (a.zero_extended(w) for a in args)
+
+    def __lshift__(self, n):
+        return Bits((FALSE,) * n + self.__bits)
+
+    def __or__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return Bits((x | y).simplified()
+                    for x, y in zip(a.__bits, b.__bits))
+
+    def __eq__(self, other):
+        assert isinstance(other, int)  # TODO
+        return int(self) == other
 
 
 class Node(object):
@@ -642,7 +717,7 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            if '--no-rounds' not in sys.argv:
+            if '--show-rounds' in sys.argv:
                 print(f'Round {round}, {len(nodes)} nodes.')
 
             more = []
@@ -658,7 +733,7 @@ class Z80Simulator(object):
         if self.clk:
             if self.mreq and not self.rfsh and not self.iorq:
                 if self.m1 and self.rd and self.t2:
-                    self.dbus = self.__memory[self.abus]
+                    self.dbus = self.__memory[int(self.abus)]
 
         self.nclk = ~self.nclk
 
@@ -668,7 +743,7 @@ class Z80Simulator(object):
         self.half_tick()
         self.half_tick()
 
-    def __init_chip(self, skip_reset):
+    def clear_state(self):
         for n in self.__nodes.values():
             n.state = FALSE
 
@@ -677,6 +752,9 @@ class Z80Simulator(object):
 
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
+
+    def __init_chip(self, skip_reset):
+        self.clear_state()
 
         if skip_reset:
             return
@@ -704,7 +782,7 @@ class Z80Simulator(object):
 
     def __init__(self, *, memory=None, skip_reset=None, image=None):
         if image is None:
-            image = INITIAL_IMAGE
+            image = State().image
             skip_init = False
         else:
             # For custom images, leave them as-is.
@@ -897,18 +975,30 @@ class Z80Simulator(object):
         hi = self.__read_bits('reg_pch')
         return (hi << 8) | lo
 
+    def set_pin_state(self, pin, state):
+        assert pin in _PINS
+        self.__nodes_by_name[pin].state = Bool.boolify(state)
+
+    def set_pin_pull(self, pin, pull):
+        assert pin in _PINS
+        self.__nodes_by_name[pin].pull = Bool.boolify(pull)
+
+    def update_all_nodes(self):
+        self.__update_nodes([n for n in self.__nodes.values()
+                             if n not in self.__gnd_pwr])
+
     def dump(self):
         with open('z80.dump', mode='w') as f:
             for t in sorted(self.__trans.values()):
                 print(t, file=f)
 
     def __print_state(self):
-        print(f'PC {self.pc:04x}, '
-              f'A {self.a:02x}, '
-              f'R {self.r:02x}, '
+        print(f'PC {self.pc}, '
+              f'A {self.a}, '
+              f'R {self.r}, '
               f'clk {int(self.clk)}, '
-              f'abus {self.abus:04x}, '
-              f'dbus {self.dbus:02x}, '
+              f'abus {self.abus}, '
+              f'dbus {self.dbus}, '
               f'm1 {int(self.m1)}, '
               f't1 {int(self.t1)}, '
               f't2 {int(self.t2)}, '
@@ -928,32 +1018,23 @@ class Z80Simulator(object):
 
             self.half_tick()
 
-    # TODO
-    def do_something_symbolically(self):
-        PINS = (
-            'ab0', 'ab1', 'ab2', 'ab3', 'ab4', 'ab5', 'ab6', 'ab7',
-            'ab8', 'ab9', 'ab10', 'ab11', 'ab12', 'ab13', 'ab14', 'ab15',
-            'db0', 'db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7',
-            '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
-            '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
-        for pin in PINS:
-            n = self.__nodes_by_name[pin]
-            n.state = Bool(f'init.{n.id}')
-            n.pull = Bool(f'pull.{n.id}')
-
-        self.__update_nodes([n for n in self.__nodes.values()
-                             if n not in self.__gnd_pwr])
-
 
 class State(object):
-    def __init__(self, base=None):
-        self.__steps = []
+    def __init__(self, other=None):
+        if other is None:
+            self.__current_steps = []
+            self.__current_image = None
+            self.__new_steps = []
+        else:
+            self.__current_steps = list(other.__current_steps)
+            self.__current_image = other.__current_image
+            self.__new_steps = list(other.__new_steps)
 
     @staticmethod
     def __get_path(steps):
         key = str(tuple(steps)).encode()
-        h = hashlib.sha256(key).hexdigest()
-        return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h[6:]
+        h = HASH(key).hexdigest()
+        return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h
 
     @staticmethod
     def __store_state(steps, image):
@@ -968,40 +1049,99 @@ class State(object):
 
         temp_path.rename(path)
 
-    def __get_or_build_image(self):
-        steps = list(self.__steps)
-        missing_steps = []
-        while True:
-            try:
-                with __class__.__get_path(steps).open() as f:
-                    _, image = ast.literal_eval(f.read())
-                break
-            except FileNotFoundError:
-                if steps:
-                    missing_steps.insert(0, steps.pop())
-                    continue
+    @staticmethod
+    def __try_load_state(steps):
+        try:
+            with __class__.__get_path(steps).open() as f:
+                state = ast.literal_eval(f.read())
+            stored_steps, image = state
+            assert stored_steps == tuple(steps)
+            return image
+        except FileNotFoundError:
+            return None
 
-                image = _load_initial_image()
-                __class__.__store_state(steps, image)
-                break
+    def __apply_new_steps(self):
+        if self.__current_image is None:
+            assert not self.__current_steps
+            self.__current_image = (
+                __class__.__try_load_state(self.__current_steps))
+
+            if self.__current_image is None:
+                self.__current_image = _load_initial_image()
+
+                # Always store the initial image.
+                __class__.__store_state(self.__current_steps,
+                                        self.__current_image)
+
+        missing_steps = []
+        while self.__new_steps:
+            steps = self.__current_steps + self.__new_steps
+            image = __class__.__try_load_state(steps)
+            if image is None:
+                missing_steps.insert(0, self.__new_steps.pop())
+                continue
+
+            self.__current_image = image
+            self.__current_steps.extend(self.__new_steps)
+            self.__new_steps = []
 
         if not missing_steps:
-            return image
+            return
 
-        sim = Z80Simulator(image=image)
+        sim = Z80Simulator(image=self.__current_image)
 
         while missing_steps:
             step = missing_steps.pop(0)
             __class__.__apply_step(sim, step)
+            self.__current_steps.append(step)
 
-            steps.append(step)
-            image = sim.image
-            __class__.__store_state(steps, image)
+        self.__current_image = sim.image
 
-        return image
+    @property
+    def image(self):
+        self.__apply_new_steps()
+        return self.__current_image
+
+    @staticmethod
+    def __apply_step(sim, step):
+        kind = step[0]
+        if kind == 'clear_state':
+            _, = step
+            sim.clear_state()
+        elif kind == 'set_pin_state':
+            _, pin, state = step
+            sim.set_pin_state(pin, Bool.from_image(state))
+        elif kind == 'set_pin_pull':
+            _, pin, pull = step
+            sim.set_pin_state(pin, Bool.from_image(pull))
+        elif kind == 'update_all_nodes':
+            _, = step
+            sim.update_all_nodes()
+        else:
+            assert 0, step
+
+    def clear_state(self):
+        self.__new_steps.append(('clear_state',))
+
+    def set_pin_state(self, pin, state):
+        step = 'set_pin_state', pin, Bool.boolify(state).image
+        self.__new_steps.append(step)
+
+    def set_pin_pull(self, pin, pull):
+        step = 'set_pin_pull', pin, Bool.boolify(pull).image
+        self.__new_steps.append(step)
+
+    def update_all_nodes(self):
+        self.__new_steps.append(('update_all_nodes',))
+
+    def store(self):
+        self.__apply_new_steps()
+        if not self.__get_path(self.__current_steps).exists():
+            __class__.__store_state(self.__current_steps,
+                                    self.__current_image)
 
     def report(self):
-        s = Z80Simulator(image=self.__get_or_build_image())
+        s = Z80Simulator(image=self.image)
         print(f'a: {s.a}')
 
 
@@ -1025,8 +1165,19 @@ def main():
         test_computing_node_values()
 
     if '--symbolic' in sys.argv:
-        s = State()
-        s.report()
+        initial = State()
+        initial.clear_state()
+        initial.store()
+        initial.report()
+
+        propagated = State(initial)
+        for pin in _PINS:
+            propagated.set_pin_state(pin, f'init.{pin}')
+            propagated.set_pin_pull(pin, f'pull.{pin}')
+        propagated.update_all_nodes()
+        propagated.store()
+        propagated.report()
+
         return
 
     memory = [
