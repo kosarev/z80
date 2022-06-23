@@ -1129,6 +1129,11 @@ class State(object):
         self.set_pin_pull(pin, pull)
         self.update_pin(pin)
 
+    def set_pins_and_update(self, pin, width, n):
+        for i in range(width):
+            v = bool(n & (1 << i))
+            self.set_pin_and_update(f'{pin}{i}', Bool.boolify(v))
+
     def update_all_nodes(self):
         self.__new_steps.append(('update_all_nodes',))
 
@@ -1142,6 +1147,10 @@ class State(object):
     def tick(self):
         self.half_tick()
         self.half_tick()
+
+    def ticks(self, n):
+        for _ in range(n):
+            self.tick()
 
     def cache(self):
         steps = self.__current_steps + self.__new_steps
@@ -1219,14 +1228,20 @@ def build_symbolic_states():
 
     # Feed it a nop.
     nop = State(s)
-    for i in range(8):
-        nop.set_pin_and_update(f'db{i}', FALSE)
-    nop.tick()
-    nop.tick()
-    nop.tick()
-    nop.tick()
+    nop.set_pins_and_update('db', 8, 0)
+    nop.ticks(4)
     nop.report('after-reset-and-nop')
     del nop
+
+    # ld a, i8  f(4) f(5)
+    ld = State(s)
+    ld.set_pins_and_update('db', 8, 0x3e)
+    ld.ticks(4)
+    for i in range(8):
+        ld.set_pin_and_update(f'db{i}', f'imm{i}')
+    ld.ticks(5)
+    ld.report('after-ld-a-i8')
+    del ld
 
 
 def test_computing_node_values():
