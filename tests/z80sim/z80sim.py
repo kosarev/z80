@@ -753,14 +753,7 @@ class Z80Simulator(object):
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
 
-    def __init_chip(self, skip_reset):
-        self.clear_state()
-
-        self.update_all_nodes()
-
-        if skip_reset:
-            return
-
+    def __reset(self):
         self.nreset = FALSE
         self.nclk = TRUE
         self.nbusrq = TRUE
@@ -778,6 +771,14 @@ class Z80Simulator(object):
         # indication that the reset process is completed.
         while self.__nm1.state:
             self.half_tick()
+
+    def __init_chip(self, skip_reset):
+        self.clear_state()
+
+        self.update_all_nodes()
+
+        if not skip_reset:
+            self.__reset()
 
     def __init__(self, *, memory=None, skip_reset=None, image=None):
         if image is None:
