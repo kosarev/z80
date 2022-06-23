@@ -58,6 +58,27 @@ class Bool(object):
         return (repr(self.__e) if isinstance(self.__e, bool)
                 else self.__e.sexpr())
 
+    @staticmethod
+    def __str(e):
+        d = e.decl()
+        k = d.kind()
+        if k == z3.Z3_OP_FALSE:
+            return str(False)
+        if k == z3.Z3_OP_TRUE:
+            return str(True)
+        if k == z3.Z3_OP_UNINTERPRETED:
+            return str(d)
+
+        OPS = {z3.Z3_OP_OR: 'or', z3.Z3_OP_AND: 'and',
+               z3.Z3_OP_NOT: 'not', z3.Z3_OP_ITE: 'if'}
+        args = ', '.join(__class__.__str(e.arg(i))
+                         for i in range(e.num_args()))
+        return f'{OPS[k]}({args})'
+
+    def __str__(self):
+        return (str(self.__e) if isinstance(self.__e, bool)
+                else __class__.__str(self.__e))
+
     class __Key(object):
         def __init__(self, n):
             self.n = n
@@ -256,6 +277,9 @@ class Bits(object):
     def __init__(self, bits):
         self.__bits = tuple(bits)
 
+    def __getitem__(self, i):
+        return self.__bits[i]
+
     @property
     def width(self):
         return len(self.__bits)
@@ -276,7 +300,7 @@ class Bits(object):
                 n |= int(v) << i
             return n
 
-        assert 0  # TODO
+        return self.__bits
 
     def __int__(self):
         v = self.value
@@ -294,7 +318,8 @@ class Bits(object):
         if isinstance(v, int):
             return '{:0{}x}'.format(v, self.size_in_bytes * 2)
 
-        assert 0  # TODO
+        assert isinstance(v, tuple)
+        return '(' + ', '.join(str(b) for b in v) + ')'
 
     def zero_extended(self, width):
         if self.width >= width:
@@ -935,7 +960,7 @@ class Z80Simulator(object):
     def t6(self):
         return self.__t6.state
 
-    def __read_bits(self, name, width=8):
+    def read_bits(self, name, width=8):
         return Bits(self.__nodes_by_name[f'{name}{i}'].state
                     for i in range(width))
 
@@ -946,11 +971,11 @@ class Z80Simulator(object):
 
     @property
     def abus(self):
-        return self.__read_bits('ab', 16)
+        return self.read_bits('ab', 16)
 
     @property
     def dbus(self):
-        return self.__read_bits('db')
+        return self.read_bits('db')
 
     @dbus.setter
     def dbus(self, n):
@@ -958,16 +983,16 @@ class Z80Simulator(object):
 
     @property
     def a(self):
-        return self.__read_bits('reg_a')
+        return self.read_bits('reg_a')
 
     @property
     def r(self):
-        return self.__read_bits('reg_r')
+        return self.read_bits('reg_r')
 
     @property
     def pc(self):
-        lo = self.__read_bits('reg_pcl')
-        hi = self.__read_bits('reg_pch')
+        lo = self.read_bits('reg_pcl')
+        hi = self.read_bits('reg_pch')
         return (hi << 8) | lo
 
     def set_pin_state(self, pin, state):
@@ -1026,9 +1051,17 @@ class State(object):
             self.__new_steps = list(other.__new_steps)
 
     @staticmethod
-    def __get_path(steps):
+    def __get_hash(steps):
         key = str(tuple(steps)).encode()
-        h = HASH(key).hexdigest()
+        return HASH(key).hexdigest()
+
+    @property
+    def hash(self):
+        return __class__.__get_hash(self.__current_steps + self.__new_steps)
+
+    @staticmethod
+    def __get_path(steps):
+        h = __class__.__get_hash(steps)
         return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h
 
     @staticmethod
@@ -1136,21 +1169,53 @@ class State(object):
         self.__new_steps.append(('reset',))
 
     def cache(self):
-        self.__apply_new_steps()
-        if not self.__get_path(self.__current_steps).exists():
+        steps = self.__current_steps + self.__new_steps
+        if not self.__get_path(steps).exists():
+            self.__apply_new_steps()
             __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
 
-    def report(self):
+    def report(self, title):
+        print(title)
+        print(self.hash)
+
         s = Z80Simulator(image=self.image)
-        print(f'a: {s.a}')
+
+        def print_bits(id, width):
+            bits = s.read_bits(id, width)
+            v = bits.value
+            if not isinstance(v, tuple):
+                print(f'  {id}: {v}')
+                return
+
+            for i in reversed(range(bits.width)):
+                print(f'  {id}{i}: {bits[i]}')
+
+        for r in ('reg_pch', 'reg_pcl',
+                  'reg_b', 'reg_c', 'reg_d', 'reg_e',
+                  'reg_h', 'reg_l', 'reg_a', 'reg_f',
+                  'reg_ixh', 'reg_ixl', 'reg_iyh', 'reg_iyl',
+                  'reg_i', 'reg_r', 'reg_w', 'reg_z',
+                  'reg_bb', 'reg_cc', 'reg_dd', 'reg_ee',
+                  'reg_hh', 'reg_ll', 'reg_aa', 'reg_ff'):
+            print_bits(r, 8)
+
+        # TODO: Decoder state, that is, the active IX/IY prefix.
+        # TODO: flipflop int_disabled
+        # TODO: flipflop halted
+        # TODO: flipflop iff1, iff2
+        # TODO: int_mode im
+        # TODO: The SCF/SCC flag discovered by Patrik Rak, see
+        #       https://github.com/kosarev/z80/issues/42
+
+        print()
 
 
 def build_symbolic_states():
     initial = State()
     initial.clear_state()
     initial.cache()
-    initial.report()
+    # initial.report('Initial state.')
 
     propagated = State(initial)
     for pin in _PINS:
@@ -1158,7 +1223,7 @@ def build_symbolic_states():
         propagated.set_pin_pull(pin, f'pull.{pin}')
     propagated.update_all_nodes()
     propagated.cache()
-    propagated.report()
+    propagated.report('All signals propagated.')
 
 
 def test_computing_node_values():
