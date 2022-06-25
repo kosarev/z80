@@ -398,6 +398,33 @@ def _load_initial_image():
     __trans = {}
 
     def load_node_names():
+        RENAMED_NODES = {
+            # CLK is an active-low pin.
+            'clk': '~clk',
+
+            # TODO: These two refer to the same node.
+            'pla33': 'pla33?',
+            'pla37': 'pla33?',
+
+            'vss': _GND_ID,
+            'vcc': _PWR_ID,
+            'wait': '~wait',
+            'int': '~int',
+            'irq': '~int',
+            '~irq': '~int',
+            'nmi': '~nmi',
+            'busrq': '~busrq',
+        }
+
+        # In nodenames.js the alternative registers are confused
+        # with the primary ones.
+        for r in ('reg_b', 'reg_c', 'reg_d', 'reg_e',
+                  'reg_h', 'reg_l'):
+            for i in range(8):
+                a, b = f'{r}{i}', f'{r}{r[-1]}{i}'
+                RENAMED_NODES[a] = b
+                RENAMED_NODES[b] = a
+
         with open('nodenames.js') as f:
             for line in f:
                 line = line.rstrip()
@@ -414,23 +441,7 @@ def _load_initial_image():
                 assert isinstance(id, str)
                 if id[0] == '_':
                     id = '~' + id[1:]
-                id = {
-                    # CLK is an active-low pin.
-                    'clk': '~clk',
-
-                    # TODO: These two refer to the same node.
-                    'pla33': 'pla33?',
-                    'pla37': 'pla33?',
-
-                    'vss': _GND_ID,
-                    'vcc': _PWR_ID,
-                    'wait': '~wait',
-                    'int': '~int',
-                    'irq': '~int',
-                    '~irq': '~int',
-                    'nmi': '~nmi',
-                    'busrq': '~busrq',
-                    }.get(id, id)
+                id = RENAMED_NODES.get(id, id)
 
                 assert isinstance(i, str)
                 i = int(i)
@@ -677,10 +688,14 @@ class Z80Simulator(object):
                 self.__update_group_of(n, more)
             nodes = more
 
-    def __set_node(self, n, pull):
+    def __set_node_pull(self, n, pull):
+        pull = Bool.boolify(pull)
         if '--show-set-nodes' in sys.argv:
             print(n, pull)
-        n.pull = Bool.boolify(pull)
+        n.pull = pull
+
+    def __set_node(self, n, pull):
+        self.__set_node_pull(n, pull)
         self.__update_nodes([n])
 
     def half_tick(self):
@@ -948,7 +963,7 @@ class Z80Simulator(object):
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
-        self.__nodes_by_name[pin].pull = Bool.boolify(pull)
+        self.__set_node_pull(self.__nodes_by_name[pin], pull)
 
     def update_pin(self, pin):
         n = self.__nodes_by_name[pin]
@@ -1003,7 +1018,11 @@ class State(object):
 
     @staticmethod
     def __get_hash(steps):
-        key = str(tuple(steps)).encode()
+        # Whenever we make changes that invalidate cached states,
+        # e.g., the names of the nodes are changed, the version
+        # number must be bumped.
+        VERSION = 2
+        key = str((VERSION,) + tuple(steps)).encode()
         return HASH(key).hexdigest()
 
     @property
@@ -1130,9 +1149,15 @@ class State(object):
         self.update_pin(pin)
 
     def set_pins_and_update(self, pin, width, n):
+        if isinstance(n, int):
+            for i in range(width):
+                v = bool(n & (1 << i))
+                self.set_pin_and_update(f'{pin}{i}', Bool.boolify(v))
+            return
+
+        assert isinstance(n, str)
         for i in range(width):
-            v = bool(n & (1 << i))
-            self.set_pin_and_update(f'{pin}{i}', Bool.boolify(v))
+            self.set_pin_and_update(f'{pin}{i}', f'{n}{i}')
 
     def update_all_nodes(self):
         self.__new_steps.append(('update_all_nodes',))
@@ -1208,6 +1233,14 @@ class State(object):
         # TODO: int_mode im
         # TODO: The SCF/SCC flag discovered by Patrik Rak, see
         #       https://github.com/kosarev/z80/issues/42
+        # TODO: Which of af and af' is active.
+        # TODO: Which of bc, de, hl and bc', de', hl' are active.
+        # TODO: ~int
+        # TODO: ~nmi
+        # TODO: ~wait
+        # TODO: ~reset -- whether any other definable nodes and
+        #       pins leak to the state after reset.
+        # TODO: ~busrq (?)
 
         sys.exit()
 
@@ -1237,11 +1270,19 @@ def build_symbolic_states():
     ld = State(s)
     ld.set_pins_and_update('db', 8, 0x3e)
     ld.ticks(4)
-    for i in range(8):
-        ld.set_pin_and_update(f'db{i}', f'imm{i}')
+    ld.set_pins_and_update('db', 8, 'imm')
     ld.ticks(5)
     ld.report('after-ld-a-i8')
     del ld
+
+    # pop bc  f(4) r(3) r(3)
+    s.set_pins_and_update('db', 8, 0xc1)
+    s.ticks(4)
+    s.set_pins_and_update('db', 8, 'c')
+    s.ticks(3)
+    s.set_pins_and_update('db', 8, 'b')
+    s.ticks(3)
+    s.report('after-pop-bc')
 
 
 def test_computing_node_values():
