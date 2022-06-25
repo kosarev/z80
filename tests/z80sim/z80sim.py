@@ -669,7 +669,12 @@ class Z80Simulator(object):
             # the transistor is known to be same. This includes
             # the case of a floating gate.
             for t in n.gate_of:
-                if not t.state.is_equiv(n.state):
+                if t.state.is_equiv(n.state):
+                    # Here we know the states are equivalent, but
+                    # for more convenience let's go even further
+                    # and make them identical.
+                    t.state = n.state
+                else:
                     # print(t, t.state)
                     t.state = n.state
                     more.extend(t.conns)
