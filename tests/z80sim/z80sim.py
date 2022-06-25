@@ -1159,6 +1159,10 @@ class State(object):
         for i in range(width):
             self.set_pin_and_update(f'{pin}{i}', f'{n}{i}')
 
+    def set_db_and_wait(self, n, ticks):
+        self.set_pins_and_update('db', 8, n)
+        self.ticks(ticks)
+
     def update_all_nodes(self):
         self.__new_steps.append(('update_all_nodes',))
 
@@ -1261,27 +1265,21 @@ def build_symbolic_states():
 
     # Feed it a nop.
     nop = State(s)
-    nop.set_pins_and_update('db', 8, 0)
-    nop.ticks(4)
-    nop.report('after-reset-and-nop')
+    nop.set_db_and_wait(0x00, 4)
+    nop.report('after-nop')
     del nop
 
     # ld a, i8  f(4) f(5)
     ld = State(s)
-    ld.set_pins_and_update('db', 8, 0x3e)
-    ld.ticks(4)
-    ld.set_pins_and_update('db', 8, 'imm')
-    ld.ticks(5)
+    ld.set_db_and_wait(0x3e, 4)
+    ld.set_db_and_wait('imm', 5)
     ld.report('after-ld-a-i8')
     del ld
 
     # pop bc  f(4) r(3) r(3)
-    s.set_pins_and_update('db', 8, 0xc1)
-    s.ticks(4)
-    s.set_pins_and_update('db', 8, 'c')
-    s.ticks(3)
-    s.set_pins_and_update('db', 8, 'b')
-    s.ticks(3)
+    s.set_db_and_wait(0xc1, 4)
+    s.set_db_and_wait('c', 3)
+    s.set_db_and_wait('b', 3)
     s.report('after-pop-bc')
 
 
