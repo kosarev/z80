@@ -1006,7 +1006,7 @@ class Z80Simulator(object):
 
 
 class State(object):
-    def __init__(self, other=None):
+    def __init__(self, other=None, *, cache_all_reportable_states=False):
         if other is None:
             self.__current_steps = []
             self.__current_image = None
@@ -1015,6 +1015,8 @@ class State(object):
             self.__current_steps = list(other.__current_steps)
             self.__current_image = other.__current_image
             self.__new_steps = list(other.__new_steps)
+
+        self.__cache_all_reportable_states = cache_all_reportable_states
 
     @staticmethod
     def __get_hash(steps):
@@ -1189,11 +1191,13 @@ class State(object):
                                     self.__current_image)
 
     def report(self, id):
-        # Cache reported images.
-        self.cache()
+        if self.__cache_all_reportable_states:
+            self.cache()
 
         if f'--{id}' not in sys.argv:
             return
+
+        self.cache()
 
         # Generate image before printing results.
         image = self.image
@@ -1250,7 +1254,7 @@ class State(object):
 
 
 def build_symbolic_states():
-    s = State()
+    s = State(cache_all_reportable_states=True)
     s.clear_state()
     s.report('after-clearing-state')
 
