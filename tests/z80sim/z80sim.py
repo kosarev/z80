@@ -175,6 +175,8 @@ class Bool(object):
 
         return equiv
 
+    __simplify_tactic = z3.Tactic('aig')
+
     def is_equiv(self, other):
         return __class__.__is_equiv(self.__e, other.__e)
 
@@ -182,7 +184,7 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        return Bool(z3.simplify(self.__e))
+        return Bool(__class__.__simplify_tactic.apply(self.__e)[0][0])
 
     def reduced(self):
         if isinstance(self.__e, bool):
@@ -983,6 +985,16 @@ class Z80Simulator(object):
             for t in sorted(self.__trans.values()):
                 print(t, file=f)
 
+    def dump_nodes(self):
+        with open('z80sim-nodes.dump', 'w') as f:
+            for n in sorted(self.__nodes.values()):
+                print(n, n.state, file=f)
+
+    def dump_trans(self):
+        with open('z80sim-trans.dump', 'w') as f:
+            for t in sorted(self.__trans.values()):
+                print(t, t.state, file=f)
+
     def __print_state(self):
         print(f'PC {self.pc}, '
               f'A {self.a}, '
@@ -1254,6 +1266,12 @@ class State(object):
         # TODO: ~reset -- whether any other definable nodes and
         #       pins leak to the state after reset.
         # TODO: ~busrq (?)
+
+        if '--dump-nodes' in sys.argv:
+            s.dump_nodes()
+
+        if '--dump-trans' in sys.argv:
+            s.dump_trans()
 
         sys.exit()
 
