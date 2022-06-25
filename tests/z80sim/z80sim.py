@@ -1345,6 +1345,7 @@ def play_sandbox():
 def main():
     if '--test' in sys.argv:
         test_computing_node_values()
+        return
 
     if '--play-sandbox' in sys.argv:
         play_sandbox()
