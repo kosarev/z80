@@ -964,7 +964,7 @@ private:
         case 0004: {
             // INR/INC r[y]
             // INR r            f(5)
-            // INR M            f(4)           r(3) r(3)
+            // INR M            f(4)           r(3) w(3)
             // INC r            f(4)
             // INC (HL)         f(4)           r(4) w(3)
             // INC (i+d)   f(4) f(4) r(3) e(5) r(4) w(3)
