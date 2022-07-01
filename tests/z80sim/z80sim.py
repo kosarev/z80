@@ -1450,7 +1450,8 @@ def test_computing_node_values():
         s.half_tick()
     assert s.abus == 0x0002
 
-    print('Tests passed.')
+    Status.print('Tests passed.')
+    Status.clear()
 
 
 def play_sandbox():
