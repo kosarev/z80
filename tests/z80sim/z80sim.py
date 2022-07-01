@@ -39,6 +39,48 @@ def _ceil_div(a, b):
     return -(a // -b)
 
 
+class Cache(object):
+    class __Entry(object):
+        def __init__(self, domain, key):
+            self.domain, self.key = domain, key
+
+        def __get_path(self, suffix=None):
+            h = HASH(str(self.key).encode()).hexdigest()
+            if suffix is not None:
+                h += suffix
+            return _CACHE_ROOT / self.domain / h[:3] / h[3:6] / h
+
+        def exists(self, suffix=None):
+            return self.__get_path(suffix).exists()
+
+        def load(self):
+            try:
+                with self.__get_path().open() as f:
+                    return ast.literal_eval(f.read())
+            except FileNotFoundError:
+                return None
+
+        def store(self, payload):
+            path = self.__get_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            temp_path = path.parent / (path.name + '.tmp')
+            with temp_path.open('w') as f:
+                pprint.pprint(tuple(payload), compact=True, stream=f)
+
+            temp_path.rename(path)
+
+        def create(self, suffix=None):
+            path = self.__get_path(suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('w'):
+                pass
+
+    @staticmethod
+    def get_entry(domain, key):
+        return __class__.__Entry(domain, key)
+
+
 class Bool(object):
     __decls = {}
 
@@ -130,8 +172,7 @@ class Bool(object):
             return a if cond.__e else b
         return Bool(z3.If(cond.__e, a.__e, b.__e))
 
-    __equiv0_cache = set()
-    __equiv1_cache = set()
+    __equiv_cache = {}
 
     @staticmethod
     def __is_equiv(a, b):
@@ -142,21 +183,17 @@ class Bool(object):
         elif isinstance(b, bool):
             b = z3.BoolVal(b)
 
-        key = a.sexpr() + ':' + b.sexpr()
-        h = HASH(key.encode()).hexdigest()
+        key = HASH((a.sexpr() + b.sexpr()).encode()).digest()
+        equiv = __class__.__equiv_cache.get(key)
+        if equiv is not None:
+            return equiv
 
-        if h in __class__.__equiv0_cache:
+        cache = Cache.get_entry('equiv', key)
+        if cache.exists('.0'):
+            __class__.__equiv_cache[key] = False
             return False
-        if h in __class__.__equiv1_cache:
-            return True
-
-        path0 = _CACHE_ROOT / 'equiv0' / h[:3] / h[3:6] / h
-        if path0.exists():
-            __class__.__equiv0_cache.add(h)
-            return False
-        path1 = _CACHE_ROOT / 'equiv1' / h[:3] / h[3:6] / h
-        if path1.exists():
-            __class__.__equiv1_cache.add(h)
+        if cache.exists('.1'):
+            __class__.__equiv_cache[key] = True
             return True
 
         s = z3.Solver()
@@ -165,13 +202,8 @@ class Bool(object):
         assert res in (z3.sat, z3.unsat)
         equiv = (res == z3.unsat)
 
-        cache = __class__.__equiv1_cache if equiv else __class__.__equiv0_cache
-        cache.add(h)
-
-        path = path1 if equiv else path0
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open('w') as f:
-            pass
+        __class__.__equiv_cache[key] = equiv
+        cache.create('.1' if equiv else '.0')
 
         return equiv
 
