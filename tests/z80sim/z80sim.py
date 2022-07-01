@@ -678,7 +678,7 @@ class Z80Simulator(object):
 
     __predicate_sizes = {}
 
-    def __update_group_of(self, n, more):
+    def __update_group_of(self, n, more, updated):
         # Identify nodes of the group.
         group = []
         worklist = [n]
@@ -712,6 +712,8 @@ class Z80Simulator(object):
             n.state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
             # print(n, n.state)
 
+            updated.add(n)
+
             # No further propagation is necessary if the state of
             # the transistor is known to be same. This includes
             # the case of a floating gate.
@@ -737,9 +739,11 @@ class Z80Simulator(object):
             if '--show-rounds' in sys.argv:
                 print(f'Round {round}: {len(nodes):,} nodes.')
 
+            updated = set()
             more = []
             for n in nodes:
-                self.__update_group_of(n, more)
+                if n not in updated:
+                    self.__update_group_of(n, more, updated)
             nodes = more
 
     def __set_node_pull(self, n, pull):
