@@ -220,7 +220,16 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        return Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
+        cache = Cache.get_entry('simplified', self.__e.sexpr())
+        c = cache.load()
+        if c is not None:
+            i, = c
+            return __class__.from_image(i)
+
+        e = Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
+        cache.store((e.image,))
+
+        return e
 
     def reduced(self):
         if isinstance(self.__e, bool):
