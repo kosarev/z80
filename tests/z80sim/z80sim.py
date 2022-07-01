@@ -276,20 +276,27 @@ class Bool(object):
         return __class__.__is_equiv(self.__e, other.__e)
 
     def simplified(self):
-        if isinstance(self.__e, bool):
-            return self
+        # It seems the 'ctx-simplify' tactic doesn't
+        # guarantee the result couldn't be simplified further.
+        s = e = self
+        while True:
+            if isinstance(s.__e, bool):
+                return s
 
-        with Status.do('simplify', '--show-simplify'):
-            cache = Cache.get_entry('simplified', self.__e.sexpr())
-            c = cache.load()
-            if c is not None:
-                i, = c
-                return __class__.from_image(i)
+            if s is not e and len(s.__e.sexpr()) >= len(e.__e.sexpr()):
+                return e
 
-            e = Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
-            cache.store((e.image,))
-
-        return e
+            with Status.do('simplify', '--show-simplify'):
+                e = s
+                cache = Cache.get_entry('simplified', e.__e.sexpr())
+                c = cache.load()
+                if c is not None:
+                    i, = c
+                    s = __class__.from_image(i)
+                else:
+                    s = Bool(__class__.__simplify_tactic.apply(e.__e)
+                             .as_expr())
+                    cache.store((s.image,))
 
     def reduced(self):
         if isinstance(self.__e, bool):
