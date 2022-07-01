@@ -455,10 +455,8 @@ class Node(object):
 
 
 class Transistor(object):
-    def __init__(self, index, gate, c1, c2, state=None):
+    def __init__(self, index, gate, c1, c2):
         self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
-        assert state is None or isinstance(state, Bool)
-        self.state = state
 
     def __repr__(self):
         return f'{self.c1} = {self.c2} [{self.gate}]  # {self.id}'
@@ -472,18 +470,16 @@ class Transistor(object):
 
     @property
     def image(self):
-        state = None if self.state is None else self.state.image
-        return self.gate.index, self.c1.index, self.c2.index, state
+        return self.gate.index, self.c1.index, self.c2.index
 
     @staticmethod
     def from_image(index, image, nodes):
-        gate, c1, c2, state = image
+        gate, c1, c2 = image
         gate = nodes[gate]
         c1 = nodes[c1]
         c2 = nodes[c2]
-        state = None if state is None else Bool.from_image(state)
 
-        t = Transistor(index, gate, c1, c2, state)
+        t = Transistor(index, gate, c1, c2)
         gate.gate_of.append(t)
         c1.conn_of.append(t)
         c2.conn_of.append(t)
@@ -729,7 +725,7 @@ class Z80Simulator(object):
                 conns[n] = {n: TRUE}
 
             for t in n.conn_of:
-                if t.state.is_trivially_false():
+                if t.gate.state.is_trivially_false():
                     continue
 
                 m = t.get_other_conn(n)
@@ -749,7 +745,7 @@ class Z80Simulator(object):
                             conns[x][y] = conns[y][x] = FALSE
                         xyp = conns[x][y]
                         assert xyp is conns[y][x]
-                        xyp |= xp & t.state & yp
+                        xyp |= xp & t.gate.state & yp
                         conns[x][y] = conns[y][x] = xyp
 
         # Compute state predicates.
@@ -785,26 +781,19 @@ class Z80Simulator(object):
 
             floating = n.state
             pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
-            n.state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
-            # print(n, n.state)
-
-            updated.add(n)
+            state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
 
             # No further propagation is necessary if the state of
             # the transistor is known to be same. This includes
             # the case of a floating gate.
-            for t in n.gate_of:
-                if t.state.is_equiv(n.state):
-                    # Here we know the states are equivalent, but
-                    # for more convenience let's go even further
-                    # and make them identical.
-                    t.state = n.state
-                else:
-                    # print(t, t.state)
-                    t.state = n.state
+            if not state.is_equiv(n.state):
+                n.state = state
+                for t in n.gate_of:
                     for c in t.conns:
                         if c not in more:
                             more.append(c)
+
+            updated.add(n)
 
     def __update_nodes(self, nodes):
         round = 0
@@ -848,9 +837,6 @@ class Z80Simulator(object):
     def clear_state(self):
         for n in self.__nodes.values():
             n.state = FALSE
-
-        for t in self.__trans.values():
-            t.state = FALSE
 
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
@@ -1166,7 +1152,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 2
+        VERSION = 3
         key = (VERSION,) + tuple(steps)
         return Cache.get_entry('states', key)
 
