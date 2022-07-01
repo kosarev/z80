@@ -715,7 +715,9 @@ class Z80Simulator(object):
                 else:
                     # print(t, t.state)
                     t.state = n.state
-                    more.extend(t.conns)
+                    for c in t.conns:
+                        if c not in more:
+                            more.append(c)
 
     def __update_nodes(self, nodes):
         round = 0
