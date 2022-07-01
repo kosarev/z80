@@ -44,24 +44,28 @@ class Cache(object):
         def __init__(self, domain, key):
             self.domain, self.key = domain, key
 
-        def __get_path(self, suffix=None):
-            h = HASH(str(self.key).encode()).hexdigest()
+        @property
+        def hash(self):
+            return HASH(str(self.key).encode()).hexdigest()
+
+        def get_path(self, suffix=None):
+            h = self.hash
             if suffix is not None:
                 h += suffix
             return _CACHE_ROOT / self.domain / h[:3] / h[3:6] / h
 
         def exists(self, suffix=None):
-            return self.__get_path(suffix).exists()
+            return self.get_path(suffix).exists()
 
         def load(self):
             try:
-                with self.__get_path().open() as f:
+                with self.get_path().open() as f:
                     return ast.literal_eval(f.read())
             except FileNotFoundError:
                 return None
 
         def store(self, payload):
-            path = self.__get_path()
+            path = self.get_path()
             path.parent.mkdir(parents=True, exist_ok=True)
 
             temp_path = path.parent / (path.name + '.tmp')
@@ -71,7 +75,7 @@ class Cache(object):
             temp_path.rename(path)
 
         def create(self, suffix=None):
-            path = self.__get_path(suffix)
+            path = self.get_path(suffix)
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open('w'):
                 pass
@@ -1068,49 +1072,40 @@ class State(object):
         self.__cache_all_reportable_states = cache_all_reportable_states
 
     @staticmethod
-    def __get_hash(steps):
+    def __get_cache(steps):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
         VERSION = 2
-        key = str((VERSION,) + tuple(steps)).encode()
-        return HASH(key).hexdigest()
+        key = (VERSION,) + tuple(steps)
+        return Cache.get_entry('states', key)
+
+    @staticmethod
+    def __get_hash(steps):
+        return __class__.__get_cache(steps).hash
 
     @property
     def hash(self):
         return __class__.__get_hash(self.__current_steps + self.__new_steps)
 
     @staticmethod
-    def __get_path(steps):
-        h = __class__.__get_hash(steps)
-        return _CACHE_ROOT / 'states' / h[:3] / h[3:6] / h
-
-    @staticmethod
     def __cache_state(steps, image):
         state = tuple(steps), image
-
-        path = __class__.__get_path(steps)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        temp_path = path.parent / (path.name + '.tmp')
-        with temp_path.open('w') as f:
-            pprint.pprint(state, compact=True, stream=f)
-
-        temp_path.rename(path)
+        __class__.__get_cache(steps).store(state)
 
     @staticmethod
     def __try_load_state(steps):
-        try:
-            path = __class__.__get_path(steps)
-            with path.open() as f:
-                state = ast.literal_eval(f.read())
-            if '--show-loaded-state' in sys.argv:
-                print(path)
-            stored_steps, image = state
-            assert stored_steps == tuple(steps)
-            return image
-        except FileNotFoundError:
+        cache = __class__.__get_cache(steps)
+        state = cache.load()
+        if state is None:
             return None
+
+        if '--show-loaded-state' in sys.argv:
+            print(cache.get_path())
+
+        stored_steps, image = state
+        assert stored_steps == tuple(steps)
+        return image
 
     def __apply_new_steps(self):
         missing_steps = []
@@ -1234,7 +1229,7 @@ class State(object):
 
     def cache(self):
         steps = self.__current_steps + self.__new_steps
-        if not self.__get_path(steps).exists():
+        if not self.__get_cache(steps).exists():
             self.__apply_new_steps()
             __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
