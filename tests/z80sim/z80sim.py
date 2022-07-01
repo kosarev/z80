@@ -175,7 +175,7 @@ class Bool(object):
 
         return equiv
 
-    __simplify_tactic = z3.Tactic('aig')
+    __simplify_tactic = z3.Tactic('ctx-simplify')
 
     def is_equiv(self, other):
         return __class__.__is_equiv(self.__e, other.__e)
@@ -184,7 +184,7 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        return Bool(__class__.__simplify_tactic.apply(self.__e)[0][0])
+        return Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
 
     def reduced(self):
         if isinstance(self.__e, bool):
