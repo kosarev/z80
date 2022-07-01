@@ -13,6 +13,7 @@
 
 
 import ast
+import datetime
 import hashlib
 import pathlib
 import pprint
@@ -37,6 +38,61 @@ _PINS = (
 
 def _ceil_div(a, b):
     return -(a // -b)
+
+
+class Status(object):
+    __parts = []
+    __line = ''
+
+    @staticmethod
+    def __emit(line):
+        line_with_spaces = line
+        if len(line) < len(__class__.__line):
+            line_with_spaces += ' ' * (len(__class__.__line) - len(line))
+
+        print(f'\r{line_with_spaces}', end='')
+        __class__.__line = line
+
+    @staticmethod
+    def __update():
+        time = datetime.datetime.now().strftime("%y-%m-%d %H:%M:%S")
+        parts = ', '.join(p for p in __class__.__parts if p)
+        __class__.__emit(f'{time} {parts}')
+
+    @staticmethod
+    def clear():
+        __class__.__emit('')
+        print('\r', end='')
+
+    @staticmethod
+    def print(*args):
+        line = __class__.__line
+        __class__.clear()
+
+        print(*args)
+
+        __class__.__emit(line)
+
+    @staticmethod
+    def enter(s):
+        __class__.__parts.append(s)
+        __class__.__update()
+
+    @staticmethod
+    def exit():
+        __class__.__parts.pop()
+        __class__.__update()
+
+    @staticmethod
+    def do(p):
+        class S:
+            def __enter__(self):
+                Status.enter(p)
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                Status.exit()
+
+        return S()
 
 
 class Cache(object):
@@ -220,14 +276,15 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        cache = Cache.get_entry('simplified', self.__e.sexpr())
-        c = cache.load()
-        if c is not None:
-            i, = c
-            return __class__.from_image(i)
+        with Status.do('simplify'):
+            cache = Cache.get_entry('simplified', self.__e.sexpr())
+            c = cache.load()
+            if c is not None:
+                i, = c
+                return __class__.from_image(i)
 
-        e = Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
-        cache.store((e.image,))
+            e = Bool(__class__.__simplify_tactic.apply(self.__e).as_expr())
+            cache.store((e.image,))
 
         return e
 
@@ -235,10 +292,11 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        simplified = self.simplified()
-        for c in (FALSE, TRUE):
-            if __class__.__is_equiv(simplified.__e, c.__e):
-                return c
+        with Status.do('reduce'):
+            simplified = self.simplified()
+            for c in (FALSE, TRUE):
+                if __class__.__is_equiv(simplified.__e, c.__e):
+                    return c
 
         return simplified
 
@@ -744,20 +802,18 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            if '--show-rounds' in sys.argv:
-                print(f'Round {round}: {len(nodes):,} nodes.')
-
-            updated = set()
-            more = []
-            for n in nodes:
-                if n not in updated:
-                    self.__update_group_of(n, more, updated)
-            nodes = more
+            with Status.do(f'round {round}, {len(nodes)} nodes'):
+                updated = set()
+                more = []
+                for n in nodes:
+                    if n not in updated:
+                        self.__update_group_of(n, more, updated)
+                nodes = more
 
     def __set_node_pull(self, n, pull):
         pull = Bool.boolify(pull)
         if '--show-set-nodes' in sys.argv:
-            print(n, pull)
+            Status.print(n, pull)
         n.pull = pull
 
     def __set_node(self, n, pull):
@@ -1124,7 +1180,7 @@ class State(object):
             return None
 
         if '--show-loaded-state' in sys.argv:
-            print(cache.get_path())
+            Status.print(cache.get_path())
 
         stored_steps, image = state
         assert stored_steps == tuple(steps)
@@ -1268,6 +1324,8 @@ class State(object):
 
         # Generate image before printing results.
         image = self.image
+
+        Status.clear()
 
         print(id)
         print(self.hash)
