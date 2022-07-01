@@ -84,13 +84,16 @@ class Status(object):
         __class__.__update()
 
     @staticmethod
-    def do(p):
+    def do(p, option=None):
         class S:
             def __enter__(self):
-                Status.enter(p)
+                self.__show = (option is None or option in sys.argv)
+                if self.__show:
+                    Status.enter(p)
 
             def __exit__(self, exc_type, exc_val, exc_tb):
-                Status.exit()
+                if self.__show:
+                    Status.exit()
 
         return S()
 
@@ -276,7 +279,7 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        with Status.do('simplify'):
+        with Status.do('simplify', '--show-simplify'):
             cache = Cache.get_entry('simplified', self.__e.sexpr())
             c = cache.load()
             if c is not None:
@@ -292,7 +295,7 @@ class Bool(object):
         if isinstance(self.__e, bool):
             return self
 
-        with Status.do('reduce'):
+        with Status.do('reduce', '--show-reduce'):
             simplified = self.simplified()
             for c in (FALSE, TRUE):
                 if __class__.__is_equiv(simplified.__e, c.__e):
