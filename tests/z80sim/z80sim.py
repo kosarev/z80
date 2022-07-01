@@ -642,44 +642,12 @@ class Z80Simulator(object):
             t = Transistor.from_image(index, i, self.__nodes)
             self.__trans[index] = t
 
-    def __evaluate_state_predicates(self, n, stack):
-        gnd = pwr = pullup = pulldown = FALSE
-
-        if n in stack:
-            pass
-        elif n.is_gnd:
-            gnd = TRUE
-        elif n.is_pwr:
-            pwr = TRUE
-        else:
-            if n.pull is None:
-                pass
-            elif isinstance(n.pull, Bool):
-                pullup = n.pull
-                pulldown = ~n.pull
-            else:
-                assert 0, n.pull
-
-            stack.append(n)
-
-            for t in n.conn_of:
-                if not t.state.is_trivially_false():
-                    g, p, u, d = self.__evaluate_state_predicates(
-                        t.get_other_conn(n), stack)
-
-                    gnd |= t.state & g
-                    pwr |= t.state & p
-                    pullup |= t.state & u
-                    pulldown |= t.state & d
-
-            assert stack.pop() == n
-
-        return gnd, pwr, pullup, pulldown
-
     __predicate_sizes = {}
 
     def __update_group_of(self, n, more, updated):
-        # Identify nodes of the group.
+        # Identify nodes of the group and compute paths
+        # connecting them.
+        conns = {}
         group = []
         worklist = [n]
         while worklist:
@@ -689,12 +657,52 @@ class Z80Simulator(object):
 
             group.append(n)
 
+            if n not in conns:
+                conns[n] = {n: TRUE}
+
             for t in n.conn_of:
-                if not t.state.is_trivially_false():
-                    worklist.append(t.get_other_conn(n))
+                if t.state.is_trivially_false():
+                    continue
+
+                m = t.get_other_conn(n)
+                worklist.append(m)
+
+                if m not in conns:
+                    conns[m] = {m: TRUE}
+
+                ns = list(conns[n].items())
+                ms = list(conns[m].items())
+
+                for x, xp in ns:
+                    for y, yp in ms:
+                        # print(x, y)
+                        if y not in conns[x]:
+                            assert x not in conns[y]
+                            conns[x][y] = conns[y][x] = FALSE
+                        xyp = conns[x][y]
+                        assert xyp is conns[y][x]
+                        xyp |= xp & t.state & yp
+                        conns[x][y] = conns[y][x] = xyp
 
         # Compute state predicates.
-        group = {n: self.__evaluate_state_predicates(n, [])
+        def evaluate_state_predicates(n):
+            cs = conns[n]
+
+            gnd = cs.get(self.__gnd, FALSE)
+            pwr = cs.get(self.__pwr, FALSE)
+
+            pullup, pulldown = FALSE, FALSE
+
+            for m in group:
+                if m.pull is not None:
+                    assert isinstance(m.pull, Bool)
+                    p = conns[n][m]
+                    pullup |= p & m.pull
+                    pulldown |= p & ~m.pull
+
+            return gnd, pwr, pullup, pulldown
+
+        group = {n: evaluate_state_predicates(n)
                  for n in group}
 
         # Update node and transistor states.
