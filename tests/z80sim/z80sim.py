@@ -1402,7 +1402,16 @@ def build_symbolic_states():
 
     for pin in _PINS:
         s.set_pin_state(pin, f'init.{pin}')
-        s.set_pin_pull(pin, f'pull.{pin}')
+        if pin == '~clk':
+            # The ~clk pull seems to propagate to lots of nodes,
+            # including register bits, and survives the reset
+            # sequence and even execution of some instructions.
+            # As we are not currently interested in investigating
+            # these effects, let's start from inactive ~clk as it
+            # seems it is expected to be in hardware implementations.
+            s.set_pin_pull(pin, TRUE)
+        else:
+            s.set_pin_pull(pin, f'pull.{pin}')
     s.update_all_nodes()
     s.report('after-updating-all-nodes')
 
