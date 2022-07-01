@@ -1,4 +1,4 @@
-__z80sim_cache/
+__z80sim_cache*/
 nodenames.js
 segdefs.js
 transdefs.js
