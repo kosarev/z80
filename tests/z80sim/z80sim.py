@@ -802,12 +802,13 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            with Status.do(f'round {round}, {len(nodes)} nodes'):
+            with Status.do(f'round {round}'):
                 updated = set()
                 more = []
-                for n in nodes:
-                    if n not in updated:
-                        self.__update_group_of(n, more, updated)
+                for i, n in enumerate(nodes):
+                    with Status.do(f'node {i}/{len(nodes)}'):
+                        if n not in updated:
+                            self.__update_group_of(n, more, updated)
                 nodes = more
 
     def __set_node_pull(self, n, pull):
