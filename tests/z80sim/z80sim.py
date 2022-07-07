@@ -270,7 +270,8 @@ class Bool(object):
 
         return equiv
 
-    __simplify_tactic = z3.Tactic('ctx-simplify')
+    __simplify_tactic = z3.Then(z3.Tactic('qe2'),
+                                z3.Tactic('solver-subsumption'))
 
     def is_equiv(self, other):
         return __class__.__is_equiv(self.__e, other.__e)
