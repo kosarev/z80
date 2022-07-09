@@ -920,6 +920,9 @@ class Z80Simulator(object):
             t = Transistor.from_image(index, i, self.__nodes)
             self.__trans[index] = t
 
+    def get_node_states(self, ids):
+        return {id: self.__nodes_by_name[id].state for id in ids}
+
     __predicate_sizes = {}
 
     def __update_group_of(self, n, more, updated):
@@ -1456,6 +1459,9 @@ class State(object):
         self.__apply_new_steps()
         return self.__current_image
 
+    def get_node_states(self, ids):
+        return Z80Simulator(image=self.image).get_node_states(ids)
+
     @staticmethod
     def __apply_step(sim, step):
         kind = step[0]
@@ -1512,8 +1518,11 @@ class State(object):
         for i in range(width):
             self.set_pin_and_update(f'{pin}{i}', f'{n}{i}')
 
-    def set_db_and_wait(self, n, ticks):
+    def set_db(self, n):
         self.set_pins_and_update('db', 8, n)
+
+    def set_db_and_wait(self, n, ticks):
+        self.set_db(n)
         self.ticks(ticks)
 
     def update_all_nodes(self):
@@ -1613,6 +1622,37 @@ class State(object):
         sys.exit()
 
 
+def test_node(a, b):
+    assert b.is_equiv(a)
+
+
+def test_instructions(reset_state):
+    NODES = 'reg_f0',
+
+    INSTRS = (
+        ('nop', ((0x00, 4),)),
+    )
+
+    for instr, cycles in INSTRS:
+        with Status.do(instr):
+            s = State(reset_state)
+            before = s.get_node_states(NODES)
+            for d, ticks in cycles:
+                s.set_db(d)
+                for t in range(ticks):
+                    with Status.do(f'tick {t}'):
+                        s.tick()
+                s.cache()
+            after = s.get_node_states(NODES)
+
+            for id in NODES:
+                with Status.do(f'test {id}'):
+                    test_node(before[id], after[id])
+
+    Status.clear()
+    print('OK')
+
+
 def build_symbolic_states():
     s = State(cache_all_reportable_states=True)
     s.clear_state()
@@ -1649,6 +1689,7 @@ def build_symbolic_states():
     ld.report('after-ld-a-i8')
     del ld
 
+    ''' TODO
     INSTRS = (
         ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
         ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
@@ -1662,18 +1703,19 @@ def build_symbolic_states():
         ('exx', ((0xd9, 4),)),
         ('ex af, af\'', ((0x08, 4),)),
     )
-    '''
         # Symbolising the AF pair causes significant slow-down,
         # which means we want to do that as late as possible.
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
         ('pop af\'', ((0xf1, 4), ('ff', 3), ('aa', 3))),
-    '''
     for instr, cycles in INSTRS:
         with Status.do(instr):
             for d, ticks in cycles:
                 s.set_db_and_wait(d, ticks)
                 s.cache()
     s.report('after-symbolising')
+    '''
+
+    test_instructions(s)
 
 
 def test_computing_node_values():
