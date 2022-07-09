@@ -144,109 +144,304 @@ class Cache(object):
         return __class__.__Entry(domain, key)
 
 
-class Bool(object):
-    __decls = {}
+class Literal(object):
+    __HASH_PREFIX = '.'
 
-    def __init__(self, e):
-        if isinstance(e, z3.BoolRef):
-            if z3.is_false(e):
-                self.__e = False
-            elif z3.is_true(e):
-                self.__e = True
-            else:
-                self.__e = e
-        elif isinstance(e, bool):
-            self.__e = e
+    __literals = {}
+    __shorten_ids = {}
+
+    @staticmethod
+    def get(id, sign=False):
+        key = id, sign
+        t = __class__.__literals.get(key)
+        if t is not None:
+            return t
+
+        shorten_id = id[:10] if id.startswith(__class__.__HASH_PREFIX) else id
+
+        # Make sure shorten ids we print are still unique.
+        if shorten_id not in __class__.__shorten_ids:
+            __class__.__shorten_ids[shorten_id] = id
         else:
-            assert isinstance(e, str)
-            self.__e = __class__.__decls.get(e)
-            if self.__e is not None:
-                return
+            assert __class__.__shorten_ids[shorten_id] == id, (
+                shorten_id, __class__.__shorten_ids[shorten_id], id)
 
-            assert e not in ('0', '1')
-            self.__e = z3.Bool(e)
-            __class__.__decls[e] = self.__e
+        t = __class__()
+        t.id, t.sign = id, sign
+        t.shorten_id = shorten_id
+        t.hash = HASH(str(t.image).encode()).digest()
+        t.__expr = None
+        __class__.__literals[key] = t
+        return t
+
+    @staticmethod
+    def from_hash(hash):
+        return __class__.get(__class__.__HASH_PREFIX + hash.hex())
 
     def __repr__(self):
-        return (repr(self.__e) if isinstance(self.__e, bool)
-                else self.__e.sexpr())
+        SIGNS = {False: '', True: '~'}
+        return f'{SIGNS[self.sign]}{self.shorten_id}'
 
-    def __str__(self):
-        return (str(int(self.__e)) if isinstance(self.__e, bool)
-                else self.__e.sexpr())
+    def __lt__(self, other):
+        return self.image < other.image
+
+    @staticmethod
+    def cast(x):
+        if isinstance(x, __class__):
+            return x
+        return __class__.get(x)
 
     @property
     def image(self):
-        return (self.__e if isinstance(self.__e, bool)
-                else self.__e.sexpr())
+        return self.id, self.sign
+
+    @staticmethod
+    def from_image(image):
+        id, sign = image
+        return __class__.get(id, sign)
+
+    def __invert__(self):
+        return __class__.get(self.id, not self.sign)
+
+
+class Clause(object):
+    __clauses = {}
+
+    @staticmethod
+    def get(*literals):
+        literals = tuple(sorted(set(Literal.cast(t) for t in literals)))
+        c = __class__.__clauses.get(literals)
+        if c is not None:
+            return c
+
+        c = __class__()
+        c.literals = literals
+        c.__expr = None
+        __class__.__clauses[literals] = c
+        return c
+
+    def __lt__(self, other):
+        return self.image < other.image
+
+    @staticmethod
+    def cast(x):
+        if isinstance(x, __class__):
+            return x
+        return __class__.get(x)
+
+    def __repr__(self):
+        r = ' '.join(repr(t) for t in self.literals)
+        return f'[{r}]'
+
+    @property
+    def image(self):
+        return tuple(t.image for t in self.literals)
+
+    @staticmethod
+    def from_image(image):
+        return __class__.get(*(Literal.from_image(t) for t in image))
+
+
+class Bool(object):
+    __literal_exprs = {}
+    __clause_exprs = {}
+
+    def __init__(self, term):
+        self.__constrs_expr = None
+        self.__clauses = ()
+
+        if isinstance(term, bool):
+            self.value = term
+            return
+
+        if isinstance(term, str):
+            term = Literal.get(term)
+
+        assert isinstance(term, Literal)
+        assert term.sign is False
+        self.value = None
+        self.__symbol = term
+
+    @staticmethod
+    def __from_clauses(symbol, *clause_sets):
+        b = Bool(symbol)
+
+        clauses = set()
+        for s in clause_sets:
+            clauses.update(s)
+        b.__clauses = tuple(sorted(clauses))
+
+        return b
+
+    def __repr__(self):
+        if self.value is not None:
+            return repr(int(self.value))
+        r = ' '.join(repr(c) for c in self.__clauses)
+        return f'{self.__symbol}: ({r})'
+
+    @property
+    def image(self):
+        if self.value is not None:
+            return self.value
+        return self.__symbol.image, tuple(c.image for c in self.__clauses)
 
     @staticmethod
     def from_image(image):
         if isinstance(image, bool):
             return TRUE if image else FALSE
-        return Bool(z3.parse_smt2_string(f'(assert {image})',
-                                         decls=__class__.__decls)[0])
+        symbol, clauses = image
+        return __class__.__from_clauses(
+            Literal.from_image(symbol),
+            (Clause.from_image(c) for c in clauses))
 
     @staticmethod
-    def boolify(x):
+    def cast(x):
         if isinstance(x, bool):
             return TRUE if x else FALSE
         return x if isinstance(x, Bool) else Bool(x)
 
-    @property
-    def value(self):
-        return self.__e if isinstance(self.__e, bool) else None
-
     def is_trivially_false(self):
-        return self.__e is False
+        return self.value is False
 
     def __bool__(self):
-        assert isinstance(self.__e, bool)
-        return self.__e
+        assert self.value is not None
+        return self.value
 
     def __int__(self):
         return int(bool(self))
 
     @property
     def size(self):
+        assert 0  # TODO
         return len(str(self))
 
     def __eq__(self, other):
         assert 0, "Bool's should not be compared; use is_equiv() instead."
 
+    @staticmethod
+    def __get_op_symbol(kind, *ops):
+        key = kind + b''.join(op.hash for op in ops)
+        return Literal.from_hash(HASH(key).digest())
+
     def __or__(self, other):
-        if isinstance(self.__e, bool) and isinstance(other.__e, bool):
-            return TRUE if self.__e or other.__e else FALSE
-        return Bool(z3.Or(self.__e, other.__e))
+        if self.value is True or other.value is True:
+            return TRUE
+        if self.value is False:
+            return other
+        if other.value is False:
+            return self
+
+        # TODO: Optimise the case of two pure symbols.
+
+        a, b = sorted((self.__symbol, other.__symbol))
+        r = __class__.__get_op_symbol(b'(or)', a, b)
+        return __class__.__from_clauses(r, self.__clauses, other.__clauses,
+                                        (Clause.get(~a, r),
+                                         Clause.get(~b, r),
+                                         Clause.get(a, b, ~r)))
 
     def __and__(self, other):
-        if isinstance(self.__e, bool) and isinstance(other.__e, bool):
-            return TRUE if self.__e and other.__e else FALSE
-        return Bool(z3.And(self.__e, other.__e))
+        if self.value is False or other.value is False:
+            return FALSE
+        if self.value is True:
+            return other
+        if other.value is True:
+            return self
+
+        # TODO: Optimise the case of two pure symbols.
+
+        a, b = sorted((self.__symbol, other.__symbol))
+        r = __class__.__get_op_symbol(b'(and)', a, b)
+        return __class__.__from_clauses(r, self.__clauses, other.__clauses,
+                                        (Clause.get(a, ~r),
+                                         Clause.get(b, ~r),
+                                         Clause.get(~a, ~b, r)))
 
     def __invert__(self):
-        if isinstance(self.__e, bool):
-            return FALSE if self.__e else TRUE
-        return Bool(z3.Not(self.__e))
+        if self.value is not None:
+            return FALSE if self.value else TRUE
+
+        # TODO: Can we just return the inverted symbol of this expr?
+
+        # TODO: Optimise the case of a pure symbol.
+
+        a = self.__symbol
+        r = __class__.__get_op_symbol(b'(not)', a)
+        return __class__.__from_clauses(r, self.__clauses,
+                                        (Clause.get(a, r),
+                                         Clause.get(~a, ~r)))
 
     @staticmethod
     def ifelse(cond, a, b):
-        if isinstance(cond.__e, bool):
-            return a if cond.__e else b
-        return Bool(z3.If(cond.__e, a.__e, b.__e))
+        if cond.value is not None:
+            return a if cond.value else b
+        if a.value is False:
+            return ~cond & b
+        if a.value is True:
+            return cond | b
+        if b.value is False:
+            return cond & a
+        if b.value is True:
+            return ~cond | a
+
+        # TODO: Optimise the case of pure symbols.
+
+        i, t, e = cond.__symbol, a.__symbol, b.__symbol
+        r = __class__.__get_op_symbol(b'(ifelse)', i, t, e)
+        return __class__.__from_clauses(r, cond.__clauses,
+                                        a.__clauses, b.__clauses,
+                                        (Clause.get(~i, t, ~r),
+                                         Clause.get(~i, ~t, r),
+                                         Clause.get(i, e, ~r),
+                                         Clause.get(i, ~e, r)))
+
+    @staticmethod
+    def __get_literal_expr(literal):
+        e = __class__.__literal_exprs.get(literal)
+        if e is not None:
+            return e
+
+        if literal.sign:
+            e = z3.Not(__class__.__get_literal_expr(~literal))
+        else:
+            e = z3.Bool(literal.id)
+        __class__.__literal_exprs[literal] = e
+        return e
+
+    def __get_value_or_symbol_expr(self):
+        if self.value is not None:
+            return z3.BoolVal(self.value)
+
+        return __class__.__get_literal_expr(self.__symbol)
+
+    @staticmethod
+    def __get_clause_expr(clause):
+        e = __class__.__clause_exprs.get(clause)
+        if e is not None:
+            return e
+
+        e = z3.Or(*(__class__.__get_literal_expr(t) for t in clause.literals))
+        __class__.__literal_exprs[clause] = e
+        return e
+
+    def __get_constraints_expr(self):
+        if self.__constrs_expr is None:
+            self.__constrs_expr = z3.And(*(__class__.__get_clause_expr(c)
+                                           for c in self.__clauses))
+
+        return self.__constrs_expr
 
     __equiv_cache = {}
 
-    @staticmethod
-    def __is_equiv(a, b):
-        if isinstance(a, bool):
-            if isinstance(b, bool):
-                return a == b
-            a = z3.BoolVal(a)
-        elif isinstance(b, bool):
-            b = z3.BoolVal(b)
+    def is_equiv(self, other):
+        a, b = self.value, other.value
+        if a is not None and b is not None:
+            return a == b
 
-        key = HASH((a.sexpr() + b.sexpr()).encode()).digest()
+        s1 = self.__get_value_or_symbol_expr()
+        s2 = other.__get_value_or_symbol_expr()
+
+        key = ':'.join(sorted((s1.sexpr(), s2.sexpr())))
         equiv = __class__.__equiv_cache.get(key)
         if equiv is not None:
             return equiv
@@ -260,7 +455,9 @@ class Bool(object):
             return True
 
         s = z3.Solver()
-        s.add(a != b)
+        s.add(self.__get_constraints_expr())
+        s.add(other.__get_constraints_expr())
+        s.add(s1 != s2)
         res = s.check()
         assert res in (z3.sat, z3.unsat)
         equiv = (res == z3.unsat)
@@ -270,43 +467,40 @@ class Bool(object):
 
         return equiv
 
-    __simplify_tactic = z3.Then(z3.Tactic('qe2'),
-                                z3.Tactic('solver-subsumption'))
-
-    def is_equiv(self, other):
-        return __class__.__is_equiv(self.__e, other.__e)
-
     def simplified(self):
-        # It seems the 'ctx-simplify' tactic doesn't
-        # guarantee the result couldn't be simplified further.
+        # TODO
+        # im = self.image
+        # Cache.get_entry('exprs', str(im)).store(im)
+        return self
+
         s = e = self
         while True:
-            if isinstance(s.__e, bool):
+            if isinstance(s.__x, bool):
                 return s
 
-            if s is not e and len(s.__e.sexpr()) >= len(e.__e.sexpr()):
+            if s is not e and len(s.__x.sexpr()) >= len(e.__x.sexpr()):
                 return e
 
             with Status.do('simplify', '--show-simplify'):
                 e = s
-                cache = Cache.get_entry('simplified', e.__e.sexpr())
+                cache = Cache.get_entry('simplified', e.__x.sexpr())
                 c = cache.load()
                 if c is not None:
                     i, = c
                     s = __class__.from_image(i)
                 else:
-                    s = Bool(__class__.__simplify_tactic.apply(e.__e)
-                             .as_expr())
+                    s = Bool(__class__.__simplify_tactic.apply(e.__x)
+                             .__get_constraints())
                     cache.store((s.image,))
 
     def reduced(self):
-        if isinstance(self.__e, bool):
+        if self.value is not None:
             return self
 
         with Status.do('reduce', '--show-reduce'):
             simplified = self.simplified()
             for c in (FALSE, TRUE):
-                if __class__.__is_equiv(simplified.__e, c.__e):
+                if simplified.is_equiv(c):
                     return c
 
         return simplified
@@ -712,44 +906,44 @@ class Z80Simulator(object):
     def __update_group_of(self, n, more, updated):
         # Identify nodes of the group and compute paths
         # connecting them.
-        conns = {}
-        group = []
-        worklist = [n]
-        while worklist:
-            n = worklist.pop()
-            if n in group or n.is_gnd_or_pwr:
-                continue
-
-            group.append(n)
-
-            if n not in conns:
-                conns[n] = {n: TRUE}
-
-            for t in n.conn_of:
-                if t.gate.state.is_trivially_false():
+        with Status.do('identify group'):
+            conns = {}
+            group = []
+            worklist = [n]
+            while worklist:
+                n = worklist.pop()
+                if n in group or n.is_gnd_or_pwr:
                     continue
 
-                m = t.get_other_conn(n)
-                worklist.append(m)
+                group.append(n)
 
-                if m not in conns:
-                    conns[m] = {m: TRUE}
+                if n not in conns:
+                    conns[n] = {n: TRUE}
 
-                ns = list(conns[n].items())
-                ms = list(conns[m].items())
+                for t in n.conn_of:
+                    if t.gate.state.is_trivially_false():
+                        continue
 
-                for x, xp in ns:
-                    for y, yp in ms:
-                        # print(x, y)
-                        if y not in conns[x]:
-                            assert x not in conns[y]
-                            conns[x][y] = conns[y][x] = FALSE
-                        xyp = conns[x][y]
-                        assert xyp is conns[y][x]
-                        xyp |= xp & t.gate.state & yp
-                        conns[x][y] = conns[y][x] = xyp
+                    m = t.get_other_conn(n)
+                    worklist.append(m)
 
-        # Compute state predicates.
+                    if m not in conns:
+                        conns[m] = {m: TRUE}
+
+                    ns = list(conns[n].items())
+                    ms = list(conns[m].items())
+
+                    for x, xp in ns:
+                        for y, yp in ms:
+                            # print(x, y)
+                            if y not in conns[x]:
+                                assert x not in conns[y]
+                                conns[x][y] = conns[y][x] = FALSE
+                            xyp = conns[x][y]
+                            assert xyp is conns[y][x]
+                            xyp |= xp & t.gate.state & yp
+                            conns[x][y] = conns[y][x] = xyp
+
         def evaluate_state_predicates(n):
             cs = conns[n]
 
@@ -767,34 +961,36 @@ class Z80Simulator(object):
 
             return gnd, pwr, pullup, pulldown
 
-        group = {n: evaluate_state_predicates(n)
-                 for n in group}
+        with Status.do('evaluate predicates'):
+            group = {n: evaluate_state_predicates(n)
+                     for n in group}
 
         # Update node and transistor states.
-        for n, preds in group.items():
-            gnd, pwr, pullup, pulldown = preds
+        with Status.do('update nodes'):
+            for n, preds in group.items():
+                gnd, pwr, pullup, pulldown = preds
 
-            if 0:
-                size = sum(p.size for p in preds)
-                sizes = __class__.__predicate_sizes.setdefault(n, [])
-                sizes.append(size)
-                print(n, sizes)
+                if 0:
+                    size = sum(p.size for p in preds)
+                    sizes = __class__.__predicate_sizes.setdefault(n, [])
+                    sizes.append(size)
+                    print(n, sizes)
 
-            floating = n.state
-            pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
-            state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
+                floating = n.state
+                pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
+                state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
 
-            # No further propagation is necessary if the state of
-            # the transistor is known to be same. This includes
-            # the case of a floating gate.
-            if not state.is_equiv(n.state):
-                n.state = state
-                for t in n.gate_of:
-                    for c in t.conns:
-                        if c not in more:
-                            more.append(c)
+                # No further propagation is necessary if the state of
+                # the transistor is known to be same. This includes
+                # the case of a floating gate.
+                if not state.is_equiv(n.state):
+                    n.state = state
+                    for t in n.gate_of:
+                        for c in t.conns:
+                            if c not in more:
+                                more.append(c)
 
-            updated.add(n)
+                updated.add(n)
 
     def __update_nodes(self, nodes):
         round = 0
@@ -812,7 +1008,7 @@ class Z80Simulator(object):
                 nodes = more
 
     def __set_node_pull(self, n, pull):
-        pull = Bool.boolify(pull)
+        pull = Bool.cast(pull)
         if '--show-set-nodes' in sys.argv:
             Status.print(n, pull)
         n.pull = pull
@@ -1079,7 +1275,7 @@ class Z80Simulator(object):
 
     def set_pin_state(self, pin, state):
         assert pin in _PINS
-        self.__nodes_by_name[pin].state = Bool.boolify(state)
+        self.__nodes_by_name[pin].state = Bool.cast(state)
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
@@ -1257,11 +1453,11 @@ class State(object):
         self.__new_steps.append(('clear_state',))
 
     def set_pin_state(self, pin, state):
-        step = 'set_pin_state', pin, Bool.boolify(state).image
+        step = 'set_pin_state', pin, Bool.cast(state).image
         self.__new_steps.append(step)
 
     def set_pin_pull(self, pin, pull):
-        step = 'set_pin_pull', pin, Bool.boolify(pull).image
+        step = 'set_pin_pull', pin, Bool.cast(pull).image
         self.__new_steps.append(step)
 
     def update_pin(self, pin):
@@ -1275,7 +1471,7 @@ class State(object):
         if isinstance(n, int):
             for i in range(width):
                 v = bool(n & (1 << i))
-                self.set_pin_and_update(f'{pin}{i}', Bool.boolify(v))
+                self.set_pin_and_update(f'{pin}{i}', Bool.cast(v))
             return
 
         assert isinstance(n, str)
@@ -1418,11 +1614,28 @@ def build_symbolic_states():
     ld.report('after-ld-a-i8')
     del ld
 
-    # pop bc  f(4) r(3) r(3)
-    s.set_db_and_wait(0xc1, 4)
-    s.set_db_and_wait('c', 3)
-    s.set_db_and_wait('b', 3)
-    s.report('after-pop-bc')
+    INSTRS = (
+        ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
+        ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
+        ('pop bc', ((0xc1, 4), ('c', 3), ('b', 3))),
+        ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
+        ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
+        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
+        ('exx', ((0xf4, 4),)),
+    )
+    '''
+        ('pop bc\'', ((0xc1, 4), ('cc', 3), ('bb', 3))),
+        ('pop de\'', ((0xd1, 4), ('ee', 3), ('dd', 3))),
+        ('pop hl\'', ((0xe1, 4), ('ll', 3), ('hh', 3))),
+        ('ex af, af\'', ((0x08, 4),)),
+        ('pop af\'', ((0xf1, 4), ('ff', 3), ('aa', 3))),
+    '''
+    for instr, cycles in INSTRS:
+        with Status.do(instr):
+            for d, ticks in cycles:
+                s.set_db_and_wait(d, ticks)
+                s.cache()
+    s.report('after-symbolising')
 
 
 def test_computing_node_values():
