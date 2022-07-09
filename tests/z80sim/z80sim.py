@@ -340,22 +340,28 @@ class Bool(object):
                                          Clause.get(~b, r),
                                          Clause.get(a, b, ~r)))
 
-    def __and__(self, other):
-        if self.value is False or other.value is False:
+    @staticmethod
+    def get_and(*args):
+        args = tuple(a for a in args if a.value is not True)
+        if len(args) == 0:
+            return TRUE
+        if len(args) == 1:
+            return args[0]
+        if any(a.value is False for a in args):
             return FALSE
-        if self.value is True:
-            return other
-        if other.value is True:
-            return self
 
         # TODO: Optimise the case of two pure symbols.
 
-        a, b = sorted((self.__symbol, other.__symbol))
-        r = __class__.__get_op_symbol(b'(and)', a, b)
-        return __class__.__from_clauses(r, self.__clauses, other.__clauses,
-                                        (Clause.get(a, ~r),
-                                         Clause.get(b, ~r),
-                                         Clause.get(~a, ~b, r)))
+        syms = sorted(a.__symbol for a in args)
+        r = __class__.__get_op_symbol(b'(and)', *syms)
+
+        and_clauses = [Clause.get(*([~s for s in syms] + [r]))]
+        and_clauses.extend(Clause.get(s, ~r) for s in syms)
+        return __class__.__from_clauses(r, and_clauses,
+                                        *(a.__clauses for a in args))
+
+    def __and__(self, other):
+        return __class__.get_and(self, other)
 
     def __invert__(self):
         if self.value is not None:
@@ -941,7 +947,7 @@ class Z80Simulator(object):
                                 conns[x][y] = conns[y][x] = FALSE
                             xyp = conns[x][y]
                             assert xyp is conns[y][x]
-                            xyp |= xp & t.gate.state & yp
+                            xyp |= Bool.get_and(xp, t.gate.state, yp)
                             conns[x][y] = conns[y][x] = xyp
 
         def evaluate_state_predicates(n):
