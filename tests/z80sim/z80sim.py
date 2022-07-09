@@ -509,6 +509,10 @@ class Bool(object):
                     cache.store((s.image,))
 
     def reduced(self):
+        # TODO: It seems we do much faster without trying to
+        # reduce at every step.
+        return self
+
         if self.value is not None:
             return self
 
@@ -1575,6 +1579,7 @@ class State(object):
             print_bit(pin, with_pull=True)
 
         for r in ('reg_pch', 'reg_pcl',
+                  'reg_sph', 'reg_spl',
                   'reg_b', 'reg_c', 'reg_d', 'reg_e',
                   'reg_h', 'reg_l', 'reg_a', 'reg_f',
                   'reg_ixh', 'reg_ixl', 'reg_iyh', 'reg_iyl',
@@ -1646,18 +1651,21 @@ def build_symbolic_states():
 
     INSTRS = (
         ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
-    )
-    '''
         ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
         ('pop bc', ((0xc1, 4), ('c', 3), ('b', 3))),
         ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
         ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
-        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
-        ('exx', ((0xf4, 4),)),
+        ('exx', ((0xd9, 4),)),
         ('pop bc\'', ((0xc1, 4), ('cc', 3), ('bb', 3))),
         ('pop de\'', ((0xd1, 4), ('ee', 3), ('dd', 3))),
         ('pop hl\'', ((0xe1, 4), ('ll', 3), ('hh', 3))),
+        ('exx', ((0xd9, 4),)),
         ('ex af, af\'', ((0x08, 4),)),
+    )
+    '''
+        # Symbolising the AF pair causes significant slow-down,
+        # which means we want to do that as late as possible.
+        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
         ('pop af\'', ((0xf1, 4), ('ff', 3), ('aa', 3))),
     '''
     for instr, cycles in INSTRS:
