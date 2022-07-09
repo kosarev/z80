@@ -1622,8 +1622,14 @@ class State(object):
         sys.exit()
 
 
-def test_node(a, b):
-    assert b.is_equiv(a)
+def test_node(instr, n, a, b):
+    CF = 'reg_f0'
+
+    if instr == 'ccf' and n == CF:
+        assert b.is_equiv(~a)
+        return
+
+    assert b.is_equiv(a), (instr, n, a, b)
 
 
 def test_instructions(reset_state):
@@ -1631,6 +1637,7 @@ def test_instructions(reset_state):
 
     INSTRS = (
         ('nop', ((0x00, 4),)),
+        ('ccf', ((0x3f, 4),)),
     )
 
     for instr, cycles in INSTRS:
@@ -1643,11 +1650,18 @@ def test_instructions(reset_state):
                     with Status.do(f'tick {t}'):
                         s.tick()
                 s.cache()
+
+            # Additional ticks are necessary for the new values
+            # to reach their nodes.
+            s.set_db(0x00)  # nop
+            for t in range(ticks, ticks + 3):
+                with Status.do(f'tick {t}'):
+                    s.tick()
             after = s.get_node_states(NODES)
 
             for id in NODES:
                 with Status.do(f'test {id}'):
-                    test_node(before[id], after[id])
+                    test_node(instr, id, before[id], after[id])
 
     Status.clear()
     print('OK')
