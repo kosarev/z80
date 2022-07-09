@@ -303,6 +303,9 @@ class Bool(object):
     def is_trivially_false(self):
         return self.value is False
 
+    def is_trivially_true(self):
+        return self.value is True
+
     def __bool__(self):
         assert self.value is not None
         return self.value
@@ -323,22 +326,28 @@ class Bool(object):
         key = kind + b''.join(op.hash for op in ops)
         return Literal.from_hash(HASH(key).digest())
 
-    def __or__(self, other):
-        if self.value is True or other.value is True:
+    @staticmethod
+    def get_or(*args):
+        args = tuple(a for a in args if a.value is not False)
+        if len(args) == 0:
+            return FALSE
+        if len(args) == 1:
+            return args[0]
+        if any(a.value is True for a in args):
             return TRUE
-        if self.value is False:
-            return other
-        if other.value is False:
-            return self
 
         # TODO: Optimise the case of two pure symbols.
 
-        a, b = sorted((self.__symbol, other.__symbol))
-        r = __class__.__get_op_symbol(b'(or)', a, b)
-        return __class__.__from_clauses(r, self.__clauses, other.__clauses,
-                                        (Clause.get(~a, r),
-                                         Clause.get(~b, r),
-                                         Clause.get(a, b, ~r)))
+        syms = sorted(a.__symbol for a in args)
+        r = __class__.__get_op_symbol(b'(or)', *syms)
+
+        or_clauses = [Clause.get(*(syms + [~r]))]
+        or_clauses.extend(Clause.get(~s, r) for s in syms)
+        return __class__.__from_clauses(r, or_clauses,
+                                        *(a.__clauses for a in args))
+
+    def __or__(self, other):
+        return __class__.get_or(self, other)
 
     @staticmethod
     def get_and(*args):
@@ -924,7 +933,7 @@ class Z80Simulator(object):
                 group.append(n)
 
                 if n not in conns:
-                    conns[n] = {n: TRUE}
+                    conns[n] = {n: [TRUE]}
 
                 for t in n.conn_of:
                     if t.gate.state.is_trivially_false():
@@ -934,7 +943,7 @@ class Z80Simulator(object):
                     worklist.append(m)
 
                     if m not in conns:
-                        conns[m] = {m: TRUE}
+                        conns[m] = {m: [TRUE]}
 
                     ns = list(conns[n].items())
                     ms = list(conns[m].items())
@@ -944,26 +953,41 @@ class Z80Simulator(object):
                             # print(x, y)
                             if y not in conns[x]:
                                 assert x not in conns[y]
-                                conns[x][y] = conns[y][x] = FALSE
+                                conns[x][y] = conns[y][x] = []
                             xyp = conns[x][y]
                             assert xyp is conns[y][x]
-                            xyp |= Bool.get_and(xp, t.gate.state, yp)
-                            conns[x][y] = conns[y][x] = xyp
+
+                            if len(xyp) == 1 and xyp[0].is_trivially_true():
+                                continue
+
+                            p = Bool.get_and(
+                                    Bool.get_or(*xp),
+                                    t.gate.state,
+                                    Bool.get_or(*yp))
+                            if p.is_trivially_false():
+                                assert 0  # TODO
+                                pass
+                            elif p.is_trivially_true():
+                                conns[x][y] = conns[y][x] = [TRUE]
+                            else:
+                                xyp.append(p)
 
         def evaluate_state_predicates(n):
             cs = conns[n]
+            gnd = Bool.get_or(*cs.get(self.__gnd, []))
+            pwr = Bool.get_or(*cs.get(self.__pwr, []))
 
-            gnd = cs.get(self.__gnd, FALSE)
-            pwr = cs.get(self.__pwr, FALSE)
-
-            pullup, pulldown = FALSE, FALSE
-
+            pullup, pulldown = [], []
             for m in group:
                 if m.pull is not None:
                     assert isinstance(m.pull, Bool)
-                    p = conns[n][m]
-                    pullup |= p & m.pull
-                    pulldown |= p & ~m.pull
+                    p = Bool.get_or(*conns[n][m])
+                    if not p.is_trivially_false():
+                        pullup.append(p & m.pull)
+                        pulldown.append(p & ~m.pull)
+
+            pullup = Bool.get_or(*pullup)
+            pulldown = Bool.get_or(*pulldown)
 
             return gnd, pwr, pullup, pulldown
 
@@ -1622,14 +1646,14 @@ def build_symbolic_states():
 
     INSTRS = (
         ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
+    )
+    '''
         ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
         ('pop bc', ((0xc1, 4), ('c', 3), ('b', 3))),
         ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
         ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
         ('exx', ((0xf4, 4),)),
-    )
-    '''
         ('pop bc\'', ((0xc1, 4), ('cc', 3), ('bb', 3))),
         ('pop de\'', ((0xd1, 4), ('ee', 3), ('dd', 3))),
         ('pop hl\'', ((0xe1, 4), ('ll', 3), ('hh', 3))),
