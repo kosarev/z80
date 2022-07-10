@@ -169,7 +169,7 @@ class Literal(object):
         t = __class__()
         t.id, t.sign = id, sign
         t.shorten_id = shorten_id
-        t.hash = HASH(str(t.image).encode()).digest()
+        t.hash = HASH(str((id, sign)).encode()).digest()
         t.__expr = None
         __class__.__literals[key] = t
         return t
@@ -183,7 +183,7 @@ class Literal(object):
         return f'{SIGNS[self.sign]}{self.shorten_id}'
 
     def __lt__(self, other):
-        return self.image < other.image
+        return (self.id, self.sign) < (other.id, other.sign)
 
     @staticmethod
     def cast(x):
@@ -191,14 +191,34 @@ class Literal(object):
             return x
         return __class__.get(x)
 
-    @property
-    def image(self):
-        return self.id, self.sign
+    class Storage(object):
+        def __init__(self, *, image=None):
+            self.__ids = []
+            self.__id_indexes = {}
 
-    @staticmethod
-    def from_image(image):
-        id, sign = image
-        return __class__.get(id, sign)
+            if image is not None:
+                for id in image:
+                    self.__add_id(id)
+
+        def __add_id(self, id):
+            i = self.__id_indexes.get(id)
+            if i is None:
+                i = len(self.__ids)
+                self.__ids.append(id)
+                self.__id_indexes[id] = i
+
+            return i
+
+        def add(self, literal):
+            return self.__add_id(literal.id) * 2 + int(literal.sign)
+
+        def get(self, image):
+            i, sign = image // 2, bool(image % 2)
+            return Literal.get(self.__ids[i], sign)
+
+        @property
+        def image(self):
+            return tuple(self.__ids)
 
     def __invert__(self):
         return __class__.get(self.id, not self.sign)
@@ -221,7 +241,7 @@ class Clause(object):
         return c
 
     def __lt__(self, other):
-        return self.image < other.image
+        return self.literals < other.literals
 
     @staticmethod
     def cast(x):
@@ -233,13 +253,21 @@ class Clause(object):
         r = ' '.join(repr(t) for t in self.literals)
         return f'[{r}]'
 
-    @property
-    def image(self):
-        return tuple(t.image for t in self.literals)
+    class Storage(object):
+        def __init__(self, literal_storage, *, image=None):
+            assert image is None or image == (), image
+            self.literal_storage = literal_storage
 
-    @staticmethod
-    def from_image(image):
-        return __class__.get(*(Literal.from_image(t) for t in image))
+        def add(self, clause):
+            return tuple(self.literal_storage.add(t)
+                         for t in clause.literals)
+
+        def get(self, image):
+            return Clause.get(*(self.literal_storage.get(t) for t in image))
+
+        @property
+        def image(self):
+            return ()
 
 
 class Bool(object):
@@ -248,7 +276,7 @@ class Bool(object):
 
     def __init__(self, term):
         self.__constrs_expr = None
-        self.__clauses = ()
+        self.clauses = ()
 
         if isinstance(term, bool):
             self.value = term
@@ -260,39 +288,48 @@ class Bool(object):
         assert isinstance(term, Literal)
         assert term.sign is False
         self.value = None
-        self.__symbol = term
+        self.symbol = term
 
     @staticmethod
-    def __from_clauses(symbol, *clause_sets):
+    def from_clauses(symbol, *clause_sets):
         b = Bool(symbol)
 
         clauses = set()
         for s in clause_sets:
             clauses.update(s)
-        b.__clauses = tuple(sorted(clauses))
+        b.clauses = tuple(sorted(clauses))
 
         return b
 
     def __repr__(self):
         if self.value is not None:
             return repr(int(self.value))
-        r = ' '.join(repr(c) for c in self.__clauses)
-        return f'{self.__symbol}: ({r})'
+        r = ' '.join(repr(c) for c in self.clauses)
+        return f'{self.symbol}: ({r})'
 
-    @property
-    def image(self):
-        if self.value is not None:
-            return self.value
-        return self.__symbol.image, tuple(c.image for c in self.__clauses)
+    class Storage(object):
+        def __init__(self, clause_storage, *, image=None):
+            assert image is None or image == (), image  # TODO
+            self.__literals = clause_storage.literal_storage
+            self.__clauses = clause_storage
 
-    @staticmethod
-    def from_image(image):
-        if isinstance(image, bool):
-            return TRUE if image else FALSE
-        symbol, clauses = image
-        return __class__.__from_clauses(
-            Literal.from_image(symbol),
-            (Clause.from_image(c) for c in clauses))
+        def add(self, e):
+            if e.value is not None:
+                return e.value
+            return (self.__literals.add(e.symbol),
+                    tuple(self.__clauses.add(c) for c in e.clauses))
+
+        def get(self, image):
+            if isinstance(image, bool):
+                return TRUE if image else FALSE
+            symbol, clauses = image
+            return Bool.from_clauses(
+                self.__literals.get(symbol),
+                (self.__clauses.get(c) for c in clauses))
+
+        @property
+        def image(self):
+            return ()
 
     @staticmethod
     def cast(x):
@@ -338,13 +375,13 @@ class Bool(object):
 
         # TODO: Optimise the case of two pure symbols.
 
-        syms = sorted(a.__symbol for a in args)
+        syms = sorted(a.symbol for a in args)
         r = __class__.__get_op_symbol(b'(or)', *syms)
 
         or_clauses = [Clause.get(*(syms + [~r]))]
         or_clauses.extend(Clause.get(~s, r) for s in syms)
-        return __class__.__from_clauses(r, or_clauses,
-                                        *(a.__clauses for a in args))
+        return __class__.from_clauses(r, or_clauses,
+                                      *(a.clauses for a in args))
 
     def __or__(self, other):
         return __class__.get_or(self, other)
@@ -361,13 +398,13 @@ class Bool(object):
 
         # TODO: Optimise the case of two pure symbols.
 
-        syms = sorted(a.__symbol for a in args)
+        syms = sorted(a.symbol for a in args)
         r = __class__.__get_op_symbol(b'(and)', *syms)
 
         and_clauses = [Clause.get(*([~s for s in syms] + [r]))]
         and_clauses.extend(Clause.get(s, ~r) for s in syms)
-        return __class__.__from_clauses(r, and_clauses,
-                                        *(a.__clauses for a in args))
+        return __class__.from_clauses(r, and_clauses,
+                                      *(a.clauses for a in args))
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -380,11 +417,11 @@ class Bool(object):
 
         # TODO: Optimise the case of a pure symbol.
 
-        a = self.__symbol
+        a = self.symbol
         r = __class__.__get_op_symbol(b'(not)', a)
-        return __class__.__from_clauses(r, self.__clauses,
-                                        (Clause.get(a, r),
-                                         Clause.get(~a, ~r)))
+        return __class__.from_clauses(r, self.clauses,
+                                      (Clause.get(a, r),
+                                       Clause.get(~a, ~r)))
 
     @staticmethod
     def ifelse(cond, a, b):
@@ -401,14 +438,14 @@ class Bool(object):
 
         # TODO: Optimise the case of pure symbols.
 
-        i, t, e = cond.__symbol, a.__symbol, b.__symbol
+        i, t, e = cond.symbol, a.symbol, b.symbol
         r = __class__.__get_op_symbol(b'(ifelse)', i, t, e)
-        return __class__.__from_clauses(r, cond.__clauses,
-                                        a.__clauses, b.__clauses,
-                                        (Clause.get(~i, t, ~r),
-                                         Clause.get(~i, ~t, r),
-                                         Clause.get(i, e, ~r),
-                                         Clause.get(i, ~e, r)))
+        return __class__.from_clauses(r, cond.clauses,
+                                      a.clauses, b.clauses,
+                                      (Clause.get(~i, t, ~r),
+                                       Clause.get(~i, ~t, r),
+                                       Clause.get(i, e, ~r),
+                                       Clause.get(i, ~e, r)))
 
     @staticmethod
     def __get_literal_expr(literal):
@@ -427,7 +464,7 @@ class Bool(object):
         if self.value is not None:
             return z3.BoolVal(self.value)
 
-        return __class__.__get_literal_expr(self.__symbol)
+        return __class__.__get_literal_expr(self.symbol)
 
     @staticmethod
     def __get_clause_expr(clause):
@@ -442,7 +479,7 @@ class Bool(object):
     def __get_constraints_expr(self):
         if self.__constrs_expr is None:
             self.__constrs_expr = z3.And(*(__class__.__get_clause_expr(c)
-                                           for c in self.__clauses))
+                                           for c in self.clauses))
 
         return self.__constrs_expr
 
@@ -617,18 +654,25 @@ class Node(object):
     def __lt__(self, other):
         return self.index < other.index
 
-    @property
-    def image(self):
-        pull = None if self.pull is None else self.pull.image
-        state = None if self.state is None else self.state.image
-        return pull, state
+    class Storage(object):
+        def __init__(self, bool_storage, *, image=None):
+            assert image is None or image == (), image
+            self.__bools = bool_storage
 
-    @staticmethod
-    def from_image(index, image):
-        pull, state = image
-        pull = None if pull is None else Bool.from_image(pull)
-        state = None if state is None else Bool.from_image(state)
-        return Node(index, pull, state=state)
+        def add(self, n):
+            pull = None if n.pull is None else self.__bools.add(n.pull)
+            state = None if n.state is None else self.__bools.add(n.state)
+            return pull, state
+
+        def get(self, index, image):
+            pull, state = image
+            pull = None if pull is None else self.__bools.get(pull)
+            state = None if state is None else self.__bools.get(state)
+            return Node(index, pull, state=state)
+
+        @property
+        def image(self):
+            return ()
 
     @property
     def id(self):
@@ -709,12 +753,19 @@ class Transistor(object):
 
 
 def _make_image(nodes, trans):
+    literals = Literal.Storage()
+    clauses = Clause.Storage(literals)
+    bools = Bool.Storage(clauses)
+    node_storage = Node.Storage(bools)
+
+    # TODO: Move this logic into Node.Storage.
     nodes, trans = sorted(nodes), sorted(trans)
     node_names = tuple((n.index, n.custom_id) for n in nodes
                        if n.custom_id is not None)
-    nodes = tuple((n.index,) + n.image for n in nodes)
+    nodes = tuple((n.index,) + node_storage.add(n) for n in nodes)
     trans = tuple((t.index,) + t.image for t in trans)
-    return node_names, nodes, trans
+    return (literals.image, bools.image, node_storage.image,
+            node_names, nodes, trans)
 
 
 def _load_initial_image():
@@ -900,10 +951,10 @@ class Z80Simulator(object):
     def image(self):
         return _make_image(self.__nodes.values(), self.__trans.values())
 
-    def __restore_nodes_from_image(self, names, image):
+    def __restore_nodes_from_image(self, names, image, node_storage):
         self.__nodes = {}
         for i in image:
-            n = Node.from_image(i[0], i[1:])
+            n = node_storage.get(i[0], i[1:])
             self.__nodes[n.index] = n
 
         self.__nodes_by_name = {}
@@ -1122,8 +1173,13 @@ class Z80Simulator(object):
             # For custom images, leave them as-is.
             assert skip_reset is None
 
-        node_names, nodes, trans = image
-        self.__restore_nodes_from_image(node_names, nodes)
+        literals, bools, node_storage, node_names, nodes, trans = image
+        literals = Literal.Storage(image=literals)
+        clauses = Clause.Storage(literals)
+        bools = Bool.Storage(clauses, image=bools)
+        node_storage = Node.Storage(bools, image=node_storage)
+
+        self.__restore_nodes_from_image(node_names, nodes, node_storage)
         self.__restore_transistors_from_image(trans)
 
         self.__gnd = self.__nodes_by_name[_GND_ID]
@@ -1386,7 +1442,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 3
+        VERSION = 4
         key = (VERSION,) + tuple(steps)
         return Cache.get_entry('states', key)
 
@@ -1399,8 +1455,28 @@ class State(object):
         return __class__.__get_hash(self.__current_steps + self.__new_steps)
 
     @staticmethod
+    def __get_steps_image(steps, bools):
+        def get_step_element_image(e):
+            if isinstance(e, (str, int)):
+                return e
+            if isinstance(e, Bool):
+                return bools.add(e)
+            assert 0, repr(e)
+
+        def get_step_image(step):
+            return tuple(get_step_element_image(e) for e in step)
+
+        return tuple(get_step_image(s) for s in steps)
+
+    @staticmethod
     def __cache_state(steps, image):
-        state = tuple(steps), image
+        literals = Literal.Storage()
+        clauses = Clause.Storage(literals)
+        bools = Bool.Storage(clauses)
+
+        steps = __class__.__get_steps_image(steps, bools)
+
+        state = literals.image, clauses.image, bools.image, steps, image
         __class__.__get_cache(steps).store(state)
 
     @staticmethod
@@ -1413,8 +1489,14 @@ class State(object):
         if '--show-loaded-state' in sys.argv:
             Status.print(cache.get_path())
 
-        stored_steps, image = state
-        assert stored_steps == tuple(steps)
+        literals, clauses, bools, stored_steps, image = state
+
+        literals = Literal.Storage(image=literals)
+        clauses = Clause.Storage(literals, image=clauses)
+        bools = Bool.Storage(clauses, image=bools)
+
+        assert stored_steps == __class__.__get_steps_image(steps, bools)
+
         return image
 
     def __apply_new_steps(self):
@@ -1449,7 +1531,7 @@ class State(object):
 
         while missing_steps:
             step = missing_steps.pop(0)
-            __class__.__apply_step(sim, step)
+            self.__apply_step(sim, step)
             self.__current_steps.append(step)
 
         self.__current_image = sim.image
@@ -1462,18 +1544,17 @@ class State(object):
     def get_node_states(self, ids):
         return Z80Simulator(image=self.image).get_node_states(ids)
 
-    @staticmethod
-    def __apply_step(sim, step):
+    def __apply_step(self, sim, step):
         kind = step[0]
         if kind == 'clear_state':
             _, = step
             sim.clear_state()
         elif kind == 'set_pin_state':
             _, pin, state = step
-            sim.set_pin_state(pin, Bool.from_image(state))
+            sim.set_pin_state(pin, state)
         elif kind == 'set_pin_pull':
             _, pin, pull = step
-            sim.set_pin_pull(pin, Bool.from_image(pull))
+            sim.set_pin_pull(pin, pull)
         elif kind == 'update_pin':
             _, pin = step
             sim.update_pin(pin)
@@ -1493,11 +1574,11 @@ class State(object):
         self.__new_steps.append(('clear_state',))
 
     def set_pin_state(self, pin, state):
-        step = 'set_pin_state', pin, Bool.cast(state).image
+        step = 'set_pin_state', pin, Bool.cast(state)
         self.__new_steps.append(step)
 
     def set_pin_pull(self, pin, pull):
-        step = 'set_pin_pull', pin, Bool.cast(pull).image
+        step = 'set_pin_pull', pin, Bool.cast(pull)
         self.__new_steps.append(step)
 
     def update_pin(self, pin):
