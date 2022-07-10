@@ -197,8 +197,8 @@ class Literal(object):
             self.__id_indexes = {}
 
             if image is not None:
-                for id in image:
-                    self.__add_id(id)
+                for i, id in enumerate(image):
+                    assert self.__add_id(id) == i
 
         def __add_id(self, id):
             i = self.__id_indexes.get(id)
@@ -210,7 +210,8 @@ class Literal(object):
             return i
 
         def add(self, literal):
-            return self.__add_id(literal.id) * 2 + int(literal.sign)
+            i = self.__add_id(literal.id)
+            return i * 2 + int(literal.sign)
 
         def get(self, image):
             i, sign = image // 2, bool(image % 2)
@@ -255,19 +256,31 @@ class Clause(object):
 
     class Storage(object):
         def __init__(self, literal_storage, *, image=None):
-            assert image is None or image == (), image
             self.literal_storage = literal_storage
+            self.__clauses = []
+            self.__clause_indexes = {}
+
+            if image is not None:
+                for literals in image:
+                    literals = (self.literal_storage.get(t) for t in literals)
+                    self.add(Clause.get(*literals))
 
         def add(self, clause):
-            return tuple(self.literal_storage.add(t)
-                         for t in clause.literals)
+            i = self.__clause_indexes.get(clause)
+            if i is None:
+                i = len(self.__clauses)
+                self.__clauses.append(clause)
+                self.__clause_indexes[clause] = i
+
+            return i
 
         def get(self, image):
-            return Clause.get(*(self.literal_storage.get(t) for t in image))
+            return self.__clauses[image]
 
         @property
         def image(self):
-            return ()
+            return tuple(tuple(self.literal_storage.add(t) for t in c.literals)
+                         for c in self.__clauses)
 
 
 class Bool(object):
@@ -764,7 +777,8 @@ def _make_image(nodes, trans):
                        if n.custom_id is not None)
     nodes = tuple((n.index,) + node_storage.add(n) for n in nodes)
     trans = tuple((t.index,) + t.image for t in trans)
-    return (literals.image, bools.image, node_storage.image,
+
+    return (node_storage.image, bools.image, clauses.image, literals.image,
             node_names, nodes, trans)
 
 
@@ -1173,9 +1187,11 @@ class Z80Simulator(object):
             # For custom images, leave them as-is.
             assert skip_reset is None
 
-        literals, bools, node_storage, node_names, nodes, trans = image
+        (node_storage, bools, clauses, literals,
+         node_names, nodes, trans) = image
+
         literals = Literal.Storage(image=literals)
-        clauses = Clause.Storage(literals)
+        clauses = Clause.Storage(literals, image=clauses)
         bools = Bool.Storage(clauses, image=bools)
         node_storage = Node.Storage(bools, image=node_storage)
 
@@ -1442,8 +1458,9 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 4
-        key = (VERSION,) + tuple(steps)
+        VERSION = 5
+
+        key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
 
     @staticmethod
@@ -1455,28 +1472,27 @@ class State(object):
         return __class__.__get_hash(self.__current_steps + self.__new_steps)
 
     @staticmethod
-    def __get_steps_image(steps, bools):
+    def __get_steps_image(steps):
+        literals = Literal.Storage()
+        clauses = Clause.Storage(literals)
+        bools = Bool.Storage(clauses)
+
         def get_step_element_image(e):
             if isinstance(e, (str, int)):
                 return e
             if isinstance(e, Bool):
                 return bools.add(e)
-            assert 0, repr(e)
+            assert 0, (repr(e), steps)
 
         def get_step_image(step):
             return tuple(get_step_element_image(e) for e in step)
 
-        return tuple(get_step_image(s) for s in steps)
+        return (tuple(get_step_image(s) for s in steps),
+                bools.image, clauses.image, literals.image)
 
     @staticmethod
     def __cache_state(steps, image):
-        literals = Literal.Storage()
-        clauses = Clause.Storage(literals)
-        bools = Bool.Storage(clauses)
-
-        steps = __class__.__get_steps_image(steps, bools)
-
-        state = literals.image, clauses.image, bools.image, steps, image
+        state = __class__.__get_steps_image(steps), image
         __class__.__get_cache(steps).store(state)
 
     @staticmethod
@@ -1489,13 +1505,8 @@ class State(object):
         if '--show-loaded-state' in sys.argv:
             Status.print(cache.get_path())
 
-        literals, clauses, bools, stored_steps, image = state
-
-        literals = Literal.Storage(image=literals)
-        clauses = Clause.Storage(literals, image=clauses)
-        bools = Bool.Storage(clauses, image=bools)
-
-        assert stored_steps == __class__.__get_steps_image(steps, bools)
+        stored_steps, image = state
+        assert stored_steps == __class__.__get_steps_image(steps)
 
         return image
 
