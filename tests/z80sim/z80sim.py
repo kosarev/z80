@@ -1782,25 +1782,48 @@ class State(object):
         if '--dump-trans' in sys.argv:
             s.dump_trans()
 
+        Status.clear()
         sys.exit()
 
 
 def test_node(instr, n, a, b):
+    def check(x):
+        if b.is_equiv(x):
+            return
+
+        Status.print(instr, n)
+        Status.print('old state', a.simplified_sexpr())
+        Status.print('new state', b.simplified_sexpr())
+
+        Status.print('expected', x.simplified_sexpr())
+
+        Status.clear()
+        assert 0
+
     CF = 'reg_f0'
+    XF = 'reg_f3'
+    YF = 'reg_f5'
 
-    if instr == 'ccf' and n == CF:
-        assert b.is_equiv(~a)
-        return
+    if n == CF:
+        if instr == 'ccf':
+            return check(~a)
 
-    assert b.is_equiv(a), (instr, n, a, b)
+        if instr == 'pop af':
+            return check(Bool('f0'))
+
+    if n in (XF, YF):
+        if instr == 'pop af':
+            return check({XF: Bool('f3'), YF: Bool('f5')}[n])
+
+    check(a)
 
 
 def test_instruction(instr, cycles, base_state):
-    # Additional ticks are necessary for the new values
+    # Additional ticks are necessary for new values
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    NODES = 'reg_f0',
+    NODES = 'reg_f0', 'reg_f3', 'reg_f5'
 
     with Status.do(instr):
         s = State(base_state)
@@ -1808,20 +1831,19 @@ def test_instruction(instr, cycles, base_state):
         for cycle_no, (d, ticks) in enumerate(cycles):
             s.set_db(d)
             for t in range(ticks):
-                with Status.do(f'tick {t}'):
-                    if cycle_no == 0 and t == EXTRA_TICKS:
-                        before = s.get_node_states(NODES)
-
-                    s.tick()
+                if cycle_no == 0 and t == EXTRA_TICKS:
+                    before = s.get_node_states(NODES)
                     s.cache()
+
+                s.tick()
+            s.cache()
 
         after_instr_state = State(s)
 
         s.set_db(0x00)  # nop
         for t in range(ticks, ticks + EXTRA_TICKS):
-            with Status.do(f'extra tick {t}'):
-                s.tick()
-                s.cache()
+            s.tick()
+        s.cache()
         after = s.get_node_states(NODES)
 
         for id in NODES:
@@ -1832,16 +1854,29 @@ def test_instruction(instr, cycles, base_state):
 
 
 def test_instructions(reset_state):
+    ''' TOOD
     INSTRS = (
         ('nop', ((0x00, 4),)),
         ('ccf', ((0x3f, 4),)),
+        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
+    )
+    '''
+
+    INSTRS1 = (
+        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
     )
 
-    for instr, cycles in INSTRS:
+    INSTRS2 = (
+        ('ccf', ((0x3f, 4),)),
+    )
+
+    for instr, cycles in INSTRS1:
         after_instr_state = test_instruction(instr, cycles, reset_state)
 
+        # TODO: Use different symbolic values for subsequent
+        # instructions.
         with Status.do(instr):
-            for instr2, cycles2 in INSTRS:
+            for instr2, cycles2 in INSTRS2:
                 test_instruction(instr2, cycles2, after_instr_state)
 
     Status.clear()
