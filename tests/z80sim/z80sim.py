@@ -1552,11 +1552,11 @@ class State(object):
         bools = Bool.Storage(clauses)
 
         def get_step_element_image(e):
-            if isinstance(e, (str, int)):
+            if isinstance(e, (str, int, NoneType)):
                 return e
             if isinstance(e, Bool):
                 return bools.add(e)
-            assert 0, (repr(e), steps)
+            assert 0, (e, steps)
 
         def get_step_image(step):
             return tuple(get_step_element_image(e) for e in step)
