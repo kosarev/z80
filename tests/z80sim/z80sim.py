@@ -881,10 +881,11 @@ def _load_initial_image():
 
         # In nodenames.js the alternative registers are confused
         # with the primary ones.
-        for r in ('reg_b', 'reg_c', 'reg_d', 'reg_e',
-                  'reg_h', 'reg_l'):
+        for r in 'bcdehl':
+            # Also, hl is confused with de.
+            r2 = {'h': 'd', 'l': 'e', 'd': 'h', 'e': 'l'}.get(r, r)
             for i in range(8):
-                a, b = f'{r}{i}', f'{r}{r[-1]}{i}'
+                a, b = f'reg_{r}{i}', f'reg_{r2}{r2[-1]}{i}'
                 RENAMED_NODES[a] = b
                 RENAMED_NODES[b] = a
 
@@ -1531,7 +1532,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 6
+        VERSION = 7
 
         key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
