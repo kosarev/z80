@@ -1566,8 +1566,9 @@ class State(object):
 
     @staticmethod
     def __cache_state(steps, image):
-        state = __class__.__get_steps_image(steps), image
-        __class__.__get_cache(steps).store(state)
+        with Status.do('cache state'):
+            state = __class__.__get_steps_image(steps), image
+            __class__.__get_cache(steps).store(state)
 
     @staticmethod
     def __try_load_state(steps):
