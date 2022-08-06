@@ -742,15 +742,42 @@ TRUE = Bool(True)
 
 
 class Bits(object):
-    def __init__(self, bits):
-        self.__bits = tuple(bits)
+    def __init__(self, bits, width=None):
+        if isinstance(bits, int):
+            n = bits
+            bits = []
+            while n:
+                bits.append(n & 1)
+                n >>= 1
+
+        if isinstance(bits, str):
+            assert width is not None
+            bits = tuple(f'{bits}{i}' for i in range(width))
+
+        bits = tuple(Bool.cast(b) for b in bits)
+
+        if width is not None:
+            assert len(bits) <= width
+            if len(bits) < width:
+                bits += (FALSE,) * (width - len(bits))
+
+        self.bits = bits
+
+    @staticmethod
+    def cast(x, width=None):
+        bits = x if isinstance(x, Bits) else Bits(x, width)
+
+        if width is not None:
+            assert bits.width == width
+
+        return bits
 
     def __getitem__(self, i):
-        return self.__bits[i]
+        return self.bits[i]
 
     @property
     def width(self):
-        return len(self.__bits)
+        return len(self.bits)
 
     @property
     def size_in_bytes(self):
@@ -758,17 +785,17 @@ class Bits(object):
 
     @property
     def value(self):
-        if all(b is None for b in self.__bits):
+        if all(b is None for b in self.bits):
             return None
 
-        values = tuple(b.value for b in self.__bits)
+        values = tuple(b.value for b in self.bits)
         if all(v is not None for v in values):
             n = 0
             for i, v in enumerate(values):
                 n |= int(v) << i
             return n
 
-        return self.__bits
+        return self.bits
 
     def __int__(self):
         v = self.value
@@ -776,7 +803,7 @@ class Bits(object):
         return v
 
     def __repr__(self):
-        return repr(self.__bits)
+        return repr(self.bits)
 
     def __str__(self):
         v = self.value
@@ -792,7 +819,7 @@ class Bits(object):
     def zero_extended(self, width):
         if self.width >= width:
             return self
-        return Bits(self.__bits + (FALSE,) * (width - self.width))
+        return Bits(self.bits + (FALSE,) * (width - self.width))
 
     @staticmethod
     def zero_extend_to_same_width(*args):
@@ -800,7 +827,7 @@ class Bits(object):
         return (a.zero_extended(w) for a in args)
 
     def __lshift__(self, n):
-        return Bits((FALSE,) * n + self.__bits)
+        return Bits((FALSE,) * n + self.bits)
 
     def __or__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
@@ -1200,7 +1227,6 @@ class Z80Simulator(object):
                                     t.gate.state,
                                     Bool.get_or(*yp))
                             if p.is_trivially_false():
-                                assert 0  # TODO
                                 pass
                             elif p.is_trivially_true():
                                 conns[x][y] = conns[y][x] = [TRUE]
@@ -1641,7 +1667,7 @@ class State(object):
         bools = Bool.Storage(clauses)
 
         def get_step_element_image(e):
-            if isinstance(e, (str, int, NoneType)):
+            if isinstance(e, (str, int, type(None))):
                 return e
             if isinstance(e, Bool):
                 return bools.add(e)
@@ -1763,22 +1789,15 @@ class State(object):
         self.set_pin_pull(pin, pull)
         self.update_pin(pin)
 
-    def set_pins_and_update(self, pin, width, n):
-        if isinstance(n, int):
-            for i in range(width):
-                v = bool(n & (1 << i))
-                self.set_pin_and_update(f'{pin}{i}', Bool.cast(v))
-            return
+    def set_pins_and_update(self, pin, bits):
+        for i, b in enumerate(Bits.cast(bits).bits):
+            self.set_pin_and_update(f'{pin}{i}', b)
 
-        assert isinstance(n, str)
-        for i in range(width):
-            self.set_pin_and_update(f'{pin}{i}', f'{n}{i}')
+    def set_db(self, bits):
+        self.set_pins_and_update('db', Bits.cast(bits, width=8))
 
-    def set_db(self, n):
-        self.set_pins_and_update('db', 8, n)
-
-    def set_db_and_wait(self, n, ticks):
-        self.set_db(n)
+    def set_db_and_wait(self, bits, ticks):
+        self.set_db(bits)
         self.ticks(ticks)
 
     def update_all_nodes(self):
@@ -1851,15 +1870,12 @@ class State(object):
                   'reg_hh', 'reg_ll', 'reg_aa', 'reg_ff'):
             print_bits(r, 8)
 
-        # TODO: Decoder state, that is, the active IX/IY prefix.
         # TODO: flipflop int_disabled
         # TODO: flipflop halted
         # TODO: flipflop iff1, iff2
         # TODO: int_mode im
         # TODO: The SCF/SCC flag discovered by Patrik Rak, see
         #       https://github.com/kosarev/z80/issues/42
-        # TODO: Which of af and af' is active.
-        # TODO: Which of bc, de, hl and bc', de', hl' are active.
         # TODO: ~int
         # TODO: ~nmi
         # TODO: ~wait
@@ -1944,7 +1960,87 @@ def test_instruction(instr, cycles, base_state):
     return after_instr_state
 
 
+def make_symbolised_state(reset_state):
+    SYMBOLISING_SEQ = (
+        ('di', ((0xf3, 4),)),
+
+        ('exx', ((0xd9, 4),)),
+        ('pop bc2', ((0xc1, 4), ('cc', 3), ('bb', 3))),
+        ('pop de2', ((0xd1, 4), ('ee', 3), ('dd', 3))),
+        ('pop hl2', ((0xe1, 4), ('ll', 3), ('hh', 3))),
+        ('exx', ((0xd9, 4),)),
+
+        ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
+        ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
+        ('pop bc', ((0xc1, 4), ('c', 3), ('b', 3))),
+        ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
+        ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
+
+        ('ex af, af2', ((0x08, 4),)),
+        ('pop af2', ((0xf1, 4), ('ff', 3), ('aa', 3))),
+        ('ex af, af2', ((0x08, 4),)),
+
+        # Updates WZ.
+        ('jp pc', ((0xc3, 4), ('pcl', 3), ('pch', 3))),
+
+        ('xor a', ((0xaf, 4),)),
+        ('jp c, wz', ((0xda, 4), ('z', 3), ('w', 3))),
+
+        ('ld a, ri', ((0x3e, 4), ('ri', 3))),
+        ('ld i, a', ((0xed, 4), (0x47, 5))),
+
+        ('ld a, rr', ((0x3e, 4), ('rr', 3))),
+        ('ld r, a', ((0xed, 4), (0x4f, 5))),
+
+        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
+
+        ('ld sp, sp', ((0x31, 4), ('spl', 3), ('sph', 3))),
+
+        ('im im', ((0xed, 4),
+                   (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
+    )
+    ''' TODO
+        im n -- symbolise
+
+    void on_decode_ed_prefix() {
+        case 0x46:
+            // IM im[y]  f(4) f(4)
+            return self().on_im(0);
+        case 0x56:
+        case 0x5e:
+            return self().on_im(y - 1);
+
+        ed46 im 0   010 00 110
+        ed4e im ?   010 01 110
+        ed56 im 1   010 10 110
+        ed5e im 2   010 11 110
+
+        ed4e xim 0xed4e, 0
+
+        ed66 xim 0xed66, 0
+        ed6e xim 0xed6e, 0
+        ed76 xim 0xed76, 1
+        ed7e xim 0xed7e, 2
+
+        ei+di -- symbolise
+
+        nop
+        nop
+    '''
+    s = State(reset_state)
+    for instr, cycles in SYMBOLISING_SEQ:
+        with Status.do(instr):
+            for d, ticks in cycles:
+                s.set_db_and_wait(d, ticks)
+                s.cache()
+    s.report('after-symbolising')
+
+    return s
+
+
 def test_instructions(reset_state):
+    symbolised_state = make_symbolised_state(reset_state)
+
     ''' TOOD
     INSTRS = (
         ('nop', ((0x00, 4),)),
@@ -1962,7 +2058,7 @@ def test_instructions(reset_state):
     )
 
     for instr, cycles in INSTRS1:
-        after_instr_state = test_instruction(instr, cycles, reset_state)
+        after_instr_state = test_instruction(instr, cycles, symbolised_state)
 
         # TODO: Use different symbolic values for subsequent
         # instructions.
@@ -2009,32 +2105,6 @@ def build_symbolic_states():
     ld.set_db_and_wait('imm', 5)
     ld.report('after-ld-a-i8')
     del ld
-
-    ''' TODO
-    INSTRS = (
-        ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
-        ('pop iy', ((0xfd, 4), (0xe1, 4), ('iyl', 3), ('iyh', 3))),
-        ('pop bc', ((0xc1, 4), ('c', 3), ('b', 3))),
-        ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
-        ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
-        ('exx', ((0xd9, 4),)),
-        ('pop bc\'', ((0xc1, 4), ('cc', 3), ('bb', 3))),
-        ('pop de\'', ((0xd1, 4), ('ee', 3), ('dd', 3))),
-        ('pop hl\'', ((0xe1, 4), ('ll', 3), ('hh', 3))),
-        ('exx', ((0xd9, 4),)),
-        ('ex af, af\'', ((0x08, 4),)),
-    )
-        # Symbolising the AF pair causes significant slow-down,
-        # which means we want to do that as late as possible.
-        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
-        ('pop af\'', ((0xf1, 4), ('ff', 3), ('aa', 3))),
-    for instr, cycles in INSTRS:
-        with Status.do(instr):
-            for d, ticks in cycles:
-                s.set_db_and_wait(d, ticks)
-                s.cache()
-    s.report('after-symbolising')
-    '''
 
     test_instructions(s)
 
