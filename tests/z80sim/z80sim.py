@@ -17,6 +17,7 @@ import datetime
 import hashlib
 import pathlib
 import pprint
+import pycosat
 import sys
 import z3
 
@@ -156,7 +157,7 @@ class Literal(object):
         if t is not None:
             return t
 
-        shorten_id = id[:10] if id.startswith(__class__.__HASH_PREFIX) else id
+        shorten_id = id[:11] if id.startswith(__class__.__HASH_PREFIX) else id
 
         # Make sure shorten ids we print are still unique.
         if shorten_id not in __class__.__shorten_ids:
@@ -173,6 +174,8 @@ class Literal(object):
         t.shorten_id = i.shorten_id = shorten_id
         t.value_expr = None
         i.value_expr = ('not', t)
+        t.sat_index = len(__class__.__literals) + 1
+        i.sat_index = -t.sat_index
         t.__inversion = i
         i.__inversion = t
         __class__.__literals[id] = t
@@ -181,7 +184,7 @@ class Literal(object):
 
     @staticmethod
     def get_intermediate(op, *args):
-        assert op in ('or', 'and', 'not', 'ifelse')
+        assert op in ('or', 'and', 'not', 'ifelse', 'neq')
         value_expr = (op,) + args
         hash = HASH(str(value_expr).encode()).hexdigest()
         t = __class__.get(__class__.__HASH_PREFIX + hash)
@@ -263,7 +266,7 @@ class Clause(object):
 
         c = __class__()
         c.literals = literals
-        c.__expr = None
+        c.sat_clause = tuple(t.sat_index for t in literals)
         __class__.__clauses[literals] = c
         return c
 
@@ -310,15 +313,50 @@ class Clause(object):
 
 
 class Bool(object):
-    __literal_exprs = {}
-    __clause_exprs = {}
+    _USE_Z3_EXPR_REPR = False
+    __USE_PYCOSAT = True
+
+    if _USE_Z3_EXPR_REPR:
+        __tactic = z3.Tactic('qe2')
+        _decls = {}
+    else:
+        __literal_exprs = {}
+        __clause_exprs = {}
 
     def __init__(self, term):
+        if __class__._USE_Z3_EXPR_REPR:
+            if isinstance(term, z3.BoolRef):
+                e = __class__.__tactic.apply(term).as_expr()
+                if z3.is_false(e):
+                    self.value = False
+                elif z3.is_true(e):
+                    self.value = True
+                else:
+                    self.value = None
+                    self._e = e
+            elif isinstance(term, str):
+                self.value = None
+                self._e = __class__._decls.get(term)
+                if self._e is None:
+                    self._e = __class__._decls[term] = z3.Bool(term)
+            elif isinstance(term, int):
+                assert term in (0, 1)
+                self.value = bool(term)
+            else:
+                assert isinstance(term, bool), term
+                self.value = term
+            return
+
         self.__constrs_expr = None
         self.clauses = ()
 
         if isinstance(term, bool):
             self.value = term
+            return
+
+        if isinstance(term, int):
+            assert term in (0, 1)
+            self.value = bool(term)
             return
 
         if isinstance(term, str):
@@ -329,8 +367,13 @@ class Bool(object):
         self.value = None
         self.symbol = term
 
+    @property
+    def sat_clauses(self):
+        return (c.sat_clause for c in self.clauses)
+
     @staticmethod
     def from_clauses(symbol, *clause_sets):
+        assert not __class__._USE_Z3_EXPR_REPR
         b = Bool(symbol)
 
         clauses = set()
@@ -343,6 +386,8 @@ class Bool(object):
     def __repr__(self):
         if self.value is not None:
             return repr(int(self.value))
+        if __class__._USE_Z3_EXPR_REPR:
+            return self._e.sexpr()
         r = ' '.join(repr(c) for c in self.clauses)
         return f'{self.symbol}: ({r})'
 
@@ -355,12 +400,17 @@ class Bool(object):
         def add(self, e):
             if e.value is not None:
                 return e.value
+            if Bool._USE_Z3_EXPR_REPR:
+                return e._e.sexpr()
             return (self.__literals.add(e.symbol),
                     tuple(self.__clauses.add(c) for c in e.clauses))
 
         def get(self, image):
             if isinstance(image, bool):
                 return TRUE if image else FALSE
+            if Bool._USE_Z3_EXPR_REPR:
+                return Bool(z3.parse_smt2_string(f'(assert {image})',
+                                                 decls=Bool._decls)[0])
             symbol, clauses = image
             return Bool.from_clauses(
                 self.__literals.get(symbol),
@@ -407,6 +457,9 @@ class Bool(object):
         if any(a.value is True for a in args):
             return TRUE
 
+        if __class__._USE_Z3_EXPR_REPR:
+            return Bool(z3.Or(*(a._e for a in args)))
+
         # TODO: Optimise the case of two pure symbols.
 
         syms = sorted(a.symbol for a in args)
@@ -430,6 +483,9 @@ class Bool(object):
         if any(a.value is False for a in args):
             return FALSE
 
+        if __class__._USE_Z3_EXPR_REPR:
+            return Bool(z3.And(*(a._e for a in args)))
+
         # TODO: Optimise the case of two pure symbols.
 
         syms = sorted(a.symbol for a in args)
@@ -446,6 +502,9 @@ class Bool(object):
     def __invert__(self):
         if self.value is not None:
             return FALSE if self.value else TRUE
+
+        if __class__._USE_Z3_EXPR_REPR:
+            return Bool(z3.Not(self._e))
 
         # TODO: Can we just return the inverted symbol of this expr?
 
@@ -470,6 +529,9 @@ class Bool(object):
         if b.value is True:
             return ~cond | a
 
+        if __class__._USE_Z3_EXPR_REPR:
+            return Bool(z3.If(cond._e, a._e, b._e))
+
         # TODO: Optimise the case of pure symbols.
 
         i, t, e = cond.symbol, a.symbol, b.symbol
@@ -482,7 +544,31 @@ class Bool(object):
                                        Clause.get(i, ~e, r)))
 
     @staticmethod
+    def get_neq(a, b):
+        if a.value is False:
+            return b
+        if a.value is True:
+            return ~b
+        if b.value is False:
+            return a
+        if b.value is True:
+            return ~a
+
+        if __class__._USE_Z3_EXPR_REPR:
+            return Bool(a._e != b._e)
+
+        # TODO: Optimise the case of two pure symbols.
+
+        sa = a.symbol
+        sb = b.symbol
+        r = Literal.get_intermediate('neq', *sorted((sa, sb)))
+        return __class__.from_clauses(r, a.clauses, b.clauses,
+                                      (Clause.get(sa, sb),
+                                       Clause.get(~sa, ~sb)))
+
+    @staticmethod
     def __get_literal_expr(literal):
+        assert not __class__._USE_Z3_EXPR_REPR
         e = __class__.__literal_exprs.get(literal)
         if e is not None:
             return e
@@ -495,6 +581,7 @@ class Bool(object):
         return e
 
     def __get_value_or_symbol_expr(self):
+        assert not __class__._USE_Z3_EXPR_REPR
         if self.value is not None:
             return z3.BoolVal(self.value)
 
@@ -502,6 +589,7 @@ class Bool(object):
 
     @staticmethod
     def __get_clause_expr(clause):
+        assert not __class__._USE_Z3_EXPR_REPR
         e = __class__.__clause_exprs.get(clause)
         if e is not None:
             return e
@@ -511,6 +599,7 @@ class Bool(object):
         return e
 
     def __get_constraints_expr(self):
+        assert not __class__._USE_Z3_EXPR_REPR
         if self.__constrs_expr is None:
             self.__constrs_expr = z3.And(*(__class__.__get_clause_expr(c)
                                            for c in self.clauses))
@@ -520,14 +609,27 @@ class Bool(object):
     __equiv_cache = {}
 
     def is_equiv(self, other):
-        a, b = self.value, other.value
-        if a is not None and b is not None:
-            return a == b
+        a, b = self, other
+        if __class__._USE_Z3_EXPR_REPR:
+            if a.value is not None:
+                if b.value is not None:
+                    return a.value == b.value
+                a = z3.BoolVal(a.value)
+                b = b._e
+            elif b.value is not None:
+                a = a._e
+                b = z3.BoolVal(b)
+            else:
+                a = a._e
+                b = b._e
+        else:
+            if a.value is not None and b.value is not None:
+                return a.value == b.value
 
-        s1 = self.__get_value_or_symbol_expr()
-        s2 = other.__get_value_or_symbol_expr()
+            a = a.__get_value_or_symbol_expr()
+            b = b.__get_value_or_symbol_expr()
 
-        key = ':'.join(sorted((s1.sexpr(), s2.sexpr())))
+        key = ':'.join(sorted((a.sexpr(), b.sexpr())))
         equiv = __class__.__equiv_cache.get(key)
         if equiv is not None:
             return equiv
@@ -540,48 +642,32 @@ class Bool(object):
             __class__.__equiv_cache[key] = True
             return True
 
-        s = z3.Solver()
-        s.add(self.__get_constraints_expr())
-        s.add(other.__get_constraints_expr())
-        s.add(s1 != s2)
-        res = s.check()
-        assert res in (z3.sat, z3.unsat)
-        equiv = (res == z3.unsat)
+        with Status.do('is_equiv', '--show-is-equiv'):
+            if __class__.__USE_PYCOSAT:
+                # TODO
+                res = pycosat.solve(Bool.get_neq(self, other).sat_clauses)
+                equiv = (res == 'UNSAT')
+            else:
+                s = z3.Solver()
+                if not __class__._USE_Z3_EXPR_REPR:
+                    s.add(self.__get_constraints_expr())
+                    s.add(other.__get_constraints_expr())
+                s.add(a != b)
+                res = s.check()
+                assert res in (z3.sat, z3.unsat)
+                equiv = (res == z3.unsat)
 
         __class__.__equiv_cache[key] = equiv
         cache.create('.1' if equiv else '.0')
 
         return equiv
 
-    def simplified(self):
-        # TODO
-        # im = self.image
-        # Cache.get_entry('exprs', str(im)).store(im)
-        return self
-
-        s = e = self
-        while True:
-            if isinstance(s.__x, bool):
-                return s
-
-            if s is not e and len(s.__x.sexpr()) >= len(e.__x.sexpr()):
-                return e
-
-            with Status.do('simplify', '--show-simplify'):
-                e = s
-                cache = Cache.get_entry('simplified', e.__x.sexpr())
-                c = cache.load()
-                if c is not None:
-                    i, = c
-                    s = __class__.from_image(i)
-                else:
-                    s = Bool(__class__.__simplify_tactic.apply(e.__x)
-                             .__get_constraints())
-                    cache.store((s.image,))
-
     def simplified_sexpr(self):
         if self.value is not None:
             return z3.BoolVal(self.value).sexpr()
+
+        if __class__._USE_Z3_EXPR_REPR:
+            return self._e.sexpr()
 
         key = self.__get_value_or_symbol_expr().sexpr()
         cache = Cache.get_entry('simplified', key)
