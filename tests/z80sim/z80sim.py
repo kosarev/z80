@@ -55,10 +55,13 @@ class Status(object):
         __class__.__line = line
 
     @staticmethod
+    def __get_time():
+        return datetime.datetime.now().strftime('%H:%M:%S')
+
+    @staticmethod
     def __update():
-        time = datetime.datetime.now().strftime("%y-%m-%d %H:%M:%S")
         parts = ', '.join(p for p in __class__.__parts if p)
-        __class__.__emit(f'{time} {parts}')
+        __class__.__emit(f'{__class__.__get_time()} {parts}')
 
     @staticmethod
     def clear():
@@ -70,7 +73,7 @@ class Status(object):
         line = __class__.__line
         __class__.clear()
 
-        print(*args)
+        print(__class__.__get_time(), *args)
 
         __class__.__emit(line)
 
