@@ -1178,94 +1178,146 @@ class Z80Simulator(object):
     def get_node_states(self, ids):
         return {id: self.__nodes_by_name[id].state for id in ids}
 
-    __predicate_sizes = {}
+    def __identify_group_of(self, n):
+        group = []
+        worklist = [n]
+        while worklist:
+            n = worklist.pop()
+            if n in group:
+                continue
 
-    def __update_group_of(self, n, more, updated):
-        # Identify nodes of the group and compute paths
-        # connecting them.
-        with Status.do('identify group'):
-            conns = {}
-            group = []
-            worklist = [n]
+            group.append(n)
+
+            if not n.is_gnd_or_pwr:
+                for t in n.conn_of:
+                    if not t.gate.state.is_trivially_false():
+                        worklist.append(t.get_other_conn(n))
+
+        return group
+
+    class __PredicateEvaluator(object):
+        def __init__(self, group, get_pred):
+            self.__preds = {}
+            self.__group = tuple(group)
+            self.__get_pred = get_pred
+
+            # For every node of the group, find all gated
+            # connections through which the nodes-to-predicate
+            # can be reachable.
+            self.__conns = {}
+            worklist = [n for n in self.__group
+                        if self.__get_pred(n) is not None]
+            processed = set()
             while worklist:
                 n = worklist.pop()
-                if n in group or n.is_gnd_or_pwr:
+                if n in processed:
                     continue
 
-                group.append(n)
-
-                if n not in conns:
-                    conns[n] = {n: [TRUE]}
+                processed.add(n)
 
                 for t in n.conn_of:
                     if t.gate.state.is_trivially_false():
                         continue
 
                     m = t.get_other_conn(n)
-                    worklist.append(m)
+                    if m.is_gnd_or_pwr or m not in self.__group:
+                        continue
 
-                    if m not in conns:
-                        conns[m] = {m: [TRUE]}
+                    conns = self.__conns.setdefault(m, [])
+                    p = t, n
+                    if p not in conns:
+                        conns.append(p)
+                        worklist.append(m)
 
-                    ns = list(conns[n].items())
-                    ms = list(conns[m].items())
+        def __build_conn_graph(self, n, stack, evaluated):
+            p = evaluated.get(n)
+            if p is not None:
+                return n, p
 
-                    for x, xp in ns:
-                        for y, yp in ms:
-                            # print(x, y)
-                            if y not in conns[x]:
-                                assert x not in conns[y]
-                                conns[x][y] = conns[y][x] = []
-                            xyp = conns[x][y]
-                            assert xyp is conns[y][x]
+            stack.append(n)
+            p = tuple(
+                (t, self.__build_conn_graph(m, stack, evaluated))
+                for t, m in self.__conns.get(n, ())
+                if m not in stack and not t.gate.state.is_trivially_false())
+            assert stack.pop() == n
 
-                            if len(xyp) == 1 and xyp[0].is_trivially_true():
-                                continue
+            evaluated[n] = p
+            return n, p
 
-                            p = Bool.get_and(
-                                    Bool.get_or(*xp),
-                                    t.gate.state,
-                                    Bool.get_or(*yp))
-                            if p.is_trivially_false():
-                                pass
-                            elif p.is_trivially_true():
-                                conns[x][y] = conns[y][x] = [TRUE]
-                            else:
-                                xyp.append(p)
+        def __build_pred(self, g):
+            e = self.__preds.get(g)
+            if e is not None:
+                return e
 
-        def evaluate_state_predicates(n):
-            cs = conns[n]
-            gnd = Bool.get_or(*cs.get(self.__gnd, []))
-            pwr = Bool.get_or(*cs.get(self.__pwr, []))
+            n, p = g
 
-            pullup, pulldown = [], []
-            for m in group:
-                if m.pull is not None:
-                    assert isinstance(m.pull, Bool)
-                    p = Bool.get_or(*conns[n][m])
-                    if not p.is_trivially_false():
-                        pullup.append(p & m.pull)
-                        pulldown.append(p & ~m.pull)
+            ops = []
+            for t, m in p:
+                sp = t.gate.state & self.__build_pred(m)
+                if sp.is_trivially_true():
+                    ops = TRUE
+                    break
 
-            pullup = Bool.get_or(*pullup)
-            pulldown = Bool.get_or(*pulldown)
+                ops.append(sp)
 
-            return gnd, pwr, pullup, pulldown
+            if ops is TRUE:
+                e = TRUE
+            else:
+                e = self.__get_pred(n)
+                if e is not None:
+                    ops.append(e)
 
-        with Status.do('evaluate predicates'):
-            group = {n: evaluate_state_predicates(n)
-                     for n in group}
+                e = Bool.get_or(*ops)
+
+            self.__preds[g] = e
+            return e
+
+        def get_pred_for(self, n):
+            g = self.__build_conn_graph(n, stack=[], evaluated={})
+            return self.__build_pred(g)
+
+    def __update_group_of(self, n, more, updated):
+        pulldown_cache = {}
+
+        def get_gnd_pred(n):
+            return TRUE if n.is_gnd else None
+
+        def get_pwr_pred(n):
+            return TRUE if n.is_pwr else None
+
+        def get_pullup_pred(n):
+            if n.pull is None:
+                return None
+
+            assert isinstance(n.pull, Bool)
+            return n.pull
+
+        def get_pulldown_pred(n):
+            if n.pull is None:
+                return None
+
+            assert isinstance(n.pull, Bool)
+            p = pulldown_cache.get(n)
+            if p is not None:
+                return p
+
+            pulldown_cache[n] = p = ~n.pull
+            return p
+
+        Preds = __class__.__PredicateEvaluator
+        group = self.__identify_group_of(n)
+        gnd_preds = Preds(group, get_gnd_pred)
+        pwr_preds = Preds(group, get_pwr_pred)
+        pullup_preds = Preds(group, get_pullup_pred)
+        pulldown_preds = Preds(group, get_pulldown_pred)
 
         # Update node and transistor states.
-        with Status.do('update nodes'):
-            for n, preds in group.items():
-                gnd, pwr, pullup, pulldown = preds
-
-                if 0:
-                    size = sum(p.size for p in preds)
-                    sizes = __class__.__predicate_sizes.setdefault(n, [])
-                    sizes.append(size)
-                    print(n, sizes)
+        for i, n in enumerate(group):
+            with Status.do(f'update {i}/{len(group)} {n}', '--show-nodes'):
+                gnd = gnd_preds.get_pred_for(n)
+                pwr = pwr_preds.get_pred_for(n)
+                pullup = pullup_preds.get_pred_for(n)
+                pulldown = pulldown_preds.get_pred_for(n)
 
                 floating = n.state
                 pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
