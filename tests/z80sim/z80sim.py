@@ -2033,23 +2033,23 @@ def make_symbolised_state(reset_state):
         ('ex af, af2', ((0x08, 4),)),
 
         # Updates WZ.
-        ('jp pc', ((0xc3, 4), ('pcl', 3), ('pch', 3))),
+        ('jp <pc>', ((0xc3, 4), ('pcl', 3), ('pch', 3))),
 
         ('xor a', ((0xaf, 4),)),
-        ('jp c, wz', ((0xda, 4), ('z', 3), ('w', 3))),
+        ('jp c, <wz>', ((0xda, 4), ('z', 3), ('w', 3))),
 
-        ('ld a, ri', ((0x3e, 4), ('ri', 3))),
+        ('ld a, <ri>', ((0x3e, 4), ('ri', 3))),
         ('ld i, a', ((0xed, 4), (0x47, 5))),
 
-        ('ld a, rr', ((0x3e, 4), ('rr', 3))),
+        ('ld a, <rr>', ((0x3e, 4), ('rr', 3))),
         ('ld r, a', ((0xed, 4), (0x4f, 5))),
 
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
 
-        ('ld sp, sp', ((0x31, 4), ('spl', 3), ('sph', 3))),
+        ('ld sp, <sp>', ((0x31, 4), ('spl', 3), ('sph', 3))),
 
-        ('im im', ((0xed, 4),
-                   (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
+        ('im <im>', ((0xed, 4),
+                     (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
     )
     ''' TODO
         im n -- symbolise
