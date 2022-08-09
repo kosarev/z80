@@ -69,7 +69,7 @@ class Status(object):
     @staticmethod
     def __update():
         parts = ', '.join(p for p in __class__.__parts if p)
-        __class__.__emit(f'{__class__.__get_time()} {parts}')
+        __class__.__emit(f'{__class__.__get_time()}  {parts}')
 
     @staticmethod
     def clear():
@@ -81,7 +81,7 @@ class Status(object):
         line = __class__.__line
         __class__.clear()
 
-        print(__class__.__get_time(), *args)
+        print(f'{__class__.__get_time()} ', *args)
 
         __class__.__emit(line)
 
