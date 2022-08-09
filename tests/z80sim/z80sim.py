@@ -452,52 +452,68 @@ class Bool(object):
 
     @staticmethod
     def get_or(*args):
-        args = tuple(a for a in args if a.value is not False)
-        if len(args) == 0:
+        unique_syms = []
+        unique_args = []
+        for a in args:
+            if a.value is False:
+                continue
+            if a.value is True:
+                return TRUE
+            if a.symbol not in unique_syms:
+                unique_syms.append(a.symbol)
+                unique_args.append(a)
+
+        if len(unique_args) == 0:
             return FALSE
-        if len(args) == 1:
-            return args[0]
-        if any(a.value is True for a in args):
-            return TRUE
+        if len(unique_args) == 1:
+            return unique_args[0]
 
         if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.Or(*(a._e for a in args)))
+            return Bool(z3.Or(*(a._e for a in unique_args)))
 
         # TODO: Optimise the case of two pure symbols.
 
-        syms = sorted(a.symbol for a in args)
-        r = Literal.get_intermediate('or', *syms)
+        unique_syms = sorted(unique_syms)
+        r = Literal.get_intermediate('or', *unique_syms)
 
-        or_clauses = [Clause.get(*(syms + [~r]))]
-        or_clauses.extend(Clause.get(~s, r) for s in syms)
+        or_clauses = [Clause.get(*(unique_syms + [~r]))]
+        or_clauses.extend(Clause.get(~s, r) for s in unique_syms)
         return __class__.from_clauses(r, or_clauses,
-                                      *(a.clauses for a in args))
+                                      *(a.clauses for a in unique_args))
 
     def __or__(self, other):
         return __class__.get_or(self, other)
 
     @staticmethod
     def get_and(*args):
-        args = tuple(a for a in args if a.value is not True)
-        if len(args) == 0:
+        unique_syms = []
+        unique_args = []
+        for a in args:
+            if a.value is False:
+                return FALSE
+            if a.value is True:
+                continue
+            if a.symbol not in unique_syms:
+                unique_syms.append(a.symbol)
+                unique_args.append(a)
+
+        if len(unique_args) == 0:
             return TRUE
-        if len(args) == 1:
-            return args[0]
-        if any(a.value is False for a in args):
-            return FALSE
+        if len(unique_args) == 1:
+            return unique_args[0]
 
         if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.And(*(a._e for a in args)))
+            return Bool(z3.And(*(a._e for a in unique_args)))
 
         # TODO: Optimise the case of two pure symbols.
 
-        syms = sorted(a.symbol for a in args)
-        r = Literal.get_intermediate('and', *syms)
+        unique_syms = sorted(unique_syms)
+        r = Literal.get_intermediate('and', *unique_syms)
 
-        and_clauses = [Clause.get(*([~s for s in syms] + [r]))]
-        and_clauses.extend(Clause.get(s, ~r) for s in syms)
+        and_clauses = [Clause.get(*([~s for s in unique_syms] + [r]))]
+        and_clauses.extend(Clause.get(s, ~r) for s in unique_syms)
         return __class__.from_clauses(r, and_clauses,
-                                      *(a.clauses for a in args))
+                                      *(a.clauses for a in unique_args))
 
     def __and__(self, other):
         return __class__.get_and(self, other)
