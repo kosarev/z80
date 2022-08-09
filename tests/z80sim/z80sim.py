@@ -15,6 +15,7 @@
 import ast
 import datetime
 import hashlib
+import json
 import pathlib
 import pprint
 import pycosat
@@ -39,6 +40,13 @@ _PINS = (
 
 def _ceil_div(a, b):
     return -(a // -b)
+
+
+def deep_tupilize(x):
+    if isinstance(x, (str, int, bool, type(None))):
+        return x
+    assert isinstance(x, list), x
+    return tuple(deep_tupilize(e) for e in x)
 
 
 class Status(object):
@@ -123,7 +131,7 @@ class Cache(object):
         def load(self):
             try:
                 with self.get_path().open() as f:
-                    return ast.literal_eval(f.read())
+                    return json.load(f)
             except FileNotFoundError:
                 return None
 
@@ -133,7 +141,7 @@ class Cache(object):
 
             temp_path = path.parent / (path.name + '.tmp')
             with temp_path.open('w') as f:
-                pprint.pprint(tuple(payload), compact=True, stream=f)
+                json.dump(payload, f)
 
             temp_path.rename(path)
 
@@ -396,7 +404,7 @@ class Bool(object):
 
     class Storage(object):
         def __init__(self, clause_storage, *, image=None):
-            assert image is None or image == (), image  # TODO
+            assert image is None or len(image) == 0, image  # TODO
             self.__literals = clause_storage.literal_storage
             self.__clauses = clause_storage
 
@@ -878,7 +886,7 @@ class Node(object):
 
     class Storage(object):
         def __init__(self, bool_storage, *, image=None):
-            assert image is None or image == (), image
+            assert image is None or len(image) == 0, image
             self.__bools = bool_storage
 
         def add(self, n):
@@ -1768,6 +1776,7 @@ class State(object):
             Status.print(cache.get_path())
 
         stored_steps, image = state
+        stored_steps = deep_tupilize(stored_steps)
         assert stored_steps == __class__.__get_steps_image(steps)
 
         return image
