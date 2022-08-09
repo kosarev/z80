@@ -758,8 +758,9 @@ TRUE = Bool(True)
 
 
 class Bits(object):
-    def __init__(self, bits, width=None):
+    def __init__(self, bits, width=None, suffix=None):
         if isinstance(bits, int):
+            assert suffix is None
             n = bits
             bits = []
             while n:
@@ -768,7 +769,10 @@ class Bits(object):
 
         if isinstance(bits, str):
             assert width is not None
-            bits = tuple(f'{bits}{i}' for i in range(width))
+            suffix = '' if suffix is None else suffix
+            bits = tuple(f'{bits}{i}{suffix}' for i in range(width))
+        else:
+            assert suffix is None
 
         bits = tuple(Bool.cast(b) for b in bits)
 
@@ -1861,8 +1865,13 @@ class State(object):
         for i, b in enumerate(Bits.cast(bits).bits):
             self.set_pin_and_update(f'{pin}{i}', b)
 
-    def set_db(self, bits):
-        self.set_pins_and_update('db', Bits.cast(bits, width=8))
+    def set_db(self, bits, phase=None):
+        if isinstance(bits, str):
+            bits = Bits(bits, width=8,
+                        suffix='' if phase is None else f'_{phase}')
+        else:
+            bits = Bits.cast(bits, width=8)
+        self.set_pins_and_update('db', bits)
 
     def set_db_and_wait(self, bits, ticks):
         self.set_db(bits)
@@ -1993,7 +2002,7 @@ def test_node(instr, n, a, b):
     check(a)
 
 
-def test_instruction(instr, cycles, base_state):
+def test_instruction(instr, cycles, base_state, phase):
     # Additional ticks are necessary for new values
     # to reach their nodes.
     EXTRA_TICKS = 3
@@ -2004,7 +2013,7 @@ def test_instruction(instr, cycles, base_state):
         s = State(base_state)
         before = s.get_node_states(NODES)
         for cycle_no, (d, ticks) in enumerate(cycles):
-            s.set_db(d)
+            s.set_db(d, phase)
             for t in range(ticks):
                 if cycle_no == 0 and t == EXTRA_TICKS:
                     before = s.get_node_states(NODES)
@@ -2126,13 +2135,14 @@ def test_instructions(reset_state):
     )
 
     for instr, cycles in INSTRS1:
-        after_instr_state = test_instruction(instr, cycles, symbolised_state)
+        after_instr_state = test_instruction(instr, cycles, symbolised_state,
+                                             phase=1)
 
         # TODO: Use different symbolic values for subsequent
         # instructions.
         with Status.do(instr):
             for instr2, cycles2 in INSTRS2:
-                test_instruction(instr2, cycles2, after_instr_state)
+                test_instruction(instr2, cycles2, after_instr_state, phase=2)
 
     Status.clear()
     print('OK')
