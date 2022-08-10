@@ -657,18 +657,21 @@ class Bool(object):
             a = a.__get_value_or_symbol_expr()
             b = b.__get_value_or_symbol_expr()
 
-        key = ':'.join(sorted((a.sexpr(), b.sexpr())))
-        equiv = __class__.__equiv_cache.get(key)
-        if equiv is not None:
-            return equiv
+        # TODO: Disable caching equivalence-check results as this
+        # doesn't seem to be worth it.
+        if 0:
+            key = ':'.join(sorted((a.sexpr(), b.sexpr())))
+            equiv = __class__.__equiv_cache.get(key)
+            if equiv is not None:
+                return equiv
 
-        cache = Cache.get_entry('equiv', key)
-        if cache.exists('.0'):
-            __class__.__equiv_cache[key] = False
-            return False
-        if cache.exists('.1'):
-            __class__.__equiv_cache[key] = True
-            return True
+            cache = Cache.get_entry('equiv', key)
+            if cache.exists('.0'):
+                __class__.__equiv_cache[key] = False
+                return False
+            if cache.exists('.1'):
+                __class__.__equiv_cache[key] = True
+                return True
 
         with Status.do('is_equiv', '--show-is-equiv'):
             if __class__.__USE_PYCOSAT:
@@ -685,8 +688,9 @@ class Bool(object):
                 assert res in (z3.sat, z3.unsat)
                 equiv = (res == z3.unsat)
 
-        __class__.__equiv_cache[key] = equiv
-        cache.create('.1' if equiv else '.0')
+        if 0:
+            __class__.__equiv_cache[key] = equiv
+            cache.create('.1' if equiv else '.0')
 
         return equiv
 
@@ -723,8 +727,8 @@ class Bool(object):
         e = z3.And(self.__get_constraints_expr(),
                    self.__get_value_or_symbol_expr())
 
-        tactic = z3.Tactic('qe2')
-        e = tactic.apply(e).as_expr()
+        # tactic = z3.Tactic('qe2')
+        # e = tactic.apply(e).as_expr()
 
         while temps:
             with Status.do(f'{len(temps)} temps to eliminate'):
@@ -738,7 +742,10 @@ class Bool(object):
                 v = OPS[op](*(__class__.__get_literal_expr(a) for a in args))
 
                 e = z3.substitute(e, (s, v))
-                e = tactic.apply(e).as_expr()
+                # e = tactic.apply(e).as_expr()
+
+        # e = tactic.apply(e).as_expr()
+        e = z3.Tactic('qe2').apply(e).as_expr()
 
         s = e.sexpr()
         cache.store((s,))
