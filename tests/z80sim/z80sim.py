@@ -378,6 +378,7 @@ class Bool(object):
         assert term.sign is False
         self.value = None
         self.symbol = term
+        self.__inversion = None
 
     @property
     def sat_clauses(self):
@@ -468,6 +469,9 @@ class Bool(object):
                 continue
             if a.value is True:
                 return TRUE
+            if a.__inversion is not None:
+                if a.__inversion.symbol in unique_syms:
+                    return TRUE
             if a.symbol not in unique_syms:
                 unique_syms.append(a.symbol)
                 unique_args.append(a)
@@ -502,6 +506,9 @@ class Bool(object):
                 return FALSE
             if a.value is True:
                 continue
+            if a.__inversion is not None:
+                if a.__inversion.symbol in unique_syms:
+                    return FALSE
             if a.symbol not in unique_syms:
                 unique_syms.append(a.symbol)
                 unique_args.append(a)
@@ -538,11 +545,15 @@ class Bool(object):
 
         # TODO: Optimise the case of a pure symbol.
 
-        a = self.symbol
-        r = Literal.get_intermediate('not', a)
-        return __class__.from_clauses(r, self.clauses,
-                                      (Clause.get(a, r),
-                                       Clause.get(~a, ~r)))
+        if self.__inversion is None:
+            a = self.symbol
+            r = Literal.get_intermediate('not', a)
+            self.__inversion = __class__.from_clauses(
+                r, self.clauses, (Clause.get(a, r),
+                                  Clause.get(~a, ~r)))
+            self.__inversion.__inversion = self
+
+        return self.__inversion
 
     @staticmethod
     def ifelse(cond, a, b):
