@@ -2056,8 +2056,6 @@ def test_instruction(instr, cycles, base_state, phase):
 
 def make_symbolised_state(reset_state):
     SYMBOLISING_SEQ = (
-        ('di', ((0xf3, 4),)),
-
         ('exx', ((0xd9, 4),)),
         ('pop bc2', ((0xc1, 4), ('cc', 3), ('bb', 3))),
         ('pop de2', ((0xd1, 4), ('ee', 3), ('dd', 3))),
@@ -2074,11 +2072,12 @@ def make_symbolised_state(reset_state):
         ('pop af2', ((0xf1, 4), ('ff', 3), ('aa', 3))),
         ('ex af, af2', ((0x08, 4),)),
 
-        # Updates WZ.
-        ('jp <pc>', ((0xc3, 4), ('pcl', 3), ('pch', 3))),
+        ('ld sp, <sp>', ((0x31, 4), ('spl', 3), ('sph', 3))),
 
-        ('xor a', ((0xaf, 4),)),
-        ('jp c, <wz>', ((0xda, 4), ('z', 3), ('w', 3))),
+        ('im <im>', ((0xed, 4),
+                     (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
+
+        ('ei/di', ((reversed((1, 1, 1, 1, 'ei', 0, 1, 1)), 4),)),
 
         ('ld a, <ri>', ((0x3e, 4), ('ri', 3))),
         ('ld i, a', ((0xed, 4), (0x47, 5))),
@@ -2086,41 +2085,17 @@ def make_symbolised_state(reset_state):
         ('ld a, <rr>', ((0x3e, 4), ('rr', 3))),
         ('ld r, a', ((0xed, 4), (0x4f, 5))),
 
+        # Drops cf for the following 'jp c, <wz>'.
+        ('xor a', ((0xaf, 4),)),
+
+        # Updates wz.
+        ('jp <pc>', ((0xc3, 4), ('pcl', 3), ('pch', 3))),
+
+        ('jp c, <wz>', ((0xda, 4), ('z', 3), ('w', 3))),
+
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
-
-        ('ld sp, <sp>', ((0x31, 4), ('spl', 3), ('sph', 3))),
-
-        ('im <im>', ((0xed, 4),
-                     (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
     )
-    ''' TODO
-        im n -- symbolise
 
-    void on_decode_ed_prefix() {
-        case 0x46:
-            // IM im[y]  f(4) f(4)
-            return self().on_im(0);
-        case 0x56:
-        case 0x5e:
-            return self().on_im(y - 1);
-
-        ed46 im 0   010 00 110
-        ed4e im ?   010 01 110
-        ed56 im 1   010 10 110
-        ed5e im 2   010 11 110
-
-        ed4e xim 0xed4e, 0
-
-        ed66 xim 0xed66, 0
-        ed6e xim 0xed6e, 0
-        ed76 xim 0xed76, 1
-        ed7e xim 0xed7e, 2
-
-        ei+di -- symbolise
-
-        nop
-        nop
-    '''
     s = State(reset_state)
     for instr, cycles in SYMBOLISING_SEQ:
         with Status.do(instr):
