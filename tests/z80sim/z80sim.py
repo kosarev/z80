@@ -14,6 +14,7 @@
 
 import ast
 import datetime
+import gzip
 import hashlib
 import json
 import pathlib
@@ -130,8 +131,8 @@ class Cache(object):
 
         def load(self):
             try:
-                with self.get_path().open() as f:
-                    return json.load(f)
+                with gzip.open(self.get_path()) as f:
+                    return json.loads(f.read().decode())
             except FileNotFoundError:
                 return None
 
@@ -140,8 +141,8 @@ class Cache(object):
             path.parent.mkdir(parents=True, exist_ok=True)
 
             temp_path = path.parent / (path.name + '.tmp')
-            with temp_path.open('w') as f:
-                json.dump(payload, f)
+            with gzip.open(temp_path, 'wb') as f:
+                f.write(json.dumps(payload).encode())
 
             temp_path.rename(path)
 
