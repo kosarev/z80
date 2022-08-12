@@ -382,6 +382,7 @@ class Bool(object):
 
     @property
     def sat_clauses(self):
+        assert not __class__._USE_Z3_EXPR_REPR
         return (c.sat_clause for c in self.clauses)
 
     @staticmethod
@@ -1998,7 +1999,7 @@ class State(object):
         sys.exit()
 
 
-def test_node(instr, n, a, b):
+def test_node(instr, n, a, b, phase):
     def check(x):
         if b.is_equiv(x):
             return
@@ -2021,11 +2022,12 @@ def test_node(instr, n, a, b):
             return check(~a)
 
         if instr == 'pop af':
-            return check(Bool('f0'))
+            return check(Bool(f'f0_{phase}'))
 
     if n in (XF, YF):
         if instr == 'pop af':
-            return check({XF: Bool('f3'), YF: Bool('f5')}[n])
+            V = {XF: f'f3_{phase}', YF: f'f5_{phase}'}
+            return check(Bool(V[n]))
 
     check(a)
 
@@ -2060,7 +2062,7 @@ def test_instruction(instr, cycles, base_state, phase):
 
         for id in NODES:
             with Status.do(f'test {id}'):
-                test_node(instr, id, before[id], after[id])
+                test_node(instr, id, before[id], after[id], phase)
 
     return after_instr_state
 
