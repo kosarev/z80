@@ -1831,13 +1831,12 @@ def test_node(instr, n, a, b, phase):
             return
 
         Status.print(instr, n)
-        Status.print('old state', a.simplified_sexpr())
-        Status.print('new state', b.simplified_sexpr())
+        Status.print('  old state', a.simplified_sexpr())
+        Status.print('  new state', b.simplified_sexpr())
+        Status.print('  expected', x.simplified_sexpr())
 
-        Status.print('expected', x.simplified_sexpr())
-
-        Status.clear()
-        assert 0
+        # Status.clear()
+        # assert 0
 
     CF = 'reg_f0'
     XF = 'reg_f3'
@@ -1848,12 +1847,12 @@ def test_node(instr, n, a, b, phase):
             return check(~a)
 
         if instr == 'pop af':
-            return check(Bool(f'f0_{phase}'))
+            return check(Bool.get(f'f0_{phase}'))
 
     if n in (XF, YF):
         if instr == 'pop af':
             V = {XF: f'f3_{phase}', YF: f'f5_{phase}'}
-            return check(Bool(V[n]))
+            return check(Bool.get(V[n]))
 
     check(a)
 
@@ -1865,30 +1864,29 @@ def test_instruction(instr, cycles, base_state, phase):
 
     NODES = 'reg_f0', 'reg_f3', 'reg_f5'
 
-    with Status.do(instr):
-        s = State(base_state)
-        before = s.get_node_states(NODES)
-        for cycle_no, (d, ticks) in enumerate(cycles):
-            s.set_db(d, phase)
-            for t in range(ticks):
-                if cycle_no == 0 and t == EXTRA_TICKS:
-                    before = s.get_node_states(NODES)
-                    s.cache()
+    s = State(base_state)
+    before = s.get_node_states(NODES)
+    for cycle_no, (d, ticks) in enumerate(cycles):
+        s.set_db(d, phase)
+        for t in range(ticks):
+            if cycle_no == 0 and t == EXTRA_TICKS:
+                before = s.get_node_states(NODES)
+                s.cache()
 
-                s.tick()
-            s.cache()
-
-        after_instr_state = State(s)
-
-        s.set_db(0x00)  # nop
-        for t in range(ticks, ticks + EXTRA_TICKS):
             s.tick()
         s.cache()
-        after = s.get_node_states(NODES)
 
-        for id in NODES:
-            with Status.do(f'test {id}'):
-                test_node(instr, id, before[id], after[id], phase)
+    after_instr_state = State(s)
+
+    s.set_db(0x00)  # nop
+    for t in range(ticks, ticks + EXTRA_TICKS):
+        s.tick()
+    s.cache()
+    after = s.get_node_states(NODES)
+
+    for id in NODES:
+        with Status.do(f'test {id}'):
+            test_node(instr, id, before[id], after[id], phase)
 
     return after_instr_state
 
@@ -1949,31 +1947,21 @@ def make_symbolised_state(reset_state):
 def test_instructions(reset_state):
     symbolised_state = make_symbolised_state(reset_state)
 
-    ''' TOOD
     INSTRS = (
         ('nop', ((0x00, 4),)),
         ('ccf', ((0x3f, 4),)),
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
     )
-    '''
 
-    INSTRS1 = (
-        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
-    )
-
-    INSTRS2 = (
-        ('ccf', ((0x3f, 4),)),
-    )
-
-    for instr, cycles in INSTRS1:
-        after_instr_state = test_instruction(instr, cycles, symbolised_state,
-                                             phase=1)
-
-        # TODO: Use different symbolic values for subsequent
-        # instructions.
+    for instr, cycles in INSTRS:
         with Status.do(instr):
-            for instr2, cycles2 in INSTRS2:
-                test_instruction(instr2, cycles2, after_instr_state, phase=2)
+            after_instr_state = test_instruction(
+                instr, cycles, symbolised_state, phase=1)
+
+            for instr2, cycles2 in INSTRS:
+                with Status.do(instr2):
+                    test_instruction(
+                        instr2, cycles2, after_instr_state, phase=2)
 
     Status.clear()
     print('OK')
