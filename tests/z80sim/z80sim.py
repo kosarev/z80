@@ -264,51 +264,58 @@ class Bool(object):
 
     @property
     def sat_clauses(self):
-        syms = set()
+        clauses = []
+        syms = {}
 
         def get(n):
             assert n.value is None, self
-            if n._e is None or n.symbol in syms:
-                return
-            syms.add(n.symbol)
+
+            r = syms.get(n.symbol)
+            if r is not None:
+                return r
 
             r = n.symbol
+            if n._e is None:
+                syms[r] = r
+                return r
+
             kind, ops = n._e
             if kind == 'not':
                 a, = ops
-                a = a.symbol
-                yield (a.sat_index, r.sat_index)
-                yield ((~a).sat_index, (~r).sat_index)
+                r = ~get(a)
             elif kind == 'neq':
-                # TODO: 'r' remains unbounded.
                 a, b = ops
-                a, b = a.symbol, b.symbol
-                yield (a.sat_index, b.sat_index)
-                yield ((~a).sat_index, (~b).sat_index)
+                a, b = get(a), get(b)
+                clauses.extend(((a.sat_index, b.sat_index),
+                                ((~a).sat_index, (~b).sat_index)))
+                # TODO: 'r' remains unbounded.
+                r = None
             elif kind == 'ifelse':
                 i, t, e = ops
-                i, t, e = i.symbol, t.symbol, e.symbol
-                yield ((~i).sat_index, t.sat_index, (~r).sat_index)
-                yield ((~i).sat_index, (~t).sat_index, r.sat_index)
-                yield (i.sat_index, e.sat_index, (~r).sat_index)
-                yield (i.sat_index, (~e).sat_index, r.sat_index)
+                i, t, e = get(i), get(t), get(e)
+                clauses.extend((((~i).sat_index, t.sat_index, (~r).sat_index),
+                                ((~i).sat_index, (~t).sat_index, r.sat_index),
+                                (i.sat_index, e.sat_index, (~r).sat_index),
+                                (i.sat_index, (~e).sat_index, r.sat_index)))
             elif kind == 'or':
-                op_syms = tuple(op.symbol for op in ops)
-                yield tuple(s.sat_index for s in op_syms + (~r,))
+                op_syms = tuple(get(op) for op in ops)
+                clauses.append(tuple(s.sat_index for s in op_syms + (~r,)))
                 for s in op_syms:
-                    yield ((~s).sat_index, r.sat_index)
+                    clauses.append(((~s).sat_index, r.sat_index))
             elif kind == 'and':
-                op_syms = tuple(op.symbol for op in ops)
-                yield tuple((~s).sat_index for s in op_syms + (~r,))
+                op_syms = tuple(get(op) for op in ops)
+                clauses.append(tuple((~s).sat_index for s in op_syms + (~r,)))
                 for s in op_syms:
-                    yield (s.sat_index, (~r).sat_index)
+                    clauses.append((s.sat_index, (~r).sat_index))
             else:
                 assert 0, n  # TODO
 
-            for op in ops:
-                yield from get(op)
+            syms[r] = r
+            return r
 
-        yield from get(self)
+        get(self)
+
+        return clauses
 
     @staticmethod
     def from_ops(kind, *ops):
