@@ -232,26 +232,31 @@ class Literal(object):
 class Bool(object):
     __cache = {}
 
-    # TODO: Rework to get() and cache.
-    def __init__(self, term):
-        if isinstance(term, bool):
-            self.value = term
-            return
-
+    @staticmethod
+    def get(term):
         if isinstance(term, int):
             assert term in (0, 1)
-            self.value = bool(term)
-            return
-
-        if isinstance(term, str):
+            term = bool(term)
+        elif isinstance(term, str):
             term = Literal.get(term)
 
-        assert isinstance(term, Literal)
-        assert term.sign is False
-        self.value = None
-        self.symbol = term
-        self._e = None
-        self.__inversion = None
+        b = __class__.__cache.get(term)
+        if b is not None:
+            return b
+
+        b = __class__()
+        if isinstance(term, bool):
+            b.value = term
+        else:
+            assert isinstance(term, Literal)
+            assert term.sign is False
+            b.value = None
+            b.symbol = term
+            b._e = None
+            b.__inversion = None
+
+        __class__.__cache[term] = b
+        return b
 
     @property
     def sat_clauses(self):
@@ -316,7 +321,7 @@ class Bool(object):
         if b is not None:
             return b
 
-        b = __class__.__cache[key] = Bool(Literal.get(None))
+        b = __class__.__cache[key] = Bool.get(Literal.get(None))
         b._e = kind, ops
         return b
 
@@ -359,7 +364,7 @@ class Bool(object):
                     if kind is None:
                         s = self.__literals.get(s)
                         assert ops is None
-                        b = Bool(s)
+                        b = Bool.get(s)
                     else:
                         assert s is None
                         b = Bool.from_ops(kind,
@@ -399,9 +404,7 @@ class Bool(object):
 
     @staticmethod
     def cast(x):
-        if isinstance(x, bool):
-            return TRUE if x else FALSE
-        return x if isinstance(x, Bool) else Bool(x)
+        return x if isinstance(x, Bool) else Bool.get(x)
 
     def is_trivially_false(self):
         return self.value is False
@@ -585,8 +588,8 @@ class Bool(object):
         return simplified
 
 
-FALSE = Bool(False)
-TRUE = Bool(True)
+FALSE = Bool.get(False)
+TRUE = Bool.get(True)
 
 
 class Bits(object):
