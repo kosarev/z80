@@ -187,6 +187,8 @@ class Literal(object):
         return f'{SIGNS[self.sign]}{self.id}'
 
     def __lt__(self, other):
+        # TODO: Can we just compare SAT indexes here?
+        #       (Which also represents the 'age' of the literal.)
         return (self.id, self.sign) < (other.id, other.sign)
 
     @staticmethod
