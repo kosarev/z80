@@ -543,7 +543,7 @@ class Bool(object):
     @staticmethod
     def get_neq(a, b):
         if a is b:
-            assert 0, (a, b)  # TODO
+            return FALSE
         if a is b.__inversion:
             return TRUE
         if a.value is not None:
@@ -556,30 +556,17 @@ class Bool(object):
     __equiv_cache = {}
 
     def is_equiv(self, other):
-        a, b = self, other
-        if a.value is not None:
-            if b.value is not None:
-                return a.value == b.value
-            key = a.value, b.symbol
-        elif b.value is not None:
-            key = b.value, a.symbol
-        elif a.symbol.id == b.symbol.id:
-            assert a.symbol == b.symbol
-            return True
-        else:
-            key = ((a.symbol, b.symbol) if a.symbol < b.symbol
-                   else (b.symbol, a.symbol))
+        e = Bool.get_neq(self, other)
+        if e.value is not None:
+            return (e.value is False)
 
+        key = e.symbol
         equiv = __class__.__equiv_cache.get(key)
         if equiv is not None:
             return equiv
 
         with Status.do('is_equiv', '--show-is-equiv'):
-            e = Bool.get_neq(a, b)
-            if e.value is not None:
-                equiv = (e.value is False)
-            else:
-                equiv = (pycosat.solve(e.sat_clauses) == 'UNSAT')
+            equiv = (pycosat.solve(e.sat_clauses) == 'UNSAT')
 
         __class__.__equiv_cache[key] = equiv
         return equiv
