@@ -158,32 +158,22 @@ class Cache(object):
 
 
 class Literal(object):
-    __HASH_PREFIX = '.'
-
     __literals = {}
-    __shorten_ids = {}
 
     @staticmethod
     def get(id):
+        if id is None:
+            id = f't{len(__class__.__literals) + 1}'
+
         t = __class__.__literals.get(id)
         if t is not None:
             return t
-
-        shorten_id = id[:11] if id.startswith(__class__.__HASH_PREFIX) else id
-
-        # Make sure shorten ids we print are still unique.
-        if shorten_id not in __class__.__shorten_ids:
-            __class__.__shorten_ids[shorten_id] = id
-        else:
-            assert __class__.__shorten_ids[shorten_id] == id, (
-                shorten_id, __class__.__shorten_ids[shorten_id], id)
 
         t = __class__()
         i = __class__()
 
         t.id, t.sign = id, False
         i.id, i.sign = id, True
-        t.shorten_id = i.shorten_id = shorten_id
         t.sat_index = len(__class__.__literals) + 1
         i.sat_index = -t.sat_index
         t.__inversion = i
@@ -192,17 +182,9 @@ class Literal(object):
 
         return t
 
-    @staticmethod
-    def get_intermediate(op, *args):
-        assert op in ('or', 'and', 'not', 'ifelse', 'neq')
-        value_expr = (op,) + args
-        hash = HASH(str(value_expr).encode()).hexdigest()
-        t = __class__.get(__class__.__HASH_PREFIX + hash)
-        return t
-
     def __repr__(self):
         SIGNS = {False: '', True: '~'}
-        return f'{SIGNS[self.sign]}{self.shorten_id}'
+        return f'{SIGNS[self.sign]}{self.id}'
 
     def __lt__(self, other):
         return (self.id, self.sign) < (other.id, other.sign)
@@ -248,6 +230,9 @@ class Literal(object):
 
 
 class Bool(object):
+    __cache = {}
+
+    # TODO: Rework to get() and cache.
     def __init__(self, term):
         if isinstance(term, bool):
             self.value = term
@@ -317,8 +302,21 @@ class Bool(object):
         yield from get(self)
 
     @staticmethod
-    def from_ops(symbol, kind, *ops):
-        b = Bool(symbol)
+    def from_ops(kind, *ops):
+        syms = tuple(op.symbol for op in ops)
+
+        COMMUTATIVE = {
+            'not': False, 'ifelse': False,
+            'neq': True, 'or': True, 'and': True}
+        if COMMUTATIVE[kind]:
+            syms = tuple(sorted(syms))
+
+        key = kind, syms
+        b = __class__.__cache.get(key)
+        if b is not None:
+            return b
+
+        b = __class__.__cache[key] = Bool(Literal.get(None))
         b._e = kind, ops
         return b
 
@@ -358,12 +356,13 @@ class Bool(object):
             self.__node_indexes = {}
             if image is not None:
                 for s, kind, ops in image:
-                    s = self.__literals.get(s)
                     if kind is None:
+                        s = self.__literals.get(s)
                         assert ops is None
                         b = Bool(s)
                     else:
-                        b = Bool.from_ops(s, kind,
+                        assert s is None
+                        b = Bool.from_ops(kind,
                                           *(self.get(op) for op in ops))
                     i = len(self.__nodes)
                     self.__nodes.append(b)
@@ -376,10 +375,11 @@ class Bool(object):
             if i is not None:
                 return i
 
-            s = self.__literals.add(e.symbol)
             if e._e is None:
+                s = self.__literals.add(e.symbol)
                 kind = ops = None
             else:
+                s = None
                 kind, ops = e._e
                 ops = tuple(self.add(op) for op in ops)
 
@@ -447,9 +447,7 @@ class Bool(object):
 
         # TODO: Optimise the case of two pure symbols.
 
-        unique_syms = sorted(unique_syms)
-        r = Literal.get_intermediate('or', *unique_syms)
-        return __class__.from_ops(r, 'or', *unique_args)
+        return __class__.from_ops('or', *unique_args)
 
     def __or__(self, other):
         return __class__.get_or(self, other)
@@ -477,9 +475,7 @@ class Bool(object):
 
         # TODO: Optimise the case of two pure symbols.
 
-        unique_syms = sorted(unique_syms)
-        r = Literal.get_intermediate('and', *unique_syms)
-        return __class__.from_ops(r, 'and', *unique_args)
+        return __class__.from_ops('and', *unique_args)
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -493,9 +489,7 @@ class Bool(object):
         # TODO: Optimise the case of a pure symbol.
 
         if self.__inversion is None:
-            a = self.symbol
-            r = Literal.get_intermediate('not', a)
-            self.__inversion = __class__.from_ops(r, 'not', self)
+            self.__inversion = __class__.from_ops('not', self)
             self.__inversion.__inversion = self
 
         return self.__inversion
@@ -517,9 +511,7 @@ class Bool(object):
 
         # TODO: Optimise ifelse's that work as not's.
 
-        i, t, e = cond.symbol, a.symbol, b.symbol
-        r = Literal.get_intermediate('ifelse', i, t, e)
-        return __class__.from_ops(r, 'ifelse', cond, a, b)
+        return __class__.from_ops('ifelse', cond, a, b)
 
     @staticmethod
     def get_neq(a, b):
@@ -534,10 +526,7 @@ class Bool(object):
 
         # TODO: Optimise the case of two pure symbols.
 
-        sa = a.symbol
-        sb = b.symbol
-        r = Literal.get_intermediate('neq', *sorted((sa, sb)))
-        return __class__.from_ops(r, 'neq', a, b)
+        return __class__.from_ops('neq', a, b)
 
     # TODO: Remove.
     __equiv_cache = {}
