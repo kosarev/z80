@@ -184,8 +184,6 @@ class Literal(object):
         t.id, t.sign = id, False
         i.id, i.sign = id, True
         t.shorten_id = i.shorten_id = shorten_id
-        t.value_expr = None
-        i.value_expr = ('not', t)
         t.sat_index = len(__class__.__literals) + 1
         i.sat_index = -t.sat_index
         t.__inversion = i
@@ -200,7 +198,6 @@ class Literal(object):
         value_expr = (op,) + args
         hash = HASH(str(value_expr).encode()).hexdigest()
         t = __class__.get(__class__.__HASH_PREFIX + hash)
-        t.value_expr = value_expr
         return t
 
     def __repr__(self):
@@ -222,15 +219,8 @@ class Literal(object):
             self.__indexes = {}
 
             if image is not None:
-                for i, (id, value_expr) in enumerate(image):
+                for i, id in enumerate(image):
                     assert self.add(Literal.get(id)) == i * 2
-
-                for id, value_expr in image:
-                    if value_expr is not None:
-                        op, *args = value_expr
-                        value_expr = (op,) + tuple(self.get(a) for a in args)
-
-                    Literal.get(id).value_expr = value_expr
 
         def add(self, literal):
             if literal.sign:
@@ -251,16 +241,7 @@ class Literal(object):
 
         @property
         def image(self):
-            im = []
-            for t in self.__literals:
-                e = t.value_expr
-                if e is not None:
-                    op, *args = e
-                    e = (op,) + tuple(self.add(a) for a in args)
-
-                im.append((t.id, e))
-
-            return tuple(im)
+            return tuple(t.id for t in self.__literals)
 
     def __invert__(self):
         return self.__inversion
