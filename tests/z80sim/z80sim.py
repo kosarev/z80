@@ -60,7 +60,7 @@ class Status(object):
         if len(line) < len(__class__.__line):
             line_with_spaces += ' ' * (len(__class__.__line) - len(line))
 
-        print(f'\r{line_with_spaces}', end='')
+        print(f'\r{line_with_spaces}', end='', file=sys.stderr)
         __class__.__line = line
 
     @staticmethod
@@ -75,7 +75,7 @@ class Status(object):
     @staticmethod
     def clear():
         __class__.__emit('')
-        print('\r', end='')
+        print('\r', end='', file=sys.stderr)
 
     @staticmethod
     def print(*args):
