@@ -246,18 +246,20 @@ class Bool(object):
         if b is not None:
             return b
 
-        b = __class__()
         if isinstance(term, bool):
-            b.value = term
-        else:
-            assert isinstance(term, Literal)
-            assert term.sign is False
-            b.value = None
-            b.symbol = term
-            b._e = None
-            b.__inversion = None
+            false = __class__.__cache[False] = __class__()
+            true = __class__.__cache[True] = __class__()
+            false.value, true.value = False, True
+            false.__inversion, true.__inversion = true, false
+            return true if term else false
 
-        __class__.__cache[term] = b
+        assert isinstance(term, Literal)
+        assert term.sign is False
+        b = __class__.__cache[term] = __class__()
+        b.value = None
+        b.symbol = term
+        b._e = None
+        b.__inversion = None
         return b
 
     @property
@@ -265,7 +267,7 @@ class Bool(object):
         syms = set()
 
         def get(n):
-            assert n.value is None
+            assert n.value is None, self
             if n._e is None or n.symbol in syms:
                 return
             syms.add(n.symbol)
@@ -408,9 +410,11 @@ class Bool(object):
     def cast(x):
         return x if isinstance(x, Bool) else Bool.get(x)
 
+    # TODO: Remove and use 'is FALSE' instead.
     def is_trivially_false(self):
         return self.value is False
 
+    # TODO: Remove and use 'is TRUE' instead.
     def is_trivially_true(self):
         return self.value is True
 
