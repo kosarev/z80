@@ -325,47 +325,7 @@ class Clause(object):
 
 
 class Bool(object):
-    _USE_DAG_EXPR_REPR = True
-    _USE_Z3_EXPR_REPR = False
-    __USE_PYCOSAT = True
-
-    if _USE_Z3_EXPR_REPR:
-        __tactic = z3.Tactic('qe2')
-        _decls = {}
-    else:
-        __literal_exprs = {}
-        __clause_exprs = {}
-
     def __init__(self, term):
-        if __class__._USE_Z3_EXPR_REPR:
-            if isinstance(term, z3.BoolRef):
-                e = __class__.__tactic.apply(term).as_expr()
-                if z3.is_false(e):
-                    self.value = False
-                elif z3.is_true(e):
-                    self.value = True
-                else:
-                    self.value = None
-                    self._e = e
-            elif isinstance(term, str):
-                self.value = None
-                self._e = __class__._decls.get(term)
-                if self._e is None:
-                    self._e = __class__._decls[term] = z3.Bool(term)
-            elif isinstance(term, int):
-                assert term in (0, 1)
-                self.value = bool(term)
-            else:
-                assert isinstance(term, bool), term
-                self.value = term
-            return
-
-        if __class__._USE_DAG_EXPR_REPR:
-            self._e = None
-        else:
-            self.__constrs_expr = None
-            self.clauses = ()
-
         if isinstance(term, bool):
             self.value = term
             return
@@ -382,15 +342,11 @@ class Bool(object):
         assert term.sign is False
         self.value = None
         self.symbol = term
+        self._e = None
         self.__inversion = None
 
     @property
     def sat_clauses(self):
-        if not __class__._USE_DAG_EXPR_REPR:
-            assert not __class__._USE_Z3_EXPR_REPR
-            yield from (c.sat_clause for c in self.clauses)
-            return
-
         syms = set()
 
         def get(n):
@@ -438,21 +394,7 @@ class Bool(object):
         yield from get(self)
 
     @staticmethod
-    def from_clauses(symbol, *clause_sets):
-        assert not __class__._USE_DAG_EXPR_REPR
-        assert not __class__._USE_Z3_EXPR_REPR
-        b = Bool(symbol)
-
-        clauses = set()
-        for s in clause_sets:
-            clauses.update(s)
-        b.clauses = tuple(sorted(clauses))
-
-        return b
-
-    @staticmethod
     def from_ops(symbol, kind, *ops):
-        assert __class__._USE_DAG_EXPR_REPR
         b = Bool(symbol)
         b._e = kind, ops
         return b
@@ -460,101 +402,77 @@ class Bool(object):
     def __repr__(self):
         if self.value is not None:
             return repr(int(self.value))
-        if __class__._USE_Z3_EXPR_REPR:
-            return self._e.sexpr()
-        if __class__._USE_DAG_EXPR_REPR:
-            if self._e is None:
-                return str(self.symbol)
+        if self._e is None:
+            return str(self.symbol)
 
-            rep = []
-            syms = set()
-            worklist = [self]
-            while worklist:
-                n = worklist.pop()
-                if n.value is not None or n.symbol in syms:
-                    continue
-                syms.add(n.symbol)
-                if n._e is None:
-                    continue
-                if len(rep) != 0:
-                    rep.append('; ')
-                kind, ops = n._e
-                rep.append(f'{n.symbol} = {kind}')
+        rep = []
+        syms = set()
+        worklist = [self]
+        while worklist:
+            n = worklist.pop()
+            if n.value is not None or n.symbol in syms:
+                continue
+            syms.add(n.symbol)
+            if n._e is None:
+                continue
+            if len(rep) != 0:
+                rep.append('; ')
+            kind, ops = n._e
+            rep.append(f'{n.symbol} = {kind}')
 
-                for op in ops:
-                    if op.value is not None:
-                        rep.append(f' {int(op.value)}')
-                    else:
-                        rep.append(f' {op.symbol}')
-                worklist.extend(ops)
-            return ''.join(rep)
-        r = ' '.join(repr(c) for c in self.clauses)
-        return f'{self.symbol}: ({r})'
+            for op in ops:
+                if op.value is not None:
+                    rep.append(f' {int(op.value)}')
+                else:
+                    rep.append(f' {op.symbol}')
+            worklist.extend(ops)
+        return ''.join(rep)
 
     class Storage(object):
         def __init__(self, clause_storage, *, image=None):
             self.__literals = clause_storage.literal_storage
-            if Bool._USE_DAG_EXPR_REPR:
-                self.__nodes = []
-                self.__node_indexes = {}
-                if image is not None:
-                    for s, kind, ops in image:
-                        s = self.__literals.get(s)
-                        if kind is None:
-                            assert ops is None
-                            b = Bool(s)
-                        else:
-                            b = Bool.from_ops(s, kind,
-                                              *(self.get(op) for op in ops))
-                        i = len(self.__nodes)
-                        self.__nodes.append(b)
-                        self.__node_indexes[i] = b
-            else:
-                assert image is None or len(image) == 0, image  # TODO
-                self.__clauses = clause_storage
+            self.__nodes = []
+            self.__node_indexes = {}
+            if image is not None:
+                for s, kind, ops in image:
+                    s = self.__literals.get(s)
+                    if kind is None:
+                        assert ops is None
+                        b = Bool(s)
+                    else:
+                        b = Bool.from_ops(s, kind,
+                                          *(self.get(op) for op in ops))
+                    i = len(self.__nodes)
+                    self.__nodes.append(b)
+                    self.__node_indexes[i] = b
 
         def add(self, e):
             if e.value is not None:
                 return e.value
-            if Bool._USE_Z3_EXPR_REPR:
-                return e._e.sexpr()
-            if Bool._USE_DAG_EXPR_REPR:
-                i = self.__node_indexes.get(e.symbol)
-                if i is not None:
-                    return i
-
-                s = self.__literals.add(e.symbol)
-                if e._e is None:
-                    kind = ops = None
-                else:
-                    kind, ops = e._e
-                    ops = tuple(self.add(op) for op in ops)
-
-                i = len(self.__nodes)
-                self.__nodes.append((s, kind, ops))
-                self.__node_indexes[e.symbol] = i
+            i = self.__node_indexes.get(e.symbol)
+            if i is not None:
                 return i
-            return (self.__literals.add(e.symbol),
-                    tuple(self.__clauses.add(c) for c in e.clauses))
+
+            s = self.__literals.add(e.symbol)
+            if e._e is None:
+                kind = ops = None
+            else:
+                kind, ops = e._e
+                ops = tuple(self.add(op) for op in ops)
+
+            i = len(self.__nodes)
+            self.__nodes.append((s, kind, ops))
+            self.__node_indexes[e.symbol] = i
+            return i
 
         def get(self, image):
             if isinstance(image, bool):
                 return TRUE if image else FALSE
-            if Bool._USE_Z3_EXPR_REPR:
-                return Bool(z3.parse_smt2_string(f'(assert {image})',
-                                                 decls=Bool._decls)[0])
-            if Bool._USE_DAG_EXPR_REPR:
-                return self.__nodes[image]
-            symbol, clauses = image
-            return Bool.from_clauses(
-                self.__literals.get(symbol),
-                (self.__clauses.get(c) for c in clauses))
+            return self.__nodes[image]
 
         @property
         def image(self):
-            if Bool._USE_DAG_EXPR_REPR:
-                return tuple(self.__nodes)
-            return ()
+            return tuple(self.__nodes)
 
     @staticmethod
     def cast(x):
@@ -604,20 +522,11 @@ class Bool(object):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.Or(*(a._e for a in unique_args)))
-
         # TODO: Optimise the case of two pure symbols.
 
         unique_syms = sorted(unique_syms)
         r = Literal.get_intermediate('or', *unique_syms)
-        if __class__._USE_DAG_EXPR_REPR:
-            return __class__.from_ops(r, 'or', *unique_args)
-
-        or_clauses = [Clause.get(*(unique_syms + [~r]))]
-        or_clauses.extend(Clause.get(~s, r) for s in unique_syms)
-        return __class__.from_clauses(r, or_clauses,
-                                      *(a.clauses for a in unique_args))
+        return __class__.from_ops(r, 'or', *unique_args)
 
     def __or__(self, other):
         return __class__.get_or(self, other)
@@ -643,20 +552,11 @@ class Bool(object):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.And(*(a._e for a in unique_args)))
-
         # TODO: Optimise the case of two pure symbols.
 
         unique_syms = sorted(unique_syms)
         r = Literal.get_intermediate('and', *unique_syms)
-        if __class__._USE_DAG_EXPR_REPR:
-            return __class__.from_ops(r, 'and', *unique_args)
-
-        and_clauses = [Clause.get(*([~s for s in unique_syms] + [r]))]
-        and_clauses.extend(Clause.get(s, ~r) for s in unique_syms)
-        return __class__.from_clauses(r, and_clauses,
-                                      *(a.clauses for a in unique_args))
+        return __class__.from_ops(r, 'and', *unique_args)
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -665,9 +565,6 @@ class Bool(object):
         if self.value is not None:
             return FALSE if self.value else TRUE
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.Not(self._e))
-
         # TODO: Can we just return the inverted symbol of this expr?
 
         # TODO: Optimise the case of a pure symbol.
@@ -675,12 +572,7 @@ class Bool(object):
         if self.__inversion is None:
             a = self.symbol
             r = Literal.get_intermediate('not', a)
-            if __class__._USE_DAG_EXPR_REPR:
-                self.__inversion = __class__.from_ops(r, 'not', self)
-            else:
-                self.__inversion = __class__.from_clauses(
-                    r, self.clauses, (Clause.get(a, r),
-                                      Clause.get(~a, ~r)))
+            self.__inversion = __class__.from_ops(r, 'not', self)
             self.__inversion.__inversion = self
 
         return self.__inversion
@@ -698,24 +590,13 @@ class Bool(object):
         if b.value is True:
             return ~cond | a
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return Bool(z3.If(cond._e, a._e, b._e))
-
         # TODO: Optimise the case of pure symbols.
 
         # TODO: Optimise ifelse's that work as not's.
 
         i, t, e = cond.symbol, a.symbol, b.symbol
         r = Literal.get_intermediate('ifelse', i, t, e)
-        if __class__._USE_DAG_EXPR_REPR:
-            return __class__.from_ops(r, 'ifelse', cond, a, b)
-
-        return __class__.from_clauses(r, cond.clauses,
-                                      a.clauses, b.clauses,
-                                      (Clause.get(~i, t, ~r),
-                                       Clause.get(~i, ~t, r),
-                                       Clause.get(i, e, ~r),
-                                       Clause.get(i, ~e, r)))
+        return __class__.from_ops(r, 'ifelse', cond, a, b)
 
     @staticmethod
     def get_neq(a, b):
@@ -728,88 +609,20 @@ class Bool(object):
         if b.value is True:
             return ~a
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return Bool(a._e != b._e)
-
         # TODO: Optimise the case of two pure symbols.
 
         sa = a.symbol
         sb = b.symbol
         r = Literal.get_intermediate('neq', *sorted((sa, sb)))
-        if __class__._USE_DAG_EXPR_REPR:
-            return __class__.from_ops(r, 'neq', a, b)
+        return __class__.from_ops(r, 'neq', a, b)
 
-        return __class__.from_clauses(r, a.clauses, b.clauses,
-                                      (Clause.get(sa, sb),
-                                       Clause.get(~sa, ~sb)))
-
-    @staticmethod
-    def __get_literal_expr(literal):
-        assert not __class__._USE_DAG_EXPR_REPR
-        assert not __class__._USE_Z3_EXPR_REPR
-        e = __class__.__literal_exprs.get(literal)
-        if e is not None:
-            return e
-
-        if literal.sign:
-            e = z3.Not(__class__.__get_literal_expr(~literal))
-        else:
-            e = z3.Bool(literal.id)
-        __class__.__literal_exprs[literal] = e
-        return e
-
-    def __get_value_or_symbol_expr(self):
-        assert not __class__._USE_DAG_EXPR_REPR
-        assert not __class__._USE_Z3_EXPR_REPR
-        if self.value is not None:
-            return z3.BoolVal(self.value)
-
-        return __class__.__get_literal_expr(self.symbol)
-
-    @staticmethod
-    def __get_clause_expr(clause):
-        assert 0  # TODO
-        assert not __class__._USE_Z3_EXPR_REPR
-        e = __class__.__clause_exprs.get(clause)
-        if e is not None:
-            return e
-
-        e = z3.Or(*(__class__.__get_literal_expr(t) for t in clause.literals))
-        __class__.__literal_exprs[clause] = e
-        return e
-
-    def __get_constraints_expr(self):
-        assert not __class__._USE_DAG_EXPR_REPR
-        assert not __class__._USE_Z3_EXPR_REPR
-        if self.__constrs_expr is None:
-            self.__constrs_expr = z3.And(*(__class__.__get_clause_expr(c)
-                                           for c in self.clauses))
-
-        return self.__constrs_expr
-
+    # TODO: Remove.
     __equiv_cache = {}
 
     def is_equiv(self, other):
         a, b = self, other
-        if __class__._USE_Z3_EXPR_REPR:
-            if a.value is not None:
-                if b.value is not None:
-                    return a.value == b.value
-                a = z3.BoolVal(a.value)
-                b = b._e
-            elif b.value is not None:
-                a = a._e
-                b = z3.BoolVal(b)
-            else:
-                a = a._e
-                b = b._e
-        else:
-            if a.value is not None and b.value is not None:
-                return a.value == b.value
-
-            if not __class__._USE_DAG_EXPR_REPR:
-                a = a.__get_value_or_symbol_expr()
-                b = b.__get_value_or_symbol_expr()
+        if a.value is not None and b.value is not None:
+            return a.value == b.value
 
         # TODO: Disable caching equivalence-check results as this
         # doesn't seem to be worth it.
@@ -828,19 +641,9 @@ class Bool(object):
                 return True
 
         with Status.do('is_equiv', '--show-is-equiv'):
-            if __class__.__USE_PYCOSAT or __class__._USE_DAG_EXPR_REPR:
-                # TODO
-                res = pycosat.solve(Bool.get_neq(self, other).sat_clauses)
-                equiv = (res == 'UNSAT')
-            else:
-                s = z3.Solver()
-                if not __class__._USE_Z3_EXPR_REPR:
-                    s.add(self.__get_constraints_expr())
-                    s.add(other.__get_constraints_expr())
-                s.add(a != b)
-                res = s.check()
-                assert res in (z3.sat, z3.unsat)
-                equiv = (res == z3.unsat)
+            # TODO: Remove get_neq().
+            res = pycosat.solve(Bool.get_neq(self, other).sat_clauses)
+            equiv = (res == 'UNSAT')
 
         if 0:
             __class__.__equiv_cache[key] = equiv
@@ -848,67 +651,11 @@ class Bool(object):
 
         return equiv
 
+    # TODO: Rename.
     def simplified_sexpr(self):
-        if self.value is not None:
-            return z3.BoolVal(self.value).sexpr()
+        return repr(self)
 
-        if __class__._USE_Z3_EXPR_REPR:
-            return self._e.sexpr()
-
-        if __class__._USE_DAG_EXPR_REPR:
-            return repr(self)
-
-        key = self.__get_value_or_symbol_expr().sexpr()
-        cache = Cache.get_entry('simplified', key)
-        s = cache.load()
-        if s is not None:
-            s, = s
-            return s
-
-        temps = []
-
-        def add_temps(t):
-            if t.value_expr is None or t in temps:
-                return
-
-            op, *args = t.value_expr
-            for a in args:
-                add_temps(a)
-
-            temps.append(t)
-
-        for c in self.clauses:
-            for t in c.literals:
-                add_temps(t)
-
-        e = z3.And(self.__get_constraints_expr(),
-                   self.__get_value_or_symbol_expr())
-
-        # tactic = z3.Tactic('qe2')
-        # e = tactic.apply(e).as_expr()
-
-        while temps:
-            with Status.do(f'{len(temps)} temps to eliminate'):
-                t = temps.pop()
-                op, *args = t.value_expr
-
-                s = __class__.__get_literal_expr(t)
-
-                OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
-                       'ifelse': z3.If}
-                v = OPS[op](*(__class__.__get_literal_expr(a) for a in args))
-
-                e = z3.substitute(e, (s, v))
-                # e = tactic.apply(e).as_expr()
-
-        # e = tactic.apply(e).as_expr()
-        e = z3.Tactic('qe2').apply(e).as_expr()
-
-        s = e.sexpr()
-        cache.store((s,))
-
-        return s
-
+    # TODO: Remove.
     def reduced(self):
         # TODO: It seems we do much faster without trying to
         # reduce at every step.
