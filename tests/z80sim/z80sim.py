@@ -438,13 +438,13 @@ class Bool(object):
         unique_syms = []
         unique_args = []
         for a in args:
-            if a.value is False:
-                continue
-            if a.value is True:
+            if a.value is not None:
+                if a.value is False:
+                    continue
                 return TRUE
-            if a.__inversion is not None:
-                if a.__inversion.symbol in unique_syms:
-                    return TRUE
+            if (a.__inversion is not None and
+                    a.__inversion.symbol in unique_syms):
+                return TRUE
             if a.symbol not in unique_syms:
                 unique_syms.append(a.symbol)
                 unique_args.append(a)
@@ -453,8 +453,6 @@ class Bool(object):
             return FALSE
         if len(unique_args) == 1:
             return unique_args[0]
-
-        # TODO: Optimise the case of two pure symbols.
 
         return __class__.from_ops('or', *unique_args)
 
@@ -466,13 +464,13 @@ class Bool(object):
         unique_syms = []
         unique_args = []
         for a in args:
-            if a.value is False:
+            if a.value is not None:
+                if a.value is True:
+                    continue
                 return FALSE
-            if a.value is True:
-                continue
-            if a.__inversion is not None:
-                if a.__inversion.symbol in unique_syms:
-                    return FALSE
+            if (a.__inversion is not None and
+                    a.__inversion.symbol in unique_syms):
+                return FALSE
             if a.symbol not in unique_syms:
                 unique_syms.append(a.symbol)
                 unique_args.append(a)
@@ -482,21 +480,12 @@ class Bool(object):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        # TODO: Optimise the case of two pure symbols.
-
         return __class__.from_ops('and', *unique_args)
 
     def __and__(self, other):
         return __class__.get_and(self, other)
 
     def __invert__(self):
-        if self.value is not None:
-            return FALSE if self.value else TRUE
-
-        # TODO: Can we just return the inverted symbol of this expr?
-
-        # TODO: Optimise the case of a pure symbol.
-
         if self.__inversion is None:
             self.__inversion = __class__.from_ops('not', self)
             self.__inversion.__inversion = self
@@ -507,33 +496,53 @@ class Bool(object):
     def ifelse(cond, a, b):
         if cond.value is not None:
             return a if cond.value else b
-        if a.value is False:
-            return ~cond & b
-        if a.value is True:
-            return cond | b
-        if b.value is False:
-            return cond & a
-        if b.value is True:
-            return ~cond | a
+        if a.value is not None:
+            return (cond | b) if a.value else (~cond & b)
+        if b.value is not None:
+            return (~cond | a) if b.value else (cond & a)
 
-        # TODO: Optimise the case of pure symbols.
+        if a is b:
+            # cond ? a : a
+            return a
+        if a is b.__inversion:
+            # cond ? a : ~a
+            return __class__.get_eq(cond, a)
 
-        # TODO: Optimise ifelse's that work as not's.
+        if cond is a or cond is b.__inversion:
+            #  a ? a : b
+            # ~b ? a : b
+            return a | b
+        if cond is b or cond is a.__inversion:
+            #  b ? a : b
+            # ~a ? a : b
+            return a & b
 
         return __class__.from_ops('ifelse', cond, a, b)
 
     @staticmethod
-    def get_neq(a, b):
-        if a.value is False:
-            return b
-        if a.value is True:
-            return ~b
-        if b.value is False:
-            return a
-        if b.value is True:
-            return ~a
+    def get_eq(a, b):
+        if a is b:
+            return TRUE
+        if a is b.__inversion:
+            return FALSE
+        if a.value is not None:
+            return b if a.value else ~b
+        if b.value is not None:
+            return a if b.value else ~a
 
-        # TODO: Optimise the case of two pure symbols.
+        assert 0, (a, b)  # TODO
+        return __class__.from_ops('eq', a, b)
+
+    @staticmethod
+    def get_neq(a, b):
+        if a is b:
+            assert 0, (a, b)  # TODO
+        if a is b.__inversion:
+            return TRUE
+        if a.value is not None:
+            return ~b if a.value else b
+        if b.value is not None:
+            return ~a if b.value else a
 
         return __class__.from_ops('neq', a, b)
 
@@ -559,9 +568,11 @@ class Bool(object):
             return equiv
 
         with Status.do('is_equiv', '--show-is-equiv'):
-            # TODO: Remove get_neq().
-            res = pycosat.solve(Bool.get_neq(a, b).sat_clauses)
-            equiv = (res == 'UNSAT')
+            e = Bool.get_neq(a, b)
+            if e.value is not None:
+                equiv = (e.value is False)
+            else:
+                equiv = (pycosat.solve(e.sat_clauses) == 'UNSAT')
 
         __class__.__equiv_cache[key] = equiv
         return equiv
