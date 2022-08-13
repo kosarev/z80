@@ -531,39 +531,33 @@ class Bool(object):
 
         return __class__.from_ops('neq', a, b)
 
-    # TODO: Remove.
     __equiv_cache = {}
 
     def is_equiv(self, other):
         a, b = self, other
-        if a.value is not None and b.value is not None:
-            return a.value == b.value
+        if a.value is not None:
+            if b.value is not None:
+                return a.value == b.value
+            key = a.value, b.symbol
+        elif b.value is not None:
+            key = b.value, a.symbol
+        elif a.symbol.id == b.symbol.id:
+            assert a.symbol == b.symbol
+            return True
+        else:
+            key = ((a.symbol, b.symbol) if a.symbol < b.symbol
+                   else (b.symbol, a.symbol))
 
-        # TODO: Disable caching equivalence-check results as this
-        # doesn't seem to be worth it.
-        if 0:
-            key = ':'.join(sorted((a.sexpr(), b.sexpr())))
-            equiv = __class__.__equiv_cache.get(key)
-            if equiv is not None:
-                return equiv
-
-            cache = Cache.get_entry('equiv', key)
-            if cache.exists('.0'):
-                __class__.__equiv_cache[key] = False
-                return False
-            if cache.exists('.1'):
-                __class__.__equiv_cache[key] = True
-                return True
+        equiv = __class__.__equiv_cache.get(key)
+        if equiv is not None:
+            return equiv
 
         with Status.do('is_equiv', '--show-is-equiv'):
             # TODO: Remove get_neq().
-            res = pycosat.solve(Bool.get_neq(self, other).sat_clauses)
+            res = pycosat.solve(Bool.get_neq(a, b).sat_clauses)
             equiv = (res == 'UNSAT')
 
-        if 0:
-            __class__.__equiv_cache[key] = equiv
-            cache.create('.1' if equiv else '.0')
-
+        __class__.__equiv_cache[key] = equiv
         return equiv
 
     # TODO: Rename.
