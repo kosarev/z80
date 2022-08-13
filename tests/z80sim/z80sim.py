@@ -266,64 +266,6 @@ class Literal(object):
         return self.__inversion
 
 
-class Clause(object):
-    __clauses = {}
-
-    @staticmethod
-    def get(*literals):
-        literals = tuple(sorted(set(Literal.cast(t) for t in literals)))
-        c = __class__.__clauses.get(literals)
-        if c is not None:
-            return c
-
-        c = __class__()
-        c.literals = literals
-        c.sat_clause = tuple(t.sat_index for t in literals)
-        __class__.__clauses[literals] = c
-        return c
-
-    def __lt__(self, other):
-        return self.literals < other.literals
-
-    @staticmethod
-    def cast(x):
-        if isinstance(x, __class__):
-            return x
-        return __class__.get(x)
-
-    def __repr__(self):
-        r = ' '.join(repr(t) for t in self.literals)
-        return f'[{r}]'
-
-    class Storage(object):
-        def __init__(self, literal_storage, *, image=None):
-            self.literal_storage = literal_storage
-            self.__clauses = []
-            self.__clause_indexes = {}
-
-            if image is not None:
-                for literals in image:
-                    literals = (self.literal_storage.get(t) for t in literals)
-                    self.add(Clause.get(*literals))
-
-        def add(self, clause):
-            i = self.__clause_indexes.get(clause)
-            if i is None:
-                i = len(self.__clauses)
-                self.__clauses.append(clause)
-                self.__clause_indexes[clause] = i
-
-            return i
-
-        def get(self, image):
-            return self.__clauses[image]
-
-        @property
-        def image(self):
-            return tuple(tuple(self.literal_storage.add(t) for t in c.literals)
-                         for c in self.__clauses)
-
-
 class Bool(object):
     def __init__(self, term):
         if isinstance(term, bool):
@@ -429,8 +371,8 @@ class Bool(object):
         return ''.join(rep)
 
     class Storage(object):
-        def __init__(self, clause_storage, *, image=None):
-            self.__literals = clause_storage.literal_storage
+        def __init__(self, literal_storage, *, image=None):
+            self.__literals = literal_storage
             self.__nodes = []
             self.__node_indexes = {}
             if image is not None:
@@ -896,8 +838,7 @@ class Transistor(object):
 
 def _make_image(nodes, trans):
     literals = Literal.Storage()
-    clauses = Clause.Storage(literals)
-    bools = Bool.Storage(clauses)
+    bools = Bool.Storage(literals)
     node_storage = Node.Storage(bools)
 
     # TODO: Move this logic into Node.Storage.
@@ -907,7 +848,7 @@ def _make_image(nodes, trans):
     nodes = tuple((n.index,) + node_storage.add(n) for n in nodes)
     trans = tuple((t.index,) + t.image for t in trans)
 
-    return (node_storage.image, bools.image, clauses.image, literals.image,
+    return (node_storage.image, bools.image, literals.image,
             node_names, nodes, trans)
 
 
@@ -1368,12 +1309,11 @@ class Z80Simulator(object):
             # For custom images, leave them as-is.
             assert skip_reset is None
 
-        (node_storage, bools, clauses, literals,
+        (node_storage, bools, literals,
          node_names, nodes, trans) = image
 
         literals = Literal.Storage(image=literals)
-        clauses = Clause.Storage(literals, image=clauses)
-        bools = Bool.Storage(clauses, image=bools)
+        bools = Bool.Storage(literals, image=bools)
         node_storage = Node.Storage(bools, image=node_storage)
 
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
@@ -1655,8 +1595,7 @@ class State(object):
     @staticmethod
     def __get_steps_image(steps):
         literals = Literal.Storage()
-        clauses = Clause.Storage(literals)
-        bools = Bool.Storage(clauses)
+        bools = Bool.Storage(literals)
 
         def get_step_element_image(e):
             if isinstance(e, (str, int, type(None))):
@@ -1669,7 +1608,7 @@ class State(object):
             return tuple(get_step_element_image(e) for e in step)
 
         return (tuple(get_step_image(s) for s in steps),
-                bools.image, clauses.image, literals.image)
+                bools.image, literals.image)
 
     @staticmethod
     def __cache_state(steps, image):
