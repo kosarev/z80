@@ -571,9 +571,26 @@ class Bool(object):
         __class__.__equiv_cache[key] = equiv
         return equiv
 
-    # TODO: Rename.
     def simplified_sexpr(self):
-        return repr(self)
+        cache = {}
+
+        def get(n):
+            if n.value is not None:
+                return z3.BoolVal(n.value)
+            if n._e is None:
+                return z3.Bool(n.symbol.id)
+
+            r = cache.get(n.symbol)
+            if r is not None:
+                return r
+
+            kind, ops = n._e
+            OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
+                   'ifelse': z3.If}
+            r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
+            return r
+
+        return z3.Tactic('qe2').apply(get(self)).as_expr().sexpr()
 
     # TODO: Remove.
     def reduced(self):
