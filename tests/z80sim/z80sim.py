@@ -2169,6 +2169,8 @@ def get_instrs():
 
     yield 'out (n), a', (f(0xd3), R3, O4)
 
+    yield 'jp hl', (f(0xe9),)
+
 
 def test_instructions():
     instrs = list(get_instrs())
