@@ -1877,6 +1877,9 @@ def test_node(instrs, n, states_before, states_after):
     b = states_after[n]
 
     def check(x):
+        if isinstance(x, str):
+            x = states_before[x]
+
         if b.is_equiv(x):
             return CheckToken()
 
@@ -1908,8 +1911,10 @@ def test_node(instrs, n, states_before, states_after):
             return check(~a)
         if instr == 'pop af':
             return check(Bool.get(f'f0_{phase}'))
+        if instr == 'rla':
+            return check('reg_a7')
         if instr == 'rra':
-            return check(states_before['reg_a0'])
+            return check('reg_a0')
 
     if n in (XF, YF):
         i = int(n[-1])
@@ -1923,8 +1928,10 @@ def test_node(instrs, n, states_before, states_after):
         if instr == 'pop af':
             id = {XF: f'f3_{phase}', YF: f'f5_{phase}'}[n]
             return check(Bool.get(id))
+        if instr == 'rla':
+            return check(f'reg_a{i - 1}')
         if instr == 'rra':
-            return check(states_before[f'reg_a{i + 1}'])
+            return check(f'reg_a{i + 1}')
 
     return check(a)
 
@@ -1936,7 +1943,7 @@ def process_instr(instrs, base_state, *, test=False):
 
     TESTED_NODES = 'reg_f0', 'reg_f3', 'reg_f5'
     SAMPLED_NODES = TESTED_NODES + (
-        'reg_a0', 'reg_a3', 'reg_a4', 'reg_a5', 'reg_a6')
+        'reg_a0', 'reg_a2', 'reg_a3', 'reg_a4', 'reg_a5', 'reg_a6', 'reg_a7')
 
     phase = len(instrs)
     id, cycles = instrs[-1]
@@ -2155,6 +2162,8 @@ def get_instrs():
     yield 'ccf', (f(0x3f),)
     yield 'pop af', (f(0xf1), r3('f'), r3('a'))
     yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
+
+    yield 'rla', (f(0x17),)
     yield 'rra', (f(0x1f),)
 
 
