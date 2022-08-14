@@ -298,6 +298,9 @@ class Bool(object):
         clauses = []
         syms = {}
 
+        def add(*cs):
+            clauses.extend(tuple(t.sat_index for t in c) for c in cs)
+
         def get(n):
             assert n.value is None, self
 
@@ -314,30 +317,31 @@ class Bool(object):
             if kind == 'not':
                 a, = ops
                 r = ~get(a)
+            elif kind == 'eq':
+                # r = xnor(a, b)  ===  xor(a, b, r)
+                a, b = ops
+                a, b = get(a), get(b)
+                add((~a, ~b, r), (a, b, r), (a, ~b, ~r), (~a, b, ~r))
             elif kind == 'neq':
                 a, b = ops
                 a, b = get(a), get(b)
-                clauses.extend(((a.sat_index, b.sat_index),
-                                ((~a).sat_index, (~b).sat_index)))
+                add((a, b), (~a, ~b))
                 # TODO: 'r' remains unbounded.
                 r = None
             elif kind == 'ifelse':
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
-                clauses.extend((((~i).sat_index, t.sat_index, (~r).sat_index),
-                                ((~i).sat_index, (~t).sat_index, r.sat_index),
-                                (i.sat_index, e.sat_index, (~r).sat_index),
-                                (i.sat_index, (~e).sat_index, r.sat_index)))
+                add((~i, t, ~r), (~i, ~t, r), (i, e, ~r), (i, ~e, r))
             elif kind == 'or':
                 op_syms = tuple(get(op) for op in ops)
-                clauses.append(tuple(s.sat_index for s in op_syms + (~r,)))
+                add(tuple(s for s in op_syms + (~r,)))
                 for s in op_syms:
-                    clauses.append(((~s).sat_index, r.sat_index))
+                    add((~s, r))
             elif kind == 'and':
                 op_syms = tuple(get(op) for op in ops)
-                clauses.append(tuple((~s).sat_index for s in op_syms + (~r,)))
+                add(tuple(~s for s in op_syms + (~r,)))
                 for s in op_syms:
-                    clauses.append((s.sat_index, (~r).sat_index))
+                    add((s, ~r))
             else:
                 assert 0, n  # TODO
 
@@ -354,7 +358,7 @@ class Bool(object):
 
         COMMUTATIVE = {
             'not': False, 'ifelse': False,
-            'neq': True, 'or': True, 'and': True}
+            'eq': True, 'neq': True, 'or': True, 'and': True}
         if COMMUTATIVE[kind]:
             syms = tuple(sorted(syms))
 
@@ -568,7 +572,6 @@ class Bool(object):
         if b.value is not None:
             return a if b.value else ~a
 
-        assert 0, (a, b)  # TODO
         return __class__.from_ops('eq', a, b)
 
     @staticmethod
@@ -659,8 +662,9 @@ class Bits(object):
             assert width is not None
             suffix = '' if suffix is None else suffix
             bits = tuple(f'{bits}{i}{suffix}' for i in range(width))
-        else:
-            assert suffix is None
+        elif suffix is not None:
+            bits = tuple(f'{b}{suffix}' if isinstance(b, str) else b
+                         for b in bits)
 
         bits = tuple(Bool.cast(b) for b in bits)
 
@@ -1751,10 +1755,9 @@ class State(object):
         for i, b in enumerate(Bits.cast(bits).bits):
             self.set_pin_and_update(f'{pin}{i}', b)
 
-    def set_db(self, bits, phase=None):
+    def set_db(self, bits):
         if isinstance(bits, str):
-            bits = Bits(bits, width=8,
-                        suffix='' if phase is None else f'_{phase}')
+            bits = Bits(bits, width=8)
         else:
             bits = Bits.cast(bits, width=8)
         self.set_pins_and_update('db', bits)
@@ -1864,13 +1867,15 @@ def test_node(instrs, n, states_before, states_after):
         if b.is_equiv(x):
             return
 
-        Status.print('; '.join(id for id, cycles in instrs), n)
-        Status.print('  old state', a.simplified_sexpr())
-        Status.print('  new state', b.simplified_sexpr())
-        Status.print('  expected', x.simplified_sexpr())
+        Status.clear()
 
-        # Status.clear()
-        # assert 0
+        f = sys.stderr
+        print('; '.join(instrs), n, file=f)
+        print('  old state', a.simplified_sexpr(), file=f)
+        print('  new state', b.simplified_sexpr(), file=f)
+        print('  expected', x.simplified_sexpr(), file=f)
+
+        assert 0
 
     CF = 'reg_f0'
     XF = 'reg_f3'
@@ -1878,7 +1883,12 @@ def test_node(instrs, n, states_before, states_after):
 
     phase = len(instrs)
     instr = instrs[-1]
-    prev_instr = None if len(instrs) < 2 else instrs[-2]
+
+    prev_instr = None
+    prev_mnemonic = None
+    if len(instrs) >= 2:
+        prev_instr = instrs[-2]
+        prev_mnemonic = prev_instr.split()[0]
 
     if n == CF:
         if instr == 'ccf':
@@ -1892,7 +1902,7 @@ def test_node(instrs, n, states_before, states_after):
             an = states_before[f'reg_a{n[-1]}']
             if prev_instr == 'ccf':
                 return check(an)
-            elif prev_instr in (None, 'nop', 'pop af'):
+            elif prev_mnemonic in (None, 'nop', 'pop', 'ld'):
                 fn = states_before[f'reg_f{n[-1]}']
                 return check(an | fn)
 
@@ -1916,7 +1926,9 @@ def process_instr(instrs, base_state, *, test=False):
 
     s = State(base_state)
     for cycle_no, (d, ticks) in enumerate(cycles):
-        s.set_db(d, phase)
+        if not isinstance(d, int):
+            d = Bits(d, width=8, suffix=f'_{phase}')
+        s.set_db(d)
         for t in range(ticks):
             if cycle_no == 0 and t == EXTRA_TICKS:
                 states_before = s.get_node_states(SAMPLED_NODES)
@@ -2051,15 +2063,70 @@ def test_instr_seqs(seqs):
                 Status.print(res)
 
 
-def test_instructions():
-    INSTRS = (
-        ('nop', ((0x00, 4),)),
-        ('ccf', ((0x3f, 4),)),
-        ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
-    )
+def get_instrs():
+    AT_HL = '(hl)', '110'
 
-    test_instr_seqs((i,) for i in INSTRS)
-    test_instr_seqs((i1, i2) for i1 in INSTRS for i2 in INSTRS)
+    RS = (('{b, c, d, e}', '0ss'),
+          ('{l, a}', '1s1'),
+          ('h', '100'),
+          AT_HL)
+
+    RD = (('{b, c, d, e}', '0dd'),
+          ('{l, a}', '1d1'),
+          ('h', '100'),
+          AT_HL)
+
+    def pattern(s):
+        bits = []
+        i = 0
+        for b in reversed(s):
+            if b == ' ':
+                continue
+            if b in ('0', '1'):
+                b = int(b)
+            else:
+                b = f'{b}{i}'
+            bits.append(b)
+            i += 1
+        return bits
+
+    def f(p):
+        return p, 4
+
+    def r3(p):
+        return p, 3
+
+    def w3(p):
+        return p, 3
+
+    R3 = 'r', 3
+    W3 = 'w', 3
+
+    yield 'nop', (f(0x00),)
+
+    for rd in RD:
+        rdn, rdp = rd
+        for rs in RS:
+            rsn, rsp = rs
+            cycles = (f(pattern(f'01 {rdp} {rsp}')),)
+            if rd == AT_HL and rs == AT_HL:
+                instr = 'halt'
+            else:
+                instr = f'ld {rdn}, {rsn}'
+                if rs == AT_HL:
+                    cycles += (R3,)
+                if rd == AT_HL:
+                    cycles += (W3,)
+            yield instr, cycles
+
+    yield 'ccf', (f(0x3f),)
+    yield 'pop af', (f(0xf1), r3('f'), r3('a'))
+
+
+def test_instructions():
+    instrs = list(get_instrs())
+    test_instr_seqs((i,) for i in instrs)
+    test_instr_seqs((i1, i2) for i1 in instrs for i2 in instrs)
 
     Status.clear()
     print('OK')
