@@ -1911,7 +1911,33 @@ def test_instruction(instrs, cycles, base_state):
     return after_instr_state
 
 
-def make_symbolised_state(reset_state):
+def build_reset_state():
+    s = State(cache_all_reportable_states=True)
+    s.clear_state()
+    s.report('after-clearing-state')
+
+    for pin in _PINS:
+        s.set_pin_state(pin, f'init.{pin}')
+        if pin == '~clk':
+            # The ~clk pull seems to propagate to lots of nodes,
+            # including register bits, and survives the reset
+            # sequence and even execution of some instructions.
+            # As we are not currently interested in investigating
+            # these effects, let's start from inactive ~clk as it
+            # seems it is expected to be in hardware implementations.
+            s.set_pin_pull(pin, TRUE)
+        else:
+            s.set_pin_pull(pin, f'pull.{pin}')
+    s.update_all_nodes()
+    s.report('after-updating-all-nodes')
+
+    s.reset(propagation_delay=31, waiting_for_m1_delay=5)
+    s.report('after-reset')
+
+    return s
+
+
+def build_symbolised_state():
     SYMBOLISING_SEQ = (
         ('exx', ((0xd9, 4),)),
         ('pop bc2', ((0xc1, 4), ('cc', 3), ('bb', 3))),
@@ -1953,7 +1979,7 @@ def make_symbolised_state(reset_state):
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
     )
 
-    s = State(reset_state)
+    s = build_reset_state()
     for instr, cycles in SYMBOLISING_SEQ:
         with Status.do(instr):
             for d, ticks in cycles:
@@ -1964,8 +1990,8 @@ def make_symbolised_state(reset_state):
     return s
 
 
-def test_instructions(reset_state):
-    symbolised_state = make_symbolised_state(reset_state)
+def test_instructions():
+    symbolised_state = build_symbolised_state()
 
     INSTRS = (
         ('nop', ((0x00, 4),)),
@@ -1988,27 +2014,7 @@ def test_instructions(reset_state):
 
 
 def build_symbolic_states():
-    s = State(cache_all_reportable_states=True)
-    s.clear_state()
-    s.report('after-clearing-state')
-
-    for pin in _PINS:
-        s.set_pin_state(pin, f'init.{pin}')
-        if pin == '~clk':
-            # The ~clk pull seems to propagate to lots of nodes,
-            # including register bits, and survives the reset
-            # sequence and even execution of some instructions.
-            # As we are not currently interested in investigating
-            # these effects, let's start from inactive ~clk as it
-            # seems it is expected to be in hardware implementations.
-            s.set_pin_pull(pin, TRUE)
-        else:
-            s.set_pin_pull(pin, f'pull.{pin}')
-    s.update_all_nodes()
-    s.report('after-updating-all-nodes')
-
-    s.reset(propagation_delay=31, waiting_for_m1_delay=5)
-    s.report('after-reset')
+    s = build_reset_state()
 
     # Feed it a nop.
     nop = State(s)
@@ -2022,8 +2028,6 @@ def build_symbolic_states():
     ld.set_db_and_wait('imm', 5)
     ld.report('after-ld-a-i8')
     del ld
-
-    test_instructions(s)
 
 
 def test_computing_node_values():
@@ -2069,6 +2073,8 @@ def main():
         return
 
     build_symbolic_states()
+
+    test_instructions()
 
 
 if __name__ == "__main__":
