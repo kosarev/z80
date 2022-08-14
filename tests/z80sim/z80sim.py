@@ -1911,9 +1911,9 @@ def test_node(instrs, n, states_before, states_after):
             return check(~a)
         if instr == 'pop af':
             return check(Bool.get(f'f0_{phase}'))
-        if instr == 'rla':
+        if instr in ('rla', 'rlca'):
             return check('reg_a7')
-        if instr == 'rra':
+        if instr in ('rra', 'rrca'):
             return check('reg_a0')
 
     if n in (XF, YF):
@@ -1928,9 +1928,9 @@ def test_node(instrs, n, states_before, states_after):
         if instr == 'pop af':
             id = {XF: f'f3_{phase}', YF: f'f5_{phase}'}[n]
             return check(Bool.get(id))
-        if instr == 'rla':
+        if instr in ('rla', 'rlca'):
             return check(f'reg_a{i - 1}')
-        if instr == 'rra':
+        if instr in ('rra', 'rrca'):
             return check(f'reg_a{i + 1}')
 
     return check(a)
@@ -2163,6 +2163,8 @@ def get_instrs():
     yield 'pop af', (f(0xf1), r3('f'), r3('a'))
     yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
 
+    yield 'rlca', (f(0x07),)
+    yield 'rrca', (f(0x0f),)
     yield 'rla', (f(0x17),)
     yield 'rra', (f(0x1f),)
 
