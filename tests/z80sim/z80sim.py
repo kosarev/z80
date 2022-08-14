@@ -15,6 +15,7 @@
 import ast
 import concurrent.futures
 import datetime
+import gc
 import gzip
 import hashlib
 import json
@@ -192,6 +193,10 @@ class Literal(object):
     __literals = {}
 
     @staticmethod
+    def clear():
+        __class__.__literals.clear()
+
+    @staticmethod
     def get(id):
         if id is None:
             id = f't{len(__class__.__literals) + 1}'
@@ -264,6 +269,12 @@ class Literal(object):
 
 class Bool(object):
     __cache = {}
+    __equiv_cache = {}
+
+    @staticmethod
+    def clear():
+        __class__.__cache.clear()
+        __class__.__equiv_cache.clear()
 
     @staticmethod
     def get(term):
@@ -586,8 +597,6 @@ class Bool(object):
             return ~a if b.value else a
 
         return __class__.from_ops('neq', a, b)
-
-    __equiv_cache = {}
 
     def is_equiv(self, other):
         e = Bool.get_neq(self, other)
@@ -2038,6 +2047,10 @@ def build_symbolised_state():
 
 
 def test_instr_seq(seq):
+    Literal.clear()
+    Bool.clear()
+    gc.collect()
+
     state = build_symbolised_state()
     for i in range(len(seq) - 1):
         state = process_instr(seq[:i + 1], state)
