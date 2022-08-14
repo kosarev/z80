@@ -1833,7 +1833,7 @@ def test_node(instrs, n, states_before, states_after):
         if b.is_equiv(x):
             return
 
-        Status.print(', '.join(instrs), n)
+        Status.print('; '.join(id for id, cycles in instrs), n)
         Status.print('  old state', a.simplified_sexpr())
         Status.print('  new state', b.simplified_sexpr())
         Status.print('  expected', x.simplified_sexpr())
@@ -1872,7 +1872,7 @@ def test_node(instrs, n, states_before, states_after):
     check(a)
 
 
-def test_instruction(instrs, cycles, base_state):
+def process_instr(instrs, base_state, *, test=False):
     # Additional ticks are necessary for new values
     # to reach their nodes.
     EXTRA_TICKS = 3
@@ -1880,10 +1880,8 @@ def test_instruction(instrs, cycles, base_state):
     TESTED_NODES = 'reg_f0', 'reg_f3', 'reg_f5'
     SAMPLED_NODES = TESTED_NODES + ('reg_a3', 'reg_a5')
 
-    # Status.print(', '.join(instrs))
-
     phase = len(instrs)
-    instr = instrs[-1]
+    id, cycles = instrs[-1]
 
     s = State(base_state)
     for cycle_no, (d, ticks) in enumerate(cycles):
@@ -1898,6 +1896,12 @@ def test_instruction(instrs, cycles, base_state):
 
     after_instr_state = State(s)
 
+    if not test:
+        return after_instr_state
+
+    instr_ids = tuple(id for id, cycles in instrs)
+    Status.print('; '.join(instr_ids))
+
     s.set_db(0x00)  # nop
     for t in range(ticks, ticks + EXTRA_TICKS):
         s.tick()
@@ -1906,7 +1910,7 @@ def test_instruction(instrs, cycles, base_state):
 
     for id in TESTED_NODES:
         with Status.do(f'test {id}'):
-            test_node(instrs, id, states_before, states_after)
+            test_node(instr_ids, id, states_before, states_after)
 
     return after_instr_state
 
@@ -1990,24 +1994,25 @@ def build_symbolised_state():
     return s
 
 
-def test_instructions():
-    symbolised_state = build_symbolised_state()
+def test_instr_seq(seq):
+    state = build_symbolised_state()
+    for i in range(len(seq) - 1):
+        state = process_instr(seq[:i + 1], state)
+    process_instr(seq, state, test=True)
 
+
+def test_instructions():
     INSTRS = (
         ('nop', ((0x00, 4),)),
         ('ccf', ((0x3f, 4),)),
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
     )
 
-    for instr, cycles in INSTRS:
-        with Status.do(instr):
-            after_instr_state = test_instruction(
-                (instr,), cycles, symbolised_state)
+    for i1 in INSTRS:
+        test_instr_seq((i1,))
 
-            for instr2, cycles2 in INSTRS:
-                with Status.do(instr2):
-                    test_instruction(
-                        (instr, instr2), cycles2, after_instr_state)
+        for i2 in INSTRS:
+            test_instr_seq((i1, i2))
 
     Status.clear()
     print('OK')
