@@ -1868,13 +1868,17 @@ class State(object):
         sys.exit()
 
 
+class CheckToken(object):
+    pass
+
+
 def test_node(instrs, n, states_before, states_after):
     a = states_before[n]
     b = states_after[n]
 
     def check(x):
         if b.is_equiv(x):
-            return
+            return CheckToken()
 
         Status.clear()
 
@@ -1902,24 +1906,27 @@ def test_node(instrs, n, states_before, states_after):
     if n == CF:
         if instr == 'ccf':
             return check(~a)
-
         if instr == 'pop af':
             return check(Bool.get(f'f0_{phase}'))
+        if instr == 'rra':
+            return check(states_before['reg_a0'])
 
     if n in (XF, YF):
+        i = int(n[-1])
         if instr == 'ccf':
-            an = states_before[f'reg_a{n[-1]}']
+            an = states_before[f'reg_a{i}']
             if prev_instr == 'ccf':
                 return check(an)
             elif prev_mnemonic in (None, 'nop', 'pop', 'ld', 'ret'):
                 fn = states_before[f'reg_f{n[-1]}']
                 return check(an | fn)
-
         if instr == 'pop af':
             id = {XF: f'f3_{phase}', YF: f'f5_{phase}'}[n]
             return check(Bool.get(id))
+        if instr == 'rra':
+            return check(states_before[f'reg_a{i + 1}'])
 
-    check(a)
+    return check(a)
 
 
 def process_instr(instrs, base_state, *, test=False):
@@ -1928,7 +1935,8 @@ def process_instr(instrs, base_state, *, test=False):
     EXTRA_TICKS = 3
 
     TESTED_NODES = 'reg_f0', 'reg_f3', 'reg_f5'
-    SAMPLED_NODES = TESTED_NODES + ('reg_a3', 'reg_a5')
+    SAMPLED_NODES = TESTED_NODES + (
+        'reg_a0', 'reg_a3', 'reg_a4', 'reg_a5', 'reg_a6')
 
     phase = len(instrs)
     id, cycles = instrs[-1]
@@ -1962,7 +1970,8 @@ def process_instr(instrs, base_state, *, test=False):
 
     for id in TESTED_NODES:
         with Status.do(f'test {id}'):
-            test_node(instr_ids, id, states_before, states_after)
+            token = test_node(instr_ids, id, states_before, states_after)
+            assert isinstance(token, CheckToken)
 
     return after_instr_state
 
@@ -2146,6 +2155,7 @@ def get_instrs():
     yield 'ccf', (f(0x3f),)
     yield 'pop af', (f(0xf1), r3('f'), r3('a'))
     yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
+    yield 'rra', (f(0x1f),)
 
 
 def test_instructions():
