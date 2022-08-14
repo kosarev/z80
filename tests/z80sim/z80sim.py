@@ -1922,12 +1922,10 @@ def test_node(instrs, n, states_before, states_after):
             an = states_before[f'reg_a{i}']
             if prev_instr == 'ccf':
                 return check(an)
-            elif prev_mnemonic in (None, 'nop', 'pop', 'ld', 'ret'):
-                fn = states_before[f'reg_f{n[-1]}']
-                return check(an | fn)
+            fn = states_before[f'reg_f{i}']
+            return check(an | fn)
         if instr == 'pop af':
-            id = {XF: f'f3_{phase}', YF: f'f5_{phase}'}[n]
-            return check(Bool.get(id))
+            return check(Bool.get(f'f{i}_{phase}'))
         if instr in ('rla', 'rlca'):
             return check(f'reg_a{i - 1}')
         if instr in ('rra', 'rrca'):
@@ -2129,8 +2127,9 @@ def get_instrs():
     def w3(p):
         return p, 3
 
-    R3 = 'r', 3
-    W3 = 'w', 3
+    R3 = r3('r')
+    W3 = w3('w')
+    O4 = 'o', 4
 
     yield 'nop', (f(0x00),)
 
@@ -2167,6 +2166,8 @@ def get_instrs():
     yield 'rrca', (f(0x0f),)
     yield 'rla', (f(0x17),)
     yield 'rra', (f(0x1f),)
+
+    yield 'out (n), a', (f(0xd3), R3, O4)
 
 
 def test_instructions():
