@@ -1911,7 +1911,7 @@ def test_node(instrs, n, states_before, states_after):
             an = states_before[f'reg_a{n[-1]}']
             if prev_instr == 'ccf':
                 return check(an)
-            elif prev_mnemonic in (None, 'nop', 'pop', 'ld'):
+            elif prev_mnemonic in (None, 'nop', 'pop', 'ld', 'ret'):
                 fn = states_before[f'reg_f{n[-1]}']
                 return check(an | fn)
 
@@ -2051,10 +2051,11 @@ def test_instr_seq(seq):
     Bool.clear()
     gc.collect()
 
-    state = build_symbolised_state()
-    for i in range(len(seq) - 1):
-        state = process_instr(seq[:i + 1], state)
-    process_instr(seq, state, test=True)
+    with Status.do('; '.join(id for id, cycles in seq)):
+        state = build_symbolised_state()
+        for i in range(len(seq) - 1):
+            state = process_instr(seq[:i + 1], state)
+        process_instr(seq, state, test=True)
 
 
 def test_instr_seq_concurrently(seq):
@@ -2117,6 +2118,7 @@ def get_instrs():
 
     yield 'nop', (f(0x00),)
 
+    ''' TODO: Disable for now.
     for rd in RD:
         rdn, rdp = rd
         for rs in RS:
@@ -2132,8 +2134,18 @@ def get_instrs():
                     cycles += (W3,)
             yield instr, cycles
 
+    for rd in RD:
+        rdn, rdp = rd
+        cycles = (f(pattern(f'00 {rdp} 100')),)
+        instr = f'inc {rdn}'
+        if rd == AT_HL:
+            cycles += (R3, W3)
+        yield instr, cycles
+    '''
+
     yield 'ccf', (f(0x3f),)
     yield 'pop af', (f(0xf1), r3('f'), r3('a'))
+    yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
 
 
 def test_instructions():
