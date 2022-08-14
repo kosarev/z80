@@ -13,6 +13,7 @@
 
 
 import ast
+import concurrent.futures
 import datetime
 import gzip
 import hashlib
@@ -21,6 +22,7 @@ import pathlib
 import pprint
 import pycosat
 import sys
+import traceback
 import z3
 
 
@@ -51,11 +53,15 @@ def deep_tupilize(x):
 
 
 class Status(object):
+    __supression_count = 0
     __parts = []
     __line = ''
 
     @staticmethod
     def __emit(line):
+        if __class__.__supression_count != 0:
+            return
+
         line_with_spaces = line
         if len(line) < len(__class__.__line):
             line_with_spaces += ' ' * (len(__class__.__line) - len(line))
@@ -74,11 +80,16 @@ class Status(object):
 
     @staticmethod
     def clear():
+        if __class__.__supression_count != 0:
+            return
         __class__.__emit('')
         print('\r', end='', file=sys.stderr)
 
     @staticmethod
     def print(*args):
+        if __class__.__supression_count != 0:
+            return
+
         line = __class__.__line
         __class__.clear()
 
@@ -107,6 +118,26 @@ class Status(object):
             def __exit__(self, exc_type, exc_val, exc_tb):
                 if self.__show:
                     Status.exit()
+
+        return S()
+
+    @staticmethod
+    def start_suppression():
+        __class__.__supression_count += 1
+
+    @staticmethod
+    def end_suppression():
+        assert __class__.__supression_count > 0
+        __class__.__supression_count -= 1
+
+    @staticmethod
+    def suppress():
+        class S:
+            def __enter__(self):
+                Status.start_suppression()
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                Status.end_suppression()
 
         return S()
 
@@ -2001,6 +2032,25 @@ def test_instr_seq(seq):
     process_instr(seq, state, test=True)
 
 
+def test_instr_seq_concurrently(seq):
+    with Status.suppress():
+        try:
+            test_instr_seq(seq)
+        except Exception:
+            return traceback.format_exc()
+    return '; '.join(id for id, cycles in seq)
+
+
+def test_instr_seqs(seqs):
+    if '--single-thread' in sys.argv:
+        for seq in seqs:
+            test_instr_seq(seq)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as e:
+            for res in e.map(test_instr_seq_concurrently, seqs):
+                Status.print(res)
+
+
 def test_instructions():
     INSTRS = (
         ('nop', ((0x00, 4),)),
@@ -2008,11 +2058,8 @@ def test_instructions():
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
     )
 
-    for i1 in INSTRS:
-        test_instr_seq((i1,))
-
-        for i2 in INSTRS:
-            test_instr_seq((i1, i2))
+    test_instr_seqs((i,) for i in INSTRS)
+    test_instr_seqs((i1, i2) for i1 in INSTRS for i2 in INSTRS)
 
     Status.clear()
     print('OK')
