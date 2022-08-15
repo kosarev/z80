@@ -379,6 +379,12 @@ class Bool(object):
 
         b = __class__.__cache[key] = Bool.get(Literal.get(None))
         b._e = kind, ops
+
+        if kind == 'not':
+            op, = ops
+            b.__inversion = op
+            op.__inversion = b
+
         return b
 
     def __repr__(self):
@@ -540,7 +546,6 @@ class Bool(object):
     def __invert__(self):
         if self.__inversion is None:
             self.__inversion = __class__.from_ops('not', self)
-            self.__inversion.__inversion = self
 
         return self.__inversion
 
@@ -2064,8 +2069,8 @@ def test_instr_seq(seq):
     Bool.clear()
     gc.collect()
 
+    state = build_symbolised_state()
     with Status.do('; '.join(id for id, cycles in seq)):
-        state = build_symbolised_state()
         for i in range(len(seq) - 1):
             state = process_instr(seq[:i + 1], state)
         process_instr(seq, state, test=True)
