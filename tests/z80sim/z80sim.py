@@ -334,11 +334,10 @@ class Bool(object):
                 a, b = get(a), get(b)
                 add((~a, ~b, r), (a, b, r), (a, ~b, ~r), (~a, b, ~r))
             elif kind == 'neq':
+                # TODO: Can be just not(eq())?
                 a, b = ops
                 a, b = get(a), get(b)
-                add((a, b), (~a, ~b))
-                # TODO: 'r' remains unbounded.
-                r = None
+                add((~a, ~b, ~r), (a, b, ~r), (a, ~b, r), (~a, b, r))
             elif kind == 'ifelse':
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
@@ -359,7 +358,7 @@ class Bool(object):
             syms[r] = r
             return r
 
-        get(self)
+        add((get(self),))
 
         return clauses
 
@@ -2196,6 +2195,9 @@ def build_symbolic_states():
     ld.set_db_and_wait('imm', 5)
     ld.report('after-ld-a-i8')
     del ld
+
+    s = build_symbolised_state()
+    s.report('after-symbolising')
 
 
 def test_computing_node_values():
