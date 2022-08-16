@@ -2125,6 +2125,9 @@ def get_instrs():
     def f(p):
         return p, 4
 
+    def f6(p):
+        return p, 6
+
     def r3(p):
         return p, 3
 
@@ -2134,6 +2137,8 @@ def get_instrs():
     R3 = r3('r')
     W3 = w3('w')
     O4 = 'o', 4
+    I4 = 'i', 4
+    E5 = 'e', 5
 
     yield 'nop', (f(0x00),)
 
@@ -2162,8 +2167,14 @@ def get_instrs():
         yield instr, cycles
     '''
 
+    yield 'ex af, af2', (f(0x08),)
+    yield 'jr d', (f(0x18), R3, E5)
+    yield 'daa', (f(0x27),)
+    yield 'cpl', (f(0x2f),)
+    yield 'scf', (f(0x37),)
     yield 'ccf', (f(0x3f),)
     yield 'pop af', (f(0xf1), r3('f'), r3('a'))
+    yield 'jp nn', (f(0xc3), r3('jl'), r3('jh'))
     yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
 
     yield 'rlca', (f(0x07),)
@@ -2172,8 +2183,13 @@ def get_instrs():
     yield 'rra', (f(0x1f),)
 
     yield 'out (n), a', (f(0xd3), R3, O4)
+    yield 'in a, (n)', (f(0xdb), R3, I4)
 
+    yield 'exx', (f(0xd9),)
     yield 'jp hl', (f(0xe9),)
+    yield 'ex de, hl', (f(0xeb),)
+    yield 'ld sp, hl', (f6(0xf9),)
+    yield 'ei/di', ((reversed((1, 1, 1, 1, 'ei', 0, 1, 1)), 4),)
 
 
 def test_instructions():
