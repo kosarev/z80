@@ -173,8 +173,9 @@ class Cache(object):
             path.parent.mkdir(parents=True, exist_ok=True)
 
             temp_path = path.parent / (path.name + '.tmp')
-            with gzip.open(temp_path, 'wb') as f:
-                f.write(json.dumps(payload).encode())
+            with temp_path.open('wb') as f:
+                with gzip.GzipFile('', 'wb', mtime=0, fileobj=f) as gzf:
+                    gzf.write(json.dumps(payload).encode())
 
             temp_path.rename(path)
 
