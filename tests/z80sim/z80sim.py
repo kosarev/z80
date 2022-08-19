@@ -1969,7 +1969,7 @@ def test_node(instrs, n, before, after):
         i = int(n[-1])
         if instr in ('ccf', 'scf'):
             an = before[f'reg_a{i}']
-            if prev_instr == 'ccf':
+            if prev_instr in ('ccf', 'scf'):
                 return check(an)
             fn = before[f'reg_f{i}']
             return check(an | fn)
