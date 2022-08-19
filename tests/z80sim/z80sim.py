@@ -2184,21 +2184,25 @@ def test_instr_seqs(seqs):
         get_cache_entry(seq).store((t,))
 
     def process_results(i, seq, res):
-        done, message = res
+        ok, message = res
         if message is not None:
             Status.print(f'{i}/{len(seqs)} {message}')
-        if done:
+        if ok:
             mark_done(seqs[i])
+        return ok
 
     seqs = sorted(seqs, key=sort_key)
+    ok = True
     if '--single-thread' in sys.argv:
         for i, seq in enumerate(seqs):
-            process_results(i, seqs[i], test_instr_seq(seq))
+            ok &= process_results(i, seqs[i], test_instr_seq(seq))
     else:
         seqs = tuple(seqs)
         with concurrent.futures.ProcessPoolExecutor() as e:
             for i, res in enumerate(e.map(test_instr_seq_concurrently, seqs)):
-                process_results(i, seqs[i], res)
+                ok &= process_results(i, seqs[i], res)
+
+    return ok
 
 
 def get_instrs():
@@ -2304,9 +2308,10 @@ def test_instructions():
     seqs = []
     seqs.extend((i,) for i in instrs)
     seqs.extend((i1, i2) for i1 in instrs for i2 in instrs)
-    test_instr_seqs(seqs)
+    ok = test_instr_seqs(seqs)
 
     Status.clear()
+    print('OK' if ok else 'FAILED')
 
 
 def build_symbolic_states():
