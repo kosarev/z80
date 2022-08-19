@@ -417,6 +417,9 @@ class Bool(object):
             worklist.extend(ops)
         return ''.join(rep)
 
+    def __str__(self):
+        return self.simplified_sexpr()
+
     class Storage(object):
         def __init__(self, literal_storage, *, image=None):
             self.__literals = literal_storage
@@ -544,6 +547,10 @@ class Bool(object):
     def __and__(self, other):
         return __class__.get_and(self, other)
 
+    def __xor__(self, other):
+        # TODO: Would probably be more logical for neq to rely on xor?
+        return __class__.get_neq(self, other)
+
     def __invert__(self):
         if self.__inversion is None:
             self.__inversion = __class__.from_ops('not', self)
@@ -634,6 +641,7 @@ class Bool(object):
 
             kind, ops = n._e
             OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
+                   'neq': lambda a, b: a != b,
                    'ifelse': z3.If}
             r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
             return r
@@ -701,6 +709,13 @@ class Bits(object):
     def __getitem__(self, i):
         return self.bits[i]
 
+    def __iter__(self):
+        return (b for b in self.bits)
+
+    @property
+    def msb(self):
+        return self.bits[-1]
+
     @property
     def width(self):
         return len(self.bits)
@@ -711,10 +726,10 @@ class Bits(object):
 
     @property
     def value(self):
-        if all(b is None for b in self.bits):
+        if all(b is None for b in self):
             return None
 
-        values = tuple(b.value for b in self.bits)
+        values = tuple(b.value for b in self)
         if all(v is not None for v in values):
             n = 0
             for i, v in enumerate(values):
@@ -745,24 +760,58 @@ class Bits(object):
     def zero_extended(self, width):
         if self.width >= width:
             return self
-        return Bits(self.bits + (FALSE,) * (width - self.width))
+        return __class__(self.bits + (FALSE,) * (width - self.width))
 
     @staticmethod
     def zero_extend_to_same_width(*args):
+        args = tuple(__class__.cast(a) for a in args)
         w = max(a.width for a in args)
         return (a.zero_extended(w) for a in args)
 
     def __lshift__(self, n):
-        return Bits((FALSE,) * n + self.bits)
+        return __class__((FALSE,) * n + self.bits)
 
     def __or__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
-        return Bits((x | y).simplified()
-                    for x, y in zip(a.__bits, b.__bits))
+        return __class__((x | y) for x, y in zip(a, b))
+
+    def __and__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return __class__((x & y) for x, y in zip(a, b))
 
     def __eq__(self, other):
         assert isinstance(other, int)  # TODO
         return int(self) == other
+
+    def __add__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+
+        r = []
+        cf = FALSE
+        for x, y in zip(a, b):
+            t = x ^ y
+            r.append(t ^ cf)
+            cf = (x & y) | (cf & t)
+        r.append(cf)
+        return __class__(r)
+
+    def __neg__(self):
+        return ~self + __class__(1)
+
+    def __sub__(self, other):
+        return self + (-other)
+
+    def __invert__(self):
+        return __class__(~b for b in self)
+
+    def __ge__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return (a - b)[a.width]
+
+    @staticmethod
+    def ifelse(cond, a, b):
+        a, b = __class__.zero_extend_to_same_width(a, b)
+        return __class__(Bool.ifelse(cond, x, y) for x, y in zip(a, b))
 
 
 class Node(object):
@@ -1766,7 +1815,7 @@ class State(object):
         self.update_pin(pin)
 
     def set_pins_and_update(self, pin, bits):
-        for i, b in enumerate(Bits.cast(bits).bits):
+        for i, b in enumerate(Bits.cast(bits)):
             self.set_pin_and_update(f'{pin}{i}', b)
 
     def set_db(self, bits):
@@ -1824,9 +1873,9 @@ class State(object):
 
         def print_bit(id, with_pull=False):
             n = s.get_node(id)
-            Status.print(f'  {id}: {n.state.simplified_sexpr()}')
+            Status.print(f'  {id}: {n.state}')
             if with_pull:
-                Status.print(f'  {id} pull: {n.pull.simplified_sexpr()}')
+                Status.print(f'  {id} pull: {n.pull}')
 
         def print_bits(id, width):
             bits = s.read_nodes(id, width)
@@ -1835,7 +1884,7 @@ class State(object):
                 return
 
             for i in reversed(range(bits.width)):
-                Status.print(f'  {id}{i}: {bits[i].simplified_sexpr()}')
+                Status.print(f'  {id}{i}: {bits[i]}')
 
         for pin in _PINS:
             print_bit(pin, with_pull=True)
@@ -1877,30 +1926,23 @@ class CheckToken(object):
     pass
 
 
-def test_node(instrs, n, states_before, states_after):
-    a = states_before[n]
-    b = states_after[n]
-
+def test_node(instrs, n, before, after):
     def check(x):
         if isinstance(x, str):
-            x = states_before[x]
+            x = before[x]
 
-        if b.is_equiv(x):
+        if after[n].is_equiv(x):
             return CheckToken()
 
         Status.clear()
 
         f = sys.stderr
         print('; '.join(instrs), n, file=f)
-        print('  old state', a.simplified_sexpr(), file=f)
-        print('  new state', b.simplified_sexpr(), file=f)
-        print('  expected', x.simplified_sexpr(), file=f)
+        print('  before:', before[n], file=f)
+        print('  after:', after[n], file=f)
+        print('  expected:', x, file=f)
 
         assert 0
-
-    CF = 'reg_f0'
-    XF = 'reg_f3'
-    YF = 'reg_f5'
 
     phase = len(instrs)
     instr = instrs[-1]
@@ -1911,24 +1953,28 @@ def test_node(instrs, n, states_before, states_after):
         prev_instr = instrs[-2]
         prev_mnemonic = prev_instr.split()[0]
 
-    if n == CF:
+    if n == 'reg_f0':
         if instr == 'ccf':
-            return check(~a)
+            return check(~before[n])
         if instr == 'pop af':
             return check(Bool.get(f'f0_{phase}'))
         if instr in ('rla', 'rlca'):
             return check('reg_a7')
         if instr in ('rra', 'rrca'):
             return check('reg_a0')
+        if instr == 'scf':
+            return check(TRUE)
 
-    if n in (XF, YF):
+    if n in ('reg_f3', 'reg_f5'):
         i = int(n[-1])
-        if instr == 'ccf':
-            an = states_before[f'reg_a{i}']
+        if instr in ('ccf', 'scf'):
+            an = before[f'reg_a{i}']
             if prev_instr == 'ccf':
                 return check(an)
-            fn = states_before[f'reg_f{i}']
+            fn = before[f'reg_f{i}']
             return check(an | fn)
+        if instr == 'cpl':
+            return check(~before[f'reg_a{i}'])
         if instr == 'pop af':
             return check(Bool.get(f'f{i}_{phase}'))
         if instr in ('rla', 'rlca'):
@@ -1936,7 +1982,23 @@ def test_node(instrs, n, states_before, states_after):
         if instr in ('rra', 'rrca'):
             return check(f'reg_a{i + 1}')
 
-    return check(a)
+    if instr == 'daa':
+        a = Bits(before[f'reg_a{i}'] for i in range(8))
+        cf = before['reg_f0']
+        add_0x60 = cf | (a >= 0xa0)
+        if n == 'reg_f0':
+            return check(add_0x60)
+        if n in ('reg_f3', 'reg_f5'):
+            hf = before['reg_f4']
+            add_0x06 = hf | ((a & 0x0f) >= 0x0a)
+            d = (Bits.ifelse(add_0x60, 0x60, 0x00) +
+                 Bits.ifelse(add_0x06, 0x06, 0x00))
+            nf = before['reg_f1']
+            r = Bits.ifelse(nf, a - d, a + d)
+            i = int(n[-1])
+            return check(r[i])
+
+    return check(before[n])
 
 
 def process_instr(instrs, base_state, *, test=False):
@@ -1944,9 +2006,11 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = 'reg_f0', 'reg_f3', 'reg_f5'
-    SAMPLED_NODES = TESTED_NODES + (
-        'reg_a0', 'reg_a2', 'reg_a3', 'reg_a4', 'reg_a5', 'reg_a6', 'reg_a7')
+    TESTED_NODES = {'reg_f0', 'reg_f3', 'reg_f5'}
+
+    SAMPLED_NODES = set(TESTED_NODES)
+    SAMPLED_NODES.update(f'reg_a{i}' for i in range(8))
+    SAMPLED_NODES.update(f'reg_f{i}' for i in range(8))
 
     phase = len(instrs)
     id, cycles = instrs[-1]
@@ -1970,7 +2034,7 @@ def process_instr(instrs, base_state, *, test=False):
         return after_instr_state
 
     instr_ids = tuple(id for id, cycles in instrs)
-    Status.print('; '.join(instr_ids))
+    # Status.print('; '.join(instr_ids))
 
     s.set_db(0x00)  # nop
     for t in range(ticks, ticks + EXTRA_TICKS):
@@ -1978,7 +2042,7 @@ def process_instr(instrs, base_state, *, test=False):
     s.cache()
     states_after = s.get_node_states(SAMPLED_NODES)
 
-    for id in TESTED_NODES:
+    for id in sorted(TESTED_NODES):
         with Status.do(f'test {id}'):
             token = test_node(instr_ids, id, states_before, states_after)
             assert isinstance(token, CheckToken)
@@ -2075,25 +2139,55 @@ def test_instr_seq(seq):
         for i in range(len(seq) - 1):
             state = process_instr(seq[:i + 1], state)
         process_instr(seq, state, test=True)
+    return True, '; '.join(id for id, cycles in seq)
 
 
 def test_instr_seq_concurrently(seq):
     with Status.suppress():
         try:
-            test_instr_seq(seq)
+            return test_instr_seq(seq)
         except Exception:
-            return traceback.format_exc()
-    return '; '.join(id for id, cycles in seq)
+            return False, traceback.format_exc()
 
 
 def test_instr_seqs(seqs):
+    def get_id(seq):
+        return '; '.join(id for id, cycles in seq)
+
+    def get_cache_entry(seq):
+        return Cache.get_entry('timestamps', get_id(seq))
+
+    def get_time_stamp(seq):
+        t = get_cache_entry(seq).load()
+        if t is None:
+            return 0.0
+
+        t, = t
+        return t
+
+    def sort_key(seq):
+        return get_time_stamp(seq), len(seq), get_id(seq)
+
+    def mark_done(seq):
+        t = datetime.datetime.timestamp(datetime.datetime.now())
+        get_cache_entry(seq).store((t,))
+
+    def process_results(i, seq, res):
+        done, message = res
+        if message is not None:
+            Status.print(f'{i}/{len(seqs)} {message}')
+        if done:
+            mark_done(seqs[i])
+
+    seqs = sorted(seqs, key=sort_key)
     if '--single-thread' in sys.argv:
-        for seq in seqs:
-            test_instr_seq(seq)
+        for i, seq in enumerate(seqs):
+            process_results(i, seqs[i], test_instr_seq(seq))
     else:
+        seqs = tuple(seqs)
         with concurrent.futures.ProcessPoolExecutor() as e:
-            for res in e.map(test_instr_seq_concurrently, seqs):
-                Status.print(res)
+            for i, res in enumerate(e.map(test_instr_seq_concurrently, seqs)):
+                process_results(i, seqs[i], res)
 
 
 def get_instrs():
@@ -2195,11 +2289,13 @@ def get_instrs():
 
 def test_instructions():
     instrs = list(get_instrs())
-    test_instr_seqs((i,) for i in instrs)
-    test_instr_seqs((i1, i2) for i1 in instrs for i2 in instrs)
+
+    seqs = []
+    seqs.extend((i,) for i in instrs)
+    seqs.extend((i1, i2) for i1 in instrs for i2 in instrs)
+    test_instr_seqs(seqs)
 
     Status.clear()
-    print('OK')
 
 
 def build_symbolic_states():
