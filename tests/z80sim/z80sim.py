@@ -2009,8 +2009,9 @@ def process_instr(instrs, base_state, *, test=False):
     TESTED_NODES = {'reg_f0', 'reg_f3', 'reg_f5'}
 
     SAMPLED_NODES = set(TESTED_NODES)
-    SAMPLED_NODES.update(f'reg_a{i}' for i in range(8))
-    SAMPLED_NODES.update(f'reg_f{i}' for i in range(8))
+    for i in range(8):
+        SAMPLED_NODES.update((f'reg_a{i}', f'reg_aa{i}',
+                              f'reg_f{i}', f'reg_ff{i}'))
 
     phase = len(instrs)
     id, cycles = instrs[-1]
@@ -2022,7 +2023,7 @@ def process_instr(instrs, base_state, *, test=False):
         s.set_db(d)
         for t in range(ticks):
             if cycle_no == 0 and t == EXTRA_TICKS:
-                states_before = s.get_node_states(SAMPLED_NODES)
+                before = s.get_node_states(SAMPLED_NODES)
                 s.cache()
 
             s.tick()
@@ -2040,12 +2041,22 @@ def process_instr(instrs, base_state, *, test=False):
     for t in range(ticks, ticks + EXTRA_TICKS):
         s.tick()
     s.cache()
-    states_after = s.get_node_states(SAMPLED_NODES)
+    after = s.get_node_states(SAMPLED_NODES)
 
-    for id in sorted(TESTED_NODES):
-        with Status.do(f'test {id}'):
-            token = test_node(instr_ids, id, states_before, states_after)
-            assert isinstance(token, CheckToken)
+    def swap(*regs):
+        for ns in (before, after):
+            for r in regs:
+                for i in range(8):
+                    ns[f'reg_{r}{i}'], ns[f'reg_{r}{r}{i}'] = (
+                        ns[f'reg_{r}{r}{i}'], ns[f'reg_{r}{i}'])
+
+    for instr in instr_ids:
+        if instr == 'ex af, af2':
+            swap('a', 'f')
+
+    for n in sorted(TESTED_NODES):
+        token = test_node(instr_ids, n, before, after)
+        assert isinstance(token, CheckToken)
 
     return after_instr_state
 
