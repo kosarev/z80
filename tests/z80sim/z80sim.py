@@ -13,12 +13,13 @@
 
 
 import ast
-import concurrent.futures
 import datetime
 import gc
 import gzip
 import hashlib
 import json
+import multiprocessing
+import os
 import pathlib
 import pprint
 import pycosat
@@ -152,27 +153,40 @@ class Cache(object):
         def hash(self):
             return HASH(str(self.key).encode()).hexdigest()
 
-        def get_path(self, suffix=None):
+        def get_path(self, *, intermediate=False, suffix=None):
+            path = _CACHE_ROOT
+
+            if intermediate:
+                path = path / 'intermediate'
+
             h = self.hash
+            path = path / self.domain / h[:3] / h[3:6]
+
             if suffix is not None:
                 h += suffix
-            return _CACHE_ROOT / self.domain / h[:3] / h[3:6] / h
+            path = path / h
+
+            return path
 
         def exists(self, suffix=None):
-            return self.get_path(suffix).exists()
+            return self.get_path(suffix=suffix).exists()
 
         def load(self):
-            try:
-                with gzip.open(self.get_path()) as f:
-                    return json.loads(f.read().decode())
-            except FileNotFoundError:
-                return None
+            for intermediate in (False, True):
+                try:
+                    path = self.get_path(intermediate=intermediate)
+                    with gzip.open(path) as f:
+                        return json.loads(f.read().decode())
+                except FileNotFoundError:
+                    pass
+            return None
 
-        def store(self, payload):
-            path = self.get_path()
+        def store(self, payload, *, intermediate=False):
+            path = self.get_path(intermediate=intermediate)
             path.parent.mkdir(parents=True, exist_ok=True)
 
-            temp_path = path.parent / (path.name + '.tmp')
+            temp_path = path.parent / (
+                f'{path.name}-{os.getpid()}.tmp')
             with temp_path.open('wb') as f:
                 with gzip.GzipFile('', 'wb', mtime=0, fileobj=f) as gzf:
                     gzf.write(json.dumps(payload).encode())
@@ -1655,6 +1669,8 @@ class Z80Simulator(object):
 
 
 class State(object):
+    __step_count = 0
+
     def __init__(self, other=None, *, cache_all_reportable_states=False):
         if other is None:
             self.__current_steps = []
@@ -1666,6 +1682,9 @@ class State(object):
             self.__new_steps = list(other.__new_steps)
 
         self.__cache_all_reportable_states = cache_all_reportable_states
+        self.__intermediate_steps = set()
+        self.__steps_status = {}
+        self.__status = []
 
     @staticmethod
     def __get_cache(steps):
@@ -1704,10 +1723,11 @@ class State(object):
                 bools.image, literals.image)
 
     @staticmethod
-    def __cache_state(steps, image):
+    def __cache_state(steps, image, *, intermediate=False):
         with Status.do('cache state'):
             state = __class__.__get_steps_image(steps), image
-            __class__.__get_cache(steps).store(state)
+            __class__.__get_cache(steps).store(state,
+                                               intermediate=intermediate)
 
     @staticmethod
     def __try_load_state(steps):
@@ -1757,8 +1777,14 @@ class State(object):
 
         while missing_steps:
             step = missing_steps.pop(0)
-            self.__apply_step(sim, step)
-            self.__current_steps.append(step)
+            with Status.do(', '.join(self.__steps_status.get(id(step)))):
+                self.__apply_step(sim, step)
+                self.__current_steps.append(step)
+
+                if id(step) in self.__intermediate_steps:
+                    __class__.__cache_state(self.__current_steps,
+                                            self.__current_image,
+                                            intermediate=True)
 
         self.__current_image = sim.image
 
@@ -1771,44 +1797,49 @@ class State(object):
         return Z80Simulator(image=self.image).get_node_states(ids)
 
     def __apply_step(self, sim, step):
-        kind = step[0]
+        kind = step[1]
         if kind == 'clear_state':
-            _, = step
+            _, _, = step
             sim.clear_state()
         elif kind == 'set_pin_state':
-            _, pin, state = step
+            _, _, pin, state = step
             sim.set_pin_state(pin, state)
         elif kind == 'set_pin_pull':
-            _, pin, pull = step
+            _, _, pin, pull = step
             sim.set_pin_pull(pin, pull)
         elif kind == 'update_pin':
-            _, pin = step
+            _, _, pin = step
             sim.update_pin(pin)
         elif kind == 'update_all_nodes':
-            _, = step
+            _, _, = step
             sim.update_all_nodes()
         elif kind == 'reset':
-            _, propagation_delay, waiting_for_m1_delay = step
+            _, _, propagation_delay, waiting_for_m1_delay = step
             sim.reset(propagation_delay, waiting_for_m1_delay)
         elif kind == 'half_tick':
-            _, = step
+            _, _, = step
             sim.half_tick()
         else:
             assert 0, step
 
+    def __add_step(self, step):
+        step = (__class__.__step_count,) + step
+        self.__new_steps.append(step)
+        self.__steps_status[id(step)] = tuple(self.__status)
+
     def clear_state(self):
-        self.__new_steps.append(('clear_state',))
+        self.__add_step(('clear_state',))
 
     def set_pin_state(self, pin, state):
         step = 'set_pin_state', pin, Bool.cast(state)
-        self.__new_steps.append(step)
+        self.__add_step(step)
 
     def set_pin_pull(self, pin, pull):
         step = 'set_pin_pull', pin, Bool.cast(pull)
-        self.__new_steps.append(step)
+        self.__add_step(step)
 
     def update_pin(self, pin):
-        self.__new_steps.append(('update_pin', pin))
+        self.__add_step(('update_pin', pin))
 
     def set_pin_and_update(self, pin, pull):
         self.set_pin_pull(pin, pull)
@@ -1830,29 +1861,54 @@ class State(object):
         self.ticks(ticks)
 
     def update_all_nodes(self):
-        self.__new_steps.append(('update_all_nodes',))
+        self.__add_step(('update_all_nodes',))
 
     def reset(self, propagation_delay, waiting_for_m1_delay):
-        self.__new_steps.append(('reset', propagation_delay,
-                                 waiting_for_m1_delay))
+        self.__add_step(('reset', propagation_delay,
+                         waiting_for_m1_delay))
 
     def half_tick(self):
-        self.__new_steps.append(('half_tick',))
+        self.__add_step(('half_tick',))
 
     def tick(self):
         self.half_tick()
         self.half_tick()
 
     def ticks(self, n):
-        for _ in range(n):
-            self.tick()
+        for t in range(n):
+            with self.status(f'tick {t}.0'):
+                self.half_tick()
+            with self.status(f'tick {t}.1'):
+                self.half_tick()
 
-    def cache(self):
+    def cache(self, *, intermediate=False):
         steps = self.__current_steps + self.__new_steps
+
+        if intermediate:
+            if steps:
+                self.__intermediate_steps.add(id(steps[-1]))
+            return
+
         if not self.__get_cache(steps).exists():
             self.__apply_new_steps()
             __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
+
+    def status(self, s):
+        def enter():
+            self.__status.append(s)
+
+        def exit():
+            assert self.__status.pop() == s
+
+        class S:
+            def __enter__(self):
+                enter()
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                exit()
+
+        return S()
 
     def report(self, id):
         if self.__cache_all_reportable_states:
@@ -2063,7 +2119,8 @@ def process_instr(instrs, base_state, *, test=False):
 
 def build_reset_state():
     s = State(cache_all_reportable_states=True)
-    s.clear_state()
+    with s.status('clear state'):
+        s.clear_state()
     s.report('after-clearing-state')
 
     for pin in _PINS:
@@ -2078,16 +2135,21 @@ def build_reset_state():
             s.set_pin_pull(pin, TRUE)
         else:
             s.set_pin_pull(pin, f'pull.{pin}')
-    s.update_all_nodes()
+    with s.status('update all nodes'):
+        s.update_all_nodes()
     s.report('after-updating-all-nodes')
 
-    s.reset(propagation_delay=31, waiting_for_m1_delay=5)
+    with s.status('reset'):
+        s.reset(propagation_delay=31, waiting_for_m1_delay=5)
     s.report('after-reset')
 
     return s
 
 
 def build_symbolised_state():
+    def rev(bits):
+        return tuple(reversed(bits))
+
     SYMBOLISING_SEQ = (
         ('exx', ((0xd9, 4),)),
         ('pop bc2', ((0xc1, 4), ('cc', 3), ('bb', 3))),
@@ -2108,9 +2170,9 @@ def build_symbolised_state():
         ('ld sp, <sp>', ((0x31, 4), ('spl', 3), ('sph', 3))),
 
         ('im <im>', ((0xed, 4),
-                     (reversed((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
+                     (rev((0, 1, 0, 'im1', 'im0', 1, 1, 0)), 4))),
 
-        ('ei/di', ((reversed((1, 1, 1, 1, 'ei', 0, 1, 1)), 4),)),
+        ('ei/di', ((rev((1, 1, 1, 1, 'ei', 0, 1, 1)), 4),)),
 
         ('ld a, <ri>', ((0x3e, 4), ('ri', 3))),
         ('ld i, a', ((0xed, 4), (0x47, 5))),
@@ -2130,11 +2192,14 @@ def build_symbolised_state():
     )
 
     s = build_reset_state()
-    for instr, cycles in SYMBOLISING_SEQ:
-        with Status.do(instr):
-            for d, ticks in cycles:
-                s.set_db_and_wait(d, ticks)
-                s.cache()
+    with s.status('build symbolised state'):
+        for id, cycles in SYMBOLISING_SEQ:
+            with s.status(id):
+                for i, (d, ticks) in enumerate(cycles):
+                    with s.status(f'cycle {i}'):
+                        s.set_db_and_wait(d, ticks)
+                        s.cache(intermediate=True)
+    s.cache()
     s.report('after-symbolising')
 
     return s
