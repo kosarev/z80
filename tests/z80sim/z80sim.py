@@ -336,7 +336,7 @@ class Bool(object):
 
             r = n.symbol
             if n._e is None:
-                syms[r] = r
+                syms[n.symbol] = r
                 return r
 
             kind, ops = n._e
@@ -370,7 +370,7 @@ class Bool(object):
             else:
                 assert 0, n  # TODO
 
-            syms[r] = r
+            syms[n.symbol] = r
             return r
 
         add((get(self),))
