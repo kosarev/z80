@@ -1784,7 +1784,7 @@ class State(object):
 
                 if id(step) in self.__intermediate_steps:
                     __class__.__cache_state(self.__current_steps,
-                                            self.__current_image,
+                                            sim.image,
                                             intermediate=True)
 
         self.__current_image = sim.image
