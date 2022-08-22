@@ -1670,8 +1670,6 @@ class Z80Simulator(object):
 
 
 class State(object):
-    __step_count = 0
-
     def __init__(self, other=None, *, cache_all_reportable_states=False):
         if other is None:
             self.__current_steps = []
@@ -1824,7 +1822,8 @@ class State(object):
             assert 0, step
 
     def __add_step(self, step):
-        step = (__class__.__step_count,) + step
+        index = len(self.__current_steps) + len(self.__new_steps)
+        step = (index,) + step
         self.__new_steps.append(step)
         self.__steps_status[id(step)] = tuple(self.__status)
 
