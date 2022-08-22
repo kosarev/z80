@@ -2116,9 +2116,9 @@ def process_instr(instrs, base_state, *, test=False):
         for i in range(8):
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
 
-    instr_ids = tuple(id for id, cycles in instrs)
     phase = len(instrs)
-    id, cycles = instrs[-1]
+    id = instrs[-1]
+    cycles = TestedInstrs.cycles[id]
 
     s = State(base_state)
     for cycle_no, (d, ticks) in enumerate(cycles):
@@ -2270,7 +2270,7 @@ def test_instr_seq(seq):
 
     try:
         state = build_symbolised_state()
-        with Status.do('; '.join(id for id, cycles in seq)):
+        with Status.do('; '.join(seq)):
             for i in range(len(seq) - 1):
                 state = process_instr(seq[:i + 1], state)
             process_instr(seq, state, test=True)
@@ -2289,7 +2289,7 @@ def test_instr_seq_concurrently(args):
 
 
 def get_instr_seq_id(seq):
-    return '; '.join(id for id, cycles in seq)
+    return '; '.join(seq)
 
 
 def get_instr_seq_cache_entry(domain, seq):
@@ -2344,109 +2344,113 @@ def test_instr_seqs(seqs):
     return ok
 
 
-def get_instrs():
-    AT_HL = '(hl)', '110'
+class TestedInstrs(object):
+    def __gen_instrs():
+        AT_HL = '(hl)', '110'
 
-    RS = (('{b, c, d, e}', '0ss'),
-          ('{l, a}', '1s1'),
-          ('h', '100'),
-          AT_HL)
+        RS = (('{b, c, d, e}', '0ss'),
+              ('{l, a}', '1s1'),
+              ('h', '100'),
+              AT_HL)
 
-    RD = (('{b, c, d, e}', '0dd'),
-          ('{l, a}', '1d1'),
-          ('h', '100'),
-          AT_HL)
+        RD = (('{b, c, d, e}', '0dd'),
+              ('{l, a}', '1d1'),
+              ('h', '100'),
+              AT_HL)
 
-    def pattern(s):
-        bits = []
-        i = 0
-        for b in reversed(s):
-            if b == ' ':
-                continue
-            if b in ('0', '1'):
-                b = int(b)
-            else:
-                b = f'{b}{i}'
-            bits.append(b)
-            i += 1
-        return bits
+        def pattern(s):
+            bits = []
+            i = 0
+            for b in reversed(s):
+                if b == ' ':
+                    continue
+                if b in ('0', '1'):
+                    b = int(b)
+                else:
+                    b = f'{b}{i}'
+                bits.append(b)
+                i += 1
+            return bits
 
-    def f(p):
-        return p, 4
+        def f(p):
+            return p, 4
 
-    def f6(p):
-        return p, 6
+        def f6(p):
+            return p, 6
 
-    def r3(p='r'):
-        return p, 3
+        def r3(p='r'):
+            return p, 3
 
-    def r4(p='r'):
-        return p, 4
+        def r4(p='r'):
+            return p, 4
 
-    def w3():
-        return 'w', 3
+        def w3():
+            return 'w', 3
 
-    def e5():
-        return 'e', 5
+        def e5():
+            return 'e', 5
 
-    def i4():
-        return 'i', 4
+        def i4():
+            return 'i', 4
 
-    def o4():
-        return 'o', 4
+        def o4():
+            return 'o', 4
 
-    yield 'nop', (f(0x00),)
+        yield 'nop', (f(0x00),)
 
-    ''' TODO: Disable for now.
-    for rd in RD:
-        rdn, rdp = rd
-        for rs in RS:
-            rsn, rsp = rs
-            cycles = (f(pattern(f'01 {rdp} {rsp}')),)
-            if rd == AT_HL and rs == AT_HL:
-                instr = 'halt'
-            else:
-                instr = f'ld {rdn}, {rsn}'
-                if rs == AT_HL:
-                    cycles += (R3,)
-                if rd == AT_HL:
-                    cycles += (W3,)
-            yield instr, cycles
-    '''
-
-    for m, op in (('inc', 0), ('dec', 1)):
+        ''' TODO: Disable for now.
         for rd in RD:
             rdn, rdp = rd
-            cycles = (f(pattern(f'00 {rdp} 10{op}')),)
-            instr = f'{m} {rdn}'
-            if rd == AT_HL:
-                cycles += r4(), w3()
-            # assert instr != 'dec {b, c, d, e}', cycles
-            yield instr, cycles
+            for rs in RS:
+                rsn, rsp = rs
+                cycles = (f(pattern(f'01 {rdp} {rsp}')),)
+                if rd == AT_HL and rs == AT_HL:
+                    instr = 'halt'
+                else:
+                    instr = f'ld {rdn}, {rsn}'
+                    if rs == AT_HL:
+                        cycles += (R3,)
+                    if rd == AT_HL:
+                        cycles += (W3,)
+                yield instr, cycles
+        '''
 
-    yield 'ex af, af2', (f(0x08),)
-    yield 'jr d', (f(0x18), r3(), e5())
-    yield 'daa', (f(0x27),)
-    yield 'cpl', (f(0x2f),)
-    yield 'scf', (f(0x37),)
-    yield 'ccf', (f(0x3f),)
-    yield 'pop af', (f(0xf1), r3('f'), r3('a'))
-    yield 'jp nn', (f(0xc3), r3('jl'), r3('jh'))
-    yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
+        for m, op in (('inc', 0), ('dec', 1)):
+            for rd in RD:
+                rdn, rdp = rd
+                cycles = (f(pattern(f'00 {rdp} 10{op}')),)
+                instr = f'{m} {rdn}'
+                if rd == AT_HL:
+                    cycles += r4(), w3()
+                # assert instr != 'dec {b, c, d, e}', cycles
+                yield instr, cycles
 
-    yield 'rlca', (f(0x07),)
-    yield 'rrca', (f(0x0f),)
-    yield 'rla', (f(0x17),)
-    yield 'rra', (f(0x1f),)
+        yield 'ex af, af2', (f(0x08),)
+        yield 'jr d', (f(0x18), r3(), e5())
+        yield 'daa', (f(0x27),)
+        yield 'cpl', (f(0x2f),)
+        yield 'scf', (f(0x37),)
+        yield 'ccf', (f(0x3f),)
+        yield 'pop af', (f(0xf1), r3('f'), r3('a'))
+        yield 'jp nn', (f(0xc3), r3('jl'), r3('jh'))
+        yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
 
-    yield 'out (n), a', (f(0xd3), r3(), o4())
-    yield 'in a, (n)', (f(0xdb), r3(), i4())
+        yield 'rlca', (f(0x07),)
+        yield 'rrca', (f(0x0f),)
+        yield 'rla', (f(0x17),)
+        yield 'rra', (f(0x1f),)
 
-    yield 'exx', (f(0xd9),)
-    yield 'jp hl', (f(0xe9),)
-    yield 'ex de, hl', (f(0xeb),)
-    yield 'ld sp, hl', (f6(0xf9),)
-    yield 'ei/di', ((tuple(reversed((1, 1, 1, 1, 'ei', 0, 1, 1))), 4),)
+        yield 'out (n), a', (f(0xd3), r3(), o4())
+        yield 'in a, (n)', (f(0xdb), r3(), i4())
+
+        yield 'exx', (f(0xd9),)
+        yield 'jp hl', (f(0xe9),)
+        yield 'ex de, hl', (f(0xeb),)
+        yield 'ld sp, hl', (f6(0xf9),)
+        yield 'ei/di', ((tuple(reversed((1, 1, 1, 1, 'ei', 0, 1, 1))), 4),)
+
+    cycles = {id: cycles for id, cycles in __gen_instrs()}
+    instrs = tuple(sorted(cycles))
 
 
 def test_instructions():
@@ -2463,7 +2467,7 @@ def test_instructions():
         seqs.extend(ss)
         return True
 
-    instrs = tuple(get_instrs())
+    instrs = TestedInstrs.instrs
     ok = (add((i,) for i in instrs) and
           add((i1, i2) for i1 in instrs for i2 in instrs) and
           test_instr_seqs(seqs))
