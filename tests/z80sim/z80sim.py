@@ -813,7 +813,8 @@ class Bits(object):
         return ~self + __class__(1)
 
     def __sub__(self, other):
-        return self + (-other)
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return a + (-b)
 
     def __invert__(self):
         return __class__(~b for b in self)
@@ -1982,6 +1983,10 @@ class CheckToken(object):
     pass
 
 
+class TestFailure(Exception):
+    pass
+
+
 def test_node(instrs, n, before, after):
     def check(x):
         if isinstance(x, str):
@@ -1993,27 +1998,59 @@ def test_node(instrs, n, before, after):
         Status.clear()
 
         f = sys.stderr
-        print('; '.join(instrs), n, file=f)
+        print('; '.join(id for id, cycles in instrs), n, file=f)
         print('  before:', before[n], file=f)
         print('  after:', after[n], file=f)
         print('  expected:', x, file=f)
 
-        assert 0
+        raise TestFailure()
+
+    def bits(id):
+        return Bits(before[id.format(i=i)] for i in range(8))
+
+    def phased(b):
+        if isinstance(b, str):
+            return f'{b}_{phase}'
+        return b
+
+    def get_r(r):
+        b = bits('reg_b{i}')
+        c = bits('reg_c{i}')
+        d = bits('reg_d{i}')
+        e = bits('reg_e{i}')
+        h = bits('reg_h{i}')
+        rl = bits('reg_l{i}')
+        at_hl = Bits(phased(f'r{i}') for i in range(8))
+        a = bits('reg_a{i}')
+
+        r = Bits(phased(b) for b in r)
+        return Bits.ifelse(
+            r[2],
+            Bits.ifelse(
+                r[1],
+                Bits.ifelse(r[0], a, at_hl),
+                Bits.ifelse(r[0], rl, h)),
+            Bits.ifelse(
+                r[1],
+                Bits.ifelse(r[0], e, d),
+                Bits.ifelse(r[0], c, b)))
 
     phase = len(instrs)
-    instr = instrs[-1]
+    instr, cycles = instrs[-1]
+    opcode, ticks = cycles[0]
+    instr_parts = instr.split(maxsplit=1)
+    mnemonic = instr_parts[0]
+    ops = instr_parts[1] if len(instr_parts) > 1 else ''
 
     prev_instr = None
     prev_mnemonic = None
     if len(instrs) >= 2:
-        prev_instr = instrs[-2]
+        prev_instr, prev_cycles = instrs[-2]
         prev_mnemonic = prev_instr.split()[0]
 
     if n == 'reg_f0':
         if instr == 'ccf':
             return check(~before[n])
-        if instr == 'pop af':
-            return check(Bool.get(f'f0_{phase}'))
         if instr in ('rla', 'rlca'):
             return check('reg_a7')
         if instr in ('rra', 'rrca'):
@@ -2024,22 +2061,33 @@ def test_node(instrs, n, before, after):
     if n in ('reg_f3', 'reg_f5'):
         i = int(n[-1])
         if instr in ('ccf', 'scf'):
+            # See <https://github.com/kosarev/z80/issues/42>.
             an = before[f'reg_a{i}']
-            if prev_instr in ('ccf', 'scf'):
+            # TODO: Does this agree with the current known
+            # description of the behaviour?
+            if prev_mnemonic in ('ccf', 'scf', 'inc', 'dec'):
                 return check(an)
             fn = before[f'reg_f{i}']
             return check(an | fn)
         if instr == 'cpl':
             return check(~before[f'reg_a{i}'])
-        if instr == 'pop af':
-            return check(Bool.get(f'f{i}_{phase}'))
+        if mnemonic in ('inc', 'dec'):
+            if ops in ('h', '{b, c, d, e}', '{l, a}', '(hl)'):
+                r = get_r(opcode[3:6])
+                r = r + 1 if mnemonic == 'inc' else r - 1
+                return check(r[i])
         if instr in ('rla', 'rlca'):
             return check(f'reg_a{i - 1}')
         if instr in ('rra', 'rrca'):
             return check(f'reg_a{i + 1}')
 
+    if instr == 'pop af':
+        if n in ('reg_f0', 'reg_f3', 'reg_f5'):
+            i = int(n[-1])
+            return check(Bool.get(f'f{i}_{phase}'))
+
     if instr == 'daa':
-        a = Bits(before[f'reg_a{i}'] for i in range(8))
+        a = bits('reg_a{i}')
         cf = before['reg_f0']
         add_0x60 = cf | (a >= 0xa0)
         if n == 'reg_f0':
@@ -2065,10 +2113,11 @@ def process_instr(instrs, base_state, *, test=False):
     TESTED_NODES = {'reg_f0', 'reg_f3', 'reg_f5'}
 
     SAMPLED_NODES = set(TESTED_NODES)
-    for i in range(8):
-        SAMPLED_NODES.update((f'reg_a{i}', f'reg_aa{i}',
-                              f'reg_f{i}', f'reg_ff{i}'))
+    for r in 'afbcdehl':
+        for i in range(8):
+            SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
 
+    instr_ids = tuple(id for id, cycles in instrs)
     phase = len(instrs)
     id, cycles = instrs[-1]
 
@@ -2079,39 +2128,49 @@ def process_instr(instrs, base_state, *, test=False):
         s.set_db(d)
         for t in range(ticks):
             if cycle_no == 0 and t == EXTRA_TICKS:
-                before = s.get_node_states(SAMPLED_NODES)
                 s.cache()
+                before = s.get_node_states(SAMPLED_NODES)
 
-            s.tick()
-        s.cache()
+            for ht in (0, 1):
+                with s.status(f'cycle {cycle_no}, tick {t}.{ht}'):
+                    s.half_tick()
+        s.cache(intermediate=True)
 
+    s.cache()
     after_instr_state = State(s)
 
     if not test:
         return after_instr_state
 
-    instr_ids = tuple(id for id, cycles in instrs)
     # Status.print('; '.join(instr_ids))
 
     s.set_db(0x00)  # nop
-    for t in range(ticks, ticks + EXTRA_TICKS):
-        s.tick()
+    for t in range(EXTRA_TICKS):
+        for ht in (0, 1):
+            with s.status(f'extra tick {t}.{ht}'):
+                s.half_tick()
     s.cache()
     after = s.get_node_states(SAMPLED_NODES)
 
-    def swap(*regs):
+    def swap(a, b):
         for ns in (before, after):
-            for r in regs:
-                for i in range(8):
-                    ns[f'reg_{r}{i}'], ns[f'reg_{r}{r}{i}'] = (
-                        ns[f'reg_{r}{r}{i}'], ns[f'reg_{r}{i}'])
+            for i in range(8):
+                ns[f'reg_{a}{i}'], ns[f'reg_{b}{i}'] = (
+                    ns[f'reg_{b}{i}'], ns[f'reg_{a}{i}'])
 
     for instr in instr_ids:
+        if instr == 'ex de, hl':
+            swap('d', 'h')
+            swap('e', 'l')
         if instr == 'ex af, af2':
-            swap('a', 'f')
+            for r in 'af':
+                swap(f'{r}', f'{r}{r}')
+        if instr == 'exx':
+            for r in 'bcdehl':
+                swap(f'{r}', f'{r}{r}')
 
     for n in sorted(TESTED_NODES):
-        token = test_node(instr_ids, n, before, after)
+        token = test_node(instrs, n, before, after)
         assert isinstance(token, CheckToken)
 
     return after_instr_state
@@ -2210,61 +2269,77 @@ def test_instr_seq(seq):
     Bool.clear()
     gc.collect()
 
-    state = build_symbolised_state()
-    with Status.do('; '.join(id for id, cycles in seq)):
-        for i in range(len(seq) - 1):
-            state = process_instr(seq[:i + 1], state)
-        process_instr(seq, state, test=True)
-    return True, '; '.join(id for id, cycles in seq)
+    try:
+        state = build_symbolised_state()
+        with Status.do('; '.join(id for id, cycles in seq)):
+            for i in range(len(seq) - 1):
+                state = process_instr(seq[:i + 1], state)
+            process_instr(seq, state, test=True)
+        return True, '; '.join(id for id, cycles in seq)
+    except TestFailure:
+        return False, traceback.format_exc()
 
 
-def test_instr_seq_concurrently(seq):
+def test_instr_seq_concurrently(args):
+    i, seq = args
     with Status.suppress():
         try:
-            return test_instr_seq(seq)
+            return i, test_instr_seq(seq)
         except Exception:
-            return False, traceback.format_exc()
+            return i, None
+
+
+def get_instr_seq_id(seq):
+    return '; '.join(id for id, cycles in seq)
+
+
+def get_instr_seq_cache_entry(domain, seq):
+    assert domain in ('passed', 'failed')
+    return Cache.get_entry(domain, get_instr_seq_id(seq))
+
+
+def get_instr_seq_time_stamp(domain, seq):
+    t = get_instr_seq_cache_entry(domain, seq).load()
+    if t is None:
+        t = 0
+    else:
+        t, = t
+    return t
 
 
 def test_instr_seqs(seqs):
-    def get_id(seq):
-        return '; '.join(id for id, cycles in seq)
-
-    def get_cache_entry(seq):
-        return Cache.get_entry('timestamps', get_id(seq))
-
-    def get_time_stamp(seq):
-        t = get_cache_entry(seq).load()
-        if t is None:
-            return 0.0
-
-        t, = t
-        return t
-
     def sort_key(seq):
-        return get_time_stamp(seq), len(seq), get_id(seq)
+        last_passed_at = get_instr_seq_time_stamp('passed', seq)
+        last_failed_at = get_instr_seq_time_stamp('failed', seq)
+        seq_id = get_instr_seq_id(seq)
+        return -last_failed_at, -last_passed_at, len(seq), seq_id
 
-    def mark_done(seq):
-        t = datetime.datetime.timestamp(datetime.datetime.now())
-        get_cache_entry(seq).store((t,))
+    def mark(ok, seq):
+        domain = 'passed' if ok else 'failed'
+        now = datetime.datetime.timestamp(datetime.datetime.now())
+        get_instr_seq_cache_entry(domain, seq).store((now,))
 
     def process_results(i, seq, res):
+        if res is None:
+            return False
         ok, message = res
         if message is not None:
-            Status.print(f'{i}/{len(seqs)} {message}')
-        if ok:
-            mark_done(seqs[i])
+            Status.print(f'{i + 1}/{len(seqs)} {message}')
+        mark(ok, seqs[i])
         return ok
 
     seqs = sorted(seqs, key=sort_key)
     ok = True
     if '--single-thread' in sys.argv:
         for i, seq in enumerate(seqs):
-            ok &= process_results(i, seqs[i], test_instr_seq(seq))
+            if not process_results(i, seqs[i], test_instr_seq(seq)):
+                return False
     else:
         seqs = tuple(seqs)
-        with concurrent.futures.ProcessPoolExecutor() as e:
-            for i, res in enumerate(e.map(test_instr_seq_concurrently, seqs)):
+        with multiprocessing.Pool() as p:
+            queue = p.imap_unordered(test_instr_seq_concurrently,
+                                     enumerate(seqs))
+            for i, res in queue:
                 ok &= process_results(i, seqs[i], res)
 
     return ok
@@ -2303,17 +2378,23 @@ def get_instrs():
     def f6(p):
         return p, 6
 
-    def r3(p):
+    def r3(p='r'):
         return p, 3
 
-    def w3(p):
-        return p, 3
+    def r4(p='r'):
+        return p, 4
 
-    R3 = r3('r')
-    W3 = w3('w')
-    O4 = 'o', 4
-    I4 = 'i', 4
-    E5 = 'e', 5
+    def w3():
+        return 'w', 3
+
+    def e5():
+        return 'e', 5
+
+    def i4():
+        return 'i', 4
+
+    def o4():
+        return 'o', 4
 
     yield 'nop', (f(0x00),)
 
@@ -2332,18 +2413,20 @@ def get_instrs():
                 if rd == AT_HL:
                     cycles += (W3,)
             yield instr, cycles
-
-    for rd in RD:
-        rdn, rdp = rd
-        cycles = (f(pattern(f'00 {rdp} 100')),)
-        instr = f'inc {rdn}'
-        if rd == AT_HL:
-            cycles += (R3, W3)
-        yield instr, cycles
     '''
 
+    for m, op in (('inc', 0), ('dec', 1)):
+        for rd in RD:
+            rdn, rdp = rd
+            cycles = (f(pattern(f'00 {rdp} 10{op}')),)
+            instr = f'{m} {rdn}'
+            if rd == AT_HL:
+                cycles += r4(), w3()
+            # assert instr != 'dec {b, c, d, e}', cycles
+            yield instr, cycles
+
     yield 'ex af, af2', (f(0x08),)
-    yield 'jr d', (f(0x18), R3, E5)
+    yield 'jr d', (f(0x18), r3(), e5())
     yield 'daa', (f(0x27),)
     yield 'cpl', (f(0x2f),)
     yield 'scf', (f(0x37),)
@@ -2357,23 +2440,34 @@ def get_instrs():
     yield 'rla', (f(0x17),)
     yield 'rra', (f(0x1f),)
 
-    yield 'out (n), a', (f(0xd3), R3, O4)
-    yield 'in a, (n)', (f(0xdb), R3, I4)
+    yield 'out (n), a', (f(0xd3), r3(), o4())
+    yield 'in a, (n)', (f(0xdb), r3(), i4())
 
     yield 'exx', (f(0xd9),)
     yield 'jp hl', (f(0xe9),)
     yield 'ex de, hl', (f(0xeb),)
     yield 'ld sp, hl', (f6(0xf9),)
-    yield 'ei/di', ((reversed((1, 1, 1, 1, 'ei', 0, 1, 1)), 4),)
+    yield 'ei/di', ((tuple(reversed((1, 1, 1, 1, 'ei', 0, 1, 1))), 4),)
 
 
 def test_instructions():
-    instrs = list(get_instrs())
-
     seqs = []
-    seqs.extend((i,) for i in instrs)
-    seqs.extend((i1, i2) for i1 in instrs for i2 in instrs)
-    ok = test_instr_seqs(seqs)
+
+    def add(ss):
+        # Make sure short sequences that work as prefixes for
+        # longer sequences are generated and tested first.
+        ss = tuple(ss)
+        t = tuple(get_instr_seq_time_stamp('passed', s) for s in ss)
+        if 0.0 in t:
+            return test_instr_seqs(ss)
+
+        seqs.extend(ss)
+        return True
+
+    instrs = tuple(get_instrs())
+    ok = (add((i,) for i in instrs) and
+          add((i1, i2) for i1 in instrs for i2 in instrs) and
+          test_instr_seqs(seqs))
 
     Status.clear()
     print('OK' if ok else 'FAILED')
