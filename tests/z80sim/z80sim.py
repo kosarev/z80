@@ -660,7 +660,14 @@ class Bool(object):
             r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
             return r
 
-        return z3.Tactic('qe2').apply(get(self)).as_expr().sexpr()
+        e = get(self)
+        for t in ('qe2', 'solver-subsumption') * 3:
+            e = z3.Tactic(t).apply(e).as_expr()
+        if z3.is_false(e):
+            return '0'
+        if z3.is_true(e):
+            return '1'
+        return e.sexpr()
 
     # TODO: Remove.
     def reduced(self):
