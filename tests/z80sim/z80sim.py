@@ -571,8 +571,11 @@ class Bool(object):
 
         return self.__inversion
 
+    # TODO: Can this be a non-static method of cond?
     @staticmethod
     def ifelse(cond, a, b):
+        cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
+
         if cond.value is not None:
             return a if cond.value else b
         if a.value is not None:
@@ -703,8 +706,8 @@ class Bits(object):
 
         if isinstance(bits, str):
             assert width is not None
-            suffix = '' if suffix is None else suffix
-            bits = tuple(f'{bits}{i}{suffix}' for i in range(width))
+            suffix = '' if suffix is None else f'_{suffix}'
+            bits = tuple(f'{bits}_b{i}{suffix}' for i in range(width))
         elif suffix is not None:
             bits = tuple(f'{b}{suffix}' if isinstance(b, str) else b
                          for b in bits)
@@ -723,7 +726,8 @@ class Bits(object):
         bits = x if isinstance(x, Bits) else Bits(x, width)
 
         if width is not None:
-            assert bits.width == width
+            bits = bits.zero_extended(width)
+            assert bits.width == width, (width, bits)
 
         return bits
 
@@ -792,9 +796,13 @@ class Bits(object):
     def __lshift__(self, n):
         return __class__((FALSE,) * n + self.bits)
 
+    @staticmethod
+    def get_or(*args):
+        args = __class__.zero_extend_to_same_width(*args)
+        return __class__(Bool.get_or(*bits) for bits in zip(*args))
+
     def __or__(self, other):
-        a, b = __class__.zero_extend_to_same_width(self, other)
-        return __class__((x | y) for x, y in zip(a, b))
+        return __class__.get_or(self, other)
 
     def __and__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
@@ -826,14 +834,26 @@ class Bits(object):
     def __invert__(self):
         return __class__(~b for b in self)
 
+    def __eq__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return Bool.get_and(*(Bool.get_eq(x, y) for x, y in zip(a, b)))
+
     def __ge__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
         return (a - b)[a.width]
 
     @staticmethod
     def ifelse(cond, a, b):
+        cond = Bool.cast(cond)
         a, b = __class__.zero_extend_to_same_width(a, b)
         return __class__(Bool.ifelse(cond, x, y) for x, y in zip(a, b))
+
+    @staticmethod
+    def concat(*args):
+        bits = []
+        for a in reversed(args):
+            bits.extend(a)
+        return __class__(bits)
 
 
 class Node(object):
@@ -1287,8 +1307,8 @@ class Z80Simulator(object):
                 updated = set()
                 more = []
                 for i, n in enumerate(nodes):
-                    with Status.do(f'node {i}/{len(nodes)}'):
-                        if n not in updated:
+                    if n not in updated:
+                        with Status.do(f'node {i}/{len(nodes)}'):
                             self.__update_group_of(n, more, updated)
                 nodes = more
 
@@ -1950,20 +1970,30 @@ def test_node(instrs, n, before, after):
         Status.clear()
 
         f = sys.stderr
-        print('; '.join(id for id, cycles in instrs), n, file=f)
+        print('; '.join(instrs), n, file=f)
         print('  before:', before[n], file=f)
         print('  after:', after[n], file=f)
         print('  expected:', x, file=f)
 
         raise TestFailure()
 
+    phase = len(instrs)
+    instr = instrs[-1]
+    cycles = TestedInstrs.get_cycles(instr, phase)
+    opcode, ticks = cycles[0]
+
+    prev_instr = None
+    if len(instrs) >= 2:
+        prev_instr = instrs[-2]
+
+    def phased(x):
+        if isinstance(x, str):
+            assert '_p' not in x, x
+            return f'{x}_p{phase}'
+        return x
+
     def bits(id):
         return Bits(before[id.format(i=i)] for i in range(8))
-
-    def phased(b):
-        if isinstance(b, str):
-            return f'{b}_{phase}'
-        return b
 
     def get_r(r):
         b = bits('reg_b{i}')
@@ -1972,7 +2002,7 @@ def test_node(instrs, n, before, after):
         e = bits('reg_e{i}')
         h = bits('reg_h{i}')
         rl = bits('reg_l{i}')
-        at_hl = Bits(phased(f'r{i}') for i in range(8))
+        at_hl = Bits(f'r_p{phase}_b{i}' for i in range(8))
         a = bits('reg_a{i}')
 
         r = Bits(phased(b) for b in r)
@@ -1987,56 +2017,62 @@ def test_node(instrs, n, before, after):
                 Bits.ifelse(r[0], e, d),
                 Bits.ifelse(r[0], c, b)))
 
-    phase = len(instrs)
-    instr, cycles = instrs[-1]
-    opcode, ticks = cycles[0]
-    instr_parts = instr.split(maxsplit=1)
-    mnemonic = instr_parts[0]
-    ops = instr_parts[1] if len(instr_parts) > 1 else ''
+    if n == 'reg_f0':
+        if instr == 'scf/ccf':
+            return check(Bool.ifelse(phased('is_scf'), TRUE,
+                                     ~before['reg_f0']))
+        if instr == 'rlca/rrca/rla/rra':
+            return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
+                                     before['reg_a0']))
 
-    prev_instr = None
-    prev_mnemonic = None
-    if len(instrs) >= 2:
-        prev_instr, prev_cycles = instrs[-2]
-        prev_mnemonic = prev_instr.split()[0]
+        '''
+rlca f0: (or a_b7 a_b0)
 
     if n == 'reg_f0':
-        if instr == 'ccf':
-            return check(~before[n])
         if instr in ('rla', 'rlca'):
             return check('reg_a7')
         if instr in ('rra', 'rrca'):
             return check('reg_a0')
-        if instr == 'scf':
-            return check(TRUE)
+        '''
 
     if n in ('reg_f3', 'reg_f5'):
         i = int(n[-1])
-        if instr in ('ccf', 'scf'):
+        a = before[f'reg_a{i}']
+        if instr == 'cpl':
+            return check(~a)
+        if instr == 'scf/ccf':
             # See <https://github.com/kosarev/z80/issues/42>.
-            an = before[f'reg_a{i}']
             # TODO: Does this agree with the current known
             # description of the behaviour?
-            if prev_mnemonic in ('ccf', 'scf', 'inc', 'dec'):
-                return check(an)
-            fn = before[f'reg_f{i}']
-            return check(an | fn)
-        if instr == 'cpl':
-            return check(~before[f'reg_a{i}'])
-        if mnemonic in ('inc', 'dec'):
-            if ops in ('h', '{b, c, d, e}', '{l, a}', '(hl)'):
-                r = get_r(opcode[3:6])
-                r = r + 1 if mnemonic == 'inc' else r - 1
-                return check(r[i])
+            if prev_instr in ('scf/ccf', 'inc/dec {b, c, d, e, h, l, a}',
+                              'inc/dec (hl)'):
+                return check(a)
+            f = before[f'reg_f{i}']
+            return check(a | f)
+        if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
+            r = get_r(opcode[3:6])
+            r = Bits.ifelse(phased('is_inc'), r + 1, r - 1)
+            return check(r[i])
+        if instr == 'rlca/rrca/rla/rra':
+            return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
+                                     before[f'reg_a{i + 1}']))
+
+        '''
+    if n in ('reg_f3', 'reg_f5'):
+        i = int(n[-1])
         if instr in ('rla', 'rlca'):
             return check(f'reg_a{i - 1}')
         if instr in ('rra', 'rrca'):
             return check(f'reg_a{i + 1}')
+        '''
 
-    if instr == 'pop af':
+    if instr == 'pop <rp2>':
         if n in ('reg_f0', 'reg_f3', 'reg_f5'):
+            p = Bits(opcode.bits[4:6])
+            RP2_AF = Bits(3)
             i = int(n[-1])
-            return check(Bool.get(f'f{i}_{phase}'))
+            return check(Bool.ifelse(p == RP2_AF,
+                                     f'lo_p{phase}_b{i}', before[n]))
 
     if instr == 'daa':
         a = bits('reg_a{i}')
@@ -2053,6 +2089,21 @@ def test_node(instrs, n, before, after):
             r = Bits.ifelse(nf, a - d, a + d)
             i = int(n[-1])
             return check(r[i])
+
+    ''' TODO
+    ...
+    instr_parts = instr.split(maxsplit=1)
+    mnemonic = instr_parts[0]
+    ops = instr_parts[1] if len(instr_parts) > 1 else ''
+
+    prev_instr = None
+    prev_mnemonic = None
+    if len(instrs) >= 2:
+        prev_instr, prev_cycles = instrs[-2]
+        prev_mnemonic = prev_instr.split()[0]
+
+
+    '''
 
     return check(before[n])
 
@@ -2071,12 +2122,10 @@ def process_instr(instrs, base_state, *, test=False):
 
     phase = len(instrs)
     id = instrs[-1]
-    cycles = TestedInstrs.cycles[id]
+    cycles = TestedInstrs.get_cycles(id, phase)
 
     s = State(base_state)
     for cycle_no, (d, ticks) in enumerate(cycles):
-        if not isinstance(d, int):
-            d = Bits(d, width=8, suffix=f'_{phase}')
         s.set_db(d)
         for t in range(ticks):
             if cycle_no == 0 and t == EXTRA_TICKS:
@@ -2084,7 +2133,7 @@ def process_instr(instrs, base_state, *, test=False):
                 before = s.get_node_states(SAMPLED_NODES)
 
             for ht in (0, 1):
-                with s.status(f'cycle {cycle_no}, tick {t}.{ht}'):
+                with s.status(f'tick {cycle_no}-{t}.{ht}'):
                     s.half_tick()
         s.cache(intermediate=True)
 
@@ -2110,11 +2159,11 @@ def process_instr(instrs, base_state, *, test=False):
                 ns[f'reg_{a}{i}'], ns[f'reg_{b}{i}'] = (
                     ns[f'reg_{b}{i}'], ns[f'reg_{a}{i}'])
 
-    for instr in instr_ids:
+    for instr in instrs:
         if instr == 'ex de, hl':
             swap('d', 'h')
             swap('e', 'l')
-        if instr == 'ex af, af2':
+        if instr == "ex af, af'":
             for r in 'af':
                 swap(f'{r}', f'{r}{r}')
         if instr == 'exx':
@@ -2174,9 +2223,9 @@ def build_symbolised_state():
         ('pop de', ((0xd1, 4), ('e', 3), ('d', 3))),
         ('pop hl', ((0xe1, 4), ('l', 3), ('h', 3))),
 
-        ('ex af, af2', ((0x08, 4),)),
+        ("ex af, af'", ((0x08, 4),)),
         ('pop af2', ((0xf1, 4), ('ff', 3), ('aa', 3))),
-        ('ex af, af2', ((0x08, 4),)),
+        ("ex af, af'", ((0x08, 4),)),
 
         ('ld sp, <sp>', ((0x31, 4), ('spl', 3), ('sph', 3))),
 
@@ -2227,7 +2276,7 @@ def test_instr_seq(seq):
             for i in range(len(seq) - 1):
                 state = process_instr(seq[:i + 1], state)
             process_instr(seq, state, test=True)
-        return True, '; '.join(id for id, cycles in seq)
+        return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
 
@@ -2238,7 +2287,7 @@ def test_instr_seq_concurrently(args):
         try:
             return i, test_instr_seq(seq)
         except Exception:
-            return i, None
+            return i, traceback.format_exc()
 
 
 def get_instr_seq_id(seq):
@@ -2272,7 +2321,8 @@ def test_instr_seqs(seqs):
         get_instr_seq_cache_entry(domain, seq).store((now,))
 
     def process_results(i, seq, res):
-        if res is None:
+        if isinstance(res, str):
+            Status.print(f'{i + 1}/{len(seqs)} {seq} {res}')
             return False
         ok, message = res
         if message is not None:
@@ -2285,7 +2335,7 @@ def test_instr_seqs(seqs):
     if '--single-thread' in sys.argv:
         for i, seq in enumerate(seqs):
             if not process_results(i, seqs[i], test_instr_seq(seq)):
-                return False
+                assert 0
     else:
         seqs = tuple(seqs)
         with multiprocessing.Pool() as p:
@@ -2298,60 +2348,81 @@ def test_instr_seqs(seqs):
 
 
 class TestedInstrs(object):
-    def __gen_instrs():
-        AT_HL = '(hl)', '110'
+    @staticmethod
+    def get_instrs():
+        return tuple(sorted(id for id, cycles in __class__.__gen_instrs(0)))
 
-        RS = (('{b, c, d, e}', '0ss'),
-              ('{l, a}', '1s1'),
-              ('h', '100'),
-              AT_HL)
+    @staticmethod
+    def get_cycles(instr_id, phase):
+        assert phase > 0
+        for id, cycles in __class__.__gen_instrs(phase):
+            if id == instr_id:
+                return cycles
+        assert 0, f'Unknown instruction {instr_id}!'
 
-        RD = (('{b, c, d, e}', '0dd'),
-              ('{l, a}', '1d1'),
-              ('h', '100'),
-              AT_HL)
+    @staticmethod
+    def __gen_instrs(phase):
+        def phased(id):
+            assert isinstance(id, str)
+            assert '_p' not in id
+            return f'{id}_p{phase}'
 
-        def pattern(s):
-            bits = []
-            i = 0
-            for b in reversed(s):
-                if b == ' ':
-                    continue
-                if b in ('0', '1'):
-                    b = int(b)
-                else:
-                    b = f'{b}{i}'
-                bits.append(b)
-                i += 1
-            return bits
+        def bits(x, width):
+            if isinstance(x, str):
+                x = phased(x)
+            return Bits.cast(x, width=width)
 
-        def f(p):
-            return p, 4
+        def ifelse(cond, a, b):
+            return Bits.ifelse(phased(cond), a, b)
+
+        def xyz(x, y, z):
+            # xx yyy zzz
+            return Bits.concat(bits(x, 2), bits(y, 3), bits(z, 3))
+
+        def xpqz(x, p, q, z):
+            # xx ppq zzz
+            return Bits.concat(bits(x, 2), bits(p, 2), bits(q, 1), bits(z, 3))
+
+        def f(p, *, ticks=4):
+            # Variable names must be phased, so don't allow them here.
+            assert not isinstance(p, str)
+            return Bits.cast(p), ticks
+
+        def f5(p):
+            return f(p, ticks=5)
 
         def f6(p):
-            return p, 6
+            return f(p, ticks=6)
 
         def r3(p='r'):
-            return p, 3
+            return phased(p), 3
 
         def r4(p='r'):
-            return p, 4
+            return phased(p), 4
 
-        def w3():
-            return 'w', 3
+        def w3(p='w'):
+            return phased(p), 3
 
         def e5():
             return 'e', 5
 
+        AT_HL = 6
+
+        def get_non_at_hl_r(id='reg'):
+            b, c, d, e, h, l, a = 0, 1, 2, 3, 4, 5, 7
+            return ifelse(f'{id}_b2',
+                          ifelse(f'{id}_b1', a,
+                                 ifelse(f'{id}_b0', l, h)),
+                          ifelse(f'{id}_b1', ifelse(f'{id}_b0', e, d),
+                                 ifelse(f'{id}_b0', c, b)))
+
+        ''' TODO: Disable for now.
         def i4():
             return 'i', 4
 
         def o4():
             return 'o', 4
 
-        yield 'nop', (f(0x00),)
-
-        ''' TODO: Disable for now.
         for rd in RD:
             rdn, rdp = rd
             for rs in RS:
@@ -2368,42 +2439,46 @@ class TestedInstrs(object):
                 yield instr, cycles
         '''
 
-        for m, op in (('inc', 0), ('dec', 1)):
-            for rd in RD:
-                rdn, rdp = rd
-                cycles = (f(pattern(f'00 {rdp} 10{op}')),)
-                instr = f'{m} {rdn}'
-                if rd == AT_HL:
-                    cycles += r4(), w3()
-                # assert instr != 'dec {b, c, d, e}', cycles
-                yield instr, cycles
+        yield 'nop', (f(0x00),)
 
-        yield 'ex af, af2', (f(0x08),)
+        # '''
+        yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
+                                             ifelse('is_rl', 0x07, 0x0f),
+                                             ifelse('is_rl', 0x17, 0x1f))),)
+        # '''
+
+        # yield 'rlca/rrca', (f(ifelse('is_rl', 0x07, 0x0f)),)
+
+        # yield 'rlca', (f(0x07),)  # rlca reg_f0: a_b7
+
+        # yield 'rrca', (f(0x0f),)  # rrca reg_f0: a_b0
+
+        yield "ex af, af'", (f(0x08),)
         yield 'jr d', (f(0x18), r3(), e5())
         yield 'daa', (f(0x27),)
         yield 'cpl', (f(0x2f),)
-        yield 'scf', (f(0x37),)
-        yield 'ccf', (f(0x3f),)
-        yield 'pop af', (f(0xf1), r3('f'), r3('a'))
-        yield 'jp nn', (f(0xc3), r3('jl'), r3('jh'))
-        yield 'ret', (f(0xc9), r3('rl'), r3('rh'))
-
-        yield 'rlca', (f(0x07),)
-        yield 'rrca', (f(0x0f),)
-        yield 'rla', (f(0x17),)
-        yield 'rra', (f(0x1f),)
-
-        yield 'out (n), a', (f(0xd3), r3(), o4())
-        yield 'in a, (n)', (f(0xdb), r3(), i4())
-
+        yield 'scf/ccf', (f(ifelse('is_scf', 0x37, 0x3f)),)
         yield 'exx', (f(0xd9),)
         yield 'jp hl', (f(0xe9),)
         yield 'ex de, hl', (f(0xeb),)
         yield 'ld sp, hl', (f6(0xf9),)
-        yield 'ei/di', ((tuple(reversed((1, 1, 1, 1, 'ei', 0, 1, 1))), 4),)
+        yield 'ei/di', (f(ifelse('is_ei', 0xfb, 0xf3)),)
 
-    cycles = {id: cycles for id, cycles in __gen_instrs()}
-    instrs = tuple(sorted(cycles))
+        yield 'inc/dec {b, c, d, e, h, l, a}', (
+            f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))),)
+        yield 'inc/dec (hl)', (
+            f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))), r4(), w3())
+
+        yield 'pop <rp2>', (f(xpqz(3, 'rp2', 0, 1)), r3('lo'), r3('hi'))
+        yield 'push <rp2>', (f5(xpqz(3, 'rp2', 0, 5)), w3('lo'), w3('hi'))
+
+        ''' TODO
+        yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
+        yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
+
+        yield 'out (n), a', (f(0xd3), r3(), o4())
+        yield 'in a, (n)', (f(0xdb), r3(), i4())
+        '''
 
 
 def test_instructions():
@@ -2420,10 +2495,11 @@ def test_instructions():
         seqs.extend(ss)
         return True
 
-    instrs = TestedInstrs.instrs
-    ok = (add((i,) for i in instrs) and
-          add((i1, i2) for i1 in instrs for i2 in instrs) and
-          test_instr_seqs(seqs))
+    instrs = TestedInstrs.get_instrs()
+    ok = True
+    ok &= add((i,) for i in instrs)
+    ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
+    ok &= test_instr_seqs(seqs)
 
     Status.clear()
     print('OK' if ok else 'FAILED')
