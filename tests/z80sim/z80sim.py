@@ -793,6 +793,11 @@ class Bits(object):
         w = max(a.width for a in args)
         return (a.zero_extended(w) for a in args)
 
+    def sign_extended(self, width):
+        if self.width >= width:
+            return self
+        return __class__(self.bits + (self.msb,) * (width - self.width))
+
     def __lshift__(self, n):
         return __class__((FALSE,) * n + self.bits)
 
@@ -1993,17 +1998,17 @@ def test_node(instrs, n, before, after):
         return x
 
     def bits(id):
-        return Bits(before[id.format(i=i)] for i in range(8))
+        return Bits(before[f'{id}{i}'] for i in range(8))
 
     def get_r(r):
-        b = bits('reg_b{i}')
-        c = bits('reg_c{i}')
-        d = bits('reg_d{i}')
-        e = bits('reg_e{i}')
-        h = bits('reg_h{i}')
-        rl = bits('reg_l{i}')
-        at_hl = Bits(f'r_p{phase}_b{i}' for i in range(8))
-        a = bits('reg_a{i}')
+        b = bits('reg_b')
+        c = bits('reg_c')
+        d = bits('reg_d')
+        e = bits('reg_e')
+        h = bits('reg_h')
+        rl = bits('reg_l')
+        at_hl = Bits(phased('r'), width=8)
+        a = bits('reg_a')
 
         r = Bits(phased(b) for b in r)
         return Bits.ifelse(
@@ -2016,6 +2021,11 @@ def test_node(instrs, n, before, after):
                 r[1],
                 Bits.ifelse(r[0], e, d),
                 Bits.ifelse(r[0], c, b)))
+
+    def get_pc_plus(off):
+        # On tick 3 of an instruction the value of pc has already
+        # been advanced, so we in fact get (pc + 1).
+        return Bits.concat(bits('reg_pch'), bits('reg_pcl')) + (off - 1)
 
     if n == 'reg_f0':
         if instr == 'scf/ccf':
@@ -2066,6 +2076,15 @@ rlca f0: (or a_b7 a_b0)
             return check(f'reg_a{i + 1}')
         '''
 
+    if n.startswith('reg_w') or n.startswith('reg_z'):
+        i = int(n[-1])
+        if n.startswith('reg_w'):
+            i += 8
+        if instr == 'jr d':
+            d = Bits(phased('r'), width=8)
+            wz = get_pc_plus(2) + d.sign_extended(16)
+            return check(wz[i])
+
     if instr == 'pop <rp2>':
         if n in ('reg_f0', 'reg_f3', 'reg_f5'):
             p = Bits(opcode.bits[4:6])
@@ -2075,7 +2094,7 @@ rlca f0: (or a_b7 a_b0)
                                      f'lo_p{phase}_b{i}', before[n]))
 
     if instr == 'daa':
-        a = bits('reg_a{i}')
+        a = bits('reg_a')
         cf = before['reg_f0']
         add_0x60 = cf | (a >= 0xa0)
         if n == 'reg_f0':
@@ -2114,11 +2133,16 @@ def process_instr(instrs, base_state, *, test=False):
     EXTRA_TICKS = 3
 
     TESTED_NODES = {'reg_f0', 'reg_f3', 'reg_f5'}
+    for r in 'wz':
+        for i in range(8):
+            TESTED_NODES.add(f'reg_{r}{i}')
 
     SAMPLED_NODES = set(TESTED_NODES)
-    for r in 'afbcdehl':
-        for i in range(8):
+    for i in range(8):
+        for r in 'afbcdehl':
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
+        for r in ('pch', 'pcl'):
+            SAMPLED_NODES.add(f'reg_{r}{i}')
 
     phase = len(instrs)
     id = instrs[-1]
@@ -2252,15 +2276,16 @@ def build_symbolised_state():
     )
 
     s = build_reset_state()
-    with s.status('build symbolised state'):
-        for id, cycles in SYMBOLISING_SEQ:
-            with s.status(id):
-                for i, (d, ticks) in enumerate(cycles):
-                    with s.status(f'cycle {i}'):
-                        s.set_db_and_wait(d, ticks)
-                        s.cache(intermediate=True)
-    s.cache()
-    s.report('after-symbolising')
+    if '--no-symbolising' not in sys.argv:
+        with s.status('build symbolised state'):
+            for id, cycles in SYMBOLISING_SEQ:
+                with s.status(id):
+                    for i, (d, ticks) in enumerate(cycles):
+                        with s.status(f'cycle {i}'):
+                            s.set_db_and_wait(d, ticks)
+                            s.cache(intermediate=True)
+        s.cache()
+        s.report('after-symbolising')
 
     return s
 
