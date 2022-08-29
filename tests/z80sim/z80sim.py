@@ -45,6 +45,7 @@ _PINS = (
 CF = 'reg_f0'
 PF = 'reg_f2'
 HF = 'reg_f4'
+ZF = 'reg_f6'
 
 
 def _ceil_div(a, b):
@@ -2119,9 +2120,11 @@ def test_node(instrs, n, before, after):
         if n == HF:
             r4 = r.truncated(4)
             return check(Bool.ifelse(phased('is_inc'), r4 == 0x0, r4 == 0xf))
+        if n == ZF:
+            return check(r == 0x00)
 
     if instr == 'pop <rp2>':
-        if n in (CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5'):
+        if n in (CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5', ZF):
             p = Bits(opcode.bits[4:6])
             RP2_AF = Bits(3)
             i = int(n[-1])
@@ -2148,6 +2151,8 @@ def test_node(instrs, n, before, after):
         if n == HF:
             a4 = a.truncated(4)
             return check(Bool.ifelse(nf, hf & (a4 <= 0x5), a4 >= 0xa))
+        if n == ZF:
+            return check(r == 0x00)
 
     return check(before[n])
 
@@ -2157,7 +2162,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5'}
+    TESTED_NODES = {CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5', ZF}
     for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
