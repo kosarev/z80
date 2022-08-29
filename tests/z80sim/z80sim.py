@@ -2032,6 +2032,7 @@ def test_node(instrs, n, before, after):
         # been advanced, so we in fact get (pc + 1).
         return Bits.concat(bits('reg_pch'), bits('reg_pcl')) + (off - 1)
 
+    # cf
     if n == 'reg_f0':
         if instr == 'scf/ccf':
             return check(Bool.ifelse(phased('is_scf'), TRUE,
@@ -2040,6 +2041,16 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
                                      before['reg_a0']))
 
+    # nf
+    if n == 'reg_f1':
+        if instr == 'cpl':
+            return check(TRUE)
+        if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
+            return check(Bool.ifelse(phased('is_inc'), FALSE, TRUE))
+        if instr in ('scf/ccf', 'rlca/rrca/rla/rra'):
+            return check(FALSE)
+
+    # xf, yf
     if n in ('reg_f3', 'reg_f5'):
         i = int(n[-1])
         a = before[f'reg_a{i}']
@@ -2086,7 +2097,7 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
 
     if instr == 'pop <rp2>':
-        if n in ('reg_f0', 'reg_f3', 'reg_f5'):
+        if n in ('reg_f0', 'reg_f1', 'reg_f3', 'reg_f5'):
             p = Bits(opcode.bits[4:6])
             RP2_AF = Bits(3)
             i = int(n[-1])
@@ -2117,7 +2128,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {'reg_f0', 'reg_f3', 'reg_f5'}
+    TESTED_NODES = {'reg_f0', 'reg_f1', 'reg_f3', 'reg_f5'}
     for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
