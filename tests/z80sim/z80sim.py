@@ -2443,10 +2443,10 @@ class TestedInstrs(object):
             return phased(p), 5
 
         def e5():
-            return 'e', 5
+            return phased('e'), 5
 
         def io4():
-            return 'io', 4
+            return phased('io'), 4
 
         AT_HL = 6
 
