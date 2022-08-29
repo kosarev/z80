@@ -42,6 +42,10 @@ _PINS = (
     '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
     '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
 
+CF = 'reg_f0'
+PF = 'reg_f2'
+HF = 'reg_f4'
+
 
 def _ceil_div(a, b):
     return -(a // -b)
@@ -818,10 +822,6 @@ class Bits(object):
         a, b = __class__.zero_extend_to_same_width(self, other)
         return __class__((x & y) for x, y in zip(a, b))
 
-    def __eq__(self, other):
-        assert isinstance(other, int)  # TODO
-        return int(self) == other
-
     def __add__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
 
@@ -851,6 +851,9 @@ class Bits(object):
     def __ge__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
         return (a - b)[a.width]
+
+    def __le__(self, other):
+        return __class__.cast(other) >= self
 
     @staticmethod
     def ifelse(cond, a, b):
@@ -1977,8 +1980,6 @@ class TestFailure(Exception):
 
 
 def test_node(instrs, n, before, after):
-    PF = 'reg_f2'
-
     def check(x):
         if isinstance(x, str):
             x = before[x]
@@ -2041,11 +2042,10 @@ def test_node(instrs, n, before, after):
         # been advanced, so we in fact get (pc + 1).
         return Bits.concat(bits('reg_pch'), bits('reg_pcl')) + (off - 1)
 
-    # cf
-    if n == 'reg_f0':
+    if n == CF:
         if instr == 'scf/ccf':
             return check(Bool.ifelse(phased('is_scf'), TRUE,
-                                     ~before['reg_f0']))
+                                     ~before[CF]))
         if instr == 'rlca/rrca/rla/rra':
             return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
                                      before['reg_a0']))
@@ -2078,6 +2078,14 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
                                      before[f'reg_a{i + 1}']))
 
+    if n == HF:
+        if instr == 'cpl':
+            return check(TRUE)
+        if instr == 'rlca/rrca/rla/rra':
+            return check(FALSE)
+        if instr == 'scf/ccf':
+            return check(Bool.ifelse(phased('is_scf'), FALSE, before[CF]))
+
     if n.startswith('reg_w') or n.startswith('reg_z'):
         i = int(n[-1])
         if n.startswith('reg_w'):
@@ -2108,9 +2116,12 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_inc'), r == 0x80, r == 0x7f))
         if n in ('reg_f3', 'reg_f5'):
             return check(r[i])
+        if n == HF:
+            r4 = r.truncated(4)
+            return check(Bool.ifelse(phased('is_inc'), r4 == 0x0, r4 == 0xf))
 
     if instr == 'pop <rp2>':
-        if n in ('reg_f0', 'reg_f1', PF, 'reg_f3', 'reg_f5'):
+        if n in (CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5'):
             p = Bits(opcode.bits[4:6])
             RP2_AF = Bits(3)
             i = int(n[-1])
@@ -2119,9 +2130,9 @@ def test_node(instrs, n, before, after):
 
     if instr == 'daa':
         a = bits('reg_a')
-        cf = before['reg_f0']
+        cf = before[CF]
         add_0x60 = cf | (a >= 0xa0)
-        if n == 'reg_f0':
+        if n == CF:
             return check(add_0x60)
         hf = before['reg_f4']
         add_0x06 = hf | ((a & 0x0f) >= 0x0a)
@@ -2134,6 +2145,9 @@ def test_node(instrs, n, before, after):
         if n in ('reg_f3', 'reg_f5'):
             i = int(n[-1])
             return check(r[i])
+        if n == HF:
+            a4 = a.truncated(4)
+            return check(Bool.ifelse(nf, hf & (a4 <= 0x5), a4 >= 0xa))
 
     return check(before[n])
 
@@ -2143,7 +2157,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {'reg_f0', 'reg_f1', 'reg_f2', 'reg_f3', 'reg_f5'}
+    TESTED_NODES = {CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5'}
     for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
