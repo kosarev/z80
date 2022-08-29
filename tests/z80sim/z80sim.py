@@ -865,6 +865,13 @@ class Bits(object):
             bits.extend(a)
         return __class__(bits)
 
+    def parity(self):
+        # TODO: Have Bool.get_xor().
+        r = TRUE
+        for b in self.bits:
+            r ^= b
+        return r
+
 
 class Node(object):
     def __init__(self, index, pull, *, custom_id=None, state=None):
@@ -1970,6 +1977,8 @@ class TestFailure(Exception):
 
 
 def test_node(instrs, n, before, after):
+    PF = 'reg_f2'
+
     def check(x):
         if isinstance(x, str):
             x = before[x]
@@ -2065,10 +2074,6 @@ def test_node(instrs, n, before, after):
                 return check(a)
             f = before[f'reg_f{i}']
             return check(a | f)
-        if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
-            r = get_r(opcode[3:6])
-            r = Bits.ifelse(phased('is_inc'), r + 1, r - 1)
-            return check(r[i])
         if instr == 'rlca/rrca/rla/rra':
             return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
                                      before[f'reg_a{i + 1}']))
@@ -2096,8 +2101,16 @@ def test_node(instrs, n, before, after):
             out_wz = Bits.concat(a, (r + 1).truncated(8))
             return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
 
+    if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
+        r = get_r(opcode[3:6])
+        r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
+        if n == PF:
+            return check(Bool.ifelse(phased('is_inc'), r == 0x80, r == 0x7f))
+        if n in ('reg_f3', 'reg_f5'):
+            return check(r[i])
+
     if instr == 'pop <rp2>':
-        if n in ('reg_f0', 'reg_f1', 'reg_f3', 'reg_f5'):
+        if n in ('reg_f0', 'reg_f1', PF, 'reg_f3', 'reg_f5'):
             p = Bits(opcode.bits[4:6])
             RP2_AF = Bits(3)
             i = int(n[-1])
@@ -2110,13 +2123,15 @@ def test_node(instrs, n, before, after):
         add_0x60 = cf | (a >= 0xa0)
         if n == 'reg_f0':
             return check(add_0x60)
+        hf = before['reg_f4']
+        add_0x06 = hf | ((a & 0x0f) >= 0x0a)
+        d = (Bits.ifelse(add_0x60, 0x60, 0x00) +
+             Bits.ifelse(add_0x06, 0x06, 0x00))
+        nf = before['reg_f1']
+        r = Bits.ifelse(nf, a - d, a + d).truncated(8)
+        if n == PF:
+            return check(r.parity())
         if n in ('reg_f3', 'reg_f5'):
-            hf = before['reg_f4']
-            add_0x06 = hf | ((a & 0x0f) >= 0x0a)
-            d = (Bits.ifelse(add_0x60, 0x60, 0x00) +
-                 Bits.ifelse(add_0x06, 0x06, 0x00))
-            nf = before['reg_f1']
-            r = Bits.ifelse(nf, a - d, a + d)
             i = int(n[-1])
             return check(r[i])
 
@@ -2128,7 +2143,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {'reg_f0', 'reg_f1', 'reg_f3', 'reg_f5'}
+    TESTED_NODES = {'reg_f0', 'reg_f1', 'reg_f2', 'reg_f3', 'reg_f5'}
     for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
