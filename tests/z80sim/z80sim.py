@@ -798,6 +798,11 @@ class Bits(object):
             return self
         return __class__(self.bits + (self.msb,) * (width - self.width))
 
+    def truncated(self, width):
+        if self.width <= width:
+            return self
+        return __class__(self.bits[:width])
+
     def __lshift__(self, n):
         return __class__((FALSE,) * n + self.bits)
 
@@ -2035,16 +2040,6 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
                                      before['reg_a0']))
 
-        '''
-rlca f0: (or a_b7 a_b0)
-
-    if n == 'reg_f0':
-        if instr in ('rla', 'rlca'):
-            return check('reg_a7')
-        if instr in ('rra', 'rrca'):
-            return check('reg_a0')
-        '''
-
     if n in ('reg_f3', 'reg_f5'):
         i = int(n[-1])
         a = before[f'reg_a{i}']
@@ -2067,23 +2062,28 @@ rlca f0: (or a_b7 a_b0)
             return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
                                      before[f'reg_a{i + 1}']))
 
-        '''
-    if n in ('reg_f3', 'reg_f5'):
-        i = int(n[-1])
-        if instr in ('rla', 'rlca'):
-            return check(f'reg_a{i - 1}')
-        if instr in ('rra', 'rrca'):
-            return check(f'reg_a{i + 1}')
-        '''
-
     if n.startswith('reg_w') or n.startswith('reg_z'):
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
+        if instr in ('call nn', 'ex (sp), hl'):
+            wz = Bits.concat(Bits(phased('r2'), width=8),
+                             Bits(phased('r1'), width=8))
+            return check(wz[i])
+        if instr in ('jp nn', 'ret'):
+            wz = Bits.concat(Bits(phased('hi'), width=8),
+                             Bits(phased('lo'), width=8))
+            return check(wz[i])
         if instr == 'jr d':
             d = Bits(phased('r'), width=8)
             wz = get_pc_plus(2) + d.sign_extended(16)
             return check(wz[i])
+        if instr == 'in a, (n)/out (n), a':
+            a = bits('reg_a')
+            r = Bits(phased('r'), width=8)
+            in_wz = Bits.concat(a, r) + 1
+            out_wz = Bits.concat(a, (r + 1).truncated(8))
+            return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
 
     if instr == 'pop <rp2>':
         if n in ('reg_f0', 'reg_f3', 'reg_f5'):
@@ -2108,21 +2108,6 @@ rlca f0: (or a_b7 a_b0)
             r = Bits.ifelse(nf, a - d, a + d)
             i = int(n[-1])
             return check(r[i])
-
-    ''' TODO
-    ...
-    instr_parts = instr.split(maxsplit=1)
-    mnemonic = instr_parts[0]
-    ops = instr_parts[1] if len(instr_parts) > 1 else ''
-
-    prev_instr = None
-    prev_mnemonic = None
-    if len(instrs) >= 2:
-        prev_instr, prev_cycles = instrs[-2]
-        prev_mnemonic = prev_instr.split()[0]
-
-
-    '''
 
     return check(before[n])
 
@@ -2428,8 +2413,14 @@ class TestedInstrs(object):
         def w3(p='w'):
             return phased(p), 3
 
+        def w5(p='w'):
+            return phased(p), 5
+
         def e5():
             return 'e', 5
+
+        def io4():
+            return 'io', 4
 
         AT_HL = 6
 
@@ -2442,12 +2433,6 @@ class TestedInstrs(object):
                                  ifelse(f'{id}_b0', c, b)))
 
         ''' TODO: Disable for now.
-        def i4():
-            return 'i', 4
-
-        def o4():
-            return 'o', 4
-
         for rd in RD:
             rdn, rdp = rd
             for rs in RS:
@@ -2465,19 +2450,6 @@ class TestedInstrs(object):
         '''
 
         yield 'nop', (f(0x00),)
-
-        # '''
-        yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
-                                             ifelse('is_rl', 0x07, 0x0f),
-                                             ifelse('is_rl', 0x17, 0x1f))),)
-        # '''
-
-        # yield 'rlca/rrca', (f(ifelse('is_rl', 0x07, 0x0f)),)
-
-        # yield 'rlca', (f(0x07),)  # rlca reg_f0: a_b7
-
-        # yield 'rrca', (f(0x0f),)  # rrca reg_f0: a_b0
-
         yield "ex af, af'", (f(0x08),)
         yield 'jr d', (f(0x18), r3(), e5())
         yield 'daa', (f(0x27),)
@@ -2489,6 +2461,10 @@ class TestedInstrs(object):
         yield 'ld sp, hl', (f6(0xf9),)
         yield 'ei/di', (f(ifelse('is_ei', 0xfb, 0xf3)),)
 
+        yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
+                                             ifelse('is_rl', 0x07, 0x0f),
+                                             ifelse('is_rl', 0x17, 0x1f))),)
+
         yield 'inc/dec {b, c, d, e, h, l, a}', (
             f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))),)
         yield 'inc/dec (hl)', (
@@ -2497,13 +2473,13 @@ class TestedInstrs(object):
         yield 'pop <rp2>', (f(xpqz(3, 'rp2', 0, 1)), r3('lo'), r3('hi'))
         yield 'push <rp2>', (f5(xpqz(3, 'rp2', 0, 5)), w3('lo'), w3('hi'))
 
-        ''' TODO
         yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
         yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
+        yield 'call nn', (f(0xcd), r3('r1'), r4('r2'), w3('w3'), w3('w4'))
+        yield 'ex (sp), hl', (f(0xe3), r3('r1'), r4('r2'), w3('w3'), w5('w4'))
 
-        yield 'out (n), a', (f(0xd3), r3(), o4())
-        yield 'in a, (n)', (f(0xdb), r3(), i4())
-        '''
+        yield 'in a, (n)/out (n), a', (
+            f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
 
 
 def test_instructions():
