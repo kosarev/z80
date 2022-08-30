@@ -43,8 +43,11 @@ _PINS = (
     '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
 
 CF = 'reg_f0'
+NF = 'reg_f1'
 PF = 'reg_f2'
+XF = 'reg_f3'
 HF = 'reg_f4'
+YF = 'reg_f5'
 ZF = 'reg_f6'
 SF = 'reg_f7'
 
@@ -2017,27 +2020,59 @@ def test_node(instrs, n, before, after):
     def bits(id):
         return Bits(before[f'{id}{i}'] for i in range(8))
 
-    def get_r(r):
-        b = bits('reg_b')
-        c = bits('reg_c')
-        d = bits('reg_d')
-        e = bits('reg_e')
-        h = bits('reg_h')
-        rl = bits('reg_l')
-        at_hl = Bits(phased('r'), width=8)
-        a = bits('reg_a')
+    def get_b():
+        return bits('reg_b')
 
-        r = Bits(phased(b) for b in r)
+    def get_c():
+        return bits('reg_c')
+
+    def get_d():
+        return bits('reg_d')
+
+    def get_e():
+        return bits('reg_e')
+
+    def get_h():
+        return bits('reg_h')
+
+    def get_l():
+        return bits('reg_l')
+
+    def get_a():
+        return bits('reg_a')
+
+    def get_at_hl():
+        return Bits(phased('r'), width=8)
+
+    def get_r(r):
         return Bits.ifelse(
             r[2],
             Bits.ifelse(
                 r[1],
-                Bits.ifelse(r[0], a, at_hl),
-                Bits.ifelse(r[0], rl, h)),
+                Bits.ifelse(r[0], get_a(), get_at_hl()),
+                Bits.ifelse(r[0], get_l(), get_h())),
             Bits.ifelse(
                 r[1],
-                Bits.ifelse(r[0], e, d),
-                Bits.ifelse(r[0], c, b)))
+                Bits.ifelse(r[0], get_e(), get_d()),
+                Bits.ifelse(r[0], get_c(), get_b())))
+
+    def get_bc():
+        return Bits.concat(get_b(), get_c())
+
+    def get_de():
+        return Bits.concat(get_d(), get_e())
+
+    def get_hl():
+        return Bits.concat(get_h(), get_l())
+
+    def get_sp():
+        return Bits.concat(bits('reg_sph'), bits('reg_spl'))
+
+    def get_rp(rp):
+        return Bits.ifelse(
+            rp[1],
+            Bits.ifelse(rp[0], get_sp(), get_hl()),
+            Bits.ifelse(rp[0], get_de(), get_bc()))
 
     def get_pc_plus(off):
         # On tick 3 of an instruction the value of pc has already
@@ -2052,17 +2087,15 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
                                      before['reg_a0']))
 
-    # nf
-    if n == 'reg_f1':
+    if n == NF:
         if instr == 'cpl':
             return check(TRUE)
         if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
             return check(Bool.ifelse(phased('is_inc'), FALSE, TRUE))
-        if instr in ('scf/ccf', 'rlca/rrca/rla/rra'):
+        if instr in ('scf/ccf', 'rlca/rrca/rla/rra', 'add hl, <rp>'):
             return check(FALSE)
 
-    # xf, yf
-    if n in ('reg_f3', 'reg_f5'):
+    if n in (XF, YF):
         i = int(n[-1])
         a = before[f'reg_a{i}']
         if instr == 'cpl':
@@ -2072,7 +2105,7 @@ def test_node(instrs, n, before, after):
             # TODO: Does this agree with the current known
             # description of the behaviour?
             if prev_instr in ('scf/ccf', 'inc/dec {b, c, d, e, h, l, a}',
-                              'inc/dec (hl)'):
+                              'inc/dec (hl)', 'add hl, <rp>'):
                 return check(a)
             f = before[f'reg_f{i}']
             return check(a | f)
@@ -2110,13 +2143,16 @@ def test_node(instrs, n, before, after):
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
             return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
+        if instr == 'add hl, <rp>':
+            return check((get_hl() + 1)[i])
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
         if n == PF:
             return check(Bool.ifelse(phased('is_inc'), r == 0x80, r == 0x7f))
-        if n in ('reg_f3', 'reg_f5'):
+        if n in (XF, YF):
+            i = int(n[-1])
             return check(r[i])
         if n == HF:
             r4 = r.truncated(4)
@@ -2126,8 +2162,20 @@ def test_node(instrs, n, before, after):
         if n == SF:
             return check(r[7])
 
+    if instr == 'add hl, <rp>':
+        hl = get_hl()
+        rp = get_rp(opcode[4:6])
+        r = hl + rp
+        if n == CF:
+            return check(r[16])
+        if n in (XF, YF):
+            i = int(n[-1])
+            return check(r[i + 8])
+        if n == HF:
+            return check(hl[4 + 8] ^ rp[4 + 8] ^ r[4 + 8])
+
     if instr == 'pop <rp2>':
-        if n in (CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5', ZF, SF):
+        if n in (CF, NF, PF, XF, HF, YF, ZF, SF):
             p = Bits(opcode.bits[4:6])
             RP2_AF = Bits(3)
             i = int(n[-1])
@@ -2144,11 +2192,11 @@ def test_node(instrs, n, before, after):
         add_0x06 = hf | ((a & 0x0f) >= 0x0a)
         d = (Bits.ifelse(add_0x60, 0x60, 0x00) +
              Bits.ifelse(add_0x06, 0x06, 0x00))
-        nf = before['reg_f1']
+        nf = before[NF]
         r = Bits.ifelse(nf, a - d, a + d).truncated(8)
         if n == PF:
             return check(r.parity())
-        if n in ('reg_f3', 'reg_f5'):
+        if n in (XF, YF):
             i = int(n[-1])
             return check(r[i])
         if n == HF:
@@ -2167,7 +2215,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {CF, 'reg_f1', PF, 'reg_f3', HF, 'reg_f5', ZF, SF}
+    TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF}
     for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
@@ -2176,7 +2224,7 @@ def process_instr(instrs, base_state, *, test=False):
     for i in range(8):
         for r in 'afbcdehl':
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
-        for r in ('pch', 'pcl'):
+        for r in ('pch', 'pcl', 'sph', 'spl'):
             SAMPLED_NODES.add(f'reg_{r}{i}')
 
     phase = len(instrs)
@@ -2466,6 +2514,12 @@ class TestedInstrs(object):
         def w5(p='w'):
             return phased(p), 5
 
+        def e3(p='e'):
+            return phased(p), 3
+
+        def e4(p='e'):
+            return phased(p), 4
+
         def e5():
             return phased('e'), 5
 
@@ -2520,6 +2574,9 @@ class TestedInstrs(object):
         yield 'inc/dec (hl)', (
             f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))), r4(), w3())
 
+        yield 'ld <rp>, nn', (f(xpqz(0, 'rp', 0, 1)), r3('r1'), r3('r2'))
+        yield 'add hl, <rp>', (f(xpqz(0, 'rp', 1, 1)), e4('e1'), e3('e2'))
+        yield 'inc/dec <rp>', (f6(xpqz(0, 'rp', ifelse('is_inc', 0, 1), 3)),)
         yield 'pop <rp2>', (f(xpqz(3, 'rp2', 0, 1)), r3('lo'), r3('hi'))
         yield 'push <rp2>', (f5(xpqz(3, 'rp2', 0, 5)), w3('lo'), w3('hi'))
 
