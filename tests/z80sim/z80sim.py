@@ -2134,6 +2134,8 @@ def test_node(instrs, n, before, after):
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
+        if instr == 'add hl, <rp>':
+            return check((get_hl() + 1)[i])
         if instr in ('call nn', 'ex (sp), hl'):
             wz = Bits.concat(Bits(phased('r2'), width=8),
                              Bits(phased('r1'), width=8))
@@ -2152,8 +2154,9 @@ def test_node(instrs, n, before, after):
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
             return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
-        if instr == 'add hl, <rp>':
-            return check((get_hl() + 1)[i])
+        if instr == 'rst n':
+            wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
+            return check(wz[i])
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r(opcode[3:6])
@@ -2616,6 +2619,8 @@ class TestedInstrs(object):
             f(xyz(2, 'op', get_non_at_hl_r())),)
         yield '<alu> (hl)', (f(xyz(2, 'op', AT_HL)), r3())
         yield '<alu> n', (f(xyz(3, 'op', 6)), r3())
+
+        yield 'rst n', (f5(xyz(3, 'y', 7)), w3('w1'), w3('w2'))
 
         yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
                                              ifelse('is_rl', 0x07, 0x0f),
