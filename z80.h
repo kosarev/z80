@@ -3831,6 +3831,9 @@ protected:
 
     template<typename T>
     fast_u8 pf_ari(T r, T a, T b) {
+        // TODO: Would something like this be clearer?
+        //       + Revisit the code that calls this function.
+        // return ((r ^ (r >> 1) ^ a ^ b) >> (7 - pf_bit)) & pf_mask;
         fast_u16 x = r ^ a ^ b;
         return ((x >> 6) ^ (x >> 5)) & pf_mask;
     }

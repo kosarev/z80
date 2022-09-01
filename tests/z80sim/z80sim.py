@@ -827,6 +827,10 @@ class Bits(object):
         a, b = __class__.zero_extend_to_same_width(self, other)
         return __class__((x & y) for x, y in zip(a, b))
 
+    def __xor__(self, other):
+        a, b = __class__.zero_extend_to_same_width(self, other)
+        return __class__((x ^ y) for x, y in zip(a, b))
+
     def __add__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
 
@@ -879,6 +883,9 @@ class Bits(object):
         for b in self.bits:
             r ^= b
         return r
+
+    def is_any(self, *args):
+        return Bool.get_or(*(self == a for a in args))
 
 
 class Node(object):
@@ -1996,9 +2003,10 @@ def test_node(instrs, n, before, after):
 
         f = sys.stderr
         print('; '.join(instrs), n, file=f)
-        print('  before:', before[n], file=f)
-        print('  after:', after[n], file=f)
-        print('  expected:', x, file=f)
+        if '--no-before-after-expected' not in sys.argv:
+            print('  before:', before[n], file=f)
+            print('  after:', after[n], file=f)
+            print('  expected:', x, file=f)
 
         raise TestFailure()
 
@@ -2104,8 +2112,9 @@ def test_node(instrs, n, before, after):
             # See <https://github.com/kosarev/z80/issues/42>.
             # TODO: Does this agree with the current known
             # description of the behaviour?
-            if prev_instr in ('scf/ccf', 'inc/dec {b, c, d, e, h, l, a}',
-                              'inc/dec (hl)', 'add hl, <rp>'):
+            if prev_instr in ('scf/ccf', 'add hl, <rp>', '<alu> n',
+                              'inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)',
+                              '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)'):
                 return check(a)
             f = before[f'reg_f{i}']
             return check(a | f)
@@ -2204,6 +2213,44 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(nf, hf & (a4 <= 0x5), a4 >= 0xa))
         if n == ZF:
             return check(r == 0x00)
+        if n == SF:
+            return check(r[7])
+
+    if instr in ('<alu> {b, c, d, e, h, l, a}', '<alu> (hl)', '<alu> n'):
+        ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
+
+        a = get_a()
+        s = get_r(opcode[0:3])
+        op = Bits(opcode[3:6])
+
+        is_add_adc = op.is_any(ADD, ADC)
+        is_sub_sbc_cp = op.is_any(SUB, SBC, CP)
+        is_bitwise = op.is_any(AND, XOR, OR)
+
+        cf_in = Bits.ifelse(before[CF] & op.is_any(ADC, SBC), 1, 0)
+        r = Bits.ifelse(
+            is_add_adc, a + s + cf_in,
+            Bits.ifelse(
+                is_sub_sbc_cp, ((a - s) ^ 0x100) - cf_in,
+                Bits.ifelse(
+                    op == AND, a & s,
+                    Bits.ifelse(op == XOR, a ^ s, a | s))))
+
+        if n == CF:
+            return check(r[8])
+        if n == NF:
+            return check(is_sub_sbc_cp)
+        if n == PF:
+            overflow = r[8] ^ r[7] ^ a[7] ^ s[7]
+            return check(Bool.ifelse(is_bitwise, r.parity(), overflow))
+        if n in (XF, YF):
+            i = int(n[-1])
+            return check(Bool.ifelse(op == CP, s[i], r[i]))
+        if n == HF:
+            return check(Bool.ifelse(is_bitwise, op == AND,
+                                     r[4] ^ a[4] ^ s[4]))
+        if n == ZF:
+            return check(r.truncated(8) == 0x00)
         if n == SF:
             return check(r[7])
 
@@ -2564,6 +2611,11 @@ class TestedInstrs(object):
         yield 'ex de, hl', (f(0xeb),)
         yield 'ld sp, hl', (f6(0xf9),)
         yield 'ei/di', (f(ifelse('is_ei', 0xfb, 0xf3)),)
+
+        yield '<alu> {b, c, d, e, h, l, a}', (
+            f(xyz(2, 'op', get_non_at_hl_r())),)
+        yield '<alu> (hl)', (f(xyz(2, 'op', AT_HL)), r3())
+        yield '<alu> n', (f(xyz(3, 'op', 6)), r3())
 
         yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
                                              ifelse('is_rl', 0x07, 0x0f),
