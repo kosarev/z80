@@ -1238,10 +1238,19 @@ class Z80Simulator(object):
 
             if not n.is_gnd_or_pwr:
                 for t in n.conn_of:
-                    if t.gate.state is not FALSE:
-                        worklist.append(t.get_other_conn(n))
+                    worklist.append(t.get_other_conn(n))
 
-        return group
+        return sorted(group)
+
+    def __identify_groups(self):
+        self.__groups = {}
+        for n in self.__nodes.values():
+            if n in self.__groups:
+                continue
+
+            group = self.__identify_group_of(n)
+            for m in group:
+                self.__groups[m] = group
 
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
@@ -1255,6 +1264,7 @@ class Z80Simulator(object):
                 return p
 
             if n.is_gnd_or_pwr:
+                assert p is None
                 p = FALSE
                 preds[n] = p
                 return p
@@ -1305,7 +1315,7 @@ class Z80Simulator(object):
         return gnd, pwr, pullup, pulldown
 
     def __update_group_of(self, n, more, updated):
-        group = self.__identify_group_of(n)
+        group = self.__groups[n]
         preds = {n: self.__get_node_preds(n) for n in group}
 
         # Update node and transistor states.
@@ -1431,6 +1441,8 @@ class Z80Simulator(object):
 
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
         self.__restore_transistors_from_image(trans)
+
+        self.__identify_groups()
 
         self.__gnd = self.__nodes_by_name[_GND_ID]
         self.__pwr = self.__nodes_by_name[_PWR_ID]
