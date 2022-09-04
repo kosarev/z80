@@ -303,7 +303,7 @@ class Bool(object):
     @staticmethod
     def get(term):
         if isinstance(term, int):
-            assert term in (0, 1)
+            assert term in (0, 1), repr(term)
             term = bool(term)
         elif isinstance(term, str):
             term = Literal.get(term)
@@ -667,6 +667,7 @@ class Bool(object):
 
             kind, ops = n._e
             OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
+                   'eq': lambda a, b: a == b,
                    'neq': lambda a, b: a != b,
                    'ifelse': z3.If}
             r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
@@ -2019,6 +2020,7 @@ def test_node(instrs, n, before, after):
             print('  before:', before[n], file=f)
             print('  after:', after[n], file=f)
             print('  expected:', x, file=f)
+            print('  diff:', after[n] ^ x, file=f)
 
         raise TestFailure()
 
@@ -2168,6 +2170,24 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
         if instr == 'rst n':
             wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
+            return check(wz[i])
+        if instr == 'ld hl, (nn)/ld (nn), hl':
+            wz = Bits.concat(Bits(phased('r2'), width=8),
+                             Bits(phased('r1'), width=8)) + 1
+            return check(wz[i])
+        if instr == 'ld a, (nn)/ld (nn), a':
+            lo = Bits(phased('r1'), width=8)
+            hi = Bits(phased('r2'), width=8)
+            load_wz = Bits.concat(hi, lo) + 1
+            store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
+            wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
+            return check(wz[i])
+        if instr == 'ld (<rp>), a/ld a, (<rp>)':
+            rp = get_rp(opcode[4:5] + (FALSE,))
+            load_wz = rp + 1
+            lo = Bits(rp.bits[0:8])
+            store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
+            wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
             return check(wz[i])
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
@@ -2576,6 +2596,9 @@ class TestedInstrs(object):
         def w5(p='w'):
             return phased(p), 5
 
+        def rw3(p='rw'):
+            return phased(p), 3
+
         def e3(p='e'):
             return phased(p), 3
 
@@ -2627,10 +2650,34 @@ class TestedInstrs(object):
         yield 'ld sp, hl', (f6(0xf9),)
         yield 'ei/di', (f(ifelse('is_ei', 0xfb, 0xf3)),)
 
+        yield 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}', (
+            f(xyz(1, get_non_at_hl_r('regd'), get_non_at_hl_r('regs'))),)
+        yield 'ld {b, c, d, e, h, l, a}, (hl)', (
+            f(xyz(1, get_non_at_hl_r('regd'), AT_HL)), r3())
+        yield 'ld (hl), {b, c, d, e, h, l, a}', (
+            f(xyz(1, AT_HL, get_non_at_hl_r('regs'))), w3())
+
+        ''' TODO
+        yield 'halt', (
+            f(xyz(1, AT_HL, AT_HL)),)
+        '''
+
+        yield 'ld {b, c, d, e, h, l, a}, n', (
+            f(xyz(0, get_non_at_hl_r(), 6)), r3())
+        yield 'ld (hl), n', (
+            f(xyz(0, AT_HL, 6)), r3(), w3())
+
         yield '<alu> {b, c, d, e, h, l, a}', (
             f(xyz(2, 'op', get_non_at_hl_r())),)
         yield '<alu> (hl)', (f(xyz(2, 'op', AT_HL)), r3())
         yield '<alu> n', (f(xyz(3, 'op', 6)), r3())
+
+        yield 'ld hl, (nn)/ld (nn), hl', (
+            f(ifelse('is_store', 0x22, 0x2a)),
+            r3('r1'), r3('r2'), rw3('rw3'), rw3('rw4'))
+        yield 'ld a, (nn)/ld (nn), a', (
+            f(ifelse('is_store', 0x32, 0x3a)),
+            r3('r1'), r3('r2'), rw3('rw3'))
 
         yield 'rst n', (f5(xyz(3, 'y', 7)), w3('w1'), w3('w2'))
 
@@ -2648,6 +2695,10 @@ class TestedInstrs(object):
         yield 'inc/dec <rp>', (f6(xpqz(0, 'rp', ifelse('is_inc', 0, 1), 3)),)
         yield 'pop <rp2>', (f(xpqz(3, 'rp2', 0, 1)), r3('lo'), r3('hi'))
         yield 'push <rp2>', (f5(xpqz(3, 'rp2', 0, 5)), w3('lo'), w3('hi'))
+
+        pp = Bits.concat(Bits(0, width=1), Bits('p', width=1))
+        yield 'ld (<rp>), a/ld a, (<rp>)', (
+            f(xpqz(0, pp, Bits((~Bool.get(phased('is_store')),)), 2)), rw3())
 
         yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
         yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
