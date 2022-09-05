@@ -1255,29 +1255,35 @@ class Z80Simulator(object):
 
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
+            cyclic = False
+
             p = preds.get(n)
             if p is not None:
-                return p
+                return cyclic, p
 
             p = get_node_pred(n)
             if p is TRUE:
                 preds[n] = p
-                return p
+                return cyclic, p
 
             if n.is_gnd_or_pwr:
                 assert p is None
                 p = FALSE
                 preds[n] = p
-                return p
+                return cyclic, p
 
             p = [] if p is None else [p]
             stack.append(n)
             for t in n.conn_of:
                 if t.gate.state is not FALSE:
                     m = t.get_other_conn(n)
-                    if m not in stack:
-                        mp = t.gate.state & get_group_pred(
-                                 m, get_node_pred, stack, preds)
+                    if m in stack:
+                        cyclic = True
+                    else:
+                        cc, pp = get_group_pred(m, get_node_pred, stack, preds)
+                        cyclic |= cc
+
+                        mp = t.gate.state & pp
                         if mp is TRUE:
                             p = [TRUE]
                             break
@@ -1285,8 +1291,10 @@ class Z80Simulator(object):
             p = Bool.get_or(*p)
             assert stack.pop() == n
 
-            preds[n] = p
-            return p
+            if not cyclic:
+                preds[n] = p
+
+            return cyclic, p
 
         def get_gnd_pred(n):
             return TRUE if n.is_gnd else None
@@ -1308,10 +1316,10 @@ class Z80Simulator(object):
             assert isinstance(n.pull, Bool)
             return ~n.pull
 
-        gnd = get_group_pred(n, get_gnd_pred, [], {})
-        pwr = get_group_pred(n, get_pwr_pred, [], {})
-        pullup = get_group_pred(n, get_pullup_pred, [], {})
-        pulldown = get_group_pred(n, get_pulldown_pred, [], {})
+        _, gnd = get_group_pred(n, get_gnd_pred, [], {})
+        _, pwr = get_group_pred(n, get_pwr_pred, [], {})
+        _, pullup = get_group_pred(n, get_pullup_pred, [], {})
+        _, pulldown = get_group_pred(n, get_pulldown_pred, [], {})
 
         return gnd, pwr, pullup, pulldown
 
