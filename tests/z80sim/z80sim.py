@@ -748,6 +748,10 @@ class Bits(object):
         return (b for b in self.bits)
 
     @property
+    def lsb(self):
+        return self.bits[0]
+
+    @property
     def msb(self):
         return self.bits[-1]
 
@@ -877,6 +881,12 @@ class Bits(object):
         for a in reversed(args):
             bits.extend(a)
         return __class__(bits)
+
+    def rol(self):
+        return __class__((self.msb,) + self.bits[:-1])
+
+    def ror(self):
+        return __class__(self.bits[1:] + (self.lsb,))
 
     def parity(self):
         # TODO: Have Bool.get_xor().
@@ -2152,6 +2162,46 @@ def test_node(instrs, n, before, after):
         if instr == 'scf/ccf':
             return check(Bool.ifelse(phased('is_scf'), FALSE, before[CF]))
 
+    if n.startswith('reg_a'):
+        A = 7
+        i = int(n[-1])
+        if instr == 'cpl':
+            return check(~before[n])
+        if instr in ('ld a, (nn)/ld (nn), a', 'ld (<rp>), a/ld a, (<rp>)'):
+            id = 'rw3' if instr == 'ld a, (nn)/ld (nn), a' else 'rw'
+            v = Bits(phased(id), width=8)
+            a = Bits.ifelse(phased('is_store'), get_a(), v)
+            return check(a[i])
+        if instr in ('ld {b, c, d, e, h, l, a}, n',
+                     'ld {b, c, d, e, h, l, a}, (hl)'):
+            v = Bits(phased('r'), width=8)
+            a = Bits.ifelse(Bits(opcode[3:6]) == A, v, get_a())
+            return check(a[i])
+        if instr == 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
+            s = get_r(opcode[0:3])
+            d = Bits(opcode[3:6])
+            a = Bits.ifelse(d == A, s, get_a())
+            return check(a[i])
+        if instr == 'in a, (n)/out (n), a':
+            v = Bits(phased('io'), width=8)
+            a = Bits.ifelse(phased('is_in'), v, get_a())
+            return check(a[i])
+        if instr == 'inc/dec {b, c, d, e, h, l, a}':
+            r = Bits(opcode[3:6])
+            a = get_a()
+            v = Bits.ifelse(phased('is_inc'), a + 1, a - 1)
+            a = Bits.ifelse(r == A, v, a)
+            return check(a[i])
+        if instr == 'rlca/rrca/rla/rra':
+            a = get_a()
+            cf_a = Bits.concat(Bits((before[CF],)), a)
+            rlca, rrca = a.rol(), a.ror()
+            rla, rra = cf_a.rol(), cf_a.ror()
+            v = Bits.ifelse(phased('is_rlca_rrca'),
+                            Bits.ifelse(phased('is_rl'), rlca, rrca),
+                            Bits.ifelse(phased('is_rl'), rla, rra))
+            return check(v[i])
+
     if n.startswith('reg_w') or n.startswith('reg_z'):
         i = int(n[-1])
         if n.startswith('reg_w'):
@@ -2227,12 +2277,16 @@ def test_node(instrs, n, before, after):
             return check(hl[4 + 8] ^ rp[4 + 8] ^ r[4 + 8])
 
     if instr == 'pop <rp2>':
+        RP2_AF = 3
+        p = Bits(opcode.bits[4:6])
         if n in (CF, NF, PF, XF, HF, YF, ZF, SF):
-            p = Bits(opcode.bits[4:6])
-            RP2_AF = Bits(3)
             i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
                                      f'lo_p{phase}_b{i}', before[n]))
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            return check(Bool.ifelse(p == RP2_AF,
+                                     f'hi_p{phase}_b{i}', before[n]))
 
     if instr == 'daa':
         a = bits('reg_a')
@@ -2258,6 +2312,9 @@ def test_node(instrs, n, before, after):
             return check(r == 0x00)
         if n == SF:
             return check(r[7])
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            return check(r[i])
 
     if instr in ('<alu> {b, c, d, e, h, l, a}', '<alu> (hl)', '<alu> n'):
         ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
@@ -2296,6 +2353,10 @@ def test_node(instrs, n, before, after):
             return check(r.truncated(8) == 0x00)
         if n == SF:
             return check(r[7])
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            v = Bits.ifelse(op == CP, get_a(), r)
+            return check(v[i])
 
     return check(before[n])
 
@@ -2306,7 +2367,7 @@ def process_instr(instrs, base_state, *, test=False):
     EXTRA_TICKS = 3
 
     TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF}
-    for r in 'wz':
+    for r in 'awz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
 
