@@ -2237,7 +2237,7 @@ def test_node(instrs, n, before, after):
     if instr == 'daa':
         a = bits('reg_a')
         cf = before[CF]
-        add_0x60 = cf | (a >= 0xa0)
+        add_0x60 = cf | (a >= 0x9a)
         if n == CF:
             return check(add_0x60)
         hf = before['reg_f4']
