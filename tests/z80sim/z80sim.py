@@ -51,6 +51,9 @@ YF = 'reg_f5'
 ZF = 'reg_f6'
 SF = 'reg_f7'
 
+# TODO: Can also be n206, p1210, p1239 or p231.
+IFF2 = 'n181'
+
 
 def _ceil_div(a, b):
     return -(a // -b)
@@ -1219,6 +1222,8 @@ class Z80Simulator(object):
         for i in image:
             n = node_storage.get(i[0], i[1:])
             self.__nodes[n.index] = n
+            # if n.state.is_equiv(Bool.get('ei')):
+            #     Status.print(n, n.state)
 
         self.__nodes_by_name = {}
         for index, name in names:
@@ -1226,6 +1231,10 @@ class Z80Simulator(object):
             n = self.__nodes[index]
             n.custom_id = name
             self.__nodes_by_name[name] = n
+
+        for n in self.__nodes.values():
+            if n.custom_id is None:
+                self.__nodes_by_name[n.id] = n
 
     def __restore_transistors_from_image(self, image):
         self.__trans = {}
@@ -1335,12 +1344,11 @@ class Z80Simulator(object):
 
     def __update_group_of(self, n, more, updated):
         group = self.__groups[n]
-        preds = {n: self.__get_node_preds(n) for n in group}
 
         # Update node and transistor states.
         for i, n in enumerate(group):
             with Status.do(f'update {i}/{len(group)} {n}', '--show-nodes'):
-                gnd, pwr, pullup, pulldown = preds[n]
+                gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
 
                 floating = n.state
                 pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
@@ -2276,6 +2284,27 @@ def test_node(instrs, n, before, after):
         if n == HF:
             return check(hl[4 + 8] ^ rp[4 + 8] ^ r[4 + 8])
 
+    if instr == 'ld {i, r}, a/ld a, {i, r}':
+        ri, rr = bits('reg_i'), bits('reg_r')
+        rr = Bits((rr + 1).bits[:7] + (rr[7],))
+        r = Bits.ifelse(phased('is_i_reg'), ri, rr)
+        v = Bits.ifelse(phased('is_store'), get_a(), r)
+        if n in (NF, HF):
+            return check(Bool.ifelse(phased('is_store'), before[n], FALSE))
+        if n == PF:
+            return check(Bool.ifelse(phased('is_store'), before[n],
+                                     before[IFF2]))
+        if n in (XF, YF):
+            i = int(n[-1])
+            return check(Bool.ifelse(phased('is_store'), before[n], r[i]))
+        if n == ZF:
+            return check(Bool.ifelse(phased('is_store'), before[n], r == 0x00))
+        if n == SF:
+            return check(Bool.ifelse(phased('is_store'), before[n], r[7]))
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            return check(v[i])
+
     if instr == 'pop <rp2>':
         RP2_AF = 3
         p = Bits(opcode.bits[4:6])
@@ -2358,6 +2387,10 @@ def test_node(instrs, n, before, after):
             v = Bits.ifelse(op == CP, get_a(), r)
             return check(v[i])
 
+    if n == IFF2:
+        if instr == 'ei/di':
+            return check(Bool.get(phased('is_ei')))
+
     return check(before[n])
 
 
@@ -2366,7 +2399,7 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
-    TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF}
+    TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
     for r in 'awz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
@@ -2375,7 +2408,7 @@ def process_instr(instrs, base_state, *, test=False):
     for i in range(8):
         for r in 'afbcdehl':
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
-        for r in ('pch', 'pcl', 'sph', 'spl'):
+        for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
             SAMPLED_NODES.add(f'reg_{r}{i}')
 
     phase = len(instrs)
@@ -2597,7 +2630,10 @@ def test_instr_seqs(seqs):
                 assert 0
     else:
         seqs = tuple(seqs)
-        with multiprocessing.Pool() as p:
+        num_threads = multiprocessing.cpu_count()
+        if '--spare-thread' in sys.argv:
+            num_threads = max(1, num_threads - 1)
+        with multiprocessing.Pool(num_threads) as p:
             queue = p.imap_unordered(test_instr_seq_concurrently,
                                      enumerate(seqs))
             for i, res in queue:
@@ -2690,23 +2726,6 @@ class TestedInstrs(object):
                           ifelse(f'{id}_b1', ifelse(f'{id}_b0', e, d),
                                  ifelse(f'{id}_b0', c, b)))
 
-        ''' TODO: Disable for now.
-        for rd in RD:
-            rdn, rdp = rd
-            for rs in RS:
-                rsn, rsp = rs
-                cycles = (f(pattern(f'01 {rdp} {rsp}')),)
-                if rd == AT_HL and rs == AT_HL:
-                    instr = 'halt'
-                else:
-                    instr = f'ld {rdn}, {rsn}'
-                    if rs == AT_HL:
-                        cycles += (R3,)
-                    if rd == AT_HL:
-                        cycles += (W3,)
-                yield instr, cycles
-        '''
-
         yield 'nop', (f(0x00),)
         yield "ex af, af'", (f(0x08),)
         yield 'jr d', (f(0x18), r3(), e5())
@@ -2776,6 +2795,11 @@ class TestedInstrs(object):
 
         yield 'in a, (n)/out (n), a', (
             f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
+
+        yield 'ld {i, r}, a/ld a, {i, r}', (
+            f(0xed), f5(ifelse('is_i_reg',
+                               ifelse('is_store', 0x47, 0x57),
+                               ifelse('is_store', 0x4f, 0x5f))))
 
 
 def test_instructions():
