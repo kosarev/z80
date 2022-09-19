@@ -885,11 +885,11 @@ class Bits(object):
             bits.extend(a)
         return __class__(bits)
 
-    def rol(self):
-        return __class__((self.msb,) + self.bits[:-1])
+    def rol(self, n=1):
+        return __class__(self.bits[-n:] + self.bits[:-n])
 
-    def ror(self):
-        return __class__(self.bits[1:] + (self.lsb,))
+    def ror(self, n=1):
+        return __class__(self.bits[n:] + self.bits[:n])
 
     def parity(self):
         # TODO: Have Bool.get_xor().
@@ -2040,14 +2040,19 @@ def test_node(instrs, n, before, after):
 
         Status.clear()
 
-        f = sys.stderr
-        print('; '.join(instrs), n, file=f)
+        NAMES = {CF: 'cf', NF: 'nf', PF: 'pf', XF: 'xf',
+                 HF: 'hf', YF: 'yf', ZF: 'zf', SF: 'sf'}
+        n_name = str(n)
+        if n in NAMES:
+            n_name = f'{n_name} ({NAMES[n]})'
+        lines = ['', 'FAILED: ' + '; '.join(instrs) + f' {n_name}']
         if '--no-before-after-expected' not in sys.argv:
-            print('  before:', before[n], file=f)
-            print('  after:', after[n], file=f)
-            print('  expected:', x, file=f)
-            print('  diff:', after[n] ^ x, file=f)
-
+            lines.extend((
+                f'  before: {before[n]}',
+                f'  after: {after[n]}',
+                f'  expected: {x}',
+                f'  diff: {after[n] ^ x}'))
+        print('\n'.join(lines), file=sys.stderr, flush=True)
         raise TestFailure()
 
     phase = len(instrs)
@@ -2214,7 +2219,7 @@ def test_node(instrs, n, before, after):
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
-        if instr == 'add hl, <rp>':
+        if instr in ('add hl, <rp>', 'rrd/rld'):
             return check((get_hl() + 1)[i])
         if instr in ('call nn', 'ex (sp), hl'):
             wz = Bits.concat(Bits(phased('r2'), width=8),
@@ -2255,6 +2260,10 @@ def test_node(instrs, n, before, after):
             store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
             wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
             return check(wz[i])
+
+    if n == IFF2:
+        if instr == 'ei/di':
+            return check(Bool.get(phased('is_ei')))
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r(opcode[3:6])
@@ -2387,9 +2396,22 @@ def test_node(instrs, n, before, after):
             v = Bits.ifelse(op == CP, get_a(), r)
             return check(v[i])
 
-    if n == IFF2:
-        if instr == 'ei/di':
-            return check(Bool.get(phased('is_ei')))
+    if instr == 'rrd/rld':
+        a = get_a()
+        al, ah = Bits(a.bits[0:4]), Bits(a.bits[4:8])
+        t = Bits.concat(al, Bits(phased('r'), width=8))
+        t = Bits.ifelse(phased('is_rrd'), t.ror(4), t.rol(4))
+        t = Bits.concat(ah, t)
+        a = Bits(t[8:16])
+        if n.startswith('reg_a') or n in (XF, YF, SF):
+            i = int(n[-1])
+            return check(a[i])
+        if n in (NF, HF):
+            return check(FALSE)
+        if n == PF:
+            return check(a.parity())
+        if n == ZF:
+            return check(a == 0x00)
 
     return check(before[n])
 
@@ -2800,6 +2822,8 @@ class TestedInstrs(object):
             f(0xed), f5(ifelse('is_i_reg',
                                ifelse('is_store', 0x47, 0x57),
                                ifelse('is_store', 0x4f, 0x5f))))
+        yield 'rrd/rld', (
+            f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
 
 
 def test_instructions():
