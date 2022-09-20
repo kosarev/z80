@@ -2354,12 +2354,18 @@ def test_node(instrs, n, before, after):
             i = int(n[-1])
             return check(r[i])
 
-    if instr in ('<alu> {b, c, d, e, h, l, a}', '<alu> (hl)', '<alu> n'):
+    if instr in ('<alu> {b, c, d, e, h, l, a}', '<alu> (hl)', '<alu> n',
+                 'neg/xneg'):
         ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
 
-        a = get_a()
-        s = get_r(opcode[0:3])
-        op = Bits(opcode[3:6])
+        if instr == 'neg/xneg':
+            a = Bits(0, width=8)
+            s = get_a()
+            op = Bits(SUB)
+        else:
+            a = get_a()
+            s = get_r(opcode[0:3])
+            op = Bits(opcode[3:6])
 
         is_add_adc = op.is_any(ADD, ADC)
         is_sub_sbc_cp = op.is_any(SUB, SBC, CP)
@@ -2824,6 +2830,7 @@ class TestedInstrs(object):
                                ifelse('is_store', 0x4f, 0x5f))))
         yield 'rrd/rld', (
             f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
+        yield 'neg/xneg', (f(0xed), f(xyz(1, 'y', 4)))
 
 
 def test_instructions():
