@@ -227,6 +227,9 @@ class Literal(object):
     def get(id):
         if id is None:
             id = f't{len(__class__.__literals) + 1}'
+        else:
+            assert id.strip() == id, repr(id)
+            assert id.lower() not in ('', '0', '1', 'true', 'false'), repr(id)
 
         t = __class__.__literals.get(id)
         if t is not None:
@@ -740,7 +743,7 @@ class Bits(object):
 
         if width is not None:
             bits = bits.zero_extended(width)
-            assert bits.width == width, (width, bits)
+            assert bits.width == width, (width, bits.width, bits)
 
         return bits
 
@@ -864,6 +867,9 @@ class Bits(object):
     def __eq__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
         return Bool.get_and(*(Bool.get_eq(x, y) for x, y in zip(a, b)))
+
+    def __ne__(self, other):
+        return ~self.__eq__(other)
 
     def __ge__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
@@ -2059,15 +2065,19 @@ def test_node(instrs, n, before, after):
     instr = instrs[-1]
     cycles = TestedInstrs.get_cycles(instr, phase)
     opcode, ticks = cycles[0]
+    if opcode == 0xed:
+        opcode, ticks = cycles[1]
 
     prev_instr = None
     if len(instrs) >= 2:
         prev_instr = instrs[-2]
 
-    def phased(x):
+    A = 7
+
+    def phased(x, offset=0):
         if isinstance(x, str):
             assert '_p' not in x, x
-            return f'{x}_p{phase}'
+            return f'{x}_p{phase + offset}'
         return x
 
     def bits(id):
@@ -2159,9 +2169,12 @@ def test_node(instrs, n, before, after):
             # description of the behaviour?
             if prev_instr in ('scf/ccf', 'add hl, <rp>', '<alu> n',
                               'inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)',
-                              '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)'):
+                              '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)',
+                              'adc/sbc hl, <rp>'):
                 return check(a)
             f = before[f'reg_f{i}']
+            if prev_instr == 'in/out r, (c)':
+                return check(Bool.ifelse(phased('is_in', -1), a, a | f))
             return check(a | f)
         if instr == 'rlca/rrca/rla/rra':
             return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
@@ -2176,7 +2189,6 @@ def test_node(instrs, n, before, after):
             return check(Bool.ifelse(phased('is_scf'), FALSE, before[CF]))
 
     if n.startswith('reg_a'):
-        A = 7
         i = int(n[-1])
         if instr == 'cpl':
             return check(~before[n])
@@ -2219,7 +2231,7 @@ def test_node(instrs, n, before, after):
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
-        if instr in ('add hl, <rp>', 'rrd/rld'):
+        if instr in ('add hl, <rp>', 'rrd/rld', 'adc/sbc hl, <rp>'):
             return check((get_hl() + 1)[i])
         if instr in ('call nn', 'ex (sp), hl'):
             wz = Bits.concat(Bits(phased('r2'), width=8),
@@ -2228,6 +2240,10 @@ def test_node(instrs, n, before, after):
         if instr in ('jp nn', 'ret'):
             wz = Bits.concat(Bits(phased('hi'), width=8),
                              Bits(phased('lo'), width=8))
+            return check(wz[i])
+        if instr == 'reti/retn/xretn':
+            wz = Bits.concat(Bits(phased('r4'), width=8),
+                             Bits(phased('r3'), width=8))
             return check(wz[i])
         if instr == 'jr d':
             d = Bits(phased('r'), width=8)
@@ -2259,6 +2275,14 @@ def test_node(instrs, n, before, after):
             lo = Bits(rp.bits[0:8])
             store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
             wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
+            return check(wz[i])
+        if instr == 'in/out r, (c)':
+            wz = get_bc() + 1
+            return check(wz[i])
+        if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
+            lo = Bits(phased('r3'), width=8)
+            hi = Bits(phased('r4'), width=8)
+            wz = Bits.concat(hi, lo) + 1
             return check(wz[i])
 
     if n == IFF2:
@@ -2418,6 +2442,44 @@ def test_node(instrs, n, before, after):
             return check(a.parity())
         if n == ZF:
             return check(a == 0x00)
+
+    if instr == 'in/out r, (c)':
+        y = Bits(phased('y'), width=3)
+        io = Bits(phased('io'), width=8)
+        is_in = Bool.get(phased('is_in'))
+        a = Bits.ifelse(~is_in | (y != A), get_a(), io)
+        if n in (NF, HF):
+            return check(Bool.ifelse(is_in, FALSE, before[n]))
+        if n == PF:
+            return check(Bool.ifelse(is_in, io.parity(), before[n]))
+        if n in (XF, YF, SF):
+            i = int(n[-1])
+            return check(Bool.ifelse(is_in, io[i], before[n]))
+        if n == ZF:
+            return check(Bool.ifelse(is_in, io == 0, before[n]))
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            return check(a[i])
+
+    if instr == 'adc/sbc hl, <rp>':
+        hl, rp = get_hl(), get_rp(opcode[4:6])
+        cf = Bits.ifelse(before[CF], 1, 0)
+        is_adc = Bool.get(phased('q') + '_b0')
+        r = Bits.ifelse(is_adc, hl + rp + cf, ((hl - rp) ^ 0x10000) - cf)
+        if n == CF:
+            return check(r[16])
+        if n == NF:
+            return check(~is_adc)
+        if n == PF:
+            overflow = r[16] ^ r[15] ^ hl[15] ^ rp[15]
+            return check(overflow)
+        if n in (XF, YF, SF):
+            i = int(n[-1])
+            return check(r[i + 8])
+        if n == HF:
+            return check(r[12] ^ hl[12] ^ rp[12])
+        if n == ZF:
+            return check(r.truncated(16) == 0)
 
     return check(before[n])
 
@@ -2706,6 +2768,19 @@ class TestedInstrs(object):
             # xx ppq zzz
             return Bits.concat(bits(x, 2), bits(p, 2), bits(q, 1), bits(z, 3))
 
+        def pattern(p):
+            bits = []
+            for b in reversed(p):
+                if b == ' ':
+                    continue
+                if b in ('0', '1'):
+                    b = (b != '0')
+                else:
+                    b = f'{phased(b)}_b{len(bits)}'
+                bits.append(b)
+
+            return Bits(bits)
+
         def f(p, *, ticks=4):
             # Variable names must be phased, so don't allow them here.
             assert not isinstance(p, str)
@@ -2830,7 +2905,27 @@ class TestedInstrs(object):
                                ifelse('is_store', 0x4f, 0x5f))))
         yield 'rrd/rld', (
             f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
+        yield 'in/out r, (c)', (
+            f(0xed), f(xyz(1, 'y', ifelse('is_in', 0, 1))), io4())
+        yield 'adc/sbc hl, <rp>', (
+            f(0xed), f(xpqz(1, 'p', 'q', 2)), e4(), e3())
+        yield 'ld <rp>, (nn)/ld (nn), <rp>', (
+            f(0xed), f(xpqz(1, 'p', 'q', 3)),
+            r3('r3'), r3('r4'), rw3('rw5'), rw3('rw6'))
         yield 'neg/xneg', (f(0xed), f(xyz(1, 'y', 4)))
+        yield 'reti/retn/xretn', (
+            f(0xed), f(xyz(1, 'y', 5)), r3('r3'), r3('r4'))
+        yield 'im/xim n', (f(0xed), f(xyz(1, 'y', 6)))
+
+        xnop_00 = pattern('00 xxx xxx')
+        xnop_01 = pattern('01 11x 111')
+        xnop_10 = ifelse('is_100', pattern('10 0xx xxx'),
+                         pattern('10 1xx 1xx'))
+        xnop_11 = pattern('11 xxx xxx')
+        xnop = ifelse('is_0',
+                      ifelse('is_00', xnop_00, xnop_01),
+                      ifelse('is_10', xnop_10, xnop_11))
+        yield 'xnop', (f(0xed), f(xnop))
 
 
 def test_instructions():

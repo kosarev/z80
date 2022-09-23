@@ -825,15 +825,18 @@ public:
         fast_u8 p = get_p_part(op);
 
         switch(op) {
+        // TODO: Combine with decoding xneg's.
         case 0x44:
             // NEG  f(4) f(4)
             return self().on_neg();
+        // TODO: Combine with decoding xim's.
         case 0x46:
             // IM im[y]  f(4) f(4)
             return self().on_im(0);
         case 0x56:
         case 0x5e:
             return self().on_im(y - 1);
+        // TODO: Combine with decoding xretn's.
         case 0x4d:
             // RETI  f(4) f(4) r(3) r(3)
             return self().on_reti();
@@ -863,6 +866,7 @@ public:
             // RLD  f(4) f(4) r(3) e(4) w(3)
             return self().on_rld();
         }
+        // TODO: Can be just switch(op & (x_mask | z_mask)) ?
         if((op & x_mask) == 0100) {
             switch(op & z_mask) {
             case 0: {
@@ -3484,6 +3488,7 @@ public:
         self().on_set_a(a);
         self().on_set_f(f);
         self().on_write_cycle(hl, get_low8(t)); }
+    // TODO: Combine with on_adc_hl_rp()?
     void on_sbc_hl_rp(regp rp) {
         fast_u16 hl = self().on_get_hl();
         fast_u16 n = self().on_get_regp(rp, iregp::hl);
@@ -3500,6 +3505,7 @@ public:
                         zf_ari(r16) | hf_ari(r16 >> 8, hl >> 8, n >> 8) |
                         (pf_ari(r32 >> 8, hl >> 8, n >> 8) ^
                              (of ? pf_mask : 0)) |
+                        // TODO: Can we just look at bit 16 of the 32-bit result?
                         cf_ari(r16 > hl || of) | nf_mask;
 
         self().on_set_wz(inc16(hl));
