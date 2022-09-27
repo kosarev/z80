@@ -2569,6 +2569,17 @@ def process_instr(instrs, base_state, *, test=False):
     # to reach their nodes.
     EXTRA_TICKS = 3
 
+    def get_effective_states(s):
+        s = State(s)
+
+        s.set_db(0x00)  # nop
+        for t in range(EXTRA_TICKS):
+            for ht in (0, 1):
+                with s.status(f'extra tick {t}.{ht}'):
+                    s.half_tick()
+        s.cache()
+        return s.get_node_states(SAMPLED_NODES)
+
     TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
     for r in 'awz':
         for i in range(8):
@@ -2606,13 +2617,7 @@ def process_instr(instrs, base_state, *, test=False):
 
     # Status.print('; '.join(instr_ids))
 
-    s.set_db(0x00)  # nop
-    for t in range(EXTRA_TICKS):
-        for ht in (0, 1):
-            with s.status(f'extra tick {t}.{ht}'):
-                s.half_tick()
-    s.cache()
-    after = s.get_node_states(SAMPLED_NODES)
+    after = get_effective_states(s)
 
     def swap(a, b):
         for ns in (before, after):
