@@ -3685,6 +3685,10 @@ private:
     void do_rot(rot k, fast_u8 &n, fast_u8 &f) {
         fast_u8 t = n;
         bool cf = f & cf_mask;
+
+        // TODO: Can this be simplified? E.g., in all cases the
+        // direction is defined by bit 0. See testing nodes in
+        // z80sim.py.
         switch(k) {
         case rot::rlc:
             n = rol8(n);
@@ -3692,19 +3696,18 @@ private:
                     pf_log(n);
             break;
         case rot::rrc:
+            // TODO: Use ror()?
             n = mask8((n >> 1) | (n << 7));
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                 cf_ari(t & 0x01);
             break;
         case rot::rl:
             n = mask8((n << 1) | (cf ? 1 : 0));
-            // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x80);
             break;
         case rot::rr:
             n = (n >> 1) | ((cf ? 1u : 0u) << 7);
-            // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x01);
             break;
@@ -3716,11 +3719,13 @@ private:
             break;
         case rot::sra:
             n = (n >> 1) | (n & 0x80);
+            // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x01);
             break;
         case rot::sll:
             n = mask8(n << 1) | 1;
+            // TODO: We don't need to read F here.
             f = (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) | pf_log(n) |
                     cf_ari(t & 0x80);
             break;
@@ -3844,6 +3849,7 @@ protected:
         return ((x >> 6) ^ (x >> 5)) & pf_mask;
     }
 
+    // TODO: Rename to parity8(). Deprecate pf_log().
     static fast_u8 pf_log(fast_u8 n) {
         // Compute parity. First, half the range of bits to
         // consider by xor'ing nibbles of the passed value. Then,

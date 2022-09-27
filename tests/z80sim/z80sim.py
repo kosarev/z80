@@ -824,7 +824,19 @@ class Bits(object):
         return __class__(self.bits[:width])
 
     def __lshift__(self, n):
-        return __class__((FALSE,) * n + self.bits)
+        if isinstance(n, int):
+            return __class__((FALSE,) * n + self.bits)
+
+        n = __class__.cast(n)
+        if n.width == 0:
+            return self
+
+        s = self << __class__(n.bits[:-1])
+        return __class__.ifelse(n.msb, s << (1 << (n.width - 1)), s)
+
+    @staticmethod
+    def get_mask(n):
+        return Bits(1) << n
 
     @staticmethod
     def get_or(*args):
@@ -2065,14 +2077,14 @@ def test_node(instrs, n, before, after):
     instr = instrs[-1]
     cycles = TestedInstrs.get_cycles(instr, phase)
     opcode, ticks = cycles[0]
-    if opcode == 0xed:
+    if opcode in (0xcb, 0xed):
         opcode, ticks = cycles[1]
 
     prev_instr = None
     if len(instrs) >= 2:
         prev_instr = instrs[-2]
 
-    A = 7
+    AT_HL, A = 6, 7
 
     def phased(x, offset=0):
         if isinstance(x, str):
@@ -2170,11 +2182,15 @@ def test_node(instrs, n, before, after):
             if prev_instr in ('scf/ccf', 'add hl, <rp>', '<alu> n',
                               'inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)',
                               '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)',
-                              'adc/sbc hl, <rp>'):
+                              'adc/sbc hl, <rp>', 'bit (hl)'):
                 return check(a)
             f = before[f'reg_f{i}']
             if prev_instr == 'in/out r, (c)':
                 return check(Bool.ifelse(phased('is_in', -1), a, a | f))
+            if prev_instr == 'rot/res/set (hl)':
+                return check(Bool.ifelse(phased('is_rot', -1), a, a | f))
+            if prev_instr == 'rot/bit/res/set {b, c, d, e, h, l, a}':
+                return check(Bool.ifelse(phased('is_rot_bit', -1), a, a | f))
             return check(a | f)
         if instr == 'rlca/rrca/rla/rra':
             return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
@@ -2480,6 +2496,70 @@ def test_node(instrs, n, before, after):
             return check(r[12] ^ hl[12] ^ rp[12])
         if n == ZF:
             return check(r.truncated(16) == 0)
+
+    if instr in ('bit (hl)', 'rot/res/set (hl)',
+                 'rot/bit/res/set {b, c, d, e, h, l, a}'):
+        y = Bits(phased('y'), width=3)
+
+        reg = Bits(opcode[0:3])
+        v = get_r(reg)
+
+        # RLC, RRC, RL, RR, SLA, SRA, SLL, SRL
+        is_right = y[0]
+        rot_cf = Bool.ifelse(is_right, v[0], v[7])
+
+        is_nine_bit = y[1]
+        is_shift = y[2]
+        cf = before[CF]
+        b = Bool.ifelse(
+            is_shift,
+            Bool.ifelse(is_nine_bit, ~is_right, is_right & v[7]),
+            Bool.ifelse(is_nine_bit, cf, rot_cf))
+
+        rot_r = Bits.ifelse(is_right,
+                            Bits(v.bits[1:8] + (b,)),
+                            Bits((b,) + v.bits[0:7]))
+
+        m = Bits.get_mask(y)
+        bit_r = v & m
+        set_r = v | m
+        res_r = v & ~m
+
+        ROT, BIT, RES, SET = range(4)
+        op = Bits(opcode[6:8])
+
+        if n == CF:
+            return check(Bool.ifelse(op == ROT, rot_cf, cf))
+        if n == NF:
+            return check(Bool.ifelse(op == ROT, FALSE,
+                                     (op != BIT) & before[n]))
+        if n == HF:
+            return check(Bool.ifelse(op == ROT, FALSE,
+                                     (op == BIT) | before[n]))
+        if n == PF:
+            return check(Bool.ifelse(
+                op == BIT, bit_r == 0,
+                Bool.ifelse(op == ROT, rot_r.parity(), before[n])))
+        if n in (XF, YF):
+            i = int(n[-1])
+            return check(Bool.ifelse(
+                op == BIT,
+                Bool.ifelse(reg == AT_HL, before[f'reg_w{i}'], v[i]),
+                Bool.ifelse(op == ROT, rot_r[i], before[n])))
+        if n == ZF:
+            return check(Bool.ifelse(
+                op == BIT, bit_r == 0,
+                Bool.ifelse(op == ROT, rot_r == 0, before[n])))
+        if n == SF:
+            return check(Bool.ifelse(
+                op == BIT, bit_r[7],
+                Bool.ifelse(op == ROT, rot_r[7], before[n])))
+        if n.startswith('reg_a'):
+            i = int(n[-1])
+            return check(Bool.ifelse(
+                (op == BIT) | (reg != A), before[n],
+                Bool.ifelse(op == ROT, rot_r[i],
+                            Bool.ifelse(op == RES, res_r[i], set_r[i]))))
 
     return check(before[n])
 
@@ -2926,6 +3006,20 @@ class TestedInstrs(object):
                       ifelse('is_00', xnop_00, xnop_01),
                       ifelse('is_10', xnop_10, xnop_11))
         yield 'xnop', (f(0xed), f(xnop))
+
+        ROT, BIT, RES, SET = range(4)
+        rot_bit = ifelse('is_rot', ROT, BIT)
+        res_set = ifelse('is_res', RES, SET)
+        rot_bit_res_set = ifelse('is_rot_bit', rot_bit, res_set)
+        yield 'rot/bit/res/set {b, c, d, e, h, l, a}', (
+            f(0xcb), f(xyz(rot_bit_res_set, 'y', get_non_at_hl_r())))
+
+        yield 'bit (hl)', (
+            f(0xcb), f(xyz(BIT, 'y', AT_HL)), r4())
+
+        rot_res_set = ifelse('is_rot', ROT, res_set)
+        yield 'rot/res/set (hl)', (
+            f(0xcb), f(xyz(rot_res_set, 'y', AT_HL)), r4(), w3())
 
 
 def test_instructions():
