@@ -2565,11 +2565,11 @@ def test_node(instrs, n, before, after):
 
 
 def process_instr(instrs, base_state, *, test=False):
-    # Additional ticks are necessary for new values
-    # to reach their nodes.
-    EXTRA_TICKS = 3
-
     def get_effective_states(s):
+        # Additional ticks are necessary for new values
+        # to reach their nodes.
+        EXTRA_TICKS = 3
+
         s = State(s)
 
         s.set_db(0x00)  # nop
@@ -2578,7 +2578,26 @@ def process_instr(instrs, base_state, *, test=False):
                 with s.status(f'extra tick {t}.{ht}'):
                     s.half_tick()
         s.cache()
-        return s.get_node_states(SAMPLED_NODES)
+
+        ns = s.get_node_states(SAMPLED_NODES)
+
+        def swap(a, b):
+            for i in range(8):
+                ns[f'reg_{a}{i}'], ns[f'reg_{b}{i}'] = (
+                    ns[f'reg_{b}{i}'], ns[f'reg_{a}{i}'])
+
+        for instr in instrs:
+            if instr == 'ex de, hl':
+                swap('d', 'h')
+                swap('e', 'l')
+            if instr == "ex af, af'":
+                for r in 'af':
+                    swap(f'{r}', f'{r}{r}')
+            if instr == 'exx':
+                for r in 'bcdehl':
+                    swap(f'{r}', f'{r}{r}')
+
+        return ns
 
     TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
     for r in 'awz':
@@ -2597,13 +2616,10 @@ def process_instr(instrs, base_state, *, test=False):
     cycles = TestedInstrs.get_cycles(id, phase)
 
     s = State(base_state)
+    before = get_effective_states(s)
     for cycle_no, (d, ticks) in enumerate(cycles):
         s.set_db(d)
         for t in range(ticks):
-            if cycle_no == 0 and t == EXTRA_TICKS:
-                s.cache()
-                before = s.get_node_states(SAMPLED_NODES)
-
             for ht in (0, 1):
                 with s.status(f'tick {cycle_no}-{t}.{ht}'):
                     s.half_tick()
@@ -2618,23 +2634,6 @@ def process_instr(instrs, base_state, *, test=False):
     # Status.print('; '.join(instr_ids))
 
     after = get_effective_states(s)
-
-    def swap(a, b):
-        for ns in (before, after):
-            for i in range(8):
-                ns[f'reg_{a}{i}'], ns[f'reg_{b}{i}'] = (
-                    ns[f'reg_{b}{i}'], ns[f'reg_{a}{i}'])
-
-    for instr in instrs:
-        if instr == 'ex de, hl':
-            swap('d', 'h')
-            swap('e', 'l')
-        if instr == "ex af, af'":
-            for r in 'af':
-                swap(f'{r}', f'{r}{r}')
-        if instr == 'exx':
-            for r in 'bcdehl':
-                swap(f'{r}', f'{r}{r}')
 
     for n in sorted(TESTED_NODES):
         token = test_node(instrs, n, before, after)
