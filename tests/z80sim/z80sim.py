@@ -1409,13 +1409,16 @@ class Z80Simulator(object):
         self.__set_node_pull(n, pull)
         self.__update_nodes([n])
 
-    def half_tick(self):
+    def half_tick(self, *, cond=None):
         if self.__memory is not None and self.clk:
             if self.mreq and not self.rfsh and not self.iorq:
                 if self.m1 and self.rd and self.t2:
                     self.dbus = self.__memory[int(self.abus)]
 
-        self.nclk = ~self.nclk
+        if cond is None:
+            cond = TRUE
+
+        self.nclk = Bool.ifelse(cond, ~self.nclk, self.nclk)
 
         # self.__print_state()
 
@@ -1880,6 +1883,9 @@ class State(object):
         elif kind == 'half_tick':
             _, _, = step
             sim.half_tick()
+        elif kind == 'conditional_half_tick':
+            _, _, cond = step
+            sim.half_tick(cond=cond)
         else:
             assert 0, step
 
@@ -1929,8 +1935,11 @@ class State(object):
         self.__add_step(('reset', propagation_delay,
                          waiting_for_m1_delay))
 
-    def half_tick(self):
-        self.__add_step(('half_tick',))
+    def half_tick(self, *, cond=None):
+        if cond is None:
+            self.__add_step(('half_tick',))
+        else:
+            self.__add_step(('conditional_half_tick', cond))
 
     def tick(self):
         self.half_tick()
@@ -2076,9 +2085,9 @@ def test_node(instrs, n, before, after):
     phase = len(instrs)
     instr = instrs[-1]
     cycles = TestedInstrs.get_cycles(instr, phase)
-    opcode, ticks = cycles[0]
+    opcode, ticks, cond = cycles[0]
     if opcode in (0xcb, 0xed):
-        opcode, ticks = cycles[1]
+        opcode, ticks, cond = cycles[1]
 
     prev_instr = None
     if len(instrs) >= 2:
@@ -2142,6 +2151,9 @@ def test_node(instrs, n, before, after):
 
     def get_sp():
         return Bits.concat(bits('reg_sph'), bits('reg_spl'))
+
+    def get_wz():
+        return Bits.concat(bits('reg_w'), bits('reg_z'))
 
     def get_rp(rp):
         return Bits.ifelse(
@@ -2264,6 +2276,12 @@ def test_node(instrs, n, before, after):
         if instr == 'jr d':
             d = Bits(phased('r'), width=8)
             wz = get_pc_plus(2) + d.sign_extended(16)
+            return check(wz[i])
+        if instr == 'djnz d':
+            b = get_b()
+            d = Bits(phased('r'), width=8)
+            target = get_pc_plus(2) + d.sign_extended(16)
+            wz = Bits.ifelse(b == 1, get_wz(), target)
             return check(wz[i])
         if instr == 'in a, (n)/out (n), a':
             a = bits('reg_a')
@@ -2599,6 +2617,14 @@ def process_instr(instrs, base_state, *, test=False):
 
         return ns
 
+    def get_cond_as_expr(cond, before):
+        if cond is None:
+            return None
+        if cond == 'b != 1':
+            b = Bits(before[f'reg_b{i}'] for i in range(8))
+            return b != 1
+        assert 0, cond
+
     TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
     for r in 'awz':
         for i in range(8):
@@ -2617,12 +2643,13 @@ def process_instr(instrs, base_state, *, test=False):
 
     s = State(base_state)
     before = get_effective_states(s)
-    for cycle_no, (d, ticks) in enumerate(cycles):
+    for cycle_no, (d, ticks, cond) in enumerate(cycles):
+        cond = get_cond_as_expr(cond, before)
         s.set_db(d)
         for t in range(ticks):
             for ht in (0, 1):
                 with s.status(f'tick {cycle_no}-{t}.{ht}'):
-                    s.half_tick()
+                    s.half_tick(cond=cond)
         s.cache(intermediate=True)
 
     s.cache()
@@ -2868,7 +2895,7 @@ class TestedInstrs(object):
         def f(p, *, ticks=4):
             # Variable names must be phased, so don't allow them here.
             assert not isinstance(p, str)
-            return Bits.cast(p), ticks
+            return Bits.cast(p), ticks, None
 
         def f5(p):
             return f(p, ticks=5)
@@ -2877,31 +2904,31 @@ class TestedInstrs(object):
             return f(p, ticks=6)
 
         def r3(p='r'):
-            return phased(p), 3
+            return phased(p), 3, None
 
         def r4(p='r'):
-            return phased(p), 4
+            return phased(p), 4, None
 
         def w3(p='w'):
-            return phased(p), 3
+            return phased(p), 3, None
 
         def w5(p='w'):
-            return phased(p), 5
+            return phased(p), 5, None
 
         def rw3(p='rw'):
-            return phased(p), 3
+            return phased(p), 3, None
 
         def e3(p='e'):
-            return phased(p), 3
+            return phased(p), 3, None
 
         def e4(p='e'):
-            return phased(p), 4
+            return phased(p), 4, None
 
-        def e5():
-            return phased('e'), 5
+        def e5(*, cond=None):
+            return phased('e'), 5, cond
 
         def io4():
-            return phased('io'), 4
+            return phased('io'), 4, None
 
         AT_HL = 6
 
@@ -2983,6 +3010,9 @@ class TestedInstrs(object):
         yield 'in a, (n)/out (n), a', (
             f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
 
+        yield 'djnz d', (
+            f5(0x10), r3(), e5(cond='b != 1'))
+
         yield 'ld {i, r}, a/ld a, {i, r}', (
             f(0xed), f5(ifelse('is_i_reg',
                                ifelse('is_store', 0x47, 0x57),
@@ -3032,12 +3062,15 @@ def test_instructions():
     def add(ss):
         # Make sure short sequences that work as prefixes for
         # longer sequences are generated and tested first.
-        ss = tuple(ss)
-        t = tuple(get_instr_seq_time_stamp('passed', s) for s in ss)
-        if 0.0 in t:
-            return test_instr_seqs(ss)
+        ss = {s: get_instr_seq_time_stamp('passed', s) for s in ss}
 
-        seqs.extend(ss)
+        if '--new-only' in sys.argv:
+            ss = {s: t for s, t in ss.items() if t == 0}
+
+        if 0 in ss.values():
+            return test_instr_seqs(ss.keys())
+
+        seqs.extend(ss.keys())
         return True
 
     instrs = TestedInstrs.get_instrs()

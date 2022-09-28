@@ -3513,6 +3513,7 @@ public:
         self().on_set_f(f); }
 
     // Block operations.
+    // TODO: Combine with other block instructions?
     void on_block_cp(block_cp k) {
         fast_u16 bc = self().on_get_bc();
         fast_u16 wz = self().on_get_wz();
