@@ -22,7 +22,7 @@ import multiprocessing
 import os
 import pathlib
 import pprint
-import pycosat
+import pysat.solvers
 import sys
 import traceback
 import z3
@@ -653,7 +653,11 @@ class Bool(object):
             return equiv
 
         with Status.do('is_equiv', '--show-is-equiv'):
-            equiv = (pycosat.solve(e.sat_clauses) == 'UNSAT')
+            s = pysat.solvers.Cadical()
+            for c in e.sat_clauses:
+                s.add_clause(c)
+            equiv = (s.solve() is False)
+            s.delete()
 
         __class__.__equiv_cache[key] = equiv
         return equiv
