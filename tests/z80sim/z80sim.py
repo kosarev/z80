@@ -2277,6 +2277,22 @@ def test_node(instrs, n, before, after):
             wz = Bits.concat(Bits(phased('r4'), width=8),
                              Bits(phased('r3'), width=8))
             return check(wz[i])
+        if instr == 'ret cc':
+            cc = Bits(phased('cc'), width=3)
+            cc = Bool.ifelse(
+                cc[2],
+                Bool.ifelse(
+                    cc[1],
+                    Bool.ifelse(cc[0], before[SF], ~before[SF]),
+                    Bool.ifelse(cc[0], before[PF], ~before[PF])),
+                Bool.ifelse(
+                    cc[1],
+                    Bool.ifelse(cc[0], before[CF], ~before[CF]),
+                    Bool.ifelse(cc[0], before[ZF], ~before[ZF])))
+            target = Bits.concat(Bits(phased('r2'), width=8),
+                                 Bits(phased('r1'), width=8))
+            wz = Bits.ifelse(cc, target, get_wz())
+            return check(wz[i])
         if instr == 'jr d':
             d = Bits(phased('r'), width=8)
             wz = get_pc_plus(2) + d.sign_extended(16)
@@ -2637,6 +2653,19 @@ def process_instr(instrs, base_state, *, test=False):
         if cond == 'b != 1':
             b = Bits(before[f'reg_b{i}'] for i in range(8))
             return b != 1
+        if cond == 'cc':
+            phase = len(instrs)
+            cc = Bits(f'cc_p{phase}', width=3)
+            return Bool.ifelse(
+                cc[2],
+                Bool.ifelse(
+                    cc[1],
+                    Bool.ifelse(cc[0], before[SF], ~before[SF]),
+                    Bool.ifelse(cc[0], before[PF], ~before[PF])),
+                Bool.ifelse(
+                    cc[1],
+                    Bool.ifelse(cc[0], before[CF], ~before[CF]),
+                    Bool.ifelse(cc[0], before[ZF], ~before[ZF])))
         if cond == 'cc2':
             phase = len(instrs)
             cc2 = Bits(f'cc2_p{phase}', width=2)
@@ -2924,8 +2953,8 @@ class TestedInstrs(object):
         def f6(p):
             return f(p, ticks=6)
 
-        def r3(p='r'):
-            return phased(p), 3, None
+        def r3(p='r', cond=None):
+            return phased(p), 3, cond
 
         def r4(p='r'):
             return phased(p), 4, None
@@ -3036,6 +3065,8 @@ class TestedInstrs(object):
         yield 'jr cc, d', (
             f(xyz(0, Bits(phased('cc2'), width=2) | 0b100, 0)),
             r3(), e5(cond='cc2'))
+        yield 'ret cc', (
+            f5(xyz(3, 'cc', 0)), r3('r1', cond='cc'), r3('r2', cond='cc'))
 
         yield 'ld {i, r}, a/ld a, {i, r}', (
             f(0xed), f5(ifelse('is_i_reg',
