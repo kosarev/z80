@@ -2285,7 +2285,17 @@ def test_node(instrs, n, before, after):
             b = get_b()
             d = Bits(phased('r'), width=8)
             target = get_pc_plus(2) + d.sign_extended(16)
-            wz = Bits.ifelse(b == 1, get_wz(), target)
+            wz = Bits.ifelse(b != 1, target, get_wz())
+            return check(wz[i])
+        if instr == 'jr cc, d':
+            cc2 = Bits(phased('cc2'), width=2)
+            cc2 = Bool.ifelse(
+                cc2[1],
+                Bool.ifelse(cc2[0], before[CF], ~before[CF]),
+                Bool.ifelse(cc2[0], before[ZF], ~before[ZF]))
+            d = Bits(phased('r'), width=8)
+            target = get_pc_plus(2) + d.sign_extended(16)
+            wz = Bits.ifelse(cc2, target, get_wz())
             return check(wz[i])
         if instr == 'in a, (n)/out (n), a':
             a = bits('reg_a')
@@ -2627,6 +2637,13 @@ def process_instr(instrs, base_state, *, test=False):
         if cond == 'b != 1':
             b = Bits(before[f'reg_b{i}'] for i in range(8))
             return b != 1
+        if cond == 'cc2':
+            phase = len(instrs)
+            cc2 = Bits(f'cc2_p{phase}', width=2)
+            return Bool.ifelse(
+                cc2[1],
+                Bool.ifelse(cc2[0], before[CF], ~before[CF]),
+                Bool.ifelse(cc2[0], before[ZF], ~before[ZF]))
         assert 0, cond
 
     TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
@@ -3016,6 +3033,9 @@ class TestedInstrs(object):
 
         yield 'djnz d', (
             f5(0x10), r3(), e5(cond='b != 1'))
+        yield 'jr cc, d', (
+            f(xyz(0, Bits(phased('cc2'), width=2) | 0b100, 0)),
+            r3(), e5(cond='cc2'))
 
         yield 'ld {i, r}, a/ld a, {i, r}', (
             f(0xed), f5(ifelse('is_i_reg',
