@@ -323,6 +323,7 @@ class Bool(object):
             true = __class__.__cache[True] = __class__()
             false.value, true.value = False, True
             false.__inversion, true.__inversion = true, false
+            false.size = true.size = 1
             return true if term else false
 
         assert isinstance(term, Literal)
@@ -332,6 +333,7 @@ class Bool(object):
         b.symbol = term
         b._e = None
         b.__inversion = None
+        b.size = 1
         return b
 
     @property
@@ -409,6 +411,7 @@ class Bool(object):
 
         b = __class__.__cache[key] = Bool.get(Literal.get(None))
         b._e = kind, ops
+        b.size = sum(op.size for op in ops) + 1
 
         if kind == 'not':
             op, = ops
@@ -515,11 +518,6 @@ class Bool(object):
 
     def __int__(self):
         return int(bool(self))
-
-    @property
-    def size(self):
-        assert 0  # TODO
-        return len(str(self))
 
     def __eq__(self, other):
         assert 0, "Bool's should not be compared; use is_equiv() instead."
@@ -1379,7 +1377,11 @@ class Z80Simulator(object):
                 # No further propagation is necessary if the state of
                 # the transistor is known to be same. This includes
                 # the case of a floating gate.
-                if not state.is_equiv(n.state):
+                if state.is_equiv(n.state):
+                    # Choose the simplest of the two equivalent states.
+                    if state.size < n.state.size:
+                        n.state = state
+                else:
                     n.state = state
                     for t in n.gate_of:
                         for c in t.conns:
@@ -1759,7 +1761,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 7
+        VERSION = 8
 
         key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
