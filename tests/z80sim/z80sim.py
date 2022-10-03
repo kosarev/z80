@@ -369,11 +369,6 @@ class Bool(object):
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
                 add((~i, t, ~r), (~i, ~t, r), (i, e, ~r), (i, ~e, r))
-            elif kind == 'or':
-                op_syms = tuple(get(op) for op in ops)
-                add(tuple(s for s in op_syms + (~r,)))
-                for s in op_syms:
-                    add((~s, r))
             elif kind == 'and':
                 op_syms = tuple(get(op) for op in ops)
                 add(tuple(~s for s in op_syms + (~r,)))
@@ -395,7 +390,7 @@ class Bool(object):
 
         COMMUTATIVE = {
             'not': False, 'ifelse': False,
-            'eq': True, 'or': True, 'and': True}
+            'eq': True, 'and': True}
         if COMMUTATIVE[kind]:
             syms = tuple(sorted(syms))
 
@@ -519,26 +514,7 @@ class Bool(object):
 
     @staticmethod
     def get_or(*args):
-        unique_syms = []
-        unique_args = []
-        for a in args:
-            if a.value is not None:
-                if a.value is False:
-                    continue
-                return TRUE
-            if (a.__inversion is not None and
-                    a.__inversion.symbol in unique_syms):
-                return TRUE
-            if a.symbol not in unique_syms:
-                unique_syms.append(a.symbol)
-                unique_args.append(a)
-
-        if len(unique_args) == 0:
-            return FALSE
-        if len(unique_args) == 1:
-            return unique_args[0]
-
-        return __class__.from_ops('or', *unique_args)
+        return ~__class__.get_and(*(~a for a in args))
 
     def __or__(self, other):
         return __class__.get_or(self, other)
