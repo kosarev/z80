@@ -365,11 +365,6 @@ class Bool(object):
                 a, b = ops
                 a, b = get(a), get(b)
                 add((~a, ~b, r), (a, b, r), (a, ~b, ~r), (~a, b, ~r))
-            elif kind == 'neq':
-                # TODO: Can be just not(eq())?
-                a, b = ops
-                a, b = get(a), get(b)
-                add((~a, ~b, ~r), (a, b, ~r), (a, ~b, r), (~a, b, r))
             elif kind == 'ifelse':
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
@@ -400,7 +395,7 @@ class Bool(object):
 
         COMMUTATIVE = {
             'not': False, 'ifelse': False,
-            'eq': True, 'neq': True, 'or': True, 'and': True}
+            'eq': True, 'or': True, 'and': True}
         if COMMUTATIVE[kind]:
             syms = tuple(sorted(syms))
 
@@ -629,16 +624,7 @@ class Bool(object):
 
     @staticmethod
     def get_neq(a, b):
-        if a is b:
-            return FALSE
-        if a is b.__inversion:
-            return TRUE
-        if a.value is not None:
-            return ~b if a.value else b
-        if b.value is not None:
-            return ~a if b.value else a
-
-        return __class__.from_ops('neq', a, b)
+        return ~__class__.get_eq(a, b)
 
     def is_equiv(self, other):
         e = Bool.get_neq(self, other)
@@ -676,7 +662,6 @@ class Bool(object):
             kind, ops = n._e
             OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
                    'eq': lambda a, b: a == b,
-                   'neq': lambda a, b: a != b,
                    'ifelse': z3.If}
             r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
             return r
