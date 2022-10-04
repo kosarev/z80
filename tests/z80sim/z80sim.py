@@ -596,6 +596,29 @@ class Bool(object):
         if b.value is not None:
             return a if b.value else ~a
 
+        # This simplification is particularly important for
+        # speeding up simulation of conditional half-ticks:
+        # if t2 is ifelse(c, ~t, t), then ifelse(c, ~t2, t2) is t.
+        #
+        # eq(a, eq(a, b))  =>  b
+        # eq(a, eq(~a, b))  =>  ~b
+        for x, y in ((a, b), (b, a)):
+            f = FALSE
+            if y._e is not None and y._e[0] == 'not':
+                f = TRUE
+                y, = y._e[1]
+
+            if y._e is not None and y._e[0] == 'eq':
+                p, q = y._e[1]
+                if x is p:
+                    return q ^ f
+                if x is p.__inversion:
+                    return q ^ ~f
+                if x is q:
+                    return p ^ f
+                if x is q.__inversion:
+                    return p ^ ~f
+
         return __class__.from_ops('eq', a, b)
 
     @staticmethod
