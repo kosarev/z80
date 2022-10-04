@@ -531,6 +531,13 @@ class Bool(object):
             if (a.__inversion is not None and
                     a.__inversion.symbol in unique_syms):
                 return FALSE
+            if a._e is not None and a._e[0] == 'and':
+                for op in a._e[1]:
+                    if (op.__inversion is not None and
+                            op.__inversion.symbol in unique_syms):
+                        return FALSE
+                    if op.symbol not in unique_syms:
+                        unique_syms.append(op.symbol)
             if a.symbol not in unique_syms:
                 unique_syms.append(a.symbol)
                 unique_args.append(a)
