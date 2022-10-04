@@ -2023,10 +2023,8 @@ class State(object):
                   'reg_hh', 'reg_ll', 'reg_aa', 'reg_ff'):
             print_bits(r, 8)
 
-        # TODO: flipflop int_disabled
         # TODO: flipflop halted
         # TODO: flipflop iff1, iff2
-        # TODO: int_mode im
         # TODO: The SCF/SCC flag discovered by Patrik Rak, see
         #       https://github.com/kosarev/z80/issues/42
         # TODO: ~int
