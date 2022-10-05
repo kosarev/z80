@@ -54,6 +54,12 @@ SF, SF2 = 'reg_f7', 'reg_ff7'
 (CF_BIT, NF_BIT, PF_BIT, XF_BIT,
  HF_BIT, YF_BIT, ZF_BIT, SF_BIT) = range(8)
 
+EX_AF_FF = 'ex_af'
+EXX_FF = 'ex_bcdehl'
+EX_DE_FF0 = 'ex_dehl0'
+EX_DE_FF1 = 'ex_dehl1'
+EX_DE_FF = 'ex_dehl_combined'
+
 # TODO: Can also be n206, p1210, p1239 or p231.
 IFF2 = 'n181'
 
@@ -2107,47 +2113,50 @@ def test_node(instrs, n, before, after):
         return Bits(before[f'{id}{i}'] for i in range(8))
 
     def is_active(n):
-        if n in (IFF2,):
+        if n in (IFF2, EX_AF_FF, EXX_FF, EX_DE_FF):
             return TRUE
         if n.startswith('reg_') and n[4] in 'wz':
             return TRUE
+        if n in (EX_DE_FF0, EX_DE_FF1):
+            exx = before[EXX_FF]
+            return ~exx if n == EX_DE_FF0 else exx
         if n.startswith('reg_a') or n.startswith('reg_f'):
-            ex_af = before['ex_af']
-            return (~ex_af if n.startswith('reg_aa') or n.startswith('reg_ff')
-                    else ex_af)
+            ex_af = before[EX_AF_FF]
+            is_alt = n.startswith('reg_aa') or n.startswith('reg_ff')
+            return (~ex_af if is_alt else ex_af)
         assert 0, n
 
     def get_b():
-        return Bits.ifelse(before['ex_bcdehl'], bits('reg_b'), bits('reg_bb'))
+        return Bits.ifelse(before[EXX_FF], bits('reg_b'), bits('reg_bb'))
 
     def get_c():
-        return Bits.ifelse(before['ex_bcdehl'], bits('reg_c'), bits('reg_cc'))
+        return Bits.ifelse(before[EXX_FF], bits('reg_c'), bits('reg_cc'))
 
     def get_d():
-        d = Bits.ifelse(before['ex_bcdehl'], bits('reg_d'), bits('reg_dd'))
-        h = Bits.ifelse(before['ex_bcdehl'], bits('reg_h'), bits('reg_hh'))
-        return Bits.ifelse(before['ex_dehl_combined'], h, d)
+        d = Bits.ifelse(before[EXX_FF], bits('reg_d'), bits('reg_dd'))
+        h = Bits.ifelse(before[EXX_FF], bits('reg_h'), bits('reg_hh'))
+        return Bits.ifelse(before[EX_DE_FF], h, d)
 
     def get_e():
-        e = Bits.ifelse(before['ex_bcdehl'], bits('reg_e'), bits('reg_ee'))
-        rl = Bits.ifelse(before['ex_bcdehl'], bits('reg_l'), bits('reg_ll'))
-        return Bits.ifelse(before['ex_dehl_combined'], rl, e)
+        e = Bits.ifelse(before[EXX_FF], bits('reg_e'), bits('reg_ee'))
+        rl = Bits.ifelse(before[EXX_FF], bits('reg_l'), bits('reg_ll'))
+        return Bits.ifelse(before[EX_DE_FF], rl, e)
 
     def get_h():
-        d = Bits.ifelse(before['ex_bcdehl'], bits('reg_d'), bits('reg_dd'))
-        h = Bits.ifelse(before['ex_bcdehl'], bits('reg_h'), bits('reg_hh'))
-        return Bits.ifelse(before['ex_dehl_combined'], d, h)
+        d = Bits.ifelse(before[EXX_FF], bits('reg_d'), bits('reg_dd'))
+        h = Bits.ifelse(before[EXX_FF], bits('reg_h'), bits('reg_hh'))
+        return Bits.ifelse(before[EX_DE_FF], d, h)
 
     def get_l():
-        e = Bits.ifelse(before['ex_bcdehl'], bits('reg_e'), bits('reg_ee'))
-        rl = Bits.ifelse(before['ex_bcdehl'], bits('reg_l'), bits('reg_ll'))
-        return Bits.ifelse(before['ex_dehl_combined'], e, rl)
+        e = Bits.ifelse(before[EXX_FF], bits('reg_e'), bits('reg_ee'))
+        rl = Bits.ifelse(before[EXX_FF], bits('reg_l'), bits('reg_ll'))
+        return Bits.ifelse(before[EX_DE_FF], e, rl)
 
     def get_a():
-        return Bits.ifelse(before['ex_af'], bits('reg_a'), bits('reg_aa'))
+        return Bits.ifelse(before[EX_AF_FF], bits('reg_a'), bits('reg_aa'))
 
     def get_f():
-        return Bits.ifelse(before['ex_af'], bits('reg_f'), bits('reg_ff'))
+        return Bits.ifelse(before[EX_AF_FF], bits('reg_f'), bits('reg_ff'))
 
     def get_active(n):
         f = get_f()
@@ -2401,6 +2410,19 @@ def test_node(instrs, n, before, after):
         if instr == 'ei/di':
             return check(Bool.get(phased('is_ei')))
 
+    if n == EX_AF_FF and instr == "ex af, af'":
+        return check(~before[n])
+
+    if n == EXX_FF and instr == 'exx':
+        return check(~before[n])
+
+    if n in (EX_DE_FF0, EX_DE_FF1, EX_DE_FF) and instr == 'ex de, hl':
+        return check(~before[n])
+
+    if n == EX_DE_FF and instr == 'exx':
+        ex_de = before[EXX_FF].xifelse(before[EX_DE_FF0], before[EX_DE_FF1])
+        return check(~ex_de)
+
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
@@ -2453,11 +2475,12 @@ def test_node(instrs, n, before, after):
     if instr == 'pop <rp2>':
         RP2_AF = 3
         p = Bits(opcode.bits[4:6])
-        i = int(n[-1])
         if n.startswith('reg_f'):
+            i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
                                      f'lo_p{phase}_b{i}', before[n]))
         if n.startswith('reg_a'):
+            i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
                                      f'hi_p{phase}_b{i}', before[n]))
 
@@ -2681,12 +2704,12 @@ def process_instr(instrs, base_state, *, test=False):
             return None
         if cond == 'b != 1':
             b = Bits.ifelse(
-                    before['ex_bcdehl'],
+                    before[EXX_FF],
                     Bits(before[f'reg_b{i}'] for i in range(8)),
                     Bits(before[f'reg_bb{i}'] for i in range(8)))
             return b != 1
         f = Bits.ifelse(
-                before['ex_af'],
+                before[EX_AF_FF],
                 Bits(before[f'reg_f{i}'] for i in range(8)),
                 Bits(before[f'reg_ff{i}'] for i in range(8)))
         if cond == 'cc':
@@ -2711,7 +2734,7 @@ def process_instr(instrs, base_state, *, test=False):
                 Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
         assert 0, cond
 
-    TESTED_NODES = {IFF2}
+    TESTED_NODES = {IFF2, EX_AF_FF, EXX_FF, EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
     for r in 'af':
         for i in range(8):
             TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
@@ -2719,7 +2742,7 @@ def process_instr(instrs, base_state, *, test=False):
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
 
-    SAMPLED_NODES = TESTED_NODES | {'ex_af', 'ex_bcdehl', 'ex_dehl_combined'}
+    SAMPLED_NODES = set(TESTED_NODES)
     for i in range(8):
         for r in 'bcdehl':
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
@@ -2796,6 +2819,7 @@ def build_symbolised_state():
         ('pop bc2', ((0xc1, 4), ('cc', 3), ('bb', 3))),
         ('pop de2', ((0xd1, 4), ('ee', 3), ('dd', 3))),
         ('pop hl2', ((0xe1, 4), ('ll', 3), ('hh', 3))),
+        ('ex de, hl/nop', ((Bits.ifelse('is_ex_de_hl', 0xeb, 0x00), 4),)),
         ('exx', ((0xd9, 4),)),
 
         ('pop ix', ((0xdd, 4), (0xe1, 4), ('ixl', 3), ('ixh', 3))),
@@ -2832,7 +2856,7 @@ def build_symbolised_state():
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
 
         ("ex af, af'/nop", ((Bits.ifelse('is_ex_af_af2', 0x08, 0x00), 4),)),
-        ('ex de, hl/nop', ((Bits.ifelse('is_ex_de_hl', 0xeb, 0x00), 4),)),
+        ('ex de, hl/nop', ((Bits.ifelse('is_ex_de_hl_2', 0xeb, 0x00), 4),)),
         ('exx/nop', ((Bits.ifelse('is_exx', 0xd9, 0x00), 4),)),
     )
 
