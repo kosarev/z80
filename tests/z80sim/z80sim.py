@@ -42,14 +42,17 @@ _PINS = (
     '~int', '~nmi', '~halt', '~mreq', '~iorq', '~rfsh', '~m1',
     '~reset', '~busrq', '~wait', '~busak', '~wr', '~rd', '~clk')
 
-CF = 'reg_f0'
-NF = 'reg_f1'
-PF = 'reg_f2'
-XF = 'reg_f3'
-HF = 'reg_f4'
-YF = 'reg_f5'
-ZF = 'reg_f6'
-SF = 'reg_f7'
+CF, CF2 = 'reg_f0', 'reg_ff0'
+NF, NF2 = 'reg_f1', 'reg_ff1'
+PF, PF2 = 'reg_f2', 'reg_ff2'
+XF, XF2 = 'reg_f3', 'reg_ff3'
+HF, HF2 = 'reg_f4', 'reg_ff4'
+YF, YF2 = 'reg_f5', 'reg_ff5'
+ZF, ZF2 = 'reg_f6', 'reg_ff6'
+SF, SF2 = 'reg_f7', 'reg_ff7'
+
+(CF_BIT, NF_BIT, PF_BIT, XF_BIT,
+ HF_BIT, YF_BIT, ZF_BIT, SF_BIT) = range(8)
 
 # TODO: Can also be n206, p1210, p1239 or p231.
 IFF2 = 'n181'
@@ -562,7 +565,6 @@ class Bool(object):
 
         return self.__inversion
 
-    # TODO: Can this be a non-static method of cond?
     @staticmethod
     def ifelse(cond, a, b):
         cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
@@ -591,6 +593,10 @@ class Bool(object):
             return a & b
 
         return __class__.from_ops('ifelse', cond, a, b)
+
+    # TODO: Remove ifelse() in favour of this function.
+    def xifelse(self, a, b):
+        return __class__.ifelse(self, a, b)
 
     @staticmethod
     def get_eq(a, b):
@@ -2054,8 +2060,7 @@ class TestFailure(Exception):
 
 def test_node(instrs, n, before, after):
     def check(x):
-        if isinstance(x, str):
-            x = before[x]
+        x = is_active(n).xifelse(x, before[n])
 
         if after[n].is_equiv(x):
             return CheckToken()
@@ -2063,7 +2068,9 @@ def test_node(instrs, n, before, after):
         Status.clear()
 
         NAMES = {CF: 'cf', NF: 'nf', PF: 'pf', XF: 'xf',
-                 HF: 'hf', YF: 'yf', ZF: 'zf', SF: 'sf'}
+                 HF: 'hf', YF: 'yf', ZF: 'zf', SF: 'sf',
+                 CF2: 'cf', NF2: 'nf', PF2: 'pf', XF2: 'xf',
+                 HF2: 'hf', YF2: 'yf', ZF2: 'zf', SF2: 'sf'}
         n_name = str(n)
         if n in NAMES:
             n_name = f'{n_name} ({NAMES[n]})'
@@ -2099,26 +2106,64 @@ def test_node(instrs, n, before, after):
     def bits(id):
         return Bits(before[f'{id}{i}'] for i in range(8))
 
+    def is_active(n):
+        if n in (IFF2,):
+            return TRUE
+        if n.startswith('reg_') and n[4] in 'wz':
+            return TRUE
+        if n.startswith('reg_a') or n.startswith('reg_f'):
+            ex_af = before['ex_af']
+            return (~ex_af if n.startswith('reg_aa') or n.startswith('reg_ff')
+                    else ex_af)
+        assert 0, n
+
     def get_b():
-        return bits('reg_b')
+        return Bits.ifelse(before['ex_bcdehl'], bits('reg_b'), bits('reg_bb'))
 
     def get_c():
-        return bits('reg_c')
+        return Bits.ifelse(before['ex_bcdehl'], bits('reg_c'), bits('reg_cc'))
 
     def get_d():
-        return bits('reg_d')
+        d = Bits.ifelse(before['ex_bcdehl'], bits('reg_d'), bits('reg_dd'))
+        h = Bits.ifelse(before['ex_bcdehl'], bits('reg_h'), bits('reg_hh'))
+        return Bits.ifelse(before['ex_dehl_combined'], h, d)
 
     def get_e():
-        return bits('reg_e')
+        e = Bits.ifelse(before['ex_bcdehl'], bits('reg_e'), bits('reg_ee'))
+        rl = Bits.ifelse(before['ex_bcdehl'], bits('reg_l'), bits('reg_ll'))
+        return Bits.ifelse(before['ex_dehl_combined'], rl, e)
 
     def get_h():
-        return bits('reg_h')
+        d = Bits.ifelse(before['ex_bcdehl'], bits('reg_d'), bits('reg_dd'))
+        h = Bits.ifelse(before['ex_bcdehl'], bits('reg_h'), bits('reg_hh'))
+        return Bits.ifelse(before['ex_dehl_combined'], d, h)
 
     def get_l():
-        return bits('reg_l')
+        e = Bits.ifelse(before['ex_bcdehl'], bits('reg_e'), bits('reg_ee'))
+        rl = Bits.ifelse(before['ex_bcdehl'], bits('reg_l'), bits('reg_ll'))
+        return Bits.ifelse(before['ex_dehl_combined'], e, rl)
 
     def get_a():
-        return bits('reg_a')
+        return Bits.ifelse(before['ex_af'], bits('reg_a'), bits('reg_aa'))
+
+    def get_f():
+        return Bits.ifelse(before['ex_af'], bits('reg_f'), bits('reg_ff'))
+
+    def get_active(n):
+        f = get_f()
+        if n == CF:
+            return f[CF_BIT]
+        if n == NF:
+            return f[NF_BIT]
+        if n == PF:
+            return f[PF_BIT]
+        if n == HF:
+            return f[HF_BIT]
+        if n == ZF:
+            return f[ZF_BIT]
+        if n == SF:
+            return f[SF_BIT]
+        assert 0, n
 
     def get_at_hl():
         return Bits(phased('r'), width=8)
@@ -2161,15 +2206,24 @@ def test_node(instrs, n, before, after):
         # been advanced, so we in fact get (pc + 1).
         return Bits.concat(bits('reg_pch'), bits('reg_pcl')) + (off - 1)
 
-    if n == CF:
+    CFF = CF, CF2
+    NFF = NF, NF2
+    PFF = PF, PF2
+    XFF = XF, XF2
+    HFF = HF, HF2
+    YFF = YF, YF2
+    ZFF = ZF, ZF2
+    SFF = SF, SF2
+
+    if n in CFF:
         if instr == 'scf/ccf':
             return check(Bool.ifelse(phased('is_scf'), TRUE,
-                                     ~before[CF]))
+                                     ~get_active(CF)))
         if instr == 'rlca/rrca/rla/rra':
-            return check(Bool.ifelse(phased('is_rl'), before['reg_a7'],
-                                     before['reg_a0']))
+            a = get_a()
+            return check(Bool.ifelse(phased('is_rl'), a[7], a[0]))
 
-    if n == NF:
+    if n in NFF:
         if instr == 'cpl':
             return check(TRUE)
         if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
@@ -2177,9 +2231,9 @@ def test_node(instrs, n, before, after):
         if instr in ('scf/ccf', 'rlca/rrca/rla/rra', 'add hl, <rp>'):
             return check(FALSE)
 
-    if n in (XF, YF):
+    if n in XFF + YFF:
         i = int(n[-1])
-        a = before[f'reg_a{i}']
+        a = get_a()[i]
         if instr == 'cpl':
             return check(~a)
         if instr == 'scf/ccf':
@@ -2191,7 +2245,7 @@ def test_node(instrs, n, before, after):
                               '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)',
                               'adc/sbc hl, <rp>', 'bit (hl)'):
                 return check(a)
-            f = before[f'reg_f{i}']
+            f = get_f()[i]
             if prev_instr == 'in/out r, (c)':
                 return check(Bool.ifelse(phased('is_in', -1), a, a | f))
             if prev_instr == 'rot/res/set (hl)':
@@ -2200,16 +2254,16 @@ def test_node(instrs, n, before, after):
                 return check(Bool.ifelse(phased('is_rot_bit', -1), a, a | f))
             return check(a | f)
         if instr == 'rlca/rrca/rla/rra':
-            return check(Bool.ifelse(phased('is_rl'), before[f'reg_a{i - 1}'],
-                                     before[f'reg_a{i + 1}']))
+            a = get_a()
+            return check(Bool.ifelse(phased('is_rl'), a[i - 1], a[i + 1]))
 
-    if n == HF:
+    if n in HFF:
         if instr == 'cpl':
             return check(TRUE)
         if instr == 'rlca/rrca/rla/rra':
             return check(FALSE)
         if instr == 'scf/ccf':
-            return check(Bool.ifelse(phased('is_scf'), FALSE, before[CF]))
+            return check(Bool.ifelse(phased('is_scf'), FALSE, get_active(CF)))
 
     if n.startswith('reg_a'):
         i = int(n[-1])
@@ -2242,7 +2296,7 @@ def test_node(instrs, n, before, after):
             return check(a[i])
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            cf_a = Bits.concat(Bits((before[CF],)), a)
+            cf_a = Bits.concat(Bits((get_active(CF),)), a)
             rlca, rrca = a.rol(), a.ror()
             rla, rra = cf_a.rol(), cf_a.ror()
             v = Bits.ifelse(phased('is_rlca_rrca'),
@@ -2269,17 +2323,19 @@ def test_node(instrs, n, before, after):
                              Bits(phased('r3'), width=8))
             return check(wz[i])
         if instr == 'ret cc':
+            sf, pf = get_active(SF), get_active(PF)
+            cf, zf = get_active(CF), get_active(ZF)
             cc = Bits(phased('cc'), width=3)
             cc = Bool.ifelse(
                 cc[2],
                 Bool.ifelse(
                     cc[1],
-                    Bool.ifelse(cc[0], before[SF], ~before[SF]),
-                    Bool.ifelse(cc[0], before[PF], ~before[PF])),
+                    Bool.ifelse(cc[0], sf, ~sf),
+                    Bool.ifelse(cc[0], pf, ~pf)),
                 Bool.ifelse(
                     cc[1],
-                    Bool.ifelse(cc[0], before[CF], ~before[CF]),
-                    Bool.ifelse(cc[0], before[ZF], ~before[ZF])))
+                    Bool.ifelse(cc[0], cf, ~cf),
+                    Bool.ifelse(cc[0], zf, ~zf)))
             target = Bits.concat(Bits(phased('r2'), width=8),
                                  Bits(phased('r1'), width=8))
             wz = Bits.ifelse(cc, target, get_wz())
@@ -2296,16 +2352,17 @@ def test_node(instrs, n, before, after):
             return check(wz[i])
         if instr == 'jr cc, d':
             cc2 = Bits(phased('cc2'), width=2)
+            cf, zf = get_active(CF), get_active(ZF)
             cc2 = Bool.ifelse(
                 cc2[1],
-                Bool.ifelse(cc2[0], before[CF], ~before[CF]),
-                Bool.ifelse(cc2[0], before[ZF], ~before[ZF]))
+                Bool.ifelse(cc2[0], cf, ~cf),
+                Bool.ifelse(cc2[0], zf, ~zf))
             d = Bits(phased('r'), width=8)
             target = get_pc_plus(2) + d.sign_extended(16)
             wz = Bits.ifelse(cc2, target, get_wz())
             return check(wz[i])
         if instr == 'in a, (n)/out (n), a':
-            a = bits('reg_a')
+            a = get_a()
             r = Bits(phased('r'), width=8)
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
@@ -2347,29 +2404,29 @@ def test_node(instrs, n, before, after):
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
-        if n == PF:
+        if n in PFF:
             return check(Bool.ifelse(phased('is_inc'), r == 0x80, r == 0x7f))
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i])
-        if n == HF:
+        if n in HFF:
             r4 = r.truncated(4)
             return check(Bool.ifelse(phased('is_inc'), r4 == 0x0, r4 == 0xf))
-        if n == ZF:
+        if n in ZFF:
             return check(r == 0x00)
-        if n == SF:
+        if n in SFF:
             return check(r[7])
 
     if instr == 'add hl, <rp>':
         hl = get_hl()
         rp = get_rp(opcode[4:6])
         r = hl + rp
-        if n == CF:
+        if n in CFF:
             return check(r[16])
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i + 8])
-        if n == HF:
+        if n in HFF:
             return check(hl[4 + 8] ^ rp[4 + 8] ^ r[4 + 8])
 
     if instr == 'ld {i, r}, a/ld a, {i, r}':
@@ -2377,17 +2434,17 @@ def test_node(instrs, n, before, after):
         rr = Bits((rr + 1).bits[:7] + (rr[7],))
         r = Bits.ifelse(phased('is_i_reg'), ri, rr)
         v = Bits.ifelse(phased('is_store'), get_a(), r)
-        if n in (NF, HF):
+        if n in NFF + HFF:
             return check(Bool.ifelse(phased('is_store'), before[n], FALSE))
-        if n == PF:
+        if n in PFF:
             return check(Bool.ifelse(phased('is_store'), before[n],
                                      before[IFF2]))
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(Bool.ifelse(phased('is_store'), before[n], r[i]))
-        if n == ZF:
+        if n in ZFF:
             return check(Bool.ifelse(phased('is_store'), before[n], r == 0x00))
-        if n == SF:
+        if n in SFF:
             return check(Bool.ifelse(phased('is_store'), before[n], r[7]))
         if n.startswith('reg_a'):
             i = int(n[-1])
@@ -2396,38 +2453,37 @@ def test_node(instrs, n, before, after):
     if instr == 'pop <rp2>':
         RP2_AF = 3
         p = Bits(opcode.bits[4:6])
-        if n in (CF, NF, PF, XF, HF, YF, ZF, SF):
-            i = int(n[-1])
+        i = int(n[-1])
+        if n.startswith('reg_f'):
             return check(Bool.ifelse(p == RP2_AF,
                                      f'lo_p{phase}_b{i}', before[n]))
         if n.startswith('reg_a'):
-            i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
                                      f'hi_p{phase}_b{i}', before[n]))
 
     if instr == 'daa':
-        a = bits('reg_a')
-        cf = before[CF]
+        a = get_a()
+        cf = get_active(CF)
         add_0x60 = cf | (a >= 0x9a)
-        if n == CF:
+        if n in CFF:
             return check(add_0x60)
-        hf = before['reg_f4']
+        hf = get_active(HF)
         add_0x06 = hf | ((a & 0x0f) >= 0x0a)
         d = (Bits.ifelse(add_0x60, 0x60, 0x00) +
              Bits.ifelse(add_0x06, 0x06, 0x00))
-        nf = before[NF]
+        nf = get_active(NF)
         r = Bits.ifelse(nf, a - d, a + d).truncated(8)
-        if n == PF:
+        if n in PFF:
             return check(r.parity())
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i])
-        if n == HF:
+        if n in HFF:
             a4 = a.truncated(4)
             return check(Bool.ifelse(nf, hf & (a4 <= 0x5), a4 >= 0xa))
-        if n == ZF:
+        if n in ZFF:
             return check(r == 0x00)
-        if n == SF:
+        if n in SFF:
             return check(r[7])
         if n.startswith('reg_a'):
             i = int(n[-1])
@@ -2450,7 +2506,7 @@ def test_node(instrs, n, before, after):
         is_sub_sbc_cp = op.is_any(SUB, SBC, CP)
         is_bitwise = op.is_any(AND, XOR, OR)
 
-        cf_in = Bits.ifelse(before[CF] & op.is_any(ADC, SBC), 1, 0)
+        cf_in = Bits.ifelse(get_active(CF) & op.is_any(ADC, SBC), 1, 0)
         r = Bits.ifelse(
             is_add_adc, a + s + cf_in,
             Bits.ifelse(
@@ -2459,22 +2515,22 @@ def test_node(instrs, n, before, after):
                     op == AND, a & s,
                     Bits.ifelse(op == XOR, a ^ s, a | s))))
 
-        if n == CF:
+        if n in CFF:
             return check(r[8])
-        if n == NF:
+        if n in NFF:
             return check(is_sub_sbc_cp)
-        if n == PF:
+        if n in PFF:
             overflow = r[8] ^ r[7] ^ a[7] ^ s[7]
             return check(Bool.ifelse(is_bitwise, r.parity(), overflow))
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(Bool.ifelse(op == CP, s[i], r[i]))
-        if n == HF:
+        if n in HFF:
             return check(Bool.ifelse(is_bitwise, op == AND,
                                      r[4] ^ a[4] ^ s[4]))
-        if n == ZF:
+        if n in ZFF:
             return check(r.truncated(8) == 0x00)
-        if n == SF:
+        if n in SFF:
             return check(r[7])
         if n.startswith('reg_a'):
             i = int(n[-1])
@@ -2488,14 +2544,14 @@ def test_node(instrs, n, before, after):
         t = Bits.ifelse(phased('is_rrd'), t.ror(4), t.rol(4))
         t = Bits.concat(ah, t)
         a = Bits(t[8:16])
-        if n.startswith('reg_a') or n in (XF, YF, SF):
+        if n.startswith('reg_a') or n in XFF + YFF + SFF:
             i = int(n[-1])
             return check(a[i])
-        if n in (NF, HF):
+        if n in NFF + HFF:
             return check(FALSE)
-        if n == PF:
+        if n in PFF:
             return check(a.parity())
-        if n == ZF:
+        if n in ZFF:
             return check(a == 0x00)
 
     if instr == 'in/out r, (c)':
@@ -2503,14 +2559,14 @@ def test_node(instrs, n, before, after):
         io = Bits(phased('io'), width=8)
         is_in = Bool.get(phased('is_in'))
         a = Bits.ifelse(~is_in | (y != A), get_a(), io)
-        if n in (NF, HF):
+        if n in NFF + HFF:
             return check(Bool.ifelse(is_in, FALSE, before[n]))
-        if n == PF:
+        if n in PFF:
             return check(Bool.ifelse(is_in, io.parity(), before[n]))
-        if n in (XF, YF, SF):
+        if n in XFF + YFF + SFF:
             i = int(n[-1])
             return check(Bool.ifelse(is_in, io[i], before[n]))
-        if n == ZF:
+        if n in ZFF:
             return check(Bool.ifelse(is_in, io == 0, before[n]))
         if n.startswith('reg_a'):
             i = int(n[-1])
@@ -2518,22 +2574,22 @@ def test_node(instrs, n, before, after):
 
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
-        cf = Bits.ifelse(before[CF], 1, 0)
+        cf = Bits.ifelse(get_active(CF), 1, 0)
         is_adc = Bool.get(phased('q') + '_b0')
         r = Bits.ifelse(is_adc, hl + rp + cf, ((hl - rp) ^ 0x10000) - cf)
-        if n == CF:
+        if n in CFF:
             return check(r[16])
-        if n == NF:
+        if n in NFF:
             return check(~is_adc)
-        if n == PF:
+        if n in PFF:
             overflow = r[16] ^ r[15] ^ hl[15] ^ rp[15]
             return check(overflow)
-        if n in (XF, YF, SF):
+        if n in XFF + YFF + SFF:
             i = int(n[-1])
             return check(r[i + 8])
-        if n == HF:
+        if n in HFF:
             return check(r[12] ^ hl[12] ^ rp[12])
-        if n == ZF:
+        if n in ZFF:
             return check(r.truncated(16) == 0)
 
     if instr in ('bit (hl)', 'rot/res/set (hl)',
@@ -2549,7 +2605,7 @@ def test_node(instrs, n, before, after):
 
         is_nine_bit = y[1]
         is_shift = y[2]
-        cf = before[CF]
+        cf = get_active(CF)
         b = Bool.ifelse(
             is_shift,
             Bool.ifelse(is_nine_bit, ~is_right, is_right & v[7]),
@@ -2567,29 +2623,29 @@ def test_node(instrs, n, before, after):
         ROT, BIT, RES, SET = range(4)
         op = Bits(opcode[6:8])
 
-        if n == CF:
+        if n in CFF:
             return check(Bool.ifelse(op == ROT, rot_cf, cf))
-        if n == NF:
+        if n in NFF:
             return check(Bool.ifelse(op == ROT, FALSE,
                                      (op != BIT) & before[n]))
-        if n == HF:
+        if n in HFF:
             return check(Bool.ifelse(op == ROT, FALSE,
                                      (op == BIT) | before[n]))
-        if n == PF:
+        if n in PFF:
             return check(Bool.ifelse(
                 op == BIT, bit_r == 0,
                 Bool.ifelse(op == ROT, rot_r.parity(), before[n])))
-        if n in (XF, YF):
+        if n in XFF + YFF:
             i = int(n[-1])
             return check(Bool.ifelse(
                 op == BIT,
                 Bool.ifelse(reg == AT_HL, before[f'reg_w{i}'], v[i]),
                 Bool.ifelse(op == ROT, rot_r[i], before[n])))
-        if n == ZF:
+        if n in ZFF:
             return check(Bool.ifelse(
                 op == BIT, bit_r == 0,
                 Bool.ifelse(op == ROT, rot_r == 0, before[n])))
-        if n == SF:
+        if n in SFF:
             return check(Bool.ifelse(
                 op == BIT, bit_r[7],
                 Bool.ifelse(op == ROT, rot_r[7], before[n])))
@@ -2618,32 +2674,21 @@ def process_instr(instrs, base_state, *, test=False):
                     s.half_tick()
         s.cache()
 
-        ns = s.get_node_states(SAMPLED_NODES)
-
-        def swap(a, b):
-            for i in range(8):
-                ns[f'reg_{a}{i}'], ns[f'reg_{b}{i}'] = (
-                    ns[f'reg_{b}{i}'], ns[f'reg_{a}{i}'])
-
-        for instr in instrs:
-            if instr == 'ex de, hl':
-                swap('d', 'h')
-                swap('e', 'l')
-            if instr == "ex af, af'":
-                for r in 'af':
-                    swap(f'{r}', f'{r}{r}')
-            if instr == 'exx':
-                for r in 'bcdehl':
-                    swap(f'{r}', f'{r}{r}')
-
-        return ns
+        return s.get_node_states(SAMPLED_NODES)
 
     def get_cond_as_expr(cond, before):
         if cond is None:
             return None
         if cond == 'b != 1':
-            b = Bits(before[f'reg_b{i}'] for i in range(8))
+            b = Bits.ifelse(
+                    before['ex_bcdehl'],
+                    Bits(before[f'reg_b{i}'] for i in range(8)),
+                    Bits(before[f'reg_bb{i}'] for i in range(8)))
             return b != 1
+        f = Bits.ifelse(
+                before['ex_af'],
+                Bits(before[f'reg_f{i}'] for i in range(8)),
+                Bits(before[f'reg_ff{i}'] for i in range(8)))
         if cond == 'cc':
             phase = len(instrs)
             cc = Bits(f'cc_p{phase}', width=3)
@@ -2651,29 +2696,32 @@ def process_instr(instrs, base_state, *, test=False):
                 cc[2],
                 Bool.ifelse(
                     cc[1],
-                    Bool.ifelse(cc[0], before[SF], ~before[SF]),
-                    Bool.ifelse(cc[0], before[PF], ~before[PF])),
+                    Bool.ifelse(cc[0], f[SF_BIT], ~f[SF_BIT]),
+                    Bool.ifelse(cc[0], f[PF_BIT], ~f[PF_BIT])),
                 Bool.ifelse(
                     cc[1],
-                    Bool.ifelse(cc[0], before[CF], ~before[CF]),
-                    Bool.ifelse(cc[0], before[ZF], ~before[ZF])))
+                    Bool.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
+                    Bool.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
         if cond == 'cc2':
             phase = len(instrs)
             cc2 = Bits(f'cc2_p{phase}', width=2)
             return Bool.ifelse(
                 cc2[1],
-                Bool.ifelse(cc2[0], before[CF], ~before[CF]),
-                Bool.ifelse(cc2[0], before[ZF], ~before[ZF]))
+                Bool.ifelse(cc2[0], f[CF_BIT], ~f[CF_BIT]),
+                Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
         assert 0, cond
 
-    TESTED_NODES = {CF, NF, PF, XF, HF, YF, ZF, SF, IFF2}
-    for r in 'awz':
+    TESTED_NODES = {IFF2}
+    for r in 'af':
+        for i in range(8):
+            TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
+    for r in 'wz':
         for i in range(8):
             TESTED_NODES.add(f'reg_{r}{i}')
 
-    SAMPLED_NODES = set(TESTED_NODES)
+    SAMPLED_NODES = TESTED_NODES | {'ex_af', 'ex_bcdehl', 'ex_dehl_combined'}
     for i in range(8):
-        for r in 'afbcdehl':
+        for r in 'bcdehl':
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
         for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
             SAMPLED_NODES.add(f'reg_{r}{i}')
@@ -2782,6 +2830,10 @@ def build_symbolised_state():
         ('jp c, <wz>', ((0xda, 4), ('z', 3), ('w', 3))),
 
         ('pop af', ((0xf1, 4), ('f', 3), ('a', 3))),
+
+        ("ex af, af'/nop", ((Bits.ifelse('is_ex_af_af2', 0x08, 0x00), 4),)),
+        ('ex de, hl/nop', ((Bits.ifelse('is_ex_de_hl', 0xeb, 0x00), 4),)),
+        ('exx/nop', ((Bits.ifelse('is_exx', 0xd9, 0x00), 4),)),
     )
 
     s = build_reset_state()
@@ -3122,7 +3174,8 @@ def test_instructions():
     instrs = TestedInstrs.get_instrs()
     ok = True
     ok &= add((i,) for i in instrs)
-    ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
+    if '--two-instr-seqs' in sys.argv:
+        ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
     ok &= test_instr_seqs(seqs)
 
     Status.clear()
