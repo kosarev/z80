@@ -1685,8 +1685,7 @@ class Z80Simulator(object):
         hi = self.read_nodes('reg_pch')
         return (hi << 8) | lo
 
-    def set_pin_state(self, pin, state):
-        assert pin in _PINS
+    def set_node_state(self, pin, state):
         self.__nodes_by_name[pin].state = Bool.cast(state)
 
     def set_pin_pull(self, pin, pull):
@@ -1874,9 +1873,9 @@ class State(object):
         if kind == 'clear_state':
             _, _, = step
             sim.clear_state()
-        elif kind == 'set_pin_state':
+        elif kind == 'set_node_state':
             _, _, pin, state = step
-            sim.set_pin_state(pin, state)
+            sim.set_node_state(pin, state)
         elif kind == 'set_pin_pull':
             _, _, pin, pull = step
             sim.set_pin_pull(pin, pull)
@@ -1907,8 +1906,8 @@ class State(object):
     def clear_state(self):
         self.__add_step(('clear_state',))
 
-    def set_pin_state(self, pin, state):
-        step = 'set_pin_state', pin, Bool.cast(state)
+    def set_node_state(self, pin, state):
+        step = 'set_node_state', pin, Bool.cast(state)
         self.__add_step(step)
 
     def set_pin_pull(self, pin, pull):
@@ -2064,7 +2063,7 @@ class TestFailure(Exception):
     pass
 
 
-def test_node(instrs, n, before, after):
+def test_node(instrs, n, prev_instr_latch, before, after):
     def check(x):
         x = is_active(n).xifelse(x, before[n])
 
@@ -2097,10 +2096,6 @@ def test_node(instrs, n, before, after):
     if opcode in (0xcb, 0xed):
         opcode, ticks, cond = cycles[1]
 
-    prev_instr = None
-    if len(instrs) >= 2:
-        prev_instr = instrs[-2]
-
     AT_HL, A = 6, 7
 
     def phased(x, offset=0):
@@ -2115,15 +2110,16 @@ def test_node(instrs, n, before, after):
     def is_active(n):
         if n in (IFF2, EX_AF_FF, EXX_FF, EX_DE_FF):
             return TRUE
-        if n.startswith('reg_') and n[4] in 'wz':
-            return TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
             exx = before[EXX_FF]
             return ~exx if n == EX_DE_FF0 else exx
-        if n.startswith('reg_a') or n.startswith('reg_f'):
-            ex_af = before[EX_AF_FF]
-            is_alt = n.startswith('reg_aa') or n.startswith('reg_ff')
-            return (~ex_af if is_alt else ex_af)
+        if n.startswith('reg_'):
+            if n[4] in 'wz':
+                return TRUE
+            if n[4] in 'af':
+                ex_af = before[EX_AF_FF]
+                is_alt = (n[5] == n[4])
+                return ~ex_af if is_alt else ex_af
         assert 0, n
 
     def get_b():
@@ -2249,19 +2245,19 @@ def test_node(instrs, n, before, after):
             # See <https://github.com/kosarev/z80/issues/42>.
             # TODO: Does this agree with the current known
             # description of the behaviour?
-            if prev_instr in ('scf/ccf', 'add hl, <rp>', '<alu> n',
-                              'inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)',
-                              '<alu> {b, c, d, e, h, l, a}', '<alu> (hl)',
-                              'adc/sbc hl, <rp>', 'bit (hl)'):
-                return check(a)
             f = get_f()[i]
-            if prev_instr == 'in/out r, (c)':
-                return check(Bool.ifelse(phased('is_in', -1), a, a | f))
-            if prev_instr == 'rot/res/set (hl)':
-                return check(Bool.ifelse(phased('is_rot', -1), a, a | f))
-            if prev_instr == 'rot/bit/res/set {b, c, d, e, h, l, a}':
-                return check(Bool.ifelse(phased('is_rot_bit', -1), a, a | f))
-            return check(a | f)
+            op = prev_instr_latch
+            x = Bits(op.bits[6:8])
+            z = Bits(op.bits[0:3])
+            q = op[3]
+            is_scf_ccf = (op == 0x37) | (op == 0x3f)
+            is_alu_r = (x == 2)
+            is_alu_n = (x == 3) & (z == 6)
+            is_inc_dec_r = (x == 0) & ((z == 4) | (z == 5))
+            is_add_hl_rp = (x == 0) & q & (z == 1)
+            ignores_f = (is_scf_ccf | is_alu_r | is_alu_n | is_inc_dec_r |
+                         is_add_hl_rp)
+            return check(Bool.ifelse(ignores_f, a, a | f))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
             return check(Bool.ifelse(phased('is_rl'), a[i - 1], a[i + 1]))
@@ -2754,6 +2750,10 @@ def process_instr(instrs, base_state, *, test=False):
     cycles = TestedInstrs.get_cycles(id, phase)
 
     s = State(base_state)
+
+    instr_latch = s.get_node_states(f'instr{i}' for i in range(8))
+    instr_latch = Bits(instr_latch[f'instr{i}'] for i in range(8))
+
     before = get_effective_states(s)
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
         cond = get_cond_as_expr(cond, before)
@@ -2775,7 +2775,7 @@ def process_instr(instrs, base_state, *, test=False):
     after = get_effective_states(s)
 
     for n in sorted(TESTED_NODES):
-        token = test_node(instrs, n, before, after)
+        token = test_node(instrs, n, instr_latch, before, after)
         assert isinstance(token, CheckToken)
 
     return after_instr_state
@@ -2788,7 +2788,7 @@ def build_reset_state():
     s.report('after-clearing-state')
 
     for pin in _PINS:
-        s.set_pin_state(pin, f'init.{pin}')
+        s.set_node_state(pin, f'init.{pin}')
         if pin == '~clk':
             # The ~clk pull seems to propagate to lots of nodes,
             # including register bits, and survives the reset
@@ -2869,6 +2869,16 @@ def build_symbolised_state():
                         with s.status(f'cycle {i}'):
                             s.set_db_and_wait(d, ticks)
                             s.cache(intermediate=True)
+
+        # Symbolise the instruction latch.
+        instr = Bits('instr', width=8)
+        is_prefix = ((instr == 0xcb) | (instr == 0xed) |
+                     (instr == 0xdd) | (instr == 0xfd))
+        instr = Bits(b & ~is_prefix for b in instr)
+
+        for i in range(8):
+            s.set_node_state(f'instr{i}', instr[i])
+
         s.cache()
         s.report('after-symbolising')
 
