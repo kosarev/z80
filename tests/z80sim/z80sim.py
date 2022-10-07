@@ -1687,8 +1687,14 @@ class Z80Simulator(object):
         hi = self.read_nodes('reg_pch')
         return (hi << 8) | lo
 
-    def set_node_state(self, pin, state):
-        self.__nodes_by_name[pin].state = Bool.cast(state)
+    def set_node_state(self, n, state):
+        self.__nodes_by_name[n].state = Bool.cast(state)
+
+    def set_latch_state(self, a, b, state):
+        self.set_node_state(a, state)
+        self.set_node_state(b, ~state)
+        self.__update_nodes([self.__nodes_by_name[a],
+                             self.__nodes_by_name[b]])
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
@@ -1876,8 +1882,11 @@ class State(object):
             _, _, = step
             sim.clear_state()
         elif kind == 'set_node_state':
-            _, _, pin, state = step
-            sim.set_node_state(pin, state)
+            _, _, n, state = step
+            sim.set_node_state(n, state)
+        elif kind == 'set_latch_state':
+            _, _, a, b, state = step
+            sim.set_latch_state(a, b, state)
         elif kind == 'set_pin_pull':
             _, _, pin, pull = step
             sim.set_pin_pull(pin, pull)
@@ -1908,8 +1917,12 @@ class State(object):
     def clear_state(self):
         self.__add_step(('clear_state',))
 
-    def set_node_state(self, pin, state):
-        step = 'set_node_state', pin, Bool.cast(state)
+    def set_node_state(self, n, state):
+        step = 'set_node_state', n, Bool.cast(state)
+        self.__add_step(step)
+
+    def set_latch_state(self, a, b, state):
+        step = 'set_latch_state', a, b, Bool.cast(state)
         self.__add_step(step)
 
     def set_pin_pull(self, pin, pull):
@@ -2882,14 +2895,14 @@ def build_symbolised_state():
                             s.set_db_and_wait(d, ticks)
                             s.cache(intermediate=True)
 
-        # Symbolise the instruction latch.
-        instr = Bits('instr', width=8)
-        is_prefix = ((instr == 0xcb) | (instr == 0xed) |
-                     (instr == 0xdd) | (instr == 0xfd))
-        instr = Bits(b & ~is_prefix for b in instr)
+        with s.status('symbolise instruction latch'):
+            instr = Bits('instr', width=8)
+            is_prefix = ((instr == 0xcb) | (instr == 0xed) |
+                         (instr == 0xdd) | (instr == 0xfd))
+            instr = Bits(b & ~is_prefix for b in instr)
 
-        for i in range(8):
-            s.set_node_state(f'instr{i}', instr[i])
+            for i in range(8):
+                s.set_latch_state(f'instr{i}', f'~instr{i}', instr[i])
 
         s.cache()
         s.report('after-symbolising')
