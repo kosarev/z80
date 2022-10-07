@@ -60,8 +60,10 @@ EX_DE_FF0 = 'ex_dehl0'
 EX_DE_FF1 = 'ex_dehl1'
 EX_DE_FF = 'ex_dehl_combined'
 
-# TODO: Can also be n206, p1210, p1239 or p231.
-IFF2 = 'n181'
+# TODO: Can also be p1210, p1239 or p231.
+# These two are suggested by Tony Brewer.
+IFF1 = 'n181'
+IFF2 = 'n206'
 
 
 def _ceil_div(a, b):
@@ -2035,7 +2037,6 @@ class State(object):
             print_bits(r, 8)
 
         # TODO: flipflop halted
-        # TODO: flipflop iff1, iff2
         # TODO: The SCF/SCC flag discovered by Patrik Rak, see
         #       https://github.com/kosarev/z80/issues/42
         # TODO: ~int
@@ -2079,7 +2080,8 @@ def test_node(instrs, n, at_start, at_end, before, after):
         NAMES = {CF: 'cf', NF: 'nf', PF: 'pf', XF: 'xf',
                  HF: 'hf', YF: 'yf', ZF: 'zf', SF: 'sf',
                  CF2: 'cf', NF2: 'nf', PF2: 'pf', XF2: 'xf',
-                 HF2: 'hf', YF2: 'yf', ZF2: 'zf', SF2: 'sf'}
+                 HF2: 'hf', YF2: 'yf', ZF2: 'zf', SF2: 'sf',
+                 IFF1: 'iff1', IFF2: 'iff2'}
         n_name = str(n)
         if n in NAMES:
             n_name = f'{n_name} ({NAMES[n]})'
@@ -2113,7 +2115,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
         return Bits(before[f'{id}{i}'] for i in range(8))
 
     def is_active(n):
-        if n in (IFF2, EX_AF_FF, EXX_FF, EX_DE_FF):
+        if n in (IFF1, IFF2, EX_AF_FF, EXX_FF, EX_DE_FF):
             return TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
             exx = before[EXX_FF]
@@ -2407,7 +2409,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             wz = Bits.concat(hi, lo) + 1
             return check(wz[i])
 
-    if n == IFF2:
+    if n in (IFF1, IFF2):
         if instr == 'ei/di':
             return check(Bool.get(phased('is_ei')))
 
@@ -2740,7 +2742,8 @@ def process_instr(instrs, base_state, *, test=False):
                 Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
         assert 0, cond
 
-    TESTED_NODES = {IFF2, EX_AF_FF, EXX_FF, EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
+    TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
+                    EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
     for i in range(8):
         for r in 'af':
             TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
