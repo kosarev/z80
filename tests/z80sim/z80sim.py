@@ -2063,11 +2063,15 @@ class TestFailure(Exception):
     pass
 
 
-def test_node(instrs, n, at_start, before, after):
+def test_node(instrs, n, at_start, at_end, before, after):
     def check(x):
-        x = is_active(n).xifelse(x, before[n])
+        if n.startswith('instr'):
+            b, a = at_start[n], at_end[n]
+        else:
+            b, a = before[n], after[n]
+            x = is_active(n).xifelse(x, b)
 
-        if after[n].is_equiv(x):
+        if a.is_equiv(x):
             return CheckToken()
 
         Status.clear()
@@ -2082,10 +2086,10 @@ def test_node(instrs, n, at_start, before, after):
         lines = ['', 'FAILED: ' + '; '.join(instrs) + f' {n_name}']
         if '--no-before-after-expected' not in sys.argv:
             lines.extend((
-                f'  before: {before[n]}',
-                f'  after: {after[n]}',
+                f'  before: {b}',
+                f'  after: {a}',
                 f'  expected: {x}',
-                f'  diff: {after[n] ^ x}'))
+                f'  diff: {a ^ x}'))
         print('\n'.join(lines), file=sys.stderr, flush=True)
         raise TestFailure()
 
@@ -2095,6 +2099,7 @@ def test_node(instrs, n, at_start, before, after):
     opcode, ticks, cond = cycles[0]
     if opcode in (0xcb, 0xed):
         opcode, ticks, cond = cycles[1]
+    opcode = opcode.zero_extended(8)
 
     AT_HL, A = 6, 7
 
@@ -2675,6 +2680,11 @@ def test_node(instrs, n, at_start, before, after):
                 Bool.ifelse(op == ROT, rot_r[i],
                             Bool.ifelse(op == RES, res_r[i], set_r[i]))))
 
+    # Test instruction latch nodes.
+    if n.startswith('instr'):
+        i = int(n[-1])
+        return check(opcode[i])
+
     return check(before[n])
 
 
@@ -2731,12 +2741,12 @@ def process_instr(instrs, base_state, *, test=False):
         assert 0, cond
 
     TESTED_NODES = {IFF2, EX_AF_FF, EXX_FF, EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
-    for r in 'af':
-        for i in range(8):
+    for i in range(8):
+        for r in 'af':
             TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
-    for r in 'wz':
-        for i in range(8):
+        for r in 'wz':
             TESTED_NODES.add(f'reg_{r}{i}')
+        TESTED_NODES.add(f'instr{i}')
 
     SAMPLED_NODES = set(TESTED_NODES)
     for i in range(8):
@@ -2744,7 +2754,6 @@ def process_instr(instrs, base_state, *, test=False):
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
         for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
             SAMPLED_NODES.add(f'reg_{r}{i}')
-        SAMPLED_NODES.add(f'instr{i}')
 
     phase = len(instrs)
     id = instrs[-1]
@@ -2752,8 +2761,8 @@ def process_instr(instrs, base_state, *, test=False):
 
     s = State(base_state)
     at_start = s.get_node_states(SAMPLED_NODES)
-
     before = get_effective_states(s)
+
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
         cond = get_cond_as_expr(cond, before)
         s.set_db(d)
@@ -2771,10 +2780,11 @@ def process_instr(instrs, base_state, *, test=False):
 
     # Status.print('; '.join(instr_ids))
 
+    at_end = s.get_node_states(SAMPLED_NODES)
     after = get_effective_states(s)
 
     for n in sorted(TESTED_NODES):
-        token = test_node(instrs, n, at_start, before, after)
+        token = test_node(instrs, n, at_start, at_end, before, after)
         assert isinstance(token, CheckToken)
 
     return after_instr_state
