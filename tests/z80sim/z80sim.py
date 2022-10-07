@@ -2063,7 +2063,7 @@ class TestFailure(Exception):
     pass
 
 
-def test_node(instrs, n, prev_instr_latch, before, after):
+def test_node(instrs, n, at_start, before, after):
     def check(x):
         x = is_active(n).xifelse(x, before[n])
 
@@ -2246,7 +2246,7 @@ def test_node(instrs, n, prev_instr_latch, before, after):
             # TODO: Does this agree with the current known
             # description of the behaviour?
             f = get_f()[i]
-            op = prev_instr_latch
+            op = Bits(at_start[f'instr{b}'] for b in range(8))
             x = Bits(op.bits[6:8])
             z = Bits(op.bits[0:3])
             q = op[3]
@@ -2744,15 +2744,14 @@ def process_instr(instrs, base_state, *, test=False):
             SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
         for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
             SAMPLED_NODES.add(f'reg_{r}{i}')
+        SAMPLED_NODES.add(f'instr{i}')
 
     phase = len(instrs)
     id = instrs[-1]
     cycles = TestedInstrs.get_cycles(id, phase)
 
     s = State(base_state)
-
-    instr_latch = s.get_node_states(f'instr{i}' for i in range(8))
-    instr_latch = Bits(instr_latch[f'instr{i}'] for i in range(8))
+    at_start = s.get_node_states(SAMPLED_NODES)
 
     before = get_effective_states(s)
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
@@ -2775,7 +2774,7 @@ def process_instr(instrs, base_state, *, test=False):
     after = get_effective_states(s)
 
     for n in sorted(TESTED_NODES):
-        token = test_node(instrs, n, instr_latch, before, after)
+        token = test_node(instrs, n, at_start, before, after)
         assert isinstance(token, CheckToken)
 
     return after_instr_state
