@@ -65,6 +65,15 @@ EX_DE_FF = 'ex_dehl_combined'
 IFF1 = 'n181'
 IFF2 = 'n206'
 
+TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
+                EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
+for i in range(8):
+    for r in 'af':
+        TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
+    for r in 'wz':
+        TESTED_NODES.add(f'reg_{r}{i}')
+    TESTED_NODES.add(f'instr{i}')
+
 
 def _ceil_div(a, b):
     return -(a // -b)
@@ -975,10 +984,7 @@ class Node(object):
         if self.custom_id is None:
             return f'{pull}{self.index}'
 
-        if self.pull is None or self.is_pin:
-            return f'{self.custom_id}'
-
-        return f'{pull}.{self.custom_id}'
+        return f'{self.custom_id}'
 
     @property
     def used_in(self):
@@ -1117,8 +1123,13 @@ def _load_initial_image():
                 assert n.custom_id is None or n.custom_id == id, id
                 n.custom_id = id
 
-                assert (id not in __nodes_by_name or
-                        __nodes_by_name[id] is n)
+                if id is not None:
+                    assert (id not in __nodes_by_name or
+                            __nodes_by_name[id] is n)
+                    __nodes_by_name[id] = n
+
+                assert (n.id not in __nodes_by_name or
+                        __nodes_by_name[n.id] is n)
                 __nodes_by_name[n.id] = n
 
     def load_nodes():
@@ -1249,12 +1260,13 @@ class Z80Simulator(object):
             # if n.state.is_equiv(Bool.get('ei')):
             #     Status.print(n, n.state)
 
+        self.__nodes_by_name = {}
         for index, name in names:
             assert name is not None
             n = self.__nodes[index]
             n.custom_id = name
+            self.__nodes_by_name[name] = n
 
-        self.__nodes_by_name = {}
         for n in self.__nodes.values():
             self.__nodes_by_name[n.id] = n
 
@@ -2770,15 +2782,6 @@ def execute_instr(s, id, phase, before):
 
 
 def process_instr(instrs, base_state, *, test=False):
-    TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
-                    EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
-    for i in range(8):
-        for r in 'af':
-            TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
-        for r in 'wz':
-            TESTED_NODES.add(f'reg_{r}{i}')
-        TESTED_NODES.add(f'instr{i}')
-
     SAMPLED_NODES = set(TESTED_NODES)
     for i in range(8):
         for r in 'bcdehl':
@@ -3248,12 +3251,7 @@ def test_instructions():
     print('OK' if ok else 'FAILED')
 
 
-def identify_instr_state_nodes(base_state, instr):
-    persistent_nodes = base_state.get_node_states()
-
-    # Make sure there are initially no nodes with symbolic states.
-    assert all(s.value is not None for s in persistent_nodes.values())
-
+def identify_instr_state_nodes(base_state, instr, persistent_nodes):
     repeat = True
     while repeat:
         repeat = False
@@ -3265,9 +3263,15 @@ def identify_instr_state_nodes(base_state, instr):
                 s.set_node_state(id, Bool.get(id))
 
         phase = 1
+        at_start = s.get_node_states()
         before = get_effective_states(s)
         execute_instr(s, instr, phase, before)
         s.cache()
+
+        at_end = s.get_node_states()
+        after = get_effective_states(s)
+        for n in TESTED_NODES:
+            token = test_node((instr,), n, at_start, at_end, before, after)
 
         # Exclude nodes that may end up changing their state from
         # persistent nodes.
@@ -3276,7 +3280,7 @@ def identify_instr_state_nodes(base_state, instr):
                 continue
             if state.is_equiv(persistent_nodes[id]):
                 continue
-            # Status.print(id)
+            # Status.print(f'Found state node: {id}')
             del persistent_nodes[id]
             repeat = True
 
@@ -3290,10 +3294,15 @@ def identify_state_nodes():
     base_state.set_db_and_wait(0x00, 4)  # nop
     base_state.cache()
 
+    persistent_nodes = base_state.get_node_states()
+
+    # Make sure there are initially no nodes with symbolic states.
+    assert all(s.value is not None for s in persistent_nodes.values())
+
     instr = 'nop'
     s = State(base_state)
     with s.status(instr):
-        identify_instr_state_nodes(s, instr)
+        identify_instr_state_nodes(s, instr, persistent_nodes)
 
 
 def build_symbolic_states():
