@@ -3241,8 +3241,42 @@ def test_instructions():
 
 
 def identify_state_nodes():
-    s = build_reset_state()
-    s.get_node_states()
+    base_state = build_reset_state()
+
+    # Execute a couple nops to make sure the CPU is in its normal
+    # operational state.
+    base_state.set_db_and_wait(0x00, 4)  # nop
+    base_state.set_db_and_wait(0x00, 4)  # nop
+    base_state.cache()
+
+    persistent_nodes = base_state.get_node_states()
+
+    # Make sure there are initially no nodes with symbolic states.
+    assert all(s.value is not None for s in persistent_nodes.values())
+
+    repeat = True
+    while repeat:
+        repeat = False
+        s = State(base_state)
+
+        # Symbolise non-persistent nodes.
+        for id in s.get_node_states():
+            if id not in persistent_nodes:
+                s.set_node_state(id, Bool.get(id))
+
+        s.set_db_and_wait(0x00, 4)  # nop
+        s.cache()
+
+        # Exclude nodes that may end up changing their state from
+        # persistent nodes.
+        for id, state in s.get_node_states().items():
+            if id in _PINS or id not in persistent_nodes:
+                continue
+            if state.is_equiv(persistent_nodes[id]):
+                continue
+            # Status.print(id)
+            del persistent_nodes[id]
+            repeat = True
 
 
 def build_symbolic_states():
