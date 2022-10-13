@@ -1755,15 +1755,17 @@ class State(object):
             self.__current_steps = []
             self.__current_image = None
             self.__new_steps = []
+            self.__steps_status = {}
+            self.__status = []
         else:
             self.__current_steps = list(other.__current_steps)
             self.__current_image = other.__current_image
             self.__new_steps = list(other.__new_steps)
+            self.__steps_status = dict(other.__steps_status)
+            self.__status = list(other.__status)
 
         self.__cache_all_reportable_states = cache_all_reportable_states
         self.__intermediate_steps = set()
-        self.__steps_status = {}
-        self.__status = []
 
     @staticmethod
     def __get_cache(steps):
@@ -1856,7 +1858,7 @@ class State(object):
 
         while missing_steps:
             step = missing_steps.pop(0)
-            with Status.do(', '.join(self.__steps_status.get(id(step)))):
+            with Status.do(', '.join(self.__steps_status[id(step)])):
                 self.__apply_step(sim, step)
                 self.__current_steps.append(step)
 
@@ -2702,58 +2704,72 @@ def test_node(instrs, n, at_start, at_end, before, after):
     return check(before[n])
 
 
-def process_instr(instrs, base_state, *, test=False):
-    def get_effective_states(s):
-        # Additional ticks are necessary for new values
-        # to reach their nodes.
-        EXTRA_TICKS = 3
+def get_effective_states(s, nodes=None):
+    # Additional ticks are necessary for new values
+    # to reach their nodes.
+    EXTRA_TICKS = 3
 
-        s = State(s)
+    s = State(s)
 
-        s.set_db(0x00)  # nop
-        for t in range(EXTRA_TICKS):
+    s.set_db(0x00)  # nop
+    for t in range(EXTRA_TICKS):
+        for ht in (0, 1):
+            with s.status(f'extra tick {t}.{ht}'):
+                s.half_tick()
+    s.cache()
+
+    return s.get_node_states(nodes)
+
+
+def get_cond_as_expr(cond, before):
+    if cond is None:
+        return None
+    if cond == 'b != 1':
+        b = Bits.ifelse(
+                before[EXX_FF],
+                Bits(before[f'reg_b{i}'] for i in range(8)),
+                Bits(before[f'reg_bb{i}'] for i in range(8)))
+        return b != 1
+    f = Bits.ifelse(
+            before[EX_AF_FF],
+            Bits(before[f'reg_f{i}'] for i in range(8)),
+            Bits(before[f'reg_ff{i}'] for i in range(8)))
+    if cond == 'cc':
+        phase = len(instrs)
+        cc = Bits(f'cc_p{phase}', width=3)
+        return Bool.ifelse(
+            cc[2],
+            Bool.ifelse(
+                cc[1],
+                Bool.ifelse(cc[0], f[SF_BIT], ~f[SF_BIT]),
+                Bool.ifelse(cc[0], f[PF_BIT], ~f[PF_BIT])),
+            Bool.ifelse(
+                cc[1],
+                Bool.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
+                Bool.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
+    if cond == 'cc2':
+        phase = len(instrs)
+        cc2 = Bits(f'cc2_p{phase}', width=2)
+        return Bool.ifelse(
+            cc2[1],
+            Bool.ifelse(cc2[0], f[CF_BIT], ~f[CF_BIT]),
+            Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
+    assert 0, cond
+
+
+def execute_instr(s, id, phase, before):
+    cycles = TestedInstrs.get_cycles(id, phase)
+    for cycle_no, (d, ticks, cond) in enumerate(cycles):
+        cond = get_cond_as_expr(cond, before)
+        s.set_db(d)
+        for t in range(ticks):
             for ht in (0, 1):
-                with s.status(f'extra tick {t}.{ht}'):
-                    s.half_tick()
-        s.cache()
+                with s.status(f'tick {cycle_no}-{t}.{ht}'):
+                    s.half_tick(cond=cond)
+        s.cache(intermediate=True)
 
-        return s.get_node_states(SAMPLED_NODES)
 
-    def get_cond_as_expr(cond, before):
-        if cond is None:
-            return None
-        if cond == 'b != 1':
-            b = Bits.ifelse(
-                    before[EXX_FF],
-                    Bits(before[f'reg_b{i}'] for i in range(8)),
-                    Bits(before[f'reg_bb{i}'] for i in range(8)))
-            return b != 1
-        f = Bits.ifelse(
-                before[EX_AF_FF],
-                Bits(before[f'reg_f{i}'] for i in range(8)),
-                Bits(before[f'reg_ff{i}'] for i in range(8)))
-        if cond == 'cc':
-            phase = len(instrs)
-            cc = Bits(f'cc_p{phase}', width=3)
-            return Bool.ifelse(
-                cc[2],
-                Bool.ifelse(
-                    cc[1],
-                    Bool.ifelse(cc[0], f[SF_BIT], ~f[SF_BIT]),
-                    Bool.ifelse(cc[0], f[PF_BIT], ~f[PF_BIT])),
-                Bool.ifelse(
-                    cc[1],
-                    Bool.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
-                    Bool.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
-        if cond == 'cc2':
-            phase = len(instrs)
-            cc2 = Bits(f'cc2_p{phase}', width=2)
-            return Bool.ifelse(
-                cc2[1],
-                Bool.ifelse(cc2[0], f[CF_BIT], ~f[CF_BIT]),
-                Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
-        assert 0, cond
-
+def process_instr(instrs, base_state, *, test=False):
     TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
                     EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
     for i in range(8):
@@ -2772,20 +2788,12 @@ def process_instr(instrs, base_state, *, test=False):
 
     phase = len(instrs)
     id = instrs[-1]
-    cycles = TestedInstrs.get_cycles(id, phase)
 
     s = State(base_state)
     at_start = s.get_node_states(SAMPLED_NODES)
-    before = get_effective_states(s)
+    before = get_effective_states(s, SAMPLED_NODES)
 
-    for cycle_no, (d, ticks, cond) in enumerate(cycles):
-        cond = get_cond_as_expr(cond, before)
-        s.set_db(d)
-        for t in range(ticks):
-            for ht in (0, 1):
-                with s.status(f'tick {cycle_no}-{t}.{ht}'):
-                    s.half_tick(cond=cond)
-        s.cache(intermediate=True)
+    execute_instr(s, id, phase, before)
 
     s.cache()
     after_instr_state = State(s)
@@ -2796,7 +2804,7 @@ def process_instr(instrs, base_state, *, test=False):
     # Status.print('; '.join(instr_ids))
 
     at_end = s.get_node_states(SAMPLED_NODES)
-    after = get_effective_states(s)
+    after = get_effective_states(s, SAMPLED_NODES)
 
     for n in sorted(TESTED_NODES):
         token = test_node(instrs, n, at_start, at_end, before, after)
@@ -3240,15 +3248,7 @@ def test_instructions():
     print('OK' if ok else 'FAILED')
 
 
-def identify_state_nodes():
-    base_state = build_reset_state()
-
-    # Execute a couple nops to make sure the CPU is in its normal
-    # operational state.
-    base_state.set_db_and_wait(0x00, 4)  # nop
-    base_state.set_db_and_wait(0x00, 4)  # nop
-    base_state.cache()
-
+def identify_instr_state_nodes(base_state, instr):
     persistent_nodes = base_state.get_node_states()
 
     # Make sure there are initially no nodes with symbolic states.
@@ -3264,7 +3264,9 @@ def identify_state_nodes():
             if id not in persistent_nodes:
                 s.set_node_state(id, Bool.get(id))
 
-        s.set_db_and_wait(0x00, 4)  # nop
+        phase = 1
+        before = get_effective_states(s)
+        execute_instr(s, instr, phase, before)
         s.cache()
 
         # Exclude nodes that may end up changing their state from
@@ -3277,6 +3279,21 @@ def identify_state_nodes():
             # Status.print(id)
             del persistent_nodes[id]
             repeat = True
+
+
+def identify_state_nodes():
+    base_state = build_reset_state()
+
+    # Execute a couple nops to make sure the CPU is in its normal
+    # operational state.
+    base_state.set_db_and_wait(0x00, 4)  # nop
+    base_state.set_db_and_wait(0x00, 4)  # nop
+    base_state.cache()
+
+    instr = 'nop'
+    s = State(base_state)
+    with s.status(instr):
+        identify_instr_state_nodes(s, instr)
 
 
 def build_symbolic_states():
