@@ -975,7 +975,7 @@ class Node(object):
         if self.custom_id is None:
             return f'{pull}{self.index}'
 
-        if self.pull is None:
+        if self.pull is None or self.is_pin:
             return f'{self.custom_id}'
 
         return f'{pull}.{self.custom_id}'
@@ -998,8 +998,7 @@ class Node(object):
 
     @property
     def is_pin(self):
-        # TODO: Mark pins explicitly.
-        return self.custom_id is not None
+        return self.custom_id in _PINS
 
 
 class Transistor(object):
@@ -1115,12 +1114,12 @@ def _load_initial_image():
 
                 n = __nodes[i]
 
-                assert (id not in __nodes_by_name or
-                        __nodes_by_name[id] is n)
-                __nodes_by_name[id] = n
-
                 assert n.custom_id is None or n.custom_id == id, id
                 n.custom_id = id
+
+                assert (id not in __nodes_by_name or
+                        __nodes_by_name[id] is n)
+                __nodes_by_name[n.id] = n
 
     def load_nodes():
         with open('segdefs.js') as f:
@@ -1250,16 +1249,14 @@ class Z80Simulator(object):
             # if n.state.is_equiv(Bool.get('ei')):
             #     Status.print(n, n.state)
 
-        self.__nodes_by_name = {}
         for index, name in names:
             assert name is not None
             n = self.__nodes[index]
             n.custom_id = name
-            self.__nodes_by_name[name] = n
 
+        self.__nodes_by_name = {}
         for n in self.__nodes.values():
-            if n.custom_id is None:
-                self.__nodes_by_name[n.id] = n
+            self.__nodes_by_name[n.id] = n
 
     def __restore_transistors_from_image(self, image):
         self.__trans = {}
@@ -1268,7 +1265,9 @@ class Z80Simulator(object):
             t = Transistor.from_image(index, i, self.__nodes)
             self.__trans[index] = t
 
-    def get_node_states(self, ids):
+    def get_node_states(self, ids=None):
+        if ids is None:
+            ids = (n.id for n in self.__nodes.values())
         return {id: self.__nodes_by_name[id].state for id in ids}
 
     def __identify_group_of(self, n):
@@ -1873,7 +1872,7 @@ class State(object):
         self.__apply_new_steps()
         return self.__current_image
 
-    def get_node_states(self, ids):
+    def get_node_states(self, ids=None):
         return Z80Simulator(image=self.image).get_node_states(ids)
 
     def __apply_step(self, sim, step):
@@ -3241,6 +3240,11 @@ def test_instructions():
     print('OK' if ok else 'FAILED')
 
 
+def identify_state_nodes():
+    s = build_reset_state()
+    s.get_node_states()
+
+
 def build_symbolic_states():
     s = build_reset_state()
 
@@ -3301,6 +3305,10 @@ def main():
 
     if '--play-sandbox' in sys.argv:
         play_sandbox()
+        return
+
+    if '--identify-state-nodes' in sys.argv:
+        identify_state_nodes()
         return
 
     build_symbolic_states()
