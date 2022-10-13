@@ -3251,38 +3251,34 @@ def test_instructions():
     print('OK' if ok else 'FAILED')
 
 
-def identify_instr_state_nodes(base_state, instr, persistent_nodes):
-    repeat = True
-    while repeat:
-        repeat = False
-        s = State(base_state)
+def identify_instr_state_nodes(s, instr, persistent_nodes):
+    s = State(s)
 
-        # Symbolise non-persistent nodes.
-        for id in s.get_node_states():
-            if id not in persistent_nodes:
-                s.set_node_state(id, Bool.get(id))
+    # Symbolise non-persistent nodes.
+    for id in s.get_node_states():
+        if id not in persistent_nodes:
+            s.set_node_state(id, Bool.get(id))
 
-        phase = 1
-        at_start = s.get_node_states()
-        before = get_effective_states(s)
-        execute_instr(s, instr, phase, before)
-        s.cache()
+    phase = 1
+    at_start = s.get_node_states()
+    before = get_effective_states(s)
+    execute_instr(s, instr, phase, before)
+    s.cache()
 
-        at_end = s.get_node_states()
-        after = get_effective_states(s)
-        for n in TESTED_NODES:
-            token = test_node((instr,), n, at_start, at_end, before, after)
+    at_end = s.get_node_states()
+    after = get_effective_states(s)
+    for n in TESTED_NODES:
+        token = test_node((instr,), n, at_start, at_end, before, after)
 
-        # Exclude nodes that may end up changing their state from
-        # persistent nodes.
-        for id, state in s.get_node_states().items():
-            if id in _PINS or id not in persistent_nodes:
-                continue
-            if state.is_equiv(persistent_nodes[id]):
-                continue
-            # Status.print(f'Found state node: {id}')
-            del persistent_nodes[id]
-            repeat = True
+    # Exclude nodes that may end up changing their state from
+    # persistent nodes.
+    for id, state in s.get_node_states().items():
+        if id in _PINS or id not in persistent_nodes:
+            continue
+        if state.is_equiv(persistent_nodes[id]):
+            continue
+        # Status.print(f'Found state node: {id}')
+        del persistent_nodes[id]
 
 
 def identify_state_nodes():
@@ -3299,10 +3295,13 @@ def identify_state_nodes():
     # Make sure there are initially no nodes with symbolic states.
     assert all(s.value is not None for s in persistent_nodes.values())
 
-    instr = 'nop'
-    s = State(base_state)
-    with s.status(instr):
-        identify_instr_state_nodes(s, instr, persistent_nodes)
+    while True:
+        pn = dict(persistent_nodes)
+        instr = 'nop'
+        with Status.do(f'{instr}, {len(persistent_nodes)} persistent nodes'):
+            identify_instr_state_nodes(base_state, instr, persistent_nodes)
+        if persistent_nodes == pn:
+            break
 
 
 def build_symbolic_states():
