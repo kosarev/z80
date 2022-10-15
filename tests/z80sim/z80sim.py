@@ -23,6 +23,7 @@ import os
 import pathlib
 import pprint
 import pysat.solvers
+import random
 import sys
 import traceback
 import z3
@@ -73,6 +74,16 @@ for i in range(8):
     for r in 'wz':
         TESTED_NODES.add(f'reg_{r}{i}')
     TESTED_NODES.add(f'instr{i}')
+
+
+def get_opt(id, type):
+    for a in sys.argv:
+        if a.startswith(id + '='):
+            return type(a.split('=', maxsplit=1)[1])
+    return None
+
+
+SEED = get_opt('--seed', int)
 
 
 def _ceil_div(a, b):
@@ -1406,9 +1417,18 @@ class Z80Simulator(object):
 
                 updated.add(n)
 
-    def __update_nodes(self, nodes):
+    def __update_nodes(self, nodes, *, shuffle=True):
+        # TODO: Does always updating all nodes lead to any failures?
+        # nodes = list(self.__nodes.values())
+
+        shuffle &= (SEED is not None)
+        nodes = list(nodes)
+
         round = 0
         while nodes:
+            if shuffle:
+                random.shuffle(nodes)
+
             round += 1
             assert round < 100, 'Loop encountered!'
 
@@ -1718,7 +1738,8 @@ class Z80Simulator(object):
     def update_all_nodes(self):
         with Status.do('update nodes'):
             self.__update_nodes([n for n in self.__nodes.values()
-                                 if n not in self.__gnd_pwr])
+                                 if n not in self.__gnd_pwr],
+                                shuffle=False)
 
     def dump(self):
         with open('z80.dump', mode='w') as f:
@@ -1785,7 +1806,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 8
+        VERSION = 8, SEED
 
         key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
@@ -2769,6 +2790,9 @@ def get_cond_as_expr(cond, phase, before):
 
 
 def execute_instr(s, id, phase, before):
+    if SEED is not None:
+        random.seed(SEED)
+
     cycles = TestedInstrs.get_cycles(id, phase)
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
         cond = get_cond_as_expr(cond, phase, before)
@@ -2896,6 +2920,9 @@ def build_symbolised_state():
 
     s = build_reset_state()
     if '--no-symbolising' not in sys.argv:
+        if SEED is not None:
+            random.seed(SEED)
+
         with s.status('build symbolised state'):
             for id, cycles in SYMBOLISING_SEQ:
                 with s.status(id):
@@ -2904,6 +2931,8 @@ def build_symbolised_state():
                             s.set_db_and_wait(d, ticks)
                             s.cache(intermediate=True)
 
+        ''' TODO: Symbolising the latch seems to cause failures
+                  on shiffling (updating nodes in random order).
         with s.status('symbolise instruction latch'):
             instr = Bits('instr', width=8)
             is_prefix = ((instr == 0xcb) | (instr == 0xed) |
@@ -2912,6 +2941,7 @@ def build_symbolised_state():
 
             for i in range(8):
                 s.set_latch_state(f'instr{i}', f'~instr{i}', instr[i])
+        '''
 
         s.cache()
         s.report('after-symbolising')
