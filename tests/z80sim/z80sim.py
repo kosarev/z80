@@ -1716,8 +1716,9 @@ class Z80Simulator(object):
         self.__update_nodes([n])
 
     def update_all_nodes(self):
-        self.__update_nodes([n for n in self.__nodes.values()
-                             if n not in self.__gnd_pwr])
+        with Status.do('update nodes'):
+            self.__update_nodes([n for n in self.__nodes.values()
+                                 if n not in self.__gnd_pwr])
 
     def dump(self):
         with open('z80.dump', mode='w') as f:
@@ -2733,7 +2734,7 @@ def get_effective_states(s, nodes=None):
     return s.get_node_states(nodes)
 
 
-def get_cond_as_expr(cond, before):
+def get_cond_as_expr(cond, phase, before):
     if cond is None:
         return None
     if cond == 'b != 1':
@@ -2747,7 +2748,6 @@ def get_cond_as_expr(cond, before):
             Bits(before[f'reg_f{i}'] for i in range(8)),
             Bits(before[f'reg_ff{i}'] for i in range(8)))
     if cond == 'cc':
-        phase = len(instrs)
         cc = Bits(f'cc_p{phase}', width=3)
         return Bool.ifelse(
             cc[2],
@@ -2760,7 +2760,6 @@ def get_cond_as_expr(cond, before):
                 Bool.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
                 Bool.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
     if cond == 'cc2':
-        phase = len(instrs)
         cc2 = Bits(f'cc2_p{phase}', width=2)
         return Bool.ifelse(
             cc2[1],
@@ -2772,7 +2771,7 @@ def get_cond_as_expr(cond, before):
 def execute_instr(s, id, phase, before):
     cycles = TestedInstrs.get_cycles(id, phase)
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
-        cond = get_cond_as_expr(cond, before)
+        cond = get_cond_as_expr(cond, phase, before)
         s.set_db(d)
         for t in range(ticks):
             for ht in (0, 1):
@@ -3258,22 +3257,26 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     for id in s.get_node_states():
         if id not in persistent_nodes:
             s.set_node_state(id, Bool.get(id))
+    s.update_all_nodes()
+    s.cache()
 
-    phase = 1
     at_start = s.get_node_states()
     before = get_effective_states(s)
+
+    phase = 1
     execute_instr(s, instr, phase, before)
     s.cache()
 
     at_end = s.get_node_states()
     after = get_effective_states(s)
+
     for n in TESTED_NODES:
         token = test_node((instr,), n, at_start, at_end, before, after)
 
     # Exclude nodes that may end up changing their state from
     # persistent nodes.
     for id, state in s.get_node_states().items():
-        if id in _PINS or id not in persistent_nodes:
+        if id not in persistent_nodes:
             continue
         if state.is_equiv(persistent_nodes[id]):
             continue
@@ -3295,13 +3298,22 @@ def identify_state_nodes():
     # Make sure there are initially no nodes with symbolic states.
     assert all(s.value is not None for s in persistent_nodes.values())
 
-    while True:
-        pn = dict(persistent_nodes)
-        instr = 'nop'
-        with Status.do(f'{instr}, {len(persistent_nodes)} persistent nodes'):
+    for instr in ('nop', '<alu> (hl)', '<alu> n',
+                  '<alu> {b, c, d, e, h, l, a}'):
+        while True:
+            pn = persistent_nodes.copy()
+            with Status.do(f'{len(persistent_nodes)} persistent nodes'):
+                with Status.do(f'{instr}'):
+                    identify_instr_state_nodes(base_state, instr,
+                                               persistent_nodes)
+            if persistent_nodes == pn:
+                break
+
+    for instr in TestedInstrs.get_instrs():
+        pn = persistent_nodes.copy()
+        with Status.do(f'{instr}'):
             identify_instr_state_nodes(base_state, instr, persistent_nodes)
-        if persistent_nodes == pn:
-            break
+        assert persistent_nodes == pn, instr
 
 
 def build_symbolic_states():
