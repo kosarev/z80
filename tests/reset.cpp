@@ -1,19 +1,10 @@
 
 #include "z80.h"
 
-#define CHECK(c) (check((c), __LINE__))
+#include "check.h"
 
 using z80::fast_u8;
 using z80::fast_u16;
-
-static void check(bool c, unsigned line_no) {
-    if(c)
-        return;
-
-    std::fprintf(stderr, "%s:%u: check failed\n", __FILE__,
-                 static_cast<unsigned>(line_no));
-    std::abort();
-}
 
 class my_emulator : public z80::z80_machine<my_emulator>
 {};

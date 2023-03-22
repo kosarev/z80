@@ -7,6 +7,7 @@ set(TESTS
     dummy_state
     interrupts
     reset
+    root
     )
 
 foreach(test ${TESTS})

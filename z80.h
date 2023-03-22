@@ -302,8 +302,8 @@ public:
         self().on_set_iyh(get_high8(iy)); }
     fast_u16 on_get_ir() {
         // Always get the low byte first.
-        fast_u8 l = self().on_get_i();
-        fast_u8 h = self().on_get_r();
+        fast_u8 l = self().on_get_r();
+        fast_u8 h = self().on_get_i();
         return make16(h, l); }
 
     fast_u8 on_get_reg(reg r) {
