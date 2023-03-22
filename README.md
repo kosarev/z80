@@ -1,7 +1,7 @@
 # z80
 Fast and flexible Z80/i8080 emulator.
 
-[![Build Status](https://app.travis-ci.com/kosarev/z80.svg?branch=master)](https://app.travis-ci.com/kosarev/z80)
+![C/C++ CI](https://github.com/kosarev/z80/actions/workflows/c-cpp.yml/badge.svg)
 
 
 ## Quick facts
