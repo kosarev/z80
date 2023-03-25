@@ -3922,10 +3922,10 @@ protected:
 private:
     struct memory_image {
         memory_image() {
-            uint_fast32_t rnd = 0xde347a01;
+            fast_u32 rnd = 0xde347a01;
             for(auto &b : bytes) {
                 b = static_cast<least_u8>(rnd & 0xff);
-                rnd = (rnd * 0x74392cef) ^ (rnd >> 16);
+                rnd = (rnd * 0x74392cef) ^ ((rnd >> 16) & 0xffff);
             }
         }
 
