@@ -677,7 +677,7 @@ class Bool(object):
             return equiv
 
         with Status.do('is_equiv', '--show-is-equiv'):
-            s = pysat.solvers.Cadical()
+            s = pysat.solvers.Cadical153()
             for c in e.sat_clauses:
                 s.add_clause(c)
             equiv = (s.solve() is False)
