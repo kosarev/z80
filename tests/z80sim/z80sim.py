@@ -1389,7 +1389,7 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def __update_group_of(self, n, more, updated):
+    def __update_group_of(self, n, next_round_nodes, updated):
         group = self.__groups[n]
 
         # Update node and transistor states.
@@ -1412,8 +1412,8 @@ class Z80Simulator(object):
                     n.state = state
                     for t in n.gate_of:
                         for c in t.conns:
-                            if c not in more:
-                                more.append(c)
+                            if c not in next_round_nodes:
+                                next_round_nodes.append(c)
 
                 updated.add(n)
 
@@ -1434,12 +1434,13 @@ class Z80Simulator(object):
 
             with Status.do(f'round {round}'):
                 updated = set()
-                more = []
+                next_round_nodes = []
                 for i, n in enumerate(nodes):
                     if n not in updated:
                         with Status.do(f'node {i}/{len(nodes)}'):
-                            self.__update_group_of(n, more, updated)
-                nodes = more
+                            self.__update_group_of(n, next_round_nodes,
+                                                   updated)
+                nodes = next_round_nodes
 
     def __set_node_pull(self, n, pull):
         pull = Bool.cast(pull)
