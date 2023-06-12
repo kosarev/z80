@@ -1020,6 +1020,14 @@ class Node(object):
         return self.custom_id in _PINS
 
 
+class NodeGroup(object):
+    def __init__(self, nodes):
+        self.__nodes = tuple(sorted(nodes))
+
+    def __iter__(self):
+        yield from self.__nodes
+
+
 class Transistor(object):
     def __init__(self, index, gate, c1, c2):
         self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
@@ -1296,19 +1304,19 @@ class Z80Simulator(object):
         return {id: self.__nodes_by_name[id].state for id in ids}
 
     def __identify_group_of(self, n):
-        group = []
+        nodes = []
         worklist = [n]
         while worklist:
             n = worklist.pop()
-            if n.is_gnd_or_pwr or n in group:
+            if n.is_gnd_or_pwr or n in nodes:
                 continue
 
-            group.append(n)
+            nodes.append(n)
 
             for t in n.conn_of:
                 worklist.append(t.get_other_conn(n))
 
-        return sorted(group)
+        return NodeGroup(nodes)
 
     def __identify_groups(self):
         for n in self.__nodes.values():
@@ -1443,7 +1451,7 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            nodes = sum(groups, start=[])
+            nodes = sum((tuple(g) for g in groups), start=())
             assert len(nodes) == len(set(nodes))
 
             if shuffle:
