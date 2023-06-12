@@ -1325,10 +1325,15 @@ class Z80Simulator(object):
         for t in self.__trans.values():
             if t.c1.is_gnd_or_pwr:
                 assert not t.c2.is_gnd_or_pwr
+                t.conns_group = t.c2.group
             elif t.c2.is_gnd_or_pwr:
                 assert not t.c1.is_gnd_or_pwr
+                t.conns_group = t.c1.group
             else:
                 assert t.c1.group is t.c2.group
+                t.conns_group = t.c1.group
+
+            assert t.conns_group is not None
 
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
@@ -1400,58 +1405,56 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def __update_group_of(self, n, next_round_nodes, updated):
-        # Update node and transistor states.
-        for i, n in enumerate(n.group):
-            with Status.do(f'update {i}/{len(n.group)} {n}', '--show-nodes'):
-                assert not n.is_gnd_or_pwr
-                gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
+    def __update_node(self, n, next_round_groups):
+        assert not n.is_gnd_or_pwr
+        gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
 
-                floating = n.state
-                pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
-                state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
+        floating = n.state
+        pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
+        state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
 
-                # No further propagation is necessary if the state of
-                # the transistor is known to be same. This includes
-                # the case of a floating gate.
-                if state.is_equiv(n.state):
-                    # Choose the simplest of the two equivalent states.
-                    if state.size < n.state.size:
-                        n.state = state
-                else:
-                    n.state = state
-                    for t in n.gate_of:
-                        for c in t.conns:
-                            if (not c.is_gnd_or_pwr and
-                                    c not in next_round_nodes):
-                                next_round_nodes.append(c)
+        # No further propagation is necessary if the state of
+        # the transistor is known to be same. This includes
+        # the case of a floating gate.
+        if state.is_equiv(n.state):
+            # Choose the simplest of the two equivalent states.
+            if state.size < n.state.size:
+                n.state = state
+        else:
+            n.state = state
+            for t in n.gate_of:
+                if t.conns_group not in next_round_groups:
+                    next_round_groups.append(t.conns_group)
 
-                updated.add(n)
-
-    def __update_nodes(self, nodes, *, shuffle=True):
+    def __update_groups_of(self, nodes, *, shuffle=True):
         # TODO: Does always updating all nodes lead to any failures?
         # nodes = list(self.__nodes.values())
 
         shuffle &= (SEED is not None)
-        nodes = list(nodes)
+
+        groups = []
+        for n in nodes:
+            if n.group not in groups:
+                groups.append(n.group)
+        del nodes
 
         round = 0
-        while nodes:
-            if shuffle:
-                random.shuffle(nodes)
-
+        while groups:
             round += 1
             assert round < 100, 'Loop encountered!'
 
+            nodes = sum(groups, start=[])
+            assert len(nodes) == len(set(nodes))
+
+            if shuffle:
+                random.shuffle(nodes)
+
             with Status.do(f'round {round}'):
-                updated = set()
-                next_round_nodes = []
+                next_round_groups = []
                 for i, n in enumerate(nodes):
-                    if n not in updated:
-                        with Status.do(f'node {i}/{len(nodes)}'):
-                            self.__update_group_of(n, next_round_nodes,
-                                                   updated)
-                nodes = next_round_nodes
+                    with Status.do(f'node {i}/{len(nodes)}'):
+                        self.__update_node(n, next_round_groups)
+                groups = next_round_groups
 
     def __set_node_pull(self, n, pull):
         pull = Bool.cast(pull)
@@ -1461,7 +1464,7 @@ class Z80Simulator(object):
 
     def __set_node(self, n, pull):
         self.__set_node_pull(n, pull)
-        self.__update_nodes([n])
+        self.__update_groups_of([n])
 
     def half_tick(self, *, cond=None):
         if self.__memory is not None and self.clk:
@@ -1736,8 +1739,8 @@ class Z80Simulator(object):
     def set_latch_state(self, a, b, state):
         self.set_node_state(a, state)
         self.set_node_state(b, ~state)
-        self.__update_nodes([self.__nodes_by_name[a],
-                             self.__nodes_by_name[b]])
+        self.__update_groups_of([self.__nodes_by_name[a],
+                                 self.__nodes_by_name[b]])
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
@@ -1745,13 +1748,13 @@ class Z80Simulator(object):
 
     def update_pin(self, pin):
         n = self.__nodes_by_name[pin]
-        self.__update_nodes([n])
+        self.__update_groups_of([n])
 
     def update_all_nodes(self):
         with Status.do('update nodes'):
-            self.__update_nodes([n for n in self.__nodes.values()
-                                 if n not in self.__gnd_pwr],
-                                shuffle=False)
+            self.__update_groups_of([n for n in self.__nodes.values()
+                                     if n not in self.__gnd_pwr],
+                                    shuffle=False)
 
     def dump(self):
         with open('z80.dump', mode='w') as f:
