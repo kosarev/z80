@@ -958,6 +958,8 @@ class Node(object):
         self.gate_of = []
         self.conn_of = []
 
+        self.group = None
+
     def __repr__(self):
         return self.id
 
@@ -1309,17 +1311,16 @@ class Z80Simulator(object):
         return sorted(group)
 
     def __identify_groups(self):
-        self.__groups = {}
         for n in self.__nodes.values():
-            if n in self.__groups:
+            if n.group is not None:
                 continue
 
             group = self.__identify_group_of(n)
             for m in group:
-                self.__groups[m] = group
+                m.group = group
 
-        assert self.__gnd not in self.__groups
-        assert self.__pwr not in self.__groups
+        assert self.__gnd.group is None
+        assert self.__pwr.group is None
 
         for t in self.__trans.values():
             if t.c1.is_gnd_or_pwr:
@@ -1327,7 +1328,7 @@ class Z80Simulator(object):
             elif t.c2.is_gnd_or_pwr:
                 assert not t.c1.is_gnd_or_pwr
             else:
-                assert self.__groups[t.c1] is self.__groups[t.c2]
+                assert t.c1.group is t.c2.group
 
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
@@ -1400,11 +1401,9 @@ class Z80Simulator(object):
         return gnd, pwr, pullup, pulldown
 
     def __update_group_of(self, n, next_round_nodes, updated):
-        group = self.__groups[n]
-
         # Update node and transistor states.
-        for i, n in enumerate(group):
-            with Status.do(f'update {i}/{len(group)} {n}', '--show-nodes'):
+        for i, n in enumerate(n.group):
+            with Status.do(f'update {i}/{len(n.group)} {n}', '--show-nodes'):
                 assert not n.is_gnd_or_pwr
                 gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
 
