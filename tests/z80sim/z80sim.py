@@ -1298,14 +1298,13 @@ class Z80Simulator(object):
         worklist = [n]
         while worklist:
             n = worklist.pop()
-            if n in group:
+            if n.is_gnd_or_pwr or n in group:
                 continue
 
             group.append(n)
 
-            if not n.is_gnd_or_pwr:
-                for t in n.conn_of:
-                    worklist.append(t.get_other_conn(n))
+            for t in n.conn_of:
+                worklist.append(t.get_other_conn(n))
 
         return sorted(group)
 
@@ -1318,6 +1317,9 @@ class Z80Simulator(object):
             group = self.__identify_group_of(n)
             for m in group:
                 self.__groups[m] = group
+
+        assert self.__gnd not in self.__groups
+        assert self.__pwr not in self.__groups
 
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
@@ -1395,6 +1397,7 @@ class Z80Simulator(object):
         # Update node and transistor states.
         for i, n in enumerate(group):
             with Status.do(f'update {i}/{len(group)} {n}', '--show-nodes'):
+                assert not n.is_gnd_or_pwr
                 gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
 
                 floating = n.state
@@ -1412,7 +1415,8 @@ class Z80Simulator(object):
                     n.state = state
                     for t in n.gate_of:
                         for c in t.conns:
-                            if c not in next_round_nodes:
+                            if (not c.is_gnd_or_pwr and
+                                    c not in next_round_nodes):
                                 next_round_nodes.append(c)
 
                 updated.add(n)
@@ -1533,11 +1537,11 @@ class Z80Simulator(object):
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
         self.__restore_transistors_from_image(trans)
 
-        self.__identify_groups()
-
         self.__gnd = self.__nodes_by_name[_GND_ID]
         self.__pwr = self.__nodes_by_name[_PWR_ID]
         self.__gnd_pwr = self.__gnd, self.__pwr
+
+        self.__identify_groups()
 
         self.__nclk = self.__nodes_by_name['~clk']
 
