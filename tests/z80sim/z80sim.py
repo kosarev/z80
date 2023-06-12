@@ -1321,6 +1321,14 @@ class Z80Simulator(object):
         assert self.__gnd not in self.__groups
         assert self.__pwr not in self.__groups
 
+        for t in self.__trans.values():
+            if t.c1.is_gnd_or_pwr:
+                assert not t.c2.is_gnd_or_pwr
+            elif t.c2.is_gnd_or_pwr:
+                assert not t.c1.is_gnd_or_pwr
+            else:
+                assert self.__groups[t.c1] is self.__groups[t.c2]
+
     def __get_node_preds(self, n):
         def get_group_pred(n, get_node_pred, stack, preds):
             cyclic = False
