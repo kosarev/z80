@@ -1029,8 +1029,9 @@ class NodeGroup(object):
 
 
 class Transistor(object):
-    def __init__(self, index, gate, c1, c2):
+    def __init__(self, index, gate, c1, c2, *, state=None):
         self.index, self.gate, self.c1, self.c2 = index, gate, c1, c2
+        self.state = state
 
     def __repr__(self):
         return f'{self.c1} = {self.c2} [{self.gate}]  # {self.id}'
@@ -1042,22 +1043,24 @@ class Transistor(object):
     def id(self):
         return f't{self.index}'
 
-    @property
-    def image(self):
-        return self.gate.index, self.c1.index, self.c2.index
+    class Storage(object):
+        def __init__(self, bool_storage):
+            self.__bools = bool_storage
 
-    @staticmethod
-    def from_image(index, image, nodes):
-        gate, c1, c2 = image
-        gate = nodes[gate]
-        c1 = nodes[c1]
-        c2 = nodes[c2]
+        def add(self, t):
+            state = None if t.state is None else self.__bools.add(t.state)
+            return t.gate.index, t.c1.index, t.c2.index, state
 
-        t = Transistor(index, gate, c1, c2)
-        gate.gate_of.append(t)
-        c1.conn_of.append(t)
-        c2.conn_of.append(t)
-        return t
+        def get(self, index, image, nodes):
+            gate, c1, c2, state = image
+            gate, c1, c2 = nodes[gate], nodes[c1], nodes[c2]
+            state = None if state is None else self.__bools.get(state)
+
+            t = Transistor(index, gate, c1, c2, state=state)
+            gate.gate_of.append(t)
+            c1.conn_of.append(t)
+            c2.conn_of.append(t)
+            return t
 
     @property
     def conns(self):
@@ -1072,13 +1075,14 @@ def _make_image(nodes, trans):
     literals = Literal.Storage()
     bools = Bool.Storage(literals)
     node_storage = Node.Storage(bools)
+    trans_storage = Transistor.Storage(bools)
 
     # TODO: Move this logic into Node.Storage.
     nodes, trans = sorted(nodes), sorted(trans)
     node_names = tuple((n.index, n.custom_id) for n in nodes
                        if n.custom_id is not None)
     nodes = tuple((n.index,) + node_storage.add(n) for n in nodes)
-    trans = tuple((t.index,) + t.image for t in trans)
+    trans = tuple((t.index,) + trans_storage.add(t) for t in trans)
 
     return (node_storage.image, bools.image, literals.image,
             node_names, nodes, trans)
@@ -1291,11 +1295,11 @@ class Z80Simulator(object):
         for n in self.__nodes.values():
             self.__nodes_by_name[n.id] = n
 
-    def __restore_transistors_from_image(self, image):
+    def __restore_transistors_from_image(self, trans_storage, image):
         self.__trans = {}
         for i in image:
             index, i = i[0], i[1:]
-            t = Transistor.from_image(index, i, self.__nodes)
+            t = trans_storage.get(index, i, self.__nodes)
             self.__trans[index] = t
 
     def get_node_states(self, ids=None):
@@ -1365,7 +1369,7 @@ class Z80Simulator(object):
             p = [] if p is None else [p]
             stack.append(n)
             for t in n.conn_of:
-                if t.gate.state is not FALSE:
+                if t.state is not FALSE:
                     m = t.get_other_conn(n)
                     if m in stack:
                         cyclic = True
@@ -1373,7 +1377,7 @@ class Z80Simulator(object):
                         cc, pp = get_group_pred(m, get_node_pred, stack, preds)
                         cyclic |= cc
 
-                        mp = t.gate.state & pp
+                        mp = t.state & pp
                         if mp is TRUE:
                             p = [TRUE]
                             break
@@ -1431,6 +1435,7 @@ class Z80Simulator(object):
         else:
             n.state = state
             for t in n.gate_of:
+                t.state = state
                 if t.conns_group not in next_round_groups:
                     next_round_groups.append(t.conns_group)
 
@@ -1494,6 +1499,8 @@ class Z80Simulator(object):
     def clear_state(self):
         for n in self.__nodes.values():
             n.state = FALSE
+        for t in self.__trans.values():
+            t.state = FALSE
 
         self.__gnd.state = FALSE
         self.__pwr.state = TRUE
@@ -1551,9 +1558,10 @@ class Z80Simulator(object):
         literals = Literal.Storage(image=literals)
         bools = Bool.Storage(literals, image=bools)
         node_storage = Node.Storage(bools, image=node_storage)
+        trans_storage = Transistor.Storage(bools)
 
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
-        self.__restore_transistors_from_image(trans)
+        self.__restore_transistors_from_image(trans_storage, trans)
 
         self.__gnd = self.__nodes_by_name[_GND_ID]
         self.__pwr = self.__nodes_by_name[_PWR_ID]
@@ -1829,7 +1837,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 8, SEED
+        VERSION = 9, SEED
 
         key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
@@ -3423,6 +3431,9 @@ def play_sandbox():
 
 
 def main():
+    if '--print-start-time' in sys.argv:
+        Status.print('started')
+
     if '--test' in sys.argv:
         test_computing_node_values()
         return
