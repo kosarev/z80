@@ -948,11 +948,10 @@ class Bits(object):
 
 
 class Node(object):
-    def __init__(self, index, pull, *, custom_id=None, state=None):
+    def __init__(self, index, pull, *, custom_id=None):
         self.custom_id = custom_id
         assert pull is None or isinstance(pull, Bool), pull
         self.index, self.pull = index, pull
-        self.state = state
 
         # These are not sets as we want reproducible behaviour.
         self.gate_of = []
@@ -973,14 +972,12 @@ class Node(object):
 
         def add(self, n):
             pull = None if n.pull is None else self.__bools.add(n.pull)
-            state = None if n.state is None else self.__bools.add(n.state)
-            return pull, state
+            return pull,
 
         def get(self, index, image):
-            pull, state = image
+            pull, = image
             pull = None if pull is None else self.__bools.get(pull)
-            state = None if state is None else self.__bools.get(state)
-            return Node(index, pull, state=state)
+            return Node(index, pull)
 
         @property
         def image(self):
@@ -1305,7 +1302,8 @@ class Z80Simulator(object):
     def get_node_states(self, ids=None):
         if ids is None:
             ids = (n.id for n in self.__nodes.values())
-        return {id: self.__nodes_by_name[id].state for id in ids}
+        return {id: self.get_node_state(self.__nodes_by_name[id])
+                for id in ids}
 
     def __identify_group_of(self, n):
         nodes = []
@@ -1417,24 +1415,37 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def __update_node(self, n, next_round_groups):
-        assert not n.is_gnd_or_pwr
+    def get_node_state(self, n):
         gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
 
-        floating = n.state
-        pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
-        state = Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
-
-        # No further propagation is necessary if the state of
-        # the transistor is known to be same. This includes
-        # the case of a floating gate.
-        if state.is_equiv(n.state):
-            # Choose the simplest of the two equivalent states.
-            if state.size < n.state.size:
-                n.state = state
+        if len(n.gate_of) == 0:
+            floating = Bool.get('<floating-non-gate>')
         else:
-            n.state = state
-            for t in n.gate_of:
+            # TODO: For now we assume that all gates of the node
+            # are always in the same state.
+            floating = n.gate_of[0].state
+            assert all(t.state is floating for t in n.gate_of)
+        pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
+        return Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
+
+    def __update_node(self, n, next_round_groups):
+        assert not n.is_gnd_or_pwr
+
+        # TODO: Groups should comprise of gates, not nodes.
+        if len(n.gate_of) == 0:
+            return
+
+        state = self.get_node_state(n)
+
+        for t in n.gate_of:
+            # No further propagation is necessary if the state of
+            # the transistor is known to be same. This includes
+            # the case of a floating gate.
+            if state.is_equiv(t.state):
+                # Choose the simplest of the two equivalent states.
+                if state.size < t.state.size:
+                    t.state = state
+            else:
                 t.state = state
                 if t.conns_group not in next_round_groups:
                     next_round_groups.append(t.conns_group)
@@ -1497,13 +1508,8 @@ class Z80Simulator(object):
         self.half_tick()
 
     def clear_state(self):
-        for n in self.__nodes.values():
-            n.state = FALSE
         for t in self.__trans.values():
             t.state = FALSE
-
-        self.__gnd.state = FALSE
-        self.__pwr.state = TRUE
 
     __DEFAULT_RESET_PROPAGATION_DELAY = 31
 
@@ -1597,7 +1603,7 @@ class Z80Simulator(object):
 
     @property
     def nclk(self):
-        return self.__nclk.state
+        return self.get_node_state(self.__nclk)
 
     @nclk.setter
     def nclk(self, state):
@@ -1715,7 +1721,7 @@ class Z80Simulator(object):
         return self.__nodes_by_name[id]
 
     def read_nodes(self, id, width=8):
-        return Bits(self.__nodes_by_name[f'{id}{i}'].state
+        return Bits(self.get_node_state(self.__nodes_by_name[f'{id}{i}'])
                     for i in range(width))
 
     def __write_bits(self, name, value, width=8):
@@ -1748,15 +1754,6 @@ class Z80Simulator(object):
         lo = self.read_nodes('reg_pcl')
         hi = self.read_nodes('reg_pch')
         return (hi << 8) | lo
-
-    def set_node_state(self, n, state):
-        self.__nodes_by_name[n].state = Bool.cast(state)
-
-    def set_latch_state(self, a, b, state):
-        self.set_node_state(a, state)
-        self.set_node_state(b, ~state)
-        self.__update_groups_of([self.__nodes_by_name[a],
-                                 self.__nodes_by_name[b]])
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
@@ -1837,7 +1834,7 @@ class State(object):
         # Whenever we make changes that invalidate cached states,
         # e.g., the names of the nodes are changed, the version
         # number must be bumped.
-        VERSION = 9, SEED
+        VERSION = 10, SEED
 
         key = VERSION, __class__.__get_steps_image(steps)
         return Cache.get_entry('states', key)
@@ -1947,12 +1944,6 @@ class State(object):
         if kind == 'clear_state':
             _, _, = step
             sim.clear_state()
-        elif kind == 'set_node_state':
-            _, _, n, state = step
-            sim.set_node_state(n, state)
-        elif kind == 'set_latch_state':
-            _, _, a, b, state = step
-            sim.set_latch_state(a, b, state)
         elif kind == 'set_pin_pull':
             _, _, pin, pull = step
             sim.set_pin_pull(pin, pull)
@@ -1982,14 +1973,6 @@ class State(object):
 
     def clear_state(self):
         self.__add_step(('clear_state',))
-
-    def set_node_state(self, n, state):
-        step = 'set_node_state', n, Bool.cast(state)
-        self.__add_step(step)
-
-    def set_latch_state(self, a, b, state):
-        step = 'set_latch_state', a, b, Bool.cast(state)
-        self.__add_step(step)
 
     def set_pin_pull(self, pin, pull):
         step = 'set_pin_pull', pin, Bool.cast(pull)
@@ -2089,7 +2072,7 @@ class State(object):
 
         def print_bit(id, with_pull=False):
             n = s.get_node(id)
-            Status.print(f'  {id}: {n.state}')
+            Status.print(f'  {id}: {s.get_node_state(n)}')
             if with_pull:
                 Status.print(f'  {id} pull: {n.pull}')
 
@@ -2877,7 +2860,6 @@ def build_reset_state():
     s.report('after-clearing-state')
 
     for pin in _PINS:
-        s.set_node_state(pin, f'init.{pin}')
         if pin == '~clk':
             # The ~clk pull seems to propagate to lots of nodes,
             # including register bits, and survives the reset
@@ -3317,7 +3299,8 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     # Symbolise non-persistent nodes.
     for id in s.get_node_states():
         if id not in persistent_nodes:
-            s.set_node_state(id, Bool.get(id))
+            # s.set_node_state(id, Bool.get(id))
+            assert 0
     s.update_all_nodes()
     s.cache()
 
