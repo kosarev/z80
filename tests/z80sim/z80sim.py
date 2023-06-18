@@ -1445,15 +1445,14 @@ class Z80Simulator(object):
                 if t.conns_group not in next_round_groups:
                     next_round_groups.append(t.conns_group)
 
-    def __update_groups_of(self, nodes, *, shuffle=True):
+    def __update_groups_of(self, nodes):
         # TODO: Does always updating all nodes lead to any failures?
         # nodes = list(self.__nodes.values())
-
-        shuffle &= (SEED is not None)
 
         groups = []
         for n in nodes:
             if n.group not in groups:
+                assert n.group is not None, n
                 groups.append(n.group)
         del nodes
 
@@ -1465,7 +1464,8 @@ class Z80Simulator(object):
             nodes = sum((g.gates for g in groups), start=())
             assert len(nodes) == len(set(nodes))
 
-            if shuffle:
+            if SEED is not None:
+                nodes = list(nodes)
                 random.shuffle(nodes)
 
             with Status.do(f'round {round}'):
@@ -1541,7 +1541,7 @@ class Z80Simulator(object):
         if image is None:
             s = State()
             s.clear_state()
-            s.update_all_nodes()
+            s.power_up()
 
             if not skip_reset:
                 s.reset(__class__.__DEFAULT_RESET_PROPAGATION_DELAY,
@@ -1758,11 +1758,13 @@ class Z80Simulator(object):
         n = self.__nodes_by_name[pin]
         self.__update_groups_of([n])
 
-    def update_all_nodes(self):
+    def power_up(self):
+        assert len(self.__gnd.gate_of) == 0
+        assert len(self.__pwr.gate_of) == 0
         with Status.do('update nodes'):
-            self.__update_groups_of([n for n in self.__nodes.values()
-                                     if n not in self.__gnd_pwr],
-                                    shuffle=False)
+            self.__update_groups_of(t.get_other_conn(n)
+                                    for n in self.__gnd_pwr
+                                    for t in n.conn_of)
 
     def dump(self):
         with open('z80.dump', mode='w') as f:
@@ -1945,9 +1947,9 @@ class State(object):
         elif kind == 'update_pin':
             _, _, pin = step
             sim.update_pin(pin)
-        elif kind == 'update_all_nodes':
+        elif kind == 'power_up':
             _, _, = step
-            sim.update_all_nodes()
+            sim.power_up()
         elif kind == 'reset':
             _, _, propagation_delay, waiting_for_m1_delay = step
             sim.reset(propagation_delay, waiting_for_m1_delay)
@@ -1995,8 +1997,8 @@ class State(object):
         self.set_db(bits)
         self.ticks(ticks)
 
-    def update_all_nodes(self):
-        self.__add_step(('update_all_nodes',))
+    def power_up(self):
+        self.__add_step(('power_up',))
 
     def reset(self, propagation_delay, waiting_for_m1_delay):
         self.__add_step(('reset', propagation_delay,
@@ -2865,8 +2867,8 @@ def build_reset_state():
             s.set_pin_pull(pin, TRUE)
         else:
             s.set_pin_pull(pin, f'pull.{pin}')
-    with s.status('update all nodes'):
-        s.update_all_nodes()
+    with s.status('power up'):
+        s.power_up()
     s.report('after-updating-all-nodes')
 
     with s.status('reset'):
@@ -3296,7 +3298,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
         if id not in persistent_nodes:
             # s.set_node_state(id, Bool.get(id))
             assert 0
-    s.update_all_nodes()
+    s.power_up()
     s.cache()
 
     at_start = s.get_node_states()
