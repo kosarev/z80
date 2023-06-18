@@ -1019,10 +1019,8 @@ class Node(object):
 
 class NodeGroup(object):
     def __init__(self, nodes):
-        self.__nodes = tuple(sorted(nodes))
-
-    def __iter__(self):
-        yield from self.__nodes
+        self.nodes = tuple(sorted(nodes))
+        self.gates = tuple(n for n in self.nodes if len(n.gate_of) > 0)
 
 
 class Transistor(object):
@@ -1326,7 +1324,7 @@ class Z80Simulator(object):
                 continue
 
             group = self.__identify_group_of(n)
-            for m in group:
+            for m in group.nodes:
                 m.group = group
 
         assert self.__gnd.group is None
@@ -1430,11 +1428,6 @@ class Z80Simulator(object):
 
     def __update_node(self, n, next_round_groups):
         assert not n.is_gnd_or_pwr
-
-        # TODO: Groups should comprise of gates, not nodes.
-        if len(n.gate_of) == 0:
-            return
-
         state = self.get_node_state(n)
 
         for t in n.gate_of:
@@ -1442,9 +1435,11 @@ class Z80Simulator(object):
             # the transistor is known to be same. This includes
             # the case of a floating gate.
             if state.is_equiv(t.state):
-                # Choose the simplest of the two equivalent states.
+                # Use the simplest of the two equivalent states.
                 if state.size < t.state.size:
                     t.state = state
+                else:
+                    state = t.state
             else:
                 t.state = state
                 if t.conns_group not in next_round_groups:
@@ -1467,7 +1462,7 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            nodes = sum((tuple(g) for g in groups), start=())
+            nodes = sum((g.gates for g in groups), start=())
             assert len(nodes) == len(set(nodes))
 
             if shuffle:
