@@ -401,6 +401,10 @@ class Bool(object):
         return b
 
     @property
+    def simplest_equiv(self):
+        return self.equiv_set.simplest
+
+    @property
     def sat_clauses(self):
         clauses = []
         syms = {}
@@ -588,6 +592,7 @@ class Bool(object):
         unique_syms = []
         unique_args = []
         for a in args:
+            a = a.simplest_equiv
             if a.value is not None:
                 if a.value is True:
                     continue
@@ -611,7 +616,7 @@ class Bool(object):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        return __class__.from_ops('and', *unique_args)
+        return __class__.from_ops('and', *unique_args).simplest_equiv
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -624,11 +629,12 @@ class Bool(object):
         if self.__inversion is None:
             self.__inversion = __class__.from_ops('not', self)
 
-        return self.__inversion
+        return self.__inversion.simplest_equiv
 
     @staticmethod
     def ifelse(cond, a, b):
         cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
+        cond, a, b = cond.simplest_equiv, a.simplest_equiv, b.simplest_equiv
 
         if cond.value is not None:
             return a if cond.value else b
@@ -653,7 +659,7 @@ class Bool(object):
             # ~a ? a : b
             return a & b
 
-        return __class__.from_ops('ifelse', cond, a, b)
+        return __class__.from_ops('ifelse', cond, a, b).simplest_equiv
 
     # TODO: Remove ifelse() in favour of this function.
     def xifelse(self, a, b):
@@ -661,6 +667,8 @@ class Bool(object):
 
     @staticmethod
     def get_eq(a, b):
+        a, b = a.simplest_equiv, b.simplest_equiv
+
         if a is b:
             return TRUE
         if a is b.__inversion:
@@ -693,7 +701,7 @@ class Bool(object):
                 if x is q.__inversion:
                     return p ^ ~f
 
-        return __class__.from_ops('eq', a, b)
+        return __class__.from_ops('eq', a, b).simplest_equiv
 
     @staticmethod
     def get_neq(a, b):
@@ -750,7 +758,7 @@ class Bool(object):
             r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
             return r
 
-        e = get(self)
+        e = get(self.simplest_equiv)
         for t in ('qe2', 'solver-subsumption') * 3:
             e = z3.Tactic(t).apply(e).as_expr()
         if z3.is_false(e):
