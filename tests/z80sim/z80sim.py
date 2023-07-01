@@ -331,6 +331,7 @@ class Literal(object):
 
 
 class Bool(object):
+    __FALSE_TRUE = None
     __cache = {}
 
     class __EquivSet(object):
@@ -371,15 +372,21 @@ class Bool(object):
             return b
 
         if isinstance(term, bool):
-            false = __class__.__cache[False] = __class__()
-            true = __class__.__cache[True] = __class__()
-            false.value, true.value = False, True
-            false.__inversion, true.__inversion = true, false
-            # We want the constants to have the smallest size so
-            # that they are always seen the simplest expressions.
-            false.size = true.size = 0
-            false.equiv_set = __class__.__EquivSet(false)
-            true.equiv_set = __class__.__EquivSet(true)
+            if __class__.__FALSE_TRUE is None:
+                false, true = __class__(), __class__()
+                false.value, true.value = False, True
+                false.__inversion, true.__inversion = true, false
+                # We want the constants to have the smallest size so
+                # that they are always seen the simplest expressions.
+                false.size = true.size = 0
+                false.equiv_set = __class__.__EquivSet(false)
+                true.equiv_set = __class__.__EquivSet(true)
+                __class__.__FALSE_TRUE = false, true
+
+            false, true = __class__.__FALSE_TRUE
+            __class__.__cache[False] = false
+            __class__.__cache[True] = true
+
             return true if term else false
 
         assert isinstance(term, Literal)
@@ -2981,6 +2988,9 @@ def test_instr_seq(seq):
     Literal.clear()
     Bool.clear()
     gc.collect()
+
+    assert FALSE is Bool.get(False)
+    assert TRUE is Bool.get(True)
 
     try:
         state = build_symbolised_state()
