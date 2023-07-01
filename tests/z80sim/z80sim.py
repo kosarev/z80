@@ -332,12 +332,31 @@ class Literal(object):
 
 class Bool(object):
     __cache = {}
-    __equiv_cache = {}
+
+    class __EquivSet(object):
+        def __init__(self, e):
+            self.equiv_exprs = [e]
+            self.unequiv_sets = set()
+            self.simplest = e
+
+        def merge(self, other):
+            assert other is not self
+
+            for e in other.equiv_exprs:
+                assert e.equiv_set is other
+                e.equiv_set = self
+                self.equiv_exprs.append(e)
+
+            self.unequiv_sets.update(other.unequiv_sets)
+            for s in other.unequiv_sets:
+                s.unequiv_sets.add(self)
+
+            if other.simplest.size < self.simplest.size:
+                self.simplest = other.simplest
 
     @staticmethod
     def clear():
         __class__.__cache.clear()
-        __class__.__equiv_cache.clear()
 
     @staticmethod
     def get(term):
@@ -359,6 +378,8 @@ class Bool(object):
             # We want the constants to have the smallest size so
             # that they are always seen the simplest expressions.
             false.size = true.size = 0
+            false.equiv_set = __class__.__EquivSet(false)
+            true.equiv_set = __class__.__EquivSet(true)
             return true if term else false
 
         assert isinstance(term, Literal)
@@ -369,6 +390,7 @@ class Bool(object):
         b._e = None
         b.__inversion = None
         b.size = 1
+        b.equiv_set = __class__.__EquivSet(b)
         return b
 
     @property
@@ -673,25 +695,29 @@ class Bool(object):
     @staticmethod
     def get_equiv(a, b):
         a, b = __class__.cast(a), __class__.cast(b)
-        simplest = a if a.size <= b.size else b
+        if a.equiv_set is b.equiv_set:
+            return a.equiv_set.simplest
+        if a.equiv_set in b.equiv_set.unequiv_sets:
+            assert b.equiv_set in a.equiv_set.unequiv_sets
+            return None
 
-        e = Bool.get_neq(a, b)
+        e = Bool.get_neq(a.equiv_set.simplest, b.equiv_set.simplest)
         if e.value is not None:
-            return simplest if e.value is False else None
+            equiv = (e.value is False)
+        else:
+            s = pysat.solvers.Cadical153()
+            for c in e.sat_clauses:
+                s.add_clause(c)
+            equiv = (s.solve() is False)
+            s.delete()
 
-        key = e.symbol
-        equiv = __class__.__equiv_cache.get(key)
-        if equiv is not None:
-            return simplest if equiv else None
+        if equiv:
+            a.equiv_set.merge(b.equiv_set)
+            return a.equiv_set.simplest
 
-        s = pysat.solvers.Cadical153()
-        for c in e.sat_clauses:
-            s.add_clause(c)
-        equiv = (s.solve() is False)
-        s.delete()
-
-        __class__.__equiv_cache[key] = equiv
-        return simplest if equiv else None
+        a.equiv_set.unequiv_sets.add(b.equiv_set)
+        b.equiv_set.unequiv_sets.add(a.equiv_set)
+        return None
 
     @staticmethod
     def is_equiv(a, b):
