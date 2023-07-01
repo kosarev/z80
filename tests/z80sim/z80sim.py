@@ -356,7 +356,9 @@ class Bool(object):
             true = __class__.__cache[True] = __class__()
             false.value, true.value = False, True
             false.__inversion, true.__inversion = true, false
-            false.size = true.size = 1
+            # We want the constants to have the smallest size so
+            # that they are always seen the simplest expressions.
+            false.size = true.size = 0
             return true if term else false
 
         assert isinstance(term, Literal)
