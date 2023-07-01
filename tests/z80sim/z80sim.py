@@ -98,6 +98,7 @@ def deep_tupilize(x):
 
 
 class Status(object):
+    __start_time = datetime.datetime.now()
     __supression_count = 0
     __parts = []
     __line = ''
@@ -116,7 +117,8 @@ class Status(object):
 
     @staticmethod
     def __get_time():
-        return datetime.datetime.now().strftime('%H:%M:%S')
+        d = datetime.datetime.now() - __class__.__start_time
+        return str(datetime.timedelta(seconds=d.seconds))
 
     @staticmethod
     def __update():
