@@ -545,7 +545,7 @@ class Bool(object):
         return int(bool(self))
 
     def __eq__(self, other):
-        assert 0, "Bool's should not be compared; use is_equiv() instead."
+        assert 0, "Bool's should not be compared; use get_equiv() instead."
 
     @staticmethod
     def get_or(*args):
@@ -670,25 +670,32 @@ class Bool(object):
     def get_neq(a, b):
         return ~__class__.get_eq(a, b)
 
-    def is_equiv(self, other):
-        e = Bool.get_neq(self, other)
+    @staticmethod
+    def get_equiv(a, b):
+        a, b = __class__.cast(a), __class__.cast(b)
+        simplest = a if a.size <= b.size else b
+
+        e = Bool.get_neq(a, b)
         if e.value is not None:
-            return (e.value is False)
+            return simplest if e.value is False else None
 
         key = e.symbol
         equiv = __class__.__equiv_cache.get(key)
         if equiv is not None:
-            return equiv
+            return simplest if equiv else None
 
-        with Status.do('is_equiv', '--show-is-equiv'):
-            s = pysat.solvers.Cadical153()
-            for c in e.sat_clauses:
-                s.add_clause(c)
-            equiv = (s.solve() is False)
-            s.delete()
+        s = pysat.solvers.Cadical153()
+        for c in e.sat_clauses:
+            s.add_clause(c)
+        equiv = (s.solve() is False)
+        s.delete()
 
         __class__.__equiv_cache[key] = equiv
-        return equiv
+        return simplest if equiv else None
+
+    @staticmethod
+    def is_equiv(a, b):
+        return __class__.get_equiv(a, b) is not None
 
     def simplified_sexpr(self):
         cache = {}
@@ -718,23 +725,6 @@ class Bool(object):
         if z3.is_true(e):
             return '1'
         return e.sexpr()
-
-    # TODO: Remove.
-    def reduced(self):
-        # TODO: It seems we do much faster without trying to
-        # reduce at every step.
-        return self
-
-        if self.value is not None:
-            return self
-
-        with Status.do('reduce', '--show-reduce'):
-            simplified = self.simplified()
-            for c in (FALSE, TRUE):
-                if simplified.is_equiv(c):
-                    return c
-
-        return simplified
 
 
 FALSE = Bool.get(False)
@@ -1177,7 +1167,7 @@ def _load_initial_image():
                     __nodes[i] = n
 
                 assert ((n.pull is None and pull is None) or
-                        n.pull.is_equiv(pull))
+                        Bool.is_equiv(n.pull, pull))
 
     def load_transistors():
         def add(t):
@@ -1281,7 +1271,7 @@ class Z80Simulator(object):
         for i in image:
             n = node_storage.get(i[0], i[1:])
             self.__nodes[n.index] = n
-            # if n.state.is_equiv(Bool.get('ei')):
+            # if Bool.is_equiv(n.state, Bool.get('ei')):
             #     Status.print(n, n.state)
 
         self.__nodes_by_name = {}
@@ -1428,7 +1418,7 @@ class Z80Simulator(object):
             floating = n.gate_of[0].state
             assert all(t.state is floating for t in n.gate_of)
         pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
-        return Bool.ifelse(gnd | pwr, ~gnd, pull).reduced()
+        return Bool.ifelse(gnd | pwr, ~gnd, pull)
 
     def __update_node(self, n, next_round_groups):
         assert not n.is_gnd_or_pwr
@@ -1438,12 +1428,10 @@ class Z80Simulator(object):
             # No further propagation is necessary if the state of
             # the transistor is known to be same. This includes
             # the case of a floating gate.
-            if state.is_equiv(t.state):
+            eq = Bool.get_equiv(state, t.state)
+            if eq is not None:
                 # Use the simplest of the two equivalent states.
-                if state.size < t.state.size:
-                    t.state = state
-                else:
-                    state = t.state
+                state = t.state = eq
             else:
                 t.state = state
                 if t.conns_group not in next_round_groups:
@@ -2135,7 +2123,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             b, a = before[n], after[n]
             x = is_active(n).xifelse(x, b)
 
-        if a.is_equiv(x):
+        if Bool.is_equiv(a, x):
             return CheckToken()
 
         Status.clear()
@@ -3323,7 +3311,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     for id, state in s.get_node_states().items():
         if id not in persistent_nodes:
             continue
-        if state.is_equiv(persistent_nodes[id]):
+        if Bool.is_equiv(state, persistent_nodes[id]):
             continue
         # Status.print(f'Found state node: {id}')
         del persistent_nodes[id]
