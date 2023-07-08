@@ -1494,17 +1494,17 @@ class Z80Simulator(object):
             round += 1
             assert round < 100, 'Loop encountered!'
 
-            nodes = sum((g.gates for g in groups), start=())
-            assert len(nodes) == len(set(nodes))
+            gates = sum((g.gates for g in groups), start=())
+            assert len(gates) == len(set(gates))
 
             if SEED is not None:
-                nodes = list(nodes)
-                random.shuffle(nodes)
+                gates = list(gates)
+                random.shuffle(gates)
 
             with Status.do(f'round {round}'):
                 next_round_groups = []
-                for i, n in enumerate(nodes):
-                    with Status.do(f'node {i}/{len(nodes)}'):
+                for i, n in enumerate(gates):
+                    with Status.do(f'gate {i}/{len(gates)}'):
                         self.__update_node(n, next_round_groups)
                 groups = next_round_groups
 
