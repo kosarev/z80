@@ -1378,7 +1378,7 @@ class Z80Simulator(object):
 
             assert t.conns_group is not None
 
-    def __get_node_preds(self, n):
+    def __get_node_preds(self, n, new_states):
         def get_group_pred(n, get_node_pred, stack, preds):
             cyclic = False
 
@@ -1400,7 +1400,8 @@ class Z80Simulator(object):
             p = [] if p is None else [p]
             stack.append(n)
             for t in n.conn_of:
-                if t.state is not FALSE:
+                state = new_states.get(t.gate, t.state)
+                if state is not FALSE:
                     m = t.get_other_conn(n)
                     if m in stack:
                         cyclic = True
@@ -1408,7 +1409,7 @@ class Z80Simulator(object):
                         cc, pp = get_group_pred(m, get_node_pred, stack, preds)
                         cyclic |= cc
 
-                        mp = t.state & pp
+                        mp = state & pp
                         if mp is TRUE:
                             p = [TRUE]
                             break
@@ -1448,35 +1449,35 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def get_node_state(self, n):
-        gnd, pwr, pullup, pulldown = self.__get_node_preds(n)
+    def get_node_state(self, n, new_states=None):
+        if new_states is None:
+            new_states = {}
+
+        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, new_states)
 
         if len(n.gate_of) == 0:
             floating = Bool.get('<floating-non-gate>')
         else:
             # TODO: For now we assume that all gates of the node
             # are always in the same state.
-            floating = n.gate_of[0].state
-            assert all(t.state is floating for t in n.gate_of)
+            floating = new_states.get(n, n.gate_of[0].state)
         pull = Bool.ifelse(pulldown | pullup, ~pulldown, floating)
         return Bool.ifelse(gnd | pwr, ~gnd, pull)
 
-    def __update_node(self, n, next_round_groups):
+    def __update_gate_state(self, n, new_states):
         assert not n.is_gnd_or_pwr
-        state = self.get_node_state(n)
 
-        for t in n.gate_of:
-            # No further propagation is necessary if the state of
-            # the transistor is known to be same. This includes
-            # the case of a floating gate.
-            eq = Bool.get_equiv(state, t.state)
-            if eq is not None:
-                # Use the simplest of the two equivalent states.
-                state = t.state = eq
-            else:
-                t.state = state
-                if t.conns_group not in next_round_groups:
-                    next_round_groups.append(t.conns_group)
+        old_state = new_states.get(n, n.gate_of[0].state)
+        new_state = self.get_node_state(n, new_states)
+
+        # No further propagation is necessary if the state of
+        # the transistor is known to be same. This includes
+        # the case of a floating gate.
+        if Bool.is_equiv(new_state, old_state):
+            return False
+
+        new_states[n] = new_state
+        return True
 
     def __update_groups_of(self, nodes):
         # TODO: Does always updating all nodes lead to any failures?
@@ -1501,11 +1502,22 @@ class Z80Simulator(object):
                     gates = list(gates)
                     random.shuffle(gates)
 
-                next_round_groups = []
-                for i, n in enumerate(gates):
-                    with Status.do(f'gate {i}/{len(gates)}'):
-                        self.__update_node(n, next_round_groups)
-                groups = next_round_groups
+                # Compute new states.
+                new_states = {}
+                repeat = True
+                while repeat:
+                    repeat = False
+                    for i, n in enumerate(gates):
+                        with Status.do(f'gate {i}/{len(gates)}'):
+                            repeat |= self.__update_gate_state(n, new_states)
+
+                # Apply new states.
+                groups = []
+                for n, state in new_states.items():
+                    for t in n.gate_of:
+                        t.state = state
+                        if t.conns_group not in groups:
+                            groups.append(t.conns_group)
 
     def __set_node_pull(self, n, pull):
         pull = Bool.cast(pull)
