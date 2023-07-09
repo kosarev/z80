@@ -1493,15 +1493,14 @@ class Z80Simulator(object):
         while groups:
             round += 1
             assert round < 100, 'Loop encountered!'
-
-            gates = sum((g.gates for g in groups), start=())
-            assert len(gates) == len(set(gates))
-
-            if SEED is not None:
-                gates = list(gates)
-                random.shuffle(gates)
-
             with Status.do(f'round {round}'):
+                gates = sum((g.gates for g in groups), start=())
+                assert len(gates) == len(set(gates))
+
+                if SEED is not None:
+                    gates = list(gates)
+                    random.shuffle(gates)
+
                 next_round_groups = []
                 for i, n in enumerate(gates):
                     with Status.do(f'gate {i}/{len(gates)}'):
