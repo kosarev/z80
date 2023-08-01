@@ -21,9 +21,11 @@ import json
 import multiprocessing
 import os
 import pathlib
+import platform
 import pprint
 import pysat.solvers
 import random
+import resource
 import sys
 import traceback
 import z3
@@ -103,6 +105,10 @@ class Status(object):
     __parts = []
     __line = ''
 
+    __profile = '--profile' in sys.argv
+    if __profile:
+        print(platform.python_implementation(), ' '.join(sys.argv))
+
     @staticmethod
     def __emit(line):
         if __class__.__supression_count != 0:
@@ -116,14 +122,19 @@ class Status(object):
         __class__.__line = line
 
     @staticmethod
-    def __get_time():
+    def __get_status_prefix():
         d = datetime.datetime.now() - __class__.__start_time
-        return str(datetime.timedelta(seconds=d.seconds))
+        p = str(datetime.timedelta(seconds=d.seconds))
+        if __class__.__profile:
+            num_bools = Bool.get_cache_size()
+            mem_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            p += f' [{num_bools} bools, {mem_usage // 1000} MB]'
+        return p
 
     @staticmethod
     def __update():
         parts = ', '.join(p for p in __class__.__parts if p)
-        __class__.__emit(f'{__class__.__get_time()}  {parts}')
+        __class__.__emit(f'{__class__.__get_status_prefix()}  {parts}')
 
     @staticmethod
     def clear():
@@ -140,9 +151,17 @@ class Status(object):
         line = __class__.__line
         __class__.clear()
 
-        print(f'{__class__.__get_time()} ', *args)
+        print(f'{__class__.__get_status_prefix()} ', *args)
 
         __class__.__emit(line)
+
+    @staticmethod
+    def print_profile_info():
+        if __class__.__profile:
+            line = __class__.__line
+            __class__.clear()
+            print(line)
+            __class__.__emit(line)
 
     @staticmethod
     def enter(s):
@@ -227,6 +246,8 @@ class Cache(object):
             return None
 
         def store(self, payload, *, intermediate=False):
+            Status.print_profile_info()
+
             path = self.get_path(intermediate=intermediate)
             path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -358,6 +379,10 @@ class Bool(object):
     @staticmethod
     def clear():
         __class__.__cache.clear()
+
+    @staticmethod
+    def get_cache_size():
+        return len(__class__.__cache)
 
     @staticmethod
     def get(term):
