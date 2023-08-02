@@ -1533,8 +1533,8 @@ class Z80Simulator(object):
                 while repeat:
                     repeat = False
                     for i, n in enumerate(gates):
-                        with Status.do(f'gate {i}/{len(gates)}'):
-                            repeat |= self.__update_gate_state(n, new_states)
+                        # with Status.do(f'gate {i}/{len(gates)}'):
+                        repeat |= self.__update_gate_state(n, new_states)
 
                 # Apply new states.
                 groups = []
