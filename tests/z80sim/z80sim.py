@@ -101,7 +101,7 @@ def deep_tupilize(x):
 
 class Status(object):
     __start_time = datetime.datetime.now()
-    __supression_count = 0
+    __suppression_count = 0
     __parts = []
     __line = ''
 
@@ -111,7 +111,7 @@ class Status(object):
 
     @staticmethod
     def __emit(line):
-        if __class__.__supression_count != 0:
+        if __class__.__suppression_count != 0:
             return
 
         line_with_spaces = line
@@ -138,14 +138,14 @@ class Status(object):
 
     @staticmethod
     def clear():
-        if __class__.__supression_count != 0:
+        if __class__.__suppression_count != 0:
             return
         __class__.__emit('')
         print('\r', end='', file=sys.stderr)
 
     @staticmethod
     def print(*args):
-        if __class__.__supression_count != 0:
+        if __class__.__suppression_count != 0:
             return
 
         line = __class__.__line
@@ -189,12 +189,12 @@ class Status(object):
 
     @staticmethod
     def start_suppression():
-        __class__.__supression_count += 1
+        __class__.__suppression_count += 1
 
     @staticmethod
     def end_suppression():
-        assert __class__.__supression_count > 0
-        __class__.__supression_count -= 1
+        assert __class__.__suppression_count > 0
+        __class__.__suppression_count -= 1
 
     @staticmethod
     def suppress():
