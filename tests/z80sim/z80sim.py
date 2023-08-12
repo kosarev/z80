@@ -270,90 +270,10 @@ class Cache(object):
         return __class__.__Entry(domain, key)
 
 
-class Literal(object):
-    __literals = {}
-
-    @staticmethod
-    def clear():
-        __class__.__literals.clear()
-
-    @staticmethod
-    def get(id):
-        if id is None:
-            id = f't{len(__class__.__literals) + 1}'
-        else:
-            assert id.strip() == id, repr(id)
-            assert id.lower() not in ('', '0', '1', 'true', 'false'), repr(id)
-
-        t = __class__.__literals.get(id)
-        if t is not None:
-            return t
-
-        t = __class__()
-        i = __class__()
-
-        t.id, t.sign = id, False
-        i.id, i.sign = id, True
-        t.sat_index = len(__class__.__literals) + 1
-        i.sat_index = -t.sat_index
-        t.__inversion = i
-        i.__inversion = t
-        __class__.__literals[id] = t
-
-        return t
-
-    def __repr__(self):
-        SIGNS = {False: '', True: '~'}
-        return f'{SIGNS[self.sign]}{self.id}'
-
-    def __lt__(self, other):
-        # TODO: Can we just compare SAT indexes here?
-        #       (Which also represents the 'age' of the literal.)
-        return (self.id, self.sign) < (other.id, other.sign)
-
-    @staticmethod
-    def cast(x):
-        if isinstance(x, __class__):
-            return x
-        return __class__.get(x)
-
-    class Storage(object):
-        def __init__(self, *, image=None):
-            self.__literals = []
-            self.__indexes = {}
-
-            if image is not None:
-                for i, id in enumerate(image):
-                    assert self.add(Literal.get(id)) == i * 2
-
-        def add(self, literal):
-            if literal.sign:
-                return self.add(~literal) + 1
-
-            i = self.__indexes.get(literal)
-            if i is None:
-                i = len(self.__literals)
-                self.__literals.append(literal)
-                self.__indexes[literal] = i
-
-            return i * 2
-
-        def get(self, image):
-            i, sign = image // 2, image % 2
-            t = self.__literals[i]
-            return ~t if sign else t
-
-        @property
-        def image(self):
-            return tuple(t.id for t in self.__literals)
-
-    def __invert__(self):
-        return self.__inversion
-
-
 class Bool(object):
     __FALSE_TRUE = None
     __cache = {}
+    __terms_counter = 1
 
     class __EquivSet(object):
         def __init__(self, e):
@@ -389,12 +309,16 @@ class Bool(object):
         if isinstance(term, int):
             assert term in (0, 1), repr(term)
             term = bool(term)
-        elif isinstance(term, str):
-            term = Literal.get(term)
 
-        b = __class__.__cache.get(term)
-        if b is not None:
-            return b
+        if term is not None:
+            b = __class__.__cache.get(term)
+            if b is not None:
+                if b.value is not None:
+                    assert b.value is term
+                else:
+                    assert b.symbol == term
+                    assert b._e is None
+                return b
 
         if isinstance(term, bool):
             if __class__.__FALSE_TRUE is None:
@@ -414,8 +338,12 @@ class Bool(object):
 
             return true if term else false
 
-        assert isinstance(term, Literal)
-        assert term.sign is False
+        if term is None:
+            term = f't{__class__.__terms_counter}'
+        else:
+            assert isinstance(term, str)
+            assert term.strip() == term, repr(term)
+            assert term.lower() not in ('', '0', '1', 'true', 'false')
         b = __class__.__cache[term] = __class__()
         b.value = None
         b.symbol = term
@@ -423,6 +351,9 @@ class Bool(object):
         b.__inversion = None
         b.size = 1
         b.equiv_set = __class__.__EquivSet(b)
+        b.sat_index = __class__.__terms_counter
+        assert b.sat_index != 0
+        __class__.__terms_counter += 1
         return b
 
     @property
@@ -432,67 +363,60 @@ class Bool(object):
     @property
     def sat_clauses(self):
         clauses = []
-        syms = {}
-
-        def add(*cs):
-            clauses.extend(tuple(t.sat_index for t in c) for c in cs)
+        indexes = {}
 
         def get(n):
-            assert n.value is None, self
+            if n._e is None:
+                return n.sat_index
 
-            r = syms.get(n.symbol)
+            r = indexes.get(n)
             if r is not None:
                 return r
 
-            r = n.symbol
-            if n._e is None:
-                syms[n.symbol] = r
-                return r
-
+            r = n.sat_index
             kind, ops = n._e
             if kind == 'not':
                 a, = ops
-                r = ~get(a)
+                r = -get(a)
             elif kind == 'eq':
                 # r = xnor(a, b)  ===  xor(a, b, r)
                 a, b = ops
                 a, b = get(a), get(b)
-                add((~a, ~b, r), (a, b, r), (a, ~b, ~r), (~a, b, ~r))
+                clauses.extend(((-a, -b, r), (a, b, r),
+                                (a, -b, -r), (-a, b, -r)))
             elif kind == 'ifelse':
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
-                add((~i, t, ~r), (~i, ~t, r), (i, e, ~r), (i, ~e, r))
+                clauses.extend(((-i, t, -r), (-i, -t, r),
+                                (i, e, -r), (i, -e, r)))
             elif kind == 'and':
-                op_syms = tuple(get(op) for op in ops)
-                add(tuple(~s for s in op_syms + (~r,)))
-                for s in op_syms:
-                    add((s, ~r))
+                ops = tuple(get(a) for a in ops)
+                clauses.append(tuple(-a for a in ops) + (r,))
+                clauses.extend((a, -r) for a in ops)
             else:
                 assert 0, n  # TODO
 
-            syms[n.symbol] = r
+            indexes[n] = r
             return r
 
-        add((get(self),))
+        clauses.append((get(self),))
 
         return clauses
 
     @staticmethod
     def from_ops(kind, *ops):
-        syms = tuple(op.symbol for op in ops)
-
         COMMUTATIVE = {
             'not': False, 'ifelse': False,
             'eq': True, 'and': True}
         if COMMUTATIVE[kind]:
-            syms = tuple(sorted(syms))
+            ops = tuple(sorted(ops, key=lambda a: a.symbol))
 
-        key = kind, syms
+        key = kind, ops
         b = __class__.__cache.get(key)
         if b is not None:
             return b
 
-        b = __class__.__cache[key] = Bool.get(Literal.get(None))
+        b = __class__.__cache[key] = Bool.get(None)
         b._e = kind, ops
         b.size = sum(op.size for op in ops) + 1
 
@@ -507,7 +431,7 @@ class Bool(object):
         if self.value is not None:
             return repr(int(self.value))
         if self._e is None:
-            return str(self.symbol)
+            return self.symbol
 
         rep = []
         syms = set()
@@ -536,14 +460,12 @@ class Bool(object):
         return self.simplified_sexpr()
 
     class Storage(object):
-        def __init__(self, literal_storage, *, image=None):
-            self.__literals = literal_storage
+        def __init__(self, *, image=None):
             self.__nodes = []
             self.__node_indexes = {}
             if image is not None:
                 for s, kind, ops in image:
                     if kind is None:
-                        s = self.__literals.get(s)
                         assert ops is None
                         b = Bool.get(s)
                     else:
@@ -562,7 +484,7 @@ class Bool(object):
                 return i
 
             if e._e is None:
-                s = self.__literals.add(e.symbol)
+                s = e.symbol
                 kind = ops = None
             else:
                 s = None
@@ -601,9 +523,6 @@ class Bool(object):
 
     def __int__(self):
         return int(bool(self))
-
-    def __eq__(self, other):
-        assert 0, "Bool's should not be compared; use get_equiv() instead."
 
     @staticmethod
     def get_or(*args):
@@ -770,9 +689,9 @@ class Bool(object):
             if n.value is not None:
                 return z3.BoolVal(n.value)
             if n._e is None:
-                return z3.Bool(n.symbol.id)
+                return z3.Bool(n.symbol)
 
-            r = cache.get(n.symbol)
+            r = cache.get(n)
             if r is not None:
                 return r
 
@@ -780,7 +699,7 @@ class Bool(object):
             OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
                    'eq': lambda a, b: a == b,
                    'ifelse': z3.If}
-            r = cache[n.symbol] = OPS[kind](*(get(op) for op in ops))
+            r = cache[n] = OPS[kind](*(get(op) for op in ops))
             return r
 
         e = get(self.simplest_equiv)
@@ -1127,8 +1046,7 @@ class Transistor(object):
 
 
 def _make_image(nodes, trans):
-    literals = Literal.Storage()
-    bools = Bool.Storage(literals)
+    bools = Bool.Storage()
     node_storage = Node.Storage(bools)
     trans_storage = Transistor.Storage(bools)
 
@@ -1139,7 +1057,7 @@ def _make_image(nodes, trans):
     nodes = tuple((n.index,) + node_storage.add(n) for n in nodes)
     trans = tuple((t.index,) + trans_storage.add(t) for t in trans)
 
-    return (node_storage.image, bools.image, literals.image,
+    return (node_storage.image, bools.image,
             node_names, nodes, trans)
 
 
@@ -1622,11 +1540,10 @@ class Z80Simulator(object):
             # For custom images, leave them as-is.
             assert skip_reset is None
 
-        (node_storage, bools, literals,
+        (node_storage, bools,
          node_names, nodes, trans) = image
 
-        literals = Literal.Storage(image=literals)
-        bools = Bool.Storage(literals, image=bools)
+        bools = Bool.Storage(image=bools)
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
@@ -1915,8 +1832,7 @@ class State(object):
 
     @staticmethod
     def __get_steps_image(steps):
-        literals = Literal.Storage()
-        bools = Bool.Storage(literals)
+        bools = Bool.Storage()
 
         def get_step_element_image(e):
             if isinstance(e, (str, int, type(None))):
@@ -1929,7 +1845,7 @@ class State(object):
             return tuple(get_step_element_image(e) for e in step)
 
         return (tuple(get_step_image(s) for s in steps),
-                bools.image, literals.image)
+                bools.image)
 
     @staticmethod
     def __cache_state(steps, image, *, intermediate=False):
@@ -3029,9 +2945,8 @@ def build_symbolised_state():
 
 
 def test_instr_seq(seq):
-    Literal.clear()
-    Bool.clear()
-    gc.collect()
+    # Bool.clear()
+    # gc.collect()
 
     assert FALSE is Bool.get(False)
     assert TRUE is Bool.get(True)
