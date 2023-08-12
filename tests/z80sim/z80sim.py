@@ -434,26 +434,34 @@ class Bool(object):
             return self.symbol
 
         rep = []
-        syms = set()
+        visited = set()
         worklist = [self]
         while worklist:
             n = worklist.pop()
-            if n.value is not None or n.symbol in syms:
+            if n.value is not None or n in visited:
                 continue
-            syms.add(n.symbol)
+            visited.add(n)
             if n._e is None:
                 continue
             if len(rep) != 0:
                 rep.append('; ')
             kind, ops = n._e
-            rep.append(f'{n.symbol} = {kind}')
+            if kind == 'not':
+                op, = ops
+                rep.append(f'{n.symbol} = ~{op.symbol}')
+            else:
+                rep.append(f'{n.symbol} = {kind}')
 
-            for op in ops:
-                if op.value is not None:
-                    rep.append(f' {int(op.value)}')
-                else:
-                    rep.append(f' {op.symbol}')
-            worklist.extend(ops)
+                for op in ops:
+                    if op.value is not None:
+                        rep.append(f' {int(op.value)}')
+                    elif op._e is not None and op._e[0] == 'not':
+                        op, = op._e[1]
+                        rep.append(f' ~{op.symbol}')
+                        worklist.append(op)
+                    else:
+                        rep.append(f' {op.symbol}')
+                        worklist.append(op)
         return ''.join(rep)
 
     def __str__(self):
@@ -717,8 +725,8 @@ def test_bools():
         if actual is expected:
             return
 
-        print('Actual:  ', repr(actual))
-        print('Expected:', repr(expected))
+        print('Actual:  ', actual, repr(actual))
+        print('Expected:', expected, repr(expected))
         assert 0
 
     a, b, c, t = (Bool.get(v) for v in 'abct')
