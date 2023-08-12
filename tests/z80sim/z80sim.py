@@ -277,12 +277,18 @@ class Bool(object):
 
     class __EquivSet(object):
         def __init__(self, e):
+            self.value = None
             self.equiv_exprs = [e]
             self.unequiv_sets = set()
             self.simplest = e
+            self.inversion = None
 
-        def merge(self, other):
+        def __merge(self, other):
             assert other is not self
+
+            if other.value is not None:
+                assert self.value is None or self.value is other.value
+                self.value = other.value
 
             for e in other.equiv_exprs:
                 assert e.equiv_set is other
@@ -291,10 +297,29 @@ class Bool(object):
 
             self.unequiv_sets.update(other.unequiv_sets)
             for s in other.unequiv_sets:
+                s.unequiv_sets.remove(other)
                 s.unequiv_sets.add(self)
 
             if other.simplest.size < self.simplest.size:
                 self.simplest = other.simplest
+
+            # Make sure the other set won't be used anymore.
+            del other.value
+            del other.equiv_exprs
+            del other.unequiv_sets
+            del other.simplest
+
+        def merge(self, other):
+            if other.inversion is not None:
+                if self.inversion is None:
+                    self.inversion = other.inversion
+                    assert self.inversion.inversion is other
+                    self.inversion.inversion = self
+                else:
+                    self.inversion.__merge(other.inversion)
+            del other.inversion
+
+            self.__merge(other)
 
     @staticmethod
     def clear():
@@ -324,12 +349,15 @@ class Bool(object):
             if __class__.__FALSE_TRUE is None:
                 false, true = __class__(), __class__()
                 false.value, true.value = False, True
-                false.__inversion, true.__inversion = true, false
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
                 false.equiv_set = __class__.__EquivSet(false)
                 true.equiv_set = __class__.__EquivSet(true)
+                false.equiv_set.value = False
+                true.equiv_set.value = True
+                false.equiv_set.inversion = true.equiv_set
+                true.equiv_set.inversion = false.equiv_set
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
@@ -348,7 +376,6 @@ class Bool(object):
         b.value = None
         b.symbol = term
         b._e = None
-        b.__inversion = None
         b.size = 1
         b.equiv_set = __class__.__EquivSet(b)
         b.sat_index = __class__.__terms_counter
@@ -359,6 +386,11 @@ class Bool(object):
     @property
     def simplest_equiv(self):
         return self.equiv_set.simplest
+
+    @property
+    def __inversion(self):
+        s = self.equiv_set.inversion
+        return None if s is None else s.simplest
 
     @property
     def sat_clauses(self):
@@ -422,8 +454,8 @@ class Bool(object):
 
         if kind == 'not':
             op, = ops
-            b.__inversion = op
-            op.__inversion = b
+            b.equiv_set.inversion = op.equiv_set
+            op.equiv_set.inversion = b.equiv_set
 
         return b
 
@@ -554,6 +586,11 @@ class Bool(object):
                 return FALSE
             if a._e is not None and a._e[0] == 'and':
                 for op in a._e[1]:
+                    op = op.simplest_equiv
+                    if op.value is not None:
+                        if op.value is True:
+                            continue
+                        return FALSE
                     if (op.__inversion is not None and
                             op.__inversion.symbol in unique_syms):
                         return FALSE
@@ -578,10 +615,10 @@ class Bool(object):
         return __class__.get_neq(self, other)
 
     def __invert__(self):
-        if self.__inversion is None:
-            self.__inversion = __class__.from_ops('not', self)
+        if self.equiv_set.inversion is None:
+            __class__.from_ops('not', self)
 
-        return self.__inversion.simplest_equiv
+        return self.equiv_set.inversion.simplest
 
     @staticmethod
     def ifelse(cond, a, b):
@@ -630,8 +667,10 @@ class Bool(object):
         if b.value is not None:
             return a if b.value else ~a
 
-        # eq(a, eq(a, b))  =>  b
-        # eq(a, eq(~a, b))  =>  ~b
+        # eq(a,  eq( a, b))  =>   b
+        # eq(a,  eq(~a, b))  =>  ~b
+        # eq(a, ~eq( a, b))  =>  ~b
+        # eq(a, ~eq(~a, b))  =>   b
         for x, y in ((a, b), (b, a)):
             f = FALSE
             if y._e is not None and y._e[0] == 'not':
@@ -640,6 +679,7 @@ class Bool(object):
 
             if y._e is not None and y._e[0] == 'eq':
                 p, q = y._e[1]
+                p, q = p.simplest_equiv, q.simplest_equiv
                 if x is p:
                     return q ^ f
                 if x is p.__inversion:
@@ -676,6 +716,7 @@ class Bool(object):
 
         if equiv:
             a.equiv_set.merge(b.equiv_set)
+            assert a.equiv_set is b.equiv_set
             return a.equiv_set.simplest
 
         a.equiv_set.unequiv_sets.add(b.equiv_set)
