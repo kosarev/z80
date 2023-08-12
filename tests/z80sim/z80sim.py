@@ -273,7 +273,7 @@ class Cache(object):
 class Bool(object):
     __FALSE_TRUE = None
     __cache = {}
-    __terms_counter = 1
+    __sat_index_counter = 0
 
     class __EquivSet(object):
         def __init__(self, e):
@@ -330,6 +330,12 @@ class Bool(object):
         return len(__class__.__cache)
 
     @staticmethod
+    def __get_sat_index():
+        __class__.__sat_index_counter += 1
+        assert __class__.__sat_index_counter != 0
+        return __class__.__sat_index_counter
+
+    @staticmethod
     def get(term):
         if isinstance(term, int):
             assert term in (0, 1), repr(term)
@@ -348,7 +354,6 @@ class Bool(object):
         if isinstance(term, bool):
             if __class__.__FALSE_TRUE is None:
                 false, true = __class__(), __class__()
-                false.value, true.value = False, True
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
@@ -358,6 +363,8 @@ class Bool(object):
                 true.equiv_set.value = True
                 false.equiv_set.inversion = true.equiv_set
                 true.equiv_set.inversion = false.equiv_set
+                false.sat_index = __class__.__get_sat_index()
+                true.sat_index = __class__.__get_sat_index()
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
@@ -366,21 +373,19 @@ class Bool(object):
 
             return true if term else false
 
+        sat_index = __class__.__get_sat_index()
         if term is None:
-            term = f't{__class__.__terms_counter}'
+            term = f't{sat_index}'
         else:
             assert isinstance(term, str)
             assert term.strip() == term, repr(term)
             assert term.lower() not in ('', '0', '1', 'true', 'false')
         b = __class__.__cache[term] = __class__()
-        b.value = None
         b.symbol = term
         b._e = None
         b.size = 1
         b.equiv_set = __class__.__EquivSet(b)
-        b.sat_index = __class__.__terms_counter
-        assert b.sat_index != 0
-        __class__.__terms_counter += 1
+        b.sat_index = sat_index
         return b
 
     @property
@@ -393,19 +398,28 @@ class Bool(object):
         return None if s is None else s.simplest
 
     @property
+    def value(self):
+        return self.equiv_set.value
+
+    @property
     def sat_clauses(self):
         clauses = []
         indexes = {}
 
         def get(n):
-            if n._e is None:
-                return n.sat_index
+            r = n.sat_index
 
-            r = indexes.get(n)
-            if r is not None:
+            if n.value is not None:
+                clauses.append((-r,) if n.value is False else (r,))
                 return r
 
-            r = n.sat_index
+            if n._e is None:
+                return r
+
+            i = indexes.get(n)
+            if i is not None:
+                return i
+
             kind, ops = n._e
             if kind == 'not':
                 a, = ops
@@ -441,7 +455,10 @@ class Bool(object):
             'not': False, 'ifelse': False,
             'eq': True, 'and': True}
         if COMMUTATIVE[kind]:
-            ops = tuple(sorted(ops, key=lambda a: a.symbol))
+            # We can't sort by symbols here, because some
+            # operands may be known to be equivalent to false or
+            # true by now when restoring from an image.
+            ops = tuple(sorted(ops, key=lambda a: a.sat_index))
 
         key = kind, ops
         b = __class__.__cache.get(key)
