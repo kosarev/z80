@@ -622,10 +622,6 @@ class Bool(object):
         if b.value is not None:
             return a if b.value else ~a
 
-        # This simplification is particularly important for
-        # speeding up simulation of conditional half-ticks:
-        # if t2 is ifelse(c, ~t, t), then ifelse(c, ~t2, t2) is t.
-        #
         # eq(a, eq(a, b))  =>  b
         # eq(a, eq(~a, b))  =>  ~b
         for x, y in ((a, b), (b, a)):
@@ -714,6 +710,45 @@ class Bool(object):
 
 FALSE = Bool.get(False)
 TRUE = Bool.get(True)
+
+
+def test_bools():
+    def test(actual, expected):
+        if actual is expected:
+            return
+
+        print('Actual:  ', repr(actual))
+        print('Expected:', repr(expected))
+        assert 0
+
+    a, b, c, t = (Bool.get(v) for v in 'abct')
+    eq = Bool.get_eq
+    ifelse = Bool.ifelse
+
+    # Canonicalise commutative operations.
+    test(eq(a, b), eq(b, a))
+
+    test(eq(a, eq(a, b)), b)
+    test(eq(eq(a, b), a), b)
+    test(eq(a, eq(~a, b)), ~b)
+    test(eq(eq(~a, b), a), ~b)
+
+    test(eq(a, ~eq(a, b)), ~b)
+    test(eq(~eq(a, b), a), ~b)
+    test(eq(a, ~eq(~a, b)), b)
+    test(eq(~eq(~a, b), a), b)
+
+    test(eq(~a, ~eq(a, b)), b)
+    test(eq(~eq(a, b), ~a), b)
+    test(eq(~a, ~eq(~a, b)), ~b)
+    test(eq(~eq(~a, b), ~a), ~b)
+
+    test(ifelse(c, ~t, t), eq(c, ~t))
+
+    # This simplification is particularly important for
+    # speeding up simulation of conditional half-ticks:
+    t2 = ifelse(c, ~t, t)
+    test(ifelse(c, ~t2, t2), t)
 
 
 class Bits(object):
@@ -3398,6 +3433,8 @@ def play_sandbox():
 
 
 def main():
+    test_bools()
+
     if '--print-start-time' in sys.argv:
         Status.print('started')
 
