@@ -407,18 +407,19 @@ class Bool(object):
         indexes = {}
 
         def get(n):
+            n = n.simplest_equiv
             r = n.sat_index
 
-            if n.value is not None:
-                clauses.append((-r,) if n.value is False else (r,))
-                return r
-
-            if n._e is None:
+            if n.value is None and n._e is None:
                 return r
 
             i = indexes.get(n)
             if i is not None:
                 return i
+
+            if n.value is not None:
+                clauses.append((-r,) if n.value is False else (r,))
+                return r
 
             kind, ops = n._e
             if kind == 'not':
