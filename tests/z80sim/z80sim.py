@@ -393,6 +393,20 @@ class Bool(object):
         return self.equiv_set.simplest
 
     @property
+    def __kind(self):
+        return self._e[0]
+
+    @property
+    def __ops(self):
+        return self._e[1]
+
+    @property
+    def __is_inversion(self):
+        return (self.value is None and
+                self._e is not None and
+                self.__kind == 'not')
+
+    @property
     def __inversion(self):
         s = self.equiv_set.inversion
         return None if s is None else s.simplest
@@ -425,12 +439,6 @@ class Bool(object):
             if kind == 'not':
                 a, = ops
                 r = -get(a)
-            elif kind == 'eq':
-                # r = xnor(a, b)  ===  xor(a, b, r)
-                a, b = ops
-                a, b = get(a), get(b)
-                clauses.extend(((-a, -b, r), (a, b, r),
-                                (a, -b, -r), (-a, b, -r)))
             elif kind == 'ifelse':
                 i, t, e = ops
                 i, t, e = get(i), get(t), get(e)
@@ -452,14 +460,21 @@ class Bool(object):
 
     @staticmethod
     def from_ops(kind, *ops):
-        COMMUTATIVE = {
-            'not': False, 'ifelse': False,
-            'eq': True, 'and': True}
-        if COMMUTATIVE[kind]:
+        if kind == 'and':
             # We can't sort by symbols here, because some
             # operands may be known to be equivalent to false or
             # true by now when restoring from an image.
             ops = tuple(sorted(ops, key=lambda a: a.sat_index))
+        elif kind == 'ifelse':
+            # Canonicalise.
+            i, t, e = ops
+            if t.__inversion is e and t < i:
+                i, t, e = t, i, ~i
+            if i.__is_inversion:
+                i, t, e = i.__inversion, e, t
+            ops = i, t, e
+        else:
+            assert kind == 'not'
 
         key = kind, ops
         b = __class__.__cache.get(key)
@@ -516,6 +531,14 @@ class Bool(object):
 
     def __str__(self):
         return self.simplified_sexpr()
+
+    def __lt__(self, other):
+        # Defines a canonical order for expressions. Depends on
+        # the order in which they are created, so not consistent
+        # between different runs. Also, establishing equivalence
+        # makes the two expressions considered identical, so the
+        # order may change between equivalence checks as well.
+        return self.sat_index < other.sat_index
 
     class Storage(object):
         def __init__(self, *, image=None):
@@ -654,6 +677,9 @@ class Bool(object):
             # cond ? a : a
             return a
         if a is b.__inversion:
+            # TODO: Is this really a simplification?
+            #       ifelse(cond, a, ~a) is just the same set of
+            #       clauses as eq(cond, a).
             # cond ? a : ~a
             return __class__.get_eq(cond, a)
 
@@ -672,6 +698,7 @@ class Bool(object):
     def xifelse(self, a, b):
         return __class__.ifelse(self, a, b)
 
+    # TODO: This should use ifelse()?
     @staticmethod
     def get_eq(a, b):
         a, b = a.simplest_equiv, b.simplest_equiv
@@ -695,19 +722,23 @@ class Bool(object):
                 f = TRUE
                 y, = y._e[1]
 
-            if y._e is not None and y._e[0] == 'eq':
-                p, q = y._e[1]
-                p, q = p.simplest_equiv, q.simplest_equiv
-                if x is p:
-                    return q ^ f
-                if x is p.__inversion:
-                    return q ^ ~f
-                if x is q:
-                    return p ^ f
-                if x is q.__inversion:
-                    return p ^ ~f
+            if y._e is not None and y.__kind == 'ifelse':
+                p, q, r = y.__ops
+                p, q, r = p.simplest_equiv, q.simplest_equiv, r.simplest_equiv
+                is_eq = q.__inversion is r
+                if is_eq:
+                    if x is p:
+                        return q ^ f
+                    if x is p.__inversion:
+                        return q ^ ~f
+                    if x is q:
+                        return p ^ f
+                    if x is q.__inversion:
+                        return p ^ ~f
 
-        return __class__.from_ops('eq', a, b).simplest_equiv
+        # ifelse takes the same set of clauses as eq, so no need
+        # to have a special operation for it.
+        return __class__.from_ops('ifelse', a, b, ~b).simplest_equiv
 
     @staticmethod
     def get_neq(a, b):
@@ -760,7 +791,6 @@ class Bool(object):
 
             kind, ops = n._e
             OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
-                   'eq': lambda a, b: a == b,
                    'ifelse': z3.If}
             r = cache[n] = OPS[kind](*(get(op) for op in ops))
             return r
