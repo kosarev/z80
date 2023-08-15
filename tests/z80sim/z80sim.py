@@ -17,6 +17,7 @@ import datetime
 import gc
 import gzip
 import hashlib
+import itertools
 import json
 import multiprocessing
 import os
@@ -273,15 +274,25 @@ class Cache(object):
 class Bool(object):
     __FALSE_TRUE = None
     __cache = {}
-    __sat_index_counter = 0
 
     class __EquivSet(object):
+        __sat_indexes = itertools.count(start=1)
+
         def __init__(self, e):
             self.value = None
             self.exprs = [e]
             self.unequiv_sets = set()
             self.simplest = e
             self.inversion = None
+            self.sat_index = next(__class__.__sat_indexes)
+
+        def __lt__(self, other):
+            # Defines a canonical order for expressions. Depends on
+            # the order in which they are created, so not consistent
+            # between different runs. Also, establishing equivalence
+            # makes the two expressions considered identical, so the
+            # order may change between equivalence checks as well.
+            return self.sat_index < other.sat_index
 
         def __merge(self, other):
             assert other is not self
@@ -330,12 +341,6 @@ class Bool(object):
         return len(__class__.__cache)
 
     @staticmethod
-    def __get_sat_index():
-        __class__.__sat_index_counter += 1
-        assert __class__.__sat_index_counter != 0
-        return __class__.__sat_index_counter
-
-    @staticmethod
     def get(term):
         if isinstance(term, int):
             assert term in (0, 1), repr(term)
@@ -363,8 +368,6 @@ class Bool(object):
                 true.equiv_set.value = True
                 false.equiv_set.inversion = true.equiv_set
                 true.equiv_set.inversion = false.equiv_set
-                false.sat_index = __class__.__get_sat_index()
-                true.sat_index = __class__.__get_sat_index()
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
@@ -373,19 +376,18 @@ class Bool(object):
 
             return true if term else false
 
-        sat_index = __class__.__get_sat_index()
+        b = __class__()
+        b.equiv_set = __class__.__EquivSet(b)
         if term is None:
-            term = f't{sat_index}'
+            term = f't{b.equiv_set.sat_index}'
         else:
             assert isinstance(term, str)
             assert term.strip() == term, repr(term)
             assert term.lower() not in ('', '0', '1', 'true', 'false')
-        b = __class__.__cache[term] = __class__()
         b.symbol = term
         b._e = None
         b.size = 1
-        b.equiv_set = __class__.__EquivSet(b)
-        b.sat_index = sat_index
+        __class__.__cache[term] = b
         return b
 
     @property
@@ -422,7 +424,7 @@ class Bool(object):
 
         def get(n):
             n = n.simplest_equiv
-            r = n.sat_index
+            r = n.equiv_set.sat_index
 
             if n.value is None and n._e is None:
                 return r
@@ -461,10 +463,7 @@ class Bool(object):
     @staticmethod
     def from_ops(kind, *ops):
         if kind == 'and':
-            # We can't sort by symbols here, because some
-            # operands may be known to be equivalent to false or
-            # true by now when restoring from an image.
-            ops = tuple(sorted(ops, key=lambda a: a.sat_index))
+            ops = tuple(sorted(ops))
         elif kind == 'ifelse':
             # Canonicalise.
             i, t, e = ops
@@ -533,12 +532,7 @@ class Bool(object):
         return self.simplified_sexpr()
 
     def __lt__(self, other):
-        # Defines a canonical order for expressions. Depends on
-        # the order in which they are created, so not consistent
-        # between different runs. Also, establishing equivalence
-        # makes the two expressions considered identical, so the
-        # order may change between equivalence checks as well.
-        return self.sat_index < other.sat_index
+        return self.equiv_set < other.equiv_set
 
     class Storage(object):
         def __init__(self, *, image=None):
