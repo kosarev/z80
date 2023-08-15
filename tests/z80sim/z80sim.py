@@ -278,7 +278,7 @@ class Bool(object):
     class __EquivSet(object):
         def __init__(self, e):
             self.value = None
-            self.equiv_exprs = [e]
+            self.exprs = [e]
             self.unequiv_sets = set()
             self.simplest = e
             self.inversion = None
@@ -290,10 +290,10 @@ class Bool(object):
                 assert self.value is None or self.value is other.value
                 self.value = other.value
 
-            for e in other.equiv_exprs:
+            for e in other.exprs:
                 assert e.equiv_set is other
                 e.equiv_set = self
-                self.equiv_exprs.append(e)
+                self.exprs.append(e)
 
             self.unequiv_sets.update(other.unequiv_sets)
             for s in other.unequiv_sets:
@@ -305,7 +305,7 @@ class Bool(object):
 
             # Make sure the other set won't be used anymore.
             del other.value
-            del other.equiv_exprs
+            del other.exprs
             del other.unequiv_sets
             del other.simplest
 
