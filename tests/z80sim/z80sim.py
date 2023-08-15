@@ -286,6 +286,8 @@ class Bool(object):
             self.inversion = None
             self.sat_index = next(__class__.__sat_indexes)
 
+            e.equiv_set = self
+
         def __lt__(self, other):
             # Defines a canonical order for expressions. Depends on
             # the order in which they are created, so not consistent
@@ -362,8 +364,8 @@ class Bool(object):
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
-                false.equiv_set = __class__.__EquivSet(false)
-                true.equiv_set = __class__.__EquivSet(true)
+                __class__.__EquivSet(false)
+                __class__.__EquivSet(true)
                 false.equiv_set.value = False
                 true.equiv_set.value = True
                 false.equiv_set.inversion = true.equiv_set
@@ -377,7 +379,7 @@ class Bool(object):
             return true if term else false
 
         b = __class__()
-        b.equiv_set = __class__.__EquivSet(b)
+        __class__.__EquivSet(b)
         if term is None:
             term = f't{b.equiv_set.sat_index}'
         else:
