@@ -278,8 +278,13 @@ class Bool(object):
     class __EquivSet(object):
         __sat_indexes = itertools.count(start=1)
 
-        def __init__(self, e):
-            self.value = None
+        def __init__(self, e, term):
+            if isinstance(term, bool):
+                self.value = term
+            else:
+                self.value = None
+                self.term = term
+
             self.exprs = [e]
             self.unequiv_sets = set()
             self.simplest = e
@@ -287,6 +292,17 @@ class Bool(object):
             self.sat_index = next(__class__.__sat_indexes)
 
             e.equiv_set = self
+
+        @property
+        def id(self):
+            if self.value is not None:
+                return 'true' if self.value else 'false'
+            if self.term is not None:
+                return self.term
+            return f't{self.sat_index}'
+
+        def __repr__(self):
+            return f'<{__class__.__qualname__} {id(self):#x} {self.id}>'
 
         def __lt__(self, other):
             # Defines a canonical order for expressions. Depends on
@@ -299,9 +315,16 @@ class Bool(object):
         def __merge(self, other):
             assert other is not self
 
-            if other.value is not None:
-                assert self.value is None or self.value is other.value
-                self.value = other.value
+            if self.value is not None or other.value is not None:
+                if self.value is not None:
+                    assert other.value is None or other.value is self.value
+                else:
+                    self.value = other.value
+                    self.term = None
+            else:
+                if other.simplest.size < self.simplest.size:
+                    self.simplest = other.simplest
+                    self.term = other.term
 
             for e in other.exprs:
                 assert e.equiv_set is other
@@ -312,9 +335,6 @@ class Bool(object):
             for s in other.unequiv_sets:
                 s.unequiv_sets.remove(other)
                 s.unequiv_sets.add(self)
-
-            if other.simplest.size < self.simplest.size:
-                self.simplest = other.simplest
 
             # Make sure the other set won't be used anymore.
             del other.value
@@ -354,8 +374,8 @@ class Bool(object):
                 if b.value is not None:
                     assert b.value is term
                 else:
-                    assert b.symbol == term
-                    assert b._e is None
+                    assert b.equiv_set.term == term
+                    assert b._e is None, (term, b._e)
                 return b
 
         if isinstance(term, bool):
@@ -364,10 +384,8 @@ class Bool(object):
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
-                __class__.__EquivSet(false)
-                __class__.__EquivSet(true)
-                false.equiv_set.value = False
-                true.equiv_set.value = True
+                __class__.__EquivSet(false, False)
+                __class__.__EquivSet(true, True)
                 false.equiv_set.inversion = true.equiv_set
                 true.equiv_set.inversion = false.equiv_set
                 __class__.__FALSE_TRUE = false, true
@@ -378,23 +396,29 @@ class Bool(object):
 
             return true if term else false
 
-        b = __class__()
-        __class__.__EquivSet(b)
-        if term is None:
-            term = f't{b.equiv_set.sat_index}'
-        else:
+        if term is not None:
             assert isinstance(term, str)
             assert term.strip() == term, repr(term)
             assert term.lower() not in ('', '0', '1', 'true', 'false')
-        b.symbol = term
+
+        b = __class__()
+        __class__.__EquivSet(b, term)
         b._e = None
         b.size = 1
-        __class__.__cache[term] = b
+
+        if term is not None:
+            assert term not in __class__.__cache
+            __class__.__cache[term] = b
+
         return b
 
     @property
     def simplest_equiv(self):
         return self.equiv_set.simplest
+
+    @property
+    def id(self):
+        return self.equiv_set.id
 
     @property
     def __kind(self):
@@ -497,7 +521,7 @@ class Bool(object):
         if self.value is not None:
             return repr(int(self.value))
         if self._e is None:
-            return self.symbol
+            return self.id
 
         rep = []
         visited = set()
@@ -514,19 +538,20 @@ class Bool(object):
             kind, ops = n._e
             if kind == 'not':
                 op, = ops
-                rep.append(f'{n.symbol} = ~{op.symbol}')
+                rep.append(f'{n.id} = ~{op.id}')
+                worklist.append(op)
             else:
-                rep.append(f'{n.symbol} = {kind}')
+                rep.append(f'{n.id} = {kind}')
 
                 for op in ops:
                     if op.value is not None:
                         rep.append(f' {int(op.value)}')
                     elif op._e is not None and op._e[0] == 'not':
                         op, = op._e[1]
-                        rep.append(f' ~{op.symbol}')
+                        rep.append(f' ~{op.id}')
                         worklist.append(op)
                     else:
-                        rep.append(f' {op.symbol}')
+                        rep.append(f' {op.id}')
                         worklist.append(op)
         return ''.join(rep)
 
@@ -543,10 +568,12 @@ class Bool(object):
             if image is not None:
                 for s, kind, ops in image:
                     if kind is None:
+                        assert s is not None
                         assert ops is None
                         b = Bool.get(s)
                     else:
                         assert s is None
+                        assert ops is not None
                         b = Bool.from_ops(kind,
                                           *(self.get(op) for op in ops))
                     i = len(self.__nodes)
@@ -554,23 +581,24 @@ class Bool(object):
                     self.__node_indexes[i] = b
 
         def add(self, e):
-            if e.value is not None:
-                return e.value
-            i = self.__node_indexes.get(e.symbol)
+            q = e.equiv_set
+            if q.value is not None:
+                return q.value
+            i = self.__node_indexes.get(q)
             if i is not None:
                 return i
 
-            if e._e is None:
-                s = e.symbol
+            if q.simplest._e is None:
+                assert q.term is not None
                 kind = ops = None
             else:
-                s = None
-                kind, ops = e._e
+                assert q.term is None
+                kind, ops = q.simplest._e
                 ops = tuple(self.add(op) for op in ops)
 
             i = len(self.__nodes)
-            self.__nodes.append((s, kind, ops))
-            self.__node_indexes[e.symbol] = i
+            self.__nodes.append((q.term, kind, ops))
+            self.__node_indexes[q] = i
             return i
 
         def get(self, image):
@@ -610,7 +638,7 @@ class Bool(object):
 
     @staticmethod
     def get_and(*args):
-        unique_syms = []
+        unique_equiv_sets = []
         unique_args = []
         for a in args:
             a = a.simplest_equiv
@@ -618,8 +646,7 @@ class Bool(object):
                 if a.value is True:
                     continue
                 return FALSE
-            if (a.__inversion is not None and
-                    a.__inversion.symbol in unique_syms):
+            if a.equiv_set.inversion in unique_equiv_sets:
                 return FALSE
             if a._e is not None and a._e[0] == 'and':
                 for op in a._e[1]:
@@ -628,13 +655,12 @@ class Bool(object):
                         if op.value is True:
                             continue
                         return FALSE
-                    if (op.__inversion is not None and
-                            op.__inversion.symbol in unique_syms):
+                    if op.equiv_set.inversion in unique_equiv_sets:
                         return FALSE
-                    if op.symbol not in unique_syms:
-                        unique_syms.append(op.symbol)
-            if a.symbol not in unique_syms:
-                unique_syms.append(a.symbol)
+                    if op.equiv_set not in unique_equiv_sets:
+                        unique_equiv_sets.append(op.equiv_set)
+            if a.equiv_set not in unique_equiv_sets:
+                unique_equiv_sets.append(a.equiv_set)
                 unique_args.append(a)
 
         if len(unique_args) == 0:
@@ -779,7 +805,7 @@ class Bool(object):
             if n.value is not None:
                 return z3.BoolVal(n.value)
             if n._e is None:
-                return z3.Bool(n.symbol)
+                return z3.Bool(n.id)
 
             r = cache.get(n)
             if r is not None:
