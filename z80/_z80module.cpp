@@ -112,6 +112,23 @@ public:
         return old_callback;
     }
 
+    void on_output(fast_u16 addr, fast_u8 value) {
+        if(!on_input_callback)
+            return;
+
+        PyObject *args = Py_BuildValue("(i, i)", addr, value);
+        decref_guard arg_guard(args);
+
+        PyObject *result = PyObject_CallObject(on_output_callback, args);
+        decref_guard result_guard(result);
+    }
+
+    PyObject *set_output_callback(PyObject *callback) {
+        PyObject *old_callback = on_output_callback;
+        on_output_callback = callback;
+        return old_callback;
+    }
+
     fast_u8 on_get_b() const { return state.b; }
     void on_set_b(fast_u8 n) { state.b = n; }
 
@@ -208,6 +225,7 @@ protected:
 
 private:
     PyObject *on_input_callback = nullptr;
+    PyObject *on_output_callback = nullptr;
 };
 
 static const unsigned max_instr_size = 4;
