@@ -203,6 +203,7 @@ class _Z80InstrBuilder(object):
         'Ghl': HL,
         'hl': HL,
         'i': IReg,
+        'ix': IX,
         'iy': IY,
         'Pbc': BC,
         'Pde': DE,
