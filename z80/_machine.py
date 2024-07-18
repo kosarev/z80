@@ -293,6 +293,14 @@ class Z80State(_StateBase):
         _set_u16(self.__alt_hl, value)
 
     @property
+    def int_disabled(self):
+        return self.__int_disabled[0]
+
+    @property
+    def halted(self):
+        return self.__halted[0]
+
+    @property
     def index_rp_kind(self):
         IREGPS = {0: HL, 1: IX, 2: IY}
         return IREGPS[self.__index_rp_kind[0]]
