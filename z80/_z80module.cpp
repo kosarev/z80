@@ -113,7 +113,7 @@ public:
     }
 
     void on_output(fast_u16 addr, fast_u8 value) {
-        if(!on_input_callback)
+        if(!on_output_callback)
             return;
 
         PyObject *args = Py_BuildValue("(i, i)", addr, value);
