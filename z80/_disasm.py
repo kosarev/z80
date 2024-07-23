@@ -189,6 +189,7 @@ class _Z80InstrBuilder(object):
         'a': A,
         'af': AF,
         'af\'': AF2,
+        'c': C,
         'Cc': CF,
         'Cm': M,
         'Cnc': NC,
