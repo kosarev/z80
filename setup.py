@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import distutils.sysconfig
 import inspect
 import os
 import platform
-# from distutils.core import Extension
 from setuptools import Extension, setup
 
 
@@ -13,18 +11,6 @@ here = os.path.abspath(os.path.dirname(inspect.getsource(lambda: 0)))
 
 with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
-
-
-# Work around the problem with the warning about '-Wstrict-prototypes'.
-# https://bugs.python.org/issue1222585
-config_vars = distutils.sysconfig.get_config_vars()
-opt_to_remove = '-Wstrict-prototypes'
-for var in ['OPT']:
-    if var in config_vars:
-        opts = config_vars[var].split()
-        if opt_to_remove in opts:
-            opts.remove(opt_to_remove)
-        config_vars[var] = ' '.join(opts)
 
 
 cxx_flags = []
