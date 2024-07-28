@@ -128,7 +128,7 @@ class _UnknownInstrError(Exception):
     pass
 
 
-class _Z80InstrBuilder(object):
+class Z80InstrBuilder(object):
     __INSTRS = {
         'Aadd': ADD,
         'Aadc': ADC,
@@ -393,7 +393,7 @@ class _Disasm(object):
 
     def __init__(self):
         # TODO: Let user choose the CPU type.
-        self.__instr_builder = _Z80InstrBuilder()
+        self.__instr_builder = Z80InstrBuilder()
 
         # Translates addresses to tags associated with those
         # addresses.

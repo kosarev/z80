@@ -7,7 +7,7 @@
 #
 #   Published under the MIT license.
 
-from ._disasm import _Disasm, _Z80InstrBuilder
+from ._disasm import _Disasm, Z80InstrBuilder
 from ._error import Error
 from ._instr import (ADD, ADC, AND, CP, OR, SBC, SUB, XOR, BIT, CALL, CCF, CPL,
                      DAA, DEC, DI, DJNZ, EI, EX, EXX, HALT, IM, INC, IN, JP,
