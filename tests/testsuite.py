@@ -6,6 +6,9 @@ import unittest
 
 
 class TestInstrBuilder(unittest.TestCase):
+    def __str__(self):
+        return 'Z80IntrsBuilder'
+
     def runTest(self):
         TESTS = (
             (b'\xdd\xe5', 'push ix'),
