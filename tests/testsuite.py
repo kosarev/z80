@@ -8,11 +8,18 @@ import unittest
 class TestInstrBuilder(unittest.TestCase):
     def runTest(self):
         TESTS = (
-            (b'\xed\x50', 'in d, (c)'),)
+            (b'\xdd\xe5', 'push ix'),
+            (b'\xfd\xe1', 'pop iy'),
+            (b'\xed\x50', 'in d, (c)'),
+            )
 
         builder = z80.Z80InstrBuilder()
-        for code, instr in TESTS:
-            self.assertEqual(str(builder.build_instr(0, code)), instr)
+        for code, text in TESTS:
+            instr = builder.build_instr(0, code)
+            if isinstance(instr, z80.UnknownInstr):
+                self.fail(f'unknown instruction: {instr.text}')
+
+            self.assertEqual(str(instr), text)
 
 
 class DisasmTestCase(unittest.TestCase):

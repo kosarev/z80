@@ -202,6 +202,8 @@ class Z80InstrBuilder(object):
         'Gbc': BC,
         'Gde': DE,
         'Ghl': HL,
+        'Gix': IX,
+        'Giy': IY,
         'hl': HL,
         'i': IReg,
         'ix': IX,
