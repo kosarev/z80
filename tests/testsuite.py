@@ -5,6 +5,16 @@ import z80
 import unittest
 
 
+class TestInstrBuilder(unittest.TestCase):
+    def runTest(self):
+        TESTS = (
+            (b'\xed\x50', 'in d, (c)'),)
+
+        builder = z80.Z80InstrBuilder()
+        for code, instr in TESTS:
+            self.assertEqual(str(builder.build_instr(0, code)), instr)
+
+
 class DisasmTestCase(unittest.TestCase):
     maxDiff = None
 
@@ -58,6 +68,8 @@ class DisasmTestCase(unittest.TestCase):
 
 def suite():
     suite = unittest.TestSuite()
+
+    suite.addTest(TestInstrBuilder())
 
     suite_dir = os.path.dirname(__file__)
     disasm_tests_dir = 'disasm'
