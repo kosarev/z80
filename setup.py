@@ -33,12 +33,12 @@ z80_emulator_module = Extension(
 # TODO: Update the URL once we have a published documentation.
 # TODO: Do we have a name for the emulator?
 setup(name='z80',
-      version='1.0b2',
+      version='1.0b3',
       description='Fast and flexible Z80/i8080 Emulator',
       long_description=long_description,
       long_description_content_type='text/markdown',
       author='Ivan Kosarev',
-      author_email='ivan@kosarev.info',
+      author_email='mail@ivankosarev.com',
       url='https://github.com/kosarev/z80',
       license='MIT',
       ext_modules=[z80_emulator_module],
