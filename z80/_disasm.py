@@ -16,7 +16,8 @@ from ._error import Error
 from ._instr import (ADD, ADC, AND, CP, OR, SBC, SUB, XOR, BIT, CALL, CCF, CPL,
                      DAA, DEC, DI, DJNZ, EI, EX, EXX, HALT, IM, INC, IN, JP,
                      JR, LD, LDDR, LDIR, NEG, NOP, RLC, RL, RR, RRC, SLA, SRA,
-                     SRL, OUT, POP, PUSH, RES, RET, RLA, RLCA, RLD, RRA, RRCA,
+                     SRL, OUT, OUTI, POP, PUSH, RES, RET,
+                     RLA, RLCA, RLD, RRA, RRCA,
                      RST, SCF, SET, A, AF, AF2, CF, M, NC, NZ, PO, P, Z, DE,
                      BC, HL, IReg, IY, IX, SP, B, C, D, E, H, L, UnknownInstr,
                      JumpInstr, CallInstr, RetInstr, At, IndexReg, Add)
@@ -183,6 +184,7 @@ class Z80InstrBuilder(object):
         'sbc': SBC,
         'scf': SCF,
         'set': SET,
+        'Touti': OUTI,
     }
 
     __OPS = {

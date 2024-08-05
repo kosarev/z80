@@ -328,6 +328,10 @@ class OUT(Instr):
     pass
 
 
+class OUTI(Instr):
+    pass
+
+
 class POP(Instr):
     pass
 

@@ -14,6 +14,7 @@ class TestInstrBuilder(unittest.TestCase):
             (b'\xdd\xe5', 'push ix'),
             (b'\xfd\xe1', 'pop iy'),
             (b'\xed\x50', 'in d, (c)'),
+            (b'\xed\xa3', 'outi'),
             )
 
         builder = z80.Z80InstrBuilder()
