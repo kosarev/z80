@@ -11,6 +11,7 @@ class TestInstrBuilder(unittest.TestCase):
 
     def runTest(self):
         TESTS = (
+            (b'\xcb\x30', 'sll b'),
             (b'\xdd\xe5', 'push ix'),
             (b'\xfd\xe1', 'pop iy'),
             (b'\xed\x50', 'in d, (c)'),

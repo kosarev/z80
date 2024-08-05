@@ -15,7 +15,8 @@ import tempfile
 from ._error import Error
 from ._instr import (ADD, ADC, AND, CP, OR, SBC, SUB, XOR, BIT, CALL, CCF, CPL,
                      DAA, DEC, DI, DJNZ, EI, EX, EXX, HALT, IM, INC, IN, JP,
-                     JR, LD, LDDR, LDIR, NEG, NOP, RLC, RL, RR, RRC, SLA, SRA,
+                     JR, LD, LDDR, LDIR, NEG, NOP,
+                     RLC, RL, RR, RRC, SLA, SLL, SRA,
                      SRL, OUT, OUTI, POP, PUSH, RES, RET,
                      RLA, RLCA, RLD, RRA, RRCA,
                      RST, SCF, SET, A, AF, AF2, CF, M, NC, NZ, PO, P, Z, DE,
@@ -168,6 +169,7 @@ class Z80InstrBuilder(object):
         'Orr': RR,
         'Orrc': RRC,
         'Osla': SLA,
+        'Osll': SLL,
         'Osra': SRA,
         'Osrl': SRL,
         'out': OUT,

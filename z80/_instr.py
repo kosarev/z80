@@ -404,6 +404,10 @@ class SLA(Instr):
     pass
 
 
+class SLL(Instr):
+    pass
+
+
 class SRA(Instr):
     pass
 
