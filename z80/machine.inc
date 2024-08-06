@@ -197,6 +197,40 @@ static PyObject *unmark_addrs(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *set_read_callback(PyObject *self, PyObject *args) {
+    PyObject *new_callback;
+    if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
+        return nullptr;
+
+    if(!PyCallable_Check(new_callback)) {
+        PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+        return nullptr;
+    }
+
+    auto &machine = cast_machine(self);
+    PyObject *old_callback = machine.set_read_callback(new_callback);
+    Py_XINCREF(new_callback);
+    Py_XDECREF(old_callback);
+    Py_RETURN_NONE;
+}
+
+static PyObject *set_write_callback(PyObject *self, PyObject *args) {
+    PyObject *new_callback;
+    if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
+        return nullptr;
+
+    if(!PyCallable_Check(new_callback)) {
+        PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+        return nullptr;
+    }
+
+    auto &machine = cast_machine(self);
+    PyObject *old_callback = machine.set_write_callback(new_callback);
+    Py_XINCREF(new_callback);
+    Py_XDECREF(old_callback);
+    Py_RETURN_NONE;
+}
+
 static PyObject *set_input_callback(PyObject *self, PyObject *args) {
     PyObject *new_callback;
     if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
@@ -226,6 +260,40 @@ static PyObject *set_output_callback(PyObject *self, PyObject *args) {
 
     auto &machine = cast_machine(self);
     PyObject *old_callback = machine.set_output_callback(new_callback);
+    Py_XINCREF(new_callback);
+    Py_XDECREF(old_callback);
+    Py_RETURN_NONE;
+}
+
+static PyObject *set_reti_callback(PyObject *self, PyObject *args) {
+    PyObject *new_callback;
+    if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
+        return nullptr;
+
+    if(!PyCallable_Check(new_callback)) {
+        PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+        return nullptr;
+    }
+
+    auto &machine = cast_machine(self);
+    PyObject *old_callback = machine.set_reti_callback(new_callback);
+    Py_XINCREF(new_callback);
+    Py_XDECREF(old_callback);
+    Py_RETURN_NONE;
+}
+
+static PyObject *set_get_int_vector_callback(PyObject *self, PyObject *args) {
+    PyObject *new_callback;
+    if(!PyArg_ParseTuple(args, "O:set_callback", &new_callback))
+        return nullptr;
+
+    if(!PyCallable_Check(new_callback)) {
+        PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+        return nullptr;
+    }
+
+    auto &machine = cast_machine(self);
+    PyObject *old_callback = machine.set_get_int_vector_callback(new_callback);
     Py_XINCREF(new_callback);
     Py_XDECREF(old_callback);
     Py_RETURN_NONE;
@@ -281,10 +349,18 @@ static PyMethodDef methods[] = {
     {"unmark_addrs", unmark_addrs, METH_VARARGS,
      "Clear the marking on a range of memory bytes that indicates it requires custom "
      "processing on reading, writing or executing them."},
+    {"set_read_callback", set_read_callback, METH_VARARGS,
+     "Set a callback function handling reading from memory."},
+    {"set_write_callback", set_write_callback, METH_VARARGS,
+     "Set a callback function handling writing to memory."},
     {"set_input_callback", set_input_callback, METH_VARARGS,
      "Set a callback function handling reading from ports."},
     {"set_output_callback", set_output_callback, METH_VARARGS,
      "Set a callback function handling writing to ports."},
+    {"set_reti_callback", set_reti_callback, METH_VARARGS,
+     "Set a callback function handling the reti instruction."},
+    {"set_get_int_vector_callback", set_get_int_vector_callback, METH_VARARGS,
+     "Set a callback function handling the interrupt mode 2 vector address."},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
 #if defined(Z80_MACHINE)

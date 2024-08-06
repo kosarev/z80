@@ -225,6 +225,7 @@ public:
     unsigned on_get_int_mode() const { return 0; }
     void on_set_int_mode(unsigned mode) { unused(mode); }
     void on_set_is_int_disabled(bool f) { unused(f); }
+    fast_u8 on_get_int_vector() { return 0xFF; }
 
     void set_i_on_ld(fast_u8 i) { self().on_set_i(i); }
 
@@ -3771,7 +3772,7 @@ private:
                 break;
             case 2: {
                 // ack(7) w(3) w(3) r(3) r(3)
-                fast_u16 vector_addr = make16(self().on_get_i(), 0xff);
+                fast_u16 vector_addr = make16(self().on_get_i(), self().on_get_int_vector());
                 fast_u8 lo = self().on_read_cycle(vector_addr);
                 fast_u8 hi = self().on_read_cycle(inc16(vector_addr));
                 isr_addr = make16(hi, lo); }
