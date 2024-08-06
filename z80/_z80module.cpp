@@ -72,13 +72,58 @@ public:
     }
 
     fast_u8 on_read(fast_u16 addr) {
+        const fast_u8 default_value = 0xff;
         assert(addr < z80::address_space_size);
-        return state.memory[addr];
+
+        if(!on_read_callback) {
+            return state.memory[addr];
+        }
+
+        PyObject *arg = Py_BuildValue("(i)", addr);
+        decref_guard arg_guard(arg);
+
+        PyObject *result = PyObject_CallObject(on_read_callback, arg);
+        decref_guard result_guard(result);
+
+        if(!result) {
+            assert(0);  // TODO: stop();
+            return default_value;
+        }
+
+        if(!PyLong_Check(result)) {
+            PyErr_SetString(PyExc_TypeError, "returning value must be integer");
+            assert(0);  // TODO: stop();
+            return default_value;
+        }
+
+        return z80::mask8(PyLong_AsUnsignedLong(result));
+    }
+
+    PyObject *set_read_callback(PyObject *callback) {
+        PyObject *old_callback = on_read_callback;
+        on_read_callback = callback;
+        return old_callback;
     }
 
     void on_write(fast_u16 addr, fast_u8 n) {
         assert(addr < z80::address_space_size);
-        state.memory[addr] = n;
+
+        if(!on_write_callback) {
+            state.memory[addr] = n;
+            return;
+        }
+
+        PyObject *args = Py_BuildValue("(i, i)", addr, n);
+        decref_guard arg_guard(args);
+
+        PyObject *result = PyObject_CallObject(on_write_callback, args);
+        decref_guard result_guard(result);
+    }
+
+    PyObject *set_write_callback(PyObject *callback) {
+        PyObject *old_callback = on_write_callback;
+        on_write_callback = callback;
+        return old_callback;
     }
 
     fast_u8 on_input(fast_u16 addr) {
@@ -126,6 +171,49 @@ public:
     PyObject *set_output_callback(PyObject *callback) {
         PyObject *old_callback = on_output_callback;
         on_output_callback = callback;
+        return old_callback;
+    }
+
+    void on_reti() {
+        base::on_reti();
+
+        if(on_reti_callback) {
+            PyObject *result = PyObject_CallObject(on_reti_callback, NULL);
+            decref_guard result_guard(result);
+        }
+    }
+
+    PyObject *set_reti_callback(PyObject *callback) {
+        PyObject *old_callback = on_reti_callback;
+        on_reti_callback = callback;
+        return old_callback;
+    }
+
+    fast_u8 on_get_int_vector() {
+        const fast_u8 default_value = 0xff;
+        if(!on_get_int_vector_callback)
+            return base::on_get_int_vector();
+
+        PyObject *result = PyObject_CallObject(on_get_int_vector_callback, NULL);
+        decref_guard result_guard(result);
+
+        if(!result) {
+            assert(0);  // TODO: stop();
+            return default_value;
+        }
+
+        if(!PyLong_Check(result)) {
+            PyErr_SetString(PyExc_TypeError, "returning value must be integer");
+            assert(0);  // TODO: stop();
+            return default_value;
+        }
+
+        return z80::mask8(PyLong_AsUnsignedLong(result));
+    }
+
+    PyObject *set_get_int_vector_callback(PyObject *callback) {
+        PyObject *old_callback = on_get_int_vector_callback;
+        on_get_int_vector_callback = callback;
         return old_callback;
     }
 
@@ -224,8 +312,12 @@ protected:
     machine_state state;
 
 private:
+    PyObject *on_read_callback = nullptr;
+    PyObject *on_write_callback = nullptr;
     PyObject *on_input_callback = nullptr;
     PyObject *on_output_callback = nullptr;
+    PyObject *on_reti_callback = nullptr;
+    PyObject *on_get_int_vector_callback = nullptr;
 };
 
 static const unsigned max_instr_size = 4;
