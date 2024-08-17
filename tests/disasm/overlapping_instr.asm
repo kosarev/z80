@@ -4,6 +4,7 @@
 
     jr 0x2734                           ; @@ 0x2771 18 c1 .instr
 ---
+    org 0x2756
     rst 0x28                            ; @@ 0x2756 ef           .instr
     dec sp                              ; @@ 0x2757 3b
     jr c, 0x2772                        ; @@ 0x2758 38 18

@@ -1,3 +1,4 @@
+    org 0x11dc
     ld (hl), 0x2                        ; @@ 0x11dc 36 02        .instr
     dec hl                              ; @@ 0x11de 2b
     cp h                                ; @@ 0x11df bc

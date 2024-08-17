@@ -653,6 +653,7 @@ class _Disasm(object):
         for a in sorted(a for a, t in self.__tags.items() if not t.empty):
             if addr is None:
                 addr = a
+                yield _AsmLine(command='org 0x%x' % addr)
             elif a < addr:
                 continue
             elif a > addr:
