@@ -42,6 +42,10 @@ class P(metaclass=CondFlag):
     pass
 
 
+class PE(metaclass=CondFlag):
+    pass
+
+
 class PO(metaclass=CondFlag):
     pass
 
@@ -94,6 +98,10 @@ class IReg(metaclass=Reg):
     _str = 'i'
 
 
+class R(metaclass=Reg):
+    pass
+
+
 class AF(metaclass=Reg):
     pass
 
@@ -118,7 +126,23 @@ class IX(metaclass=IndexReg):
     pass
 
 
+class IXH(metaclass=IndexReg):
+    pass
+
+
+class IXL(metaclass=IndexReg):
+    pass
+
+
 class IY(metaclass=IndexReg):
+    pass
+
+
+class IYH(metaclass=IndexReg):
+    pass
+
+
+class IYL(metaclass=IndexReg):
     pass
 
 
@@ -244,6 +268,22 @@ class CP(Instr):
     pass
 
 
+class CPD(Instr):
+    pass
+
+
+class CPDR(Instr):
+    pass
+
+
+class CPI(Instr):
+    pass
+
+
+class CPIR(Instr):
+    pass
+
+
 class CPL(Instr):
     pass
 
@@ -284,7 +324,27 @@ class IM(Instr):
     pass
 
 
+class XIM(Instr):
+    pass
+
+
 class IN(Instr):
+    pass
+
+
+class IND(Instr):
+    pass
+
+
+class INDR(Instr):
+    pass
+
+
+class INI(Instr):
+    pass
+
+
+class INIR(Instr):
     pass
 
 
@@ -304,7 +364,19 @@ class LD(Instr):
     pass
 
 
+class XLD(Instr):
+    pass
+
+
+class LDD(Instr):
+    pass
+
+
 class LDDR(Instr):
+    pass
+
+
+class LDI(Instr):
     pass
 
 
@@ -316,7 +388,15 @@ class NEG(Instr):
     pass
 
 
+class XNEG(Instr):
+    pass
+
+
 class NOP(Instr):
+    pass
+
+
+class XNOP(Instr):
     pass
 
 
@@ -328,7 +408,19 @@ class OUT(Instr):
     pass
 
 
+class OUTD(Instr):
+    pass
+
+
+class OTDR(Instr):
+    pass
+
+
 class OUTI(Instr):
+    pass
+
+
+class OTIR(Instr):
     pass
 
 
@@ -345,6 +437,18 @@ class RES(Instr):
 
 
 class RET(RetInstr):
+    pass
+
+
+class RETN(RetInstr):
+    pass
+
+
+class XRETN(RetInstr):
+    pass
+
+
+class RETI(RetInstr):
     pass
 
 
@@ -373,6 +477,10 @@ class RR(Instr):
 
 
 class RRA(Instr):
+    pass
+
+
+class RRD(Instr):
     pass
 
 
