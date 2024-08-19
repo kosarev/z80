@@ -2450,10 +2450,8 @@ public:
         return n; }
 
     void on_inc_r_reg() {
-        // TODO: Consider splitting R into R[7] and R[6:0].
         fast_u8 r = self().on_get_r();
-        r = (r & 0x80) | (inc8(r) & 0x7f);
-        self().on_set_r(r); }
+        self().on_set_r((r & 0x80) | ((r + 1) & 0x7f)); }
 
     fast_u8 on_m1_fetch_cycle() {
         fast_u8 n = self().on_fetch_cycle();
