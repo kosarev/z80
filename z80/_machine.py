@@ -298,7 +298,11 @@ class Z80State(_StateBase):
 
     @property
     def halted(self):
-        return self.__halted[0]
+        return bool(self.__halted[0])
+
+    @halted.setter
+    def halted(self, value):
+        self.__halted[0] = int(value)
 
     @property
     def index_rp_kind(self):
