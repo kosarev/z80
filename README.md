@@ -1,6 +1,7 @@
 # z80
 Fast and flexible Z80/i8080 emulator.
 
+![Python package CI](https://github.com/kosarev/z80/actions/workflows/python-package.yml/badge.svg)
 ![C/C++ CI](https://github.com/kosarev/z80/actions/workflows/c-cpp.yml/badge.svg)
 
 
