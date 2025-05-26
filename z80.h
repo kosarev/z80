@@ -3299,6 +3299,7 @@ public:
         self().on_set_f(f); }
 
     // Interrupts.
+    // TODO: Combine the on_di() / on_ei() handlers into on_ei(bool iff).
     void on_di() {
         if(!self().on_is_z80()) {
             self().set_iff_on_di(false);
