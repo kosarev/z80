@@ -7,7 +7,7 @@ import platform
 from setuptools import Extension, setup
 
 
-here = os.path.abspath(os.path.dirname(inspect.getsource(lambda: 0)))
+here = os.path.abspath(os.path.dirname(__file__))
 
 with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
@@ -55,7 +55,6 @@ setup(name='z80',
           'Intended Audience :: Developers',
           'Intended Audience :: Information Technology',
           'Intended Audience :: Education',
-          'License :: OSI Approved :: MIT License',
           'Operating System :: OS Independent',
           'Programming Language :: C++',
           'Programming Language :: Python :: 3',

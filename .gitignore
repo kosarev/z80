@@ -4,3 +4,4 @@ z80.egg-info
 z80/_z80.cpython-*
 z80/__pycache__
 tests/__pycache__
+/zx.egg-info
