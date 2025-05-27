@@ -25,7 +25,7 @@ jobs:
       run: |
         sudo apt-get update
         python -m pip install --upgrade pip
-        python -m pip install --upgrade mypy setuptools wheel
+        python -m pip install --upgrade pycodestyle mypy setuptools wheel
     - name: Run pycodestyle and mypy
       run: |
         pycodestyle .
