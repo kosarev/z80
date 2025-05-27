@@ -2,7 +2,7 @@
 /*  Z80 Machine Emulation Module for Python.
     https://github.com/kosarev/z80
 
-    Copyright (C) 2019 Ivan Kosarev.
+    Copyright (C) 2019-2025 Ivan Kosarev.
     mail@ivankosarev.com
 
     Published under the MIT license.

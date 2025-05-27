@@ -4,7 +4,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2021 Ivan Kosarev.
+#   Copyright (C) 2017-2025 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -12,6 +12,8 @@
 import collections
 import os
 import tempfile
+import typing
+
 from ._error import Error
 from ._instr import (ADD, ADC, AND, CP, CPD, CPDR, CPI, CPIR,
                      OR, SBC, SUB, XOR, BIT, CALL, CCF, CPL,
@@ -27,19 +29,26 @@ from ._instr import (ADD, ADC, AND, CP, CPD, CPDR, CPI, CPIR,
                      B, C, D, E, H, L, IXH, IXL, IYH, IYL,
                      UnknownInstr, JumpInstr, CallInstr, RetInstr, At,
                      IndexReg, Add)
+from ._instr import Instr
+from ._instr import Op
 from ._machine import Z80Machine
+from ._source import _SourcePos
+from ._token import _Token
 
 
 class _DisasmError(Error):
-    def __init__(self, subject, message, *notes):
+    def __init__(self, subject: '_Tag', message: str,
+                 *notes: '_DisasmError') -> None:
+        assert isinstance(subject.origin, _SourcePos)
         super().__init__('%s: %s: %s' % (subject.origin.inline_text,
                                          subject, message))
         self.subject = subject
         self.message = message
         self.notes = notes
 
-    def verbalize(self, program_name=None):
-        def g():
+    def verbalize(self, program_name: str | None = None) -> str:
+        def g() -> typing.Generator[str, None, None]:
+            assert isinstance(self.subject.origin, _SourcePos)
             yield self.subject.origin.context_text
 
             if program_name is not None:
@@ -55,23 +64,28 @@ class _DisasmError(Error):
 
 
 class _Tag(object):
-    def __init__(self, origin, addr, size):
+    ID: str
+    comment: str | _Token | None  # TODO
+
+    def __init__(self, origin: _SourcePos | None, addr: int,
+                 size: int) -> None:
         self.origin = origin
         self.addr = addr
         self.size = size
         self.comment = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '%s tag' % self.ID
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '(%#06x, %s, %r)' % (self.addr, self.ID, self.comment)
 
 
 class _CommentTag(_Tag):
     ID = 'comment'
 
-    def __init__(self, origin, addr, comment):
+    def __init__(self, origin: _SourcePos | None, addr: int,
+                 comment: str) -> None:
         super().__init__(origin, addr, size=0)
         self.comment = comment
 
@@ -79,7 +93,7 @@ class _CommentTag(_Tag):
 class _InlineCommentTag(_Tag):
     ID = 'inline_comment'
 
-    def __init__(self, origin, addr, comment):
+    def __init__(self, origin: _SourcePos, addr: int, comment: str) -> None:
         super().__init__(origin, addr, size=0)
         self.comment = comment
 
@@ -87,7 +101,7 @@ class _InlineCommentTag(_Tag):
 class _HintTag(_Tag):
     ID = 'hint'
 
-    def __init__(self, origin, addr, hint):
+    def __init__(self, origin: _SourcePos | None, addr: int, hint: str):
         super().__init__(origin, addr, size=0)
         self.comment = hint
 
@@ -95,11 +109,11 @@ class _HintTag(_Tag):
 class _ByteTag(_Tag):
     ID = 'byte'
 
-    def __init__(self, origin, addr, value):
+    def __init__(self, origin: _SourcePos | None, addr: int, value: int):
         super().__init__(origin, addr, size=1)
         self.value = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '(%#06x, %s, %#04x, %r)' % (
             self.addr, self.ID, self.value, self.comment)
 
@@ -107,12 +121,13 @@ class _ByteTag(_Tag):
 class _IncludeBinaryTag(_Tag):
     ID = 'include_binary'
 
-    def __init__(self, origin, addr, filename, image):
+    def __init__(self, origin: _SourcePos, addr: int, filename: _Token,
+                 image: bytes):
         super().__init__(origin, addr, size=len(image))
         self.filename = filename
         self.image = image
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '(%#06x, %s, %s, %s)' % (
             self.addr, self.ID, self.filename, self.comment)
 
@@ -120,14 +135,16 @@ class _IncludeBinaryTag(_Tag):
 class _InstrTag(_Tag):
     ID = 'instr'
 
-    def __init__(self, origin, addr):
+    def __init__(self, origin: _SourcePos, addr: int) -> None:
         super().__init__(origin, addr, size=0)
 
 
 class _DisasmTag(_Tag):
+    instr: Instr
+
     ID = 'disasm'
 
-    def __init__(self, origin, addr):
+    def __init__(self, origin: _SourcePos | None, addr: int) -> None:
         super().__init__(origin, addr, size=0)
 
 
@@ -260,7 +277,7 @@ class Z80InstrBuilder(object):
         'sp': SP,
     }
 
-    def __build_op(self, addr, text):
+    def __build_op(self, addr: int, text: str) -> Op:
         if text.startswith('R('):
             text = text[1:]
 
@@ -269,13 +286,16 @@ class Z80InstrBuilder(object):
             return At(self.__build_op(addr, text[1:-1]))
 
         # Base operand.
+        # TODO: Have a proper base class for operand objects other than
+        # primitive integers and strings.
+        op: Op
         if text in self.__OPS:
             op = self.__OPS[text]
             text = ''
         elif text.startswith(('W', 'N', 'U')):
-            text = text.split()
-            op = int(text[0][1:], base=0)
-            text = ' '.join(text[1:])
+            ops = text.split()
+            op = int(ops[0][1:], base=0)
+            text = ' '.join(ops[1:])
         elif text.startswith('D$'):
             op = addr
             text = text[2:].strip()
@@ -307,7 +327,7 @@ class Z80InstrBuilder(object):
 
         return op
 
-    def build_instr(self, addr, image):
+    def build_instr(self, addr: int, image: bytes) -> Instr:
         original_text, size = Z80Machine._disasm(image)
         if size > len(image):
             # TODO: Too few bytes to disassemble this instruction.
@@ -345,14 +365,14 @@ class Z80InstrBuilder(object):
 
 
 class _TagSet(object):
-    def __init__(self):
-        self.infront_tags = []
-        self.inline_tags = []
-        self.byte_tag = None
-        self.disasm_tag = None
+    def __init__(self) -> None:
+        self.infront_tags: list[_Tag] = []
+        self.inline_tags: list[_Tag] = []
+        self.byte_tag: _Tag | None = None
+        self.disasm_tag: _Tag | None = None
 
     @property
-    def empty(self):
+    def empty(self) -> bool:
         return (len(self.infront_tags) == 0 and
                 len(self.inline_tags) == 0 and
                 self.byte_tag is None and
@@ -366,8 +386,9 @@ class _AsmLine(object):
                         len(' ff') * _MAX_NUM_OF_BYTES_PER_LINE +
                         len('  '))
 
-    def __init__(self, command=None, addr=None, xbytes=[], comment=None,
-                 size=0):
+    def __init__(self, command: str | _Tag | None = None,
+                 addr: int | None = None, xbytes: list[int] = [],
+                 comment: str | _Tag | None = None, size: int = 0):
         self.command = command
         self.addr = addr
         self.xbytes = xbytes
@@ -375,14 +396,14 @@ class _AsmLine(object):
         self.size = size
 
     @staticmethod
-    def _verbalize_comment(comment, force_leader=True):
+    def _verbalize_comment(comment: str, force_leader: bool = True) -> str:
         if comment.startswith('.'):
             force_leader = True
         if force_leader:
             comment = '-- %s' % comment
         return comment
 
-    def __str__(self):
+    def __str__(self) -> str:
         line = ' ' * 4
         out_of_line = isinstance(self.command, _Tag)
         if self.command is not None and not out_of_line:
@@ -404,6 +425,7 @@ class _AsmLine(object):
             line += ' %s' % ' '.join('%02x' % b for b in self.xbytes)
         if out_of_line:
             assert isinstance(self.command, _Tag)
+            assert isinstance(self.command.comment, str)
             line += ' %s' % self._verbalize_comment(self.command.comment,
                                                     force_leader=False)
         if self.comment is not None:
@@ -429,18 +451,19 @@ class _Disasm(object):
         _InlineCommentTag: 2,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         # TODO: Let user choose the CPU type.
         self.__instr_builder = Z80InstrBuilder()
 
         # Translates addresses to tags associated with those
         # addresses.
-        self.__tags = collections.defaultdict(_TagSet)
+        self.__tags: typing.DefaultDict[int, _TagSet] = (
+            collections.defaultdict(_TagSet))
 
         # Tags to process stored in order.
-        self.__worklists = dict()
+        self.__worklists: dict[int, typing.Deque[_Tag]] = dict()
 
-    def __get_worklist(self, tag):
+    def __get_worklist(self, tag: _Tag) -> typing.Deque[_Tag]:
         # Use deque because of its popleft() being much faster
         # than list's pop(0).
         Worklist = collections.deque
@@ -450,11 +473,11 @@ class _Disasm(object):
             self.__worklists[priority] = Worklist()
         return self.__worklists[priority]
 
-    def add_tags(self, *tags):
+    def add_tags(self, *tags: _Tag) -> None:
         for tag in reversed(tags):
             self.__get_worklist(tag).appendleft(tag)
 
-    def __process_byte_tag(self, tag):
+    def __process_byte_tag(self, tag: _Tag) -> None:
         prev_tag = self.__tags[tag.addr].byte_tag
         if prev_tag is not None:
             raise _DisasmError(
@@ -463,13 +486,16 @@ class _Disasm(object):
 
         self.__tags[tag.addr].byte_tag = tag
 
-    def __process_include_binary_tag(self, tag):
-        new_tags = []
+    def __process_include_binary_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _IncludeBinaryTag)
+        new_tags: list[_Tag] = []
 
         comment = 'Included from binary file %r.' % tag.filename.literal
         new_tags.append(_CommentTag(tag.origin, tag.addr, comment))
 
         if tag.comment is not None:
+            assert isinstance(tag.comment, _Token)  # TODO
+            assert isinstance(tag.comment.literal, str)  # TODO
             new_tags.append(_CommentTag(tag.origin, tag.addr,
                                         tag.comment.literal))
 
@@ -479,17 +505,21 @@ class _Disasm(object):
         # TODO: Not really adding tags.
         self.add_tags(*new_tags)
 
-    def __process_comment_tag(self, tag):
+    def __process_comment_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _CommentTag)
         self.__tags[tag.addr].infront_tags.append(tag)
 
-    def __process_inline_comment_tag(self, tag):
+    def __process_inline_comment_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _InlineCommentTag)
         self.__tags[tag.addr].inline_tags.append(tag)
 
-    def __process_instr_tag(self, tag):
+    def __process_instr_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _InstrTag)
         self.__tags[tag.addr].inline_tags.append(tag)
         self.add_tags(_DisasmTag(tag.origin, tag.addr))
 
-    def __process_disasm_tag(self, tag):
+    def __process_disasm_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _DisasmTag)
         tags = self.__tags[tag.addr]
         if tags.disasm_tag is not None:
             return
@@ -502,7 +532,9 @@ class _Disasm(object):
             if self.__tags[i].byte_tag is None:
                 break
 
-            instr_image.append(self.__tags[i].byte_tag.value)
+            t = self.__tags[i].byte_tag
+            assert isinstance(t, _ByteTag)
+            instr_image.append(t.value)
 
         if len(instr_image) == 0:
             return
@@ -517,12 +549,15 @@ class _Disasm(object):
             if (not isinstance(instr, JumpInstr) or
                     isinstance(instr, CallInstr) or
                     instr.conditional):
+                assert isinstance(instr.addr, int)
+                assert isinstance(instr.size, int)
                 target = instr.addr + instr.size
                 self.add_tags(_DisasmTag(instr.origin, target))
 
             # Disassemble jump targets.
             if (isinstance(instr, JumpInstr) and
                     not isinstance(instr, RetInstr)):
+                assert isinstance(instr.target, int)
                 target = instr.target
                 if not isinstance(target, At):
                     assert isinstance(target, int)
@@ -537,12 +572,12 @@ class _Disasm(object):
         _DisasmTag: __process_disasm_tag,
     }
 
-    def __process_tag(self, tag):
+    def __process_tag(self, tag: _Tag) -> None:
         assert tag.addr is not None
         process = self.__TAG_PROCESSORS[type(tag)]
         process(self, tag)
 
-    def disassemble(self):
+    def disassemble(self) -> None:
         while self.__worklists:
             priority = min(self.__worklists)
             worklist = self.__worklists[priority]
@@ -553,15 +588,21 @@ class _Disasm(object):
 
             self.__process_tag(tag)
 
-    def __get_inline_comments(self, addr, first_instr_byte=False):
+    def __get_inline_comments(
+            self, addr: int,
+            first_instr_byte: bool = False) -> (
+                typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, _InstrTag):
                 comment = '.instr'
                 if tag.comment is not None:
+                    assert isinstance(tag.comment, _Token)
+                    assert isinstance(tag.comment.literal, str)
                     comment += ' %s' % (
                         _AsmLine._verbalize_comment(tag.comment.literal))
                 yield comment
             elif isinstance(tag, _InlineCommentTag):
+                assert isinstance(tag.comment, str)
                 yield _AsmLine._verbalize_comment(tag.comment,
                                                   force_leader=False)
             else:
@@ -569,6 +610,7 @@ class _Disasm(object):
 
         disasm_tag = self.__tags[addr].disasm_tag
         if disasm_tag is not None:
+            assert isinstance(disasm_tag, _DisasmTag)
             instr = disasm_tag.instr
             if not first_instr_byte:
                 yield _HintTag(instr.origin, addr,
@@ -580,7 +622,7 @@ class _Disasm(object):
                                'warning: unknown instruction: '
                                '%r' % instr.text)
 
-    def __is_commentless_addr(self, addr):
+    def __is_commentless_addr(self, addr: int) -> bool:
         tags = self.__tags[addr]
         if tags.disasm_tag is not None or len(tags.infront_tags) != 0:
             return False
@@ -590,11 +632,16 @@ class _Disasm(object):
 
         return True
 
-    def __get_instr_lines(self, instr):
-        command = str(instr)
+    def __get_instr_lines(self, instr: Instr) -> (
+            typing.Generator[_AsmLine, None, None]):
+        command: None | str = str(instr)
         addr = instr.addr
-        xbytes = [self.__tags[addr].byte_tag.value]
+        assert isinstance(addr, int)
+        t = self.__tags[addr].byte_tag
+        assert isinstance(t, _ByteTag)
+        xbytes = [t.value]
 
+        assert isinstance(instr.size, int)
         end_addr = addr + instr.size
         byte_addr = addr + 1
 
@@ -603,7 +650,9 @@ class _Disasm(object):
                    (len(xbytes) == 0 or
                     self.__is_commentless_addr(byte_addr)) and
                    len(xbytes) < _AsmLine._MAX_NUM_OF_BYTES_PER_LINE):
-                xbytes.append(self.__tags[byte_addr].byte_tag.value)
+                t = self.__tags[byte_addr].byte_tag
+                assert isinstance(t, _ByteTag)
+                xbytes.append(t.value)
                 byte_addr += 1
 
             for tag in self.__tags[addr].infront_tags:
@@ -627,7 +676,8 @@ class _Disasm(object):
 
             addr = byte_addr
 
-    def __get_data_lines(self, addr):
+    def __get_data_lines(self, addr: int) -> (
+            typing.Generator[_AsmLine, None, None]):
         tags = self.__tags[addr]
         for tag in tags.infront_tags:
             yield _AsmLine(addr=addr, command=tag)
@@ -635,6 +685,7 @@ class _Disasm(object):
         if tags.byte_tag is None:
             return
 
+        assert isinstance(tags.byte_tag, _ByteTag)
         xbytes = [tags.byte_tag.value]
         inline_comments = list(self.__get_inline_comments(addr))
 
@@ -657,6 +708,7 @@ class _Disasm(object):
                 if byte_addr % _AsmLine._MAX_NUM_OF_BYTES_PER_LINE == 0:
                     break
 
+                assert isinstance(byte_tag, _ByteTag)
                 xbytes.append(byte_tag.value)
                 byte_addr += 1
 
@@ -671,14 +723,16 @@ class _Disasm(object):
                            comment=comment, size=len(xbytes))
             xbytes = []
 
-    def __get_lines_for_addr(self, addr):
+    def __get_lines_for_addr(self, addr: int) -> (
+            typing.Generator[_AsmLine, None, None]):
         disasm_tag = self.__tags[addr].disasm_tag
         if disasm_tag is not None:
+            assert isinstance(disasm_tag, _DisasmTag)
             yield from self.__get_instr_lines(disasm_tag.instr)
         else:
             yield from self.__get_data_lines(addr)
 
-    def __get_asm_lines(self):
+    def __get_asm_lines(self) -> typing.Generator[_AsmLine, None, None]:
         yield _AsmLine()
 
         addr = None
@@ -698,18 +752,18 @@ class _Disasm(object):
                 yield line
                 addr += line.size
 
-    def _get_output(self):
+    def _get_output(self) -> typing.Generator[str, None, None]:
         for line in self.__get_asm_lines():
             yield '%s\n' % line
 
-    def save_output(self, filename):
+    def save_output(self, filename: str) -> None:
         try:
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
                 for chunk in self._get_output():
                     f.write(chunk)
 
             os.rename(f.name, filename)
-            f = None
+            del f
         finally:
             if f is not None:
                 os.remove(f.name)

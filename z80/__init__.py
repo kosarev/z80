@@ -2,7 +2,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2019 Ivan Kosarev.
+#   Copyright (C) 2017-2025 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -27,3 +27,12 @@ from ._machine import I8080Machine, Z80Machine
 from ._main import main
 from ._source import _SourceFile
 from ._disasm_parser import _DisasmTagParser
+
+__all__ = [
+    '_Disasm',
+    '_DisasmTagParser',
+    'Error',
+    '_SourceFile',
+    'UnknownInstr',
+    'Z80InstrBuilder',
+]

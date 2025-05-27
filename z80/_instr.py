@@ -4,21 +4,28 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2021 Ivan Kosarev.
+#   Copyright (C) 2017-2025 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
 
+import typing
+
+from ._source import _SourcePos
+
 
 class _InstrElement(type):
-    def __new__(cls, name, bases, attrs):
-        attrs.setdefault('_str', name.lower())
-        return super().__new__(cls, name, bases, attrs)
+    _str: str
 
-    def __repr__(cls):
+    def __new__(cls: typing.Type[type], name: str, bases: tuple[type, ...],
+                attrs: dict[str, typing.Any]) -> typing.Any:
+        attrs.setdefault('_str', name.lower())
+        return type.__new__(cls, name, bases, attrs)
+
+    def __repr__(cls: '_InstrElement') -> str:
         return cls.__name__
 
-    def __str__(cls):
+    def __str__(cls: '_InstrElement') -> str:
         return cls._str
 
 
@@ -150,7 +157,10 @@ class SP(metaclass=Reg):
     pass
 
 
-def _str_op(op):
+Op: typing.TypeAlias = typing.Union[int, str, Reg, 'At', 'Add']
+
+
+def _str_op(op: Op) -> str:
     if isinstance(op, int):
         return '%#x' % op
 
@@ -158,25 +168,25 @@ def _str_op(op):
 
 
 class At(object):
-    def __init__(self, op):
+    def __init__(self, op: Op) -> None:
         self.ops = [op]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'At(%r)' % tuple(self.ops)
 
-    def __str__(self):
+    def __str__(self) -> str:
         op, = tuple(self.ops)
         return '(%s)' % _str_op(op)
 
 
 class Add(object):
-    def __init__(self, a, b):
+    def __init__(self, a: Op, b: Op) -> None:
         self.ops = [a, b]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Add(%r, %r)' % tuple(self.ops)
 
-    def __str__(self):
+    def __str__(self) -> str:
         a, b = tuple(self.ops)
 
         sign = '+'
@@ -189,17 +199,21 @@ class Add(object):
 
 # Base class for all instructions.
 class Instr(object):
-    def __init__(self, *ops, origin=None):
+    addr: int | None
+    size: int | None
+    origin: _SourcePos | None
+
+    def __init__(self, *ops: Op, origin: int | None = None) -> None:
         self.addr = None
         self.size = None
         self.ops = ops
         self.origin = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (type(self).__name__ +
                 '(' + ', '.join(repr(op) for op in self.ops) + ')')
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = type(self).__name__.lower()
         if self.ops:
             s += ' ' + ', '.join(_str_op(op) for op in self.ops)
@@ -207,25 +221,27 @@ class Instr(object):
 
 
 class UnknownInstr(Instr):
-    def __init__(self, addr, opcode):
+    text: str | None
+
+    def __init__(self, addr: int, opcode: int) -> None:
         super().__init__()
         self.addr = addr
         self.size = 1
         self.opcode = opcode
         self.text = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'db %#04x' % self.opcode
 
 
 # Instructions that may affect control flow.
 class JumpInstr(Instr):
     @property
-    def target(self):
+    def target(self) -> Op:
         return self.ops[-1]
 
     @property
-    def conditional(self):
+    def conditional(self) -> bool:
         if isinstance(self, DJNZ):
             return True
 

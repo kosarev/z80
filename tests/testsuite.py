@@ -1,15 +1,23 @@
 # -*- coding: utf-8 -*-
 
+#   Z80 CPU Emulator.
+#   https://github.com/kosarev/z80
+#
+#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   mail@ivankosarev.com
+#
+#   Published under the MIT license.
+
 import os
 import z80
 import unittest
 
 
 class TestInstrBuilder(unittest.TestCase):
-    def __str__(self):
+    def __str__(self) -> str:
         return 'Z80IntrsBuilder'
 
-    def runTest(self):
+    def runTest(self) -> None:
         TESTS = (
             (b'\xcb\x30', 'sll b'),
             (b'\xdd\x24', 'inc ixh'),
@@ -57,15 +65,15 @@ class TestInstrBuilder(unittest.TestCase):
 class DisasmTestCase(unittest.TestCase):
     maxDiff = None
 
-    def __init__(self, id, path):
+    def __init__(self, id: str, path: str) -> None:
         super().__init__()
         self.__id = id
         self.__path = path
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__id
 
-    def runTest(self):
+    def runTest(self) -> None:
         d = z80._Disasm()
 
         old_wd = os.getcwd()
@@ -105,7 +113,7 @@ class DisasmTestCase(unittest.TestCase):
             os.chdir(old_wd)
 
 
-def suite():
+def suite() -> unittest.TestSuite:
     suite = unittest.TestSuite()
 
     suite.addTest(TestInstrBuilder())
