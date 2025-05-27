@@ -35,4 +35,4 @@ jobs:
         pip install .
     - name: Run tests
       run: |
-        python setup.py test
+        python tests/testsuite.py
