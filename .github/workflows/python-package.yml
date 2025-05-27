@@ -21,6 +21,18 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Test
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade mypy setuptools wheel
+    - name: Run pycodestyle and mypy
+      run: |
+        pycodestyle .
+        mypy z80 tests
+    - name: Install the package
+      run: |
+        pip install .
+    - name: Run tests
       run: |
         python setup.py test
