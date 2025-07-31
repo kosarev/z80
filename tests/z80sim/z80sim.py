@@ -10,10 +10,14 @@
 #
 # https://github.com/gdevic/Z80Explorer
 # commit c11574c1d80352b355d297ad3ae33701a7110485 of 19 Jan 2021
-
+#
+# Symbolic simulation Copyright (C) 2017-2025 Ivan Kosarev.
+# mail@ivankosarev.com
+# https://github.com/kosarev/z80
 
 import ast
 import datetime
+import eqbool
 import gc
 import gzip
 import hashlib
@@ -274,6 +278,7 @@ class Cache(object):
 class Bool(object):
     __FALSE_TRUE = None
     __cache = {}
+    __eqbools = eqbool.Context()
 
     class __EquivSet(object):
         __sat_indexes = itertools.count(start=1)
@@ -381,6 +386,8 @@ class Bool(object):
         if isinstance(term, bool):
             if __class__.__FALSE_TRUE is None:
                 false, true = __class__(), __class__()
+                false._v = __class__.__eqbools.get(False)
+                true._v = __class__.__eqbools.get(True)
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
@@ -404,6 +411,8 @@ class Bool(object):
         b = __class__()
         __class__.__EquivSet(b, term)
         b._e = None
+        if term is not None:
+            b._v = __class__.__eqbools.get(term)
         b.size = 1
 
         if term is not None:
@@ -514,6 +523,15 @@ class Bool(object):
             op, = ops
             b.equiv_set.inversion = op.equiv_set
             op.equiv_set.inversion = b.equiv_set
+
+        if kind == 'not':
+            b._v = ~ops[0]._v
+        elif kind == 'ifelse':
+            b._v = __class__.__eqbools.ifelse(ops[0]._v, ops[1]._v, ops[2]._v)
+        elif kind == 'and':
+            b._v = __class__.__eqbools.get_and(*(op._v for op in ops))
+        else:
+            assert 0, kind
 
         return b
 
@@ -766,6 +784,7 @@ class Bool(object):
     def get_neq(a, b):
         return ~__class__.get_eq(a, b)
 
+    # TODO: Remove.
     @staticmethod
     def get_equiv(a, b):
         a, b = __class__.cast(a), __class__.cast(b)
@@ -796,7 +815,7 @@ class Bool(object):
 
     @staticmethod
     def is_equiv(a, b):
-        return __class__.get_equiv(a, b) is not None
+        return __class__.__eqbools.is_equiv(a._v, b._v)
 
     def simplified_sexpr(self):
         cache = {}
