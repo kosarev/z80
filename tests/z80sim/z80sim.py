@@ -316,49 +316,6 @@ class Bool(object):
             # order may change between equivalence checks as well.
             return self.sat_index < other.sat_index
 
-        def __merge(self, other):
-            assert other is not self
-
-            if self.value is not None or other.value is not None:
-                if self.value is not None:
-                    assert other.value is None or other.value is self.value
-                else:
-                    self.value = other.value
-                    self.term = None
-            else:
-                if other.simplest.size < self.simplest.size:
-                    self.simplest = other.simplest
-                    self.term = other.term
-
-            for e in other.exprs:
-                assert e.equiv_set is other
-                e.equiv_set = self
-                self.exprs.append(e)
-
-            self.unequiv_sets.update(other.unequiv_sets)
-            for s in other.unequiv_sets:
-                s.unequiv_sets.remove(other)
-                s.unequiv_sets.add(self)
-
-            # Make sure the other set won't be used anymore.
-            del other.value
-            del other.exprs
-            del other.unequiv_sets
-            del other.simplest
-
-        # TODO: Remove.
-        def merge(self, other):
-            if other.inversion is not None:
-                if self.inversion is None:
-                    self.inversion = other.inversion
-                    assert self.inversion.inversion is other
-                    self.inversion.inversion = self
-                else:
-                    self.inversion.__merge(other.inversion)
-            del other.inversion
-
-            self.__merge(other)
-
     @staticmethod
     def clear():
         __class__.__cache.clear()
