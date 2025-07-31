@@ -287,22 +287,10 @@ class Bool(object):
                 self.value = None
                 self.term = term
 
-            self.exprs = [e]
             self.simplest = e
             self.inversion = None
 
             e.equiv_set = self
-
-        @property
-        def id(self):
-            if self.value is not None:
-                return 'true' if self.value else 'false'
-            if self.term is not None:
-                return self.term
-            return f't{self.sat_index}'
-
-        def __repr__(self):
-            return f'<{__class__.__qualname__} {id(self):#x} {self.id}>'
 
     @staticmethod
     def clear():
@@ -372,7 +360,11 @@ class Bool(object):
 
     @property
     def id(self):
-        return self.equiv_set.id
+        if self.value is not None:
+            return 'true' if self.value else 'false'
+        if self.equiv_set.term is not None:
+            return self.equiv_set.term
+        return f't{self._v.id}'
 
     @property
     def __kind(self):
