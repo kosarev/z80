@@ -280,8 +280,6 @@ class Bool(object):
     __eqbools = eqbool.Context()
 
     class __EquivSet(object):
-        __sat_indexes = itertools.count(start=1)
-
         def __init__(self, e, term):
             if isinstance(term, bool):
                 self.value = term
@@ -290,10 +288,8 @@ class Bool(object):
                 self.term = term
 
             self.exprs = [e]
-            self.unequiv_sets = set()
             self.simplest = e
             self.inversion = None
-            self.sat_index = next(__class__.__sat_indexes)
 
             e.equiv_set = self
 
@@ -307,14 +303,6 @@ class Bool(object):
 
         def __repr__(self):
             return f'<{__class__.__qualname__} {id(self):#x} {self.id}>'
-
-        def __lt__(self, other):
-            # Defines a canonical order for expressions. Depends on
-            # the order in which they are created, so not consistent
-            # between different runs. Also, establishing equivalence
-            # makes the two expressions considered identical, so the
-            # order may change between equivalence checks as well.
-            return self.sat_index < other.sat_index
 
     @staticmethod
     def clear():
@@ -535,7 +523,7 @@ class Bool(object):
         return self.simplified_sexpr()
 
     def __lt__(self, other):
-        return self.equiv_set < other.equiv_set
+        return self._v.id < other._v.id
 
     class Storage(object):
         def __init__(self, *, image=None):
