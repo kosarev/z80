@@ -389,50 +389,6 @@ class Bool(object):
     def value(self):
         return self.equiv_set.value
 
-    # TODO: Remove.
-    @property
-    def sat_clauses(self):
-        clauses = []
-        indexes = {}
-
-        def get(n):
-            n = n.simplest_equiv
-            r = n.equiv_set.sat_index
-
-            if n.value is None and n._e is None:
-                return r
-
-            i = indexes.get(n)
-            if i is not None:
-                return i
-
-            if n.value is not None:
-                clauses.append((-r,) if n.value is False else (r,))
-                return r
-
-            kind, ops = n._e
-            if kind == 'not':
-                a, = ops
-                r = -get(a)
-            elif kind == 'ifelse':
-                i, t, e = ops
-                i, t, e = get(i), get(t), get(e)
-                clauses.extend(((-i, t, -r), (-i, -t, r),
-                                (i, e, -r), (i, -e, r)))
-            elif kind == 'and':
-                ops = tuple(get(a) for a in ops)
-                clauses.append(tuple(-a for a in ops) + (r,))
-                clauses.extend((a, -r) for a in ops)
-            else:
-                assert 0, n  # TODO
-
-            indexes[n] = r
-            return r
-
-        clauses.append((get(self),))
-
-        return clauses
-
     @staticmethod
     def from_ops(kind, *ops):
         if kind == 'and':
