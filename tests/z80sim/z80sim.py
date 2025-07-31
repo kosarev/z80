@@ -28,7 +28,6 @@ import os
 import pathlib
 import platform
 import pprint
-import pysat.solvers
 import random
 import resource
 import sys
@@ -347,6 +346,7 @@ class Bool(object):
             del other.unequiv_sets
             del other.simplest
 
+        # TODO: Remove.
         def merge(self, other):
             if other.inversion is not None:
                 if self.inversion is None:
@@ -452,6 +452,7 @@ class Bool(object):
     def value(self):
         return self.equiv_set.value
 
+    # TODO: Remove.
     @property
     def sat_clauses(self):
         clauses = []
@@ -783,35 +784,6 @@ class Bool(object):
     @staticmethod
     def get_neq(a, b):
         return ~__class__.get_eq(a, b)
-
-    # TODO: Remove.
-    @staticmethod
-    def get_equiv(a, b):
-        a, b = __class__.cast(a), __class__.cast(b)
-        if a.equiv_set is b.equiv_set:
-            return a.equiv_set.simplest
-        if a.equiv_set in b.equiv_set.unequiv_sets:
-            assert b.equiv_set in a.equiv_set.unequiv_sets
-            return None
-
-        e = Bool.get_neq(a.equiv_set.simplest, b.equiv_set.simplest)
-        if e.value is not None:
-            equiv = (e.value is False)
-        else:
-            s = pysat.solvers.Cadical153()
-            for c in e.sat_clauses:
-                s.add_clause(c)
-            equiv = (s.solve() is False)
-            s.delete()
-
-        if equiv:
-            a.equiv_set.merge(b.equiv_set)
-            assert a.equiv_set is b.equiv_set
-            return a.equiv_set.simplest
-
-        a.equiv_set.unequiv_sets.add(b.equiv_set)
-        b.equiv_set.unequiv_sets.add(a.equiv_set)
-        return None
 
     @staticmethod
     def is_equiv(a, b):
