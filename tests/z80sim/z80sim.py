@@ -281,10 +281,7 @@ class Bool(object):
 
     class __EquivSet(object):
         def __init__(self, e, term):
-            if isinstance(term, bool):
-                self.value = term
-            else:
-                self.value = None
+            if not isinstance(term, bool):
                 self.term = term
 
             self.simplest = e
@@ -321,6 +318,8 @@ class Bool(object):
                 false, true = __class__(), __class__()
                 false._v = __class__.__eqbools.get(False)
                 true._v = __class__.__eqbools.get(True)
+                false.value = False
+                true.value = True
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
@@ -347,6 +346,7 @@ class Bool(object):
         if term is not None:
             b._v = __class__.__eqbools.get(term)
         b.size = 1
+        b.value = None
 
         if term is not None:
             assert term not in __class__.__cache
@@ -384,10 +384,6 @@ class Bool(object):
     def __inversion(self):
         s = self.equiv_set.inversion
         return None if s is None else s.simplest
-
-    @property
-    def value(self):
-        return self.equiv_set.value
 
     @staticmethod
     def from_ops(kind, *ops):
@@ -493,9 +489,10 @@ class Bool(object):
                     self.__node_indexes[i] = b
 
         def add(self, e):
+            if e.value is not None:
+                return e.value
+
             q = e.equiv_set
-            if q.value is not None:
-                return q.value
             i = self.__node_indexes.get(q)
             if i is not None:
                 return i
