@@ -285,7 +285,6 @@ class Bool(object):
                 self.term = term
 
             self.simplest = e
-            self.inversion = None
 
             e.equiv_set = self
 
@@ -325,8 +324,8 @@ class Bool(object):
                 false.size = true.size = 0
                 __class__.__EquivSet(false, False)
                 __class__.__EquivSet(true, True)
-                false.equiv_set.inversion = true.equiv_set
-                true.equiv_set.inversion = false.equiv_set
+                false.inversion = true
+                true.inversion = false
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
@@ -347,6 +346,7 @@ class Bool(object):
             b._v = __class__.__eqbools.get(term)
         b.size = 1
         b.value = None
+        b.inversion = None
 
         if term is not None:
             assert term not in __class__.__cache
@@ -382,8 +382,8 @@ class Bool(object):
 
     @property
     def __inversion(self):
-        s = self.equiv_set.inversion
-        return None if s is None else s.simplest
+        s = self.inversion
+        return None if s is None else s
 
     @staticmethod
     def from_ops(kind, *ops):
@@ -411,8 +411,8 @@ class Bool(object):
 
         if kind == 'not':
             op, = ops
-            b.equiv_set.inversion = op.equiv_set
-            op.equiv_set.inversion = b.equiv_set
+            b.inversion = op
+            op.inversion = b
 
         if kind == 'not':
             b._v = ~ops[0]._v
@@ -547,7 +547,8 @@ class Bool(object):
 
     @staticmethod
     def get_and(*args):
-        unique_equiv_sets = []
+        # TODO: unique_ops and unique_args now duplicate each other.
+        unique_ops = []
         unique_args = []
         for a in args:
             a = a.simplest_equiv
@@ -555,7 +556,7 @@ class Bool(object):
                 if a.value is True:
                     continue
                 return FALSE
-            if a.equiv_set.inversion in unique_equiv_sets:
+            if a.inversion in unique_ops:
                 return FALSE
             if a._e is not None and a._e[0] == 'and':
                 for op in a._e[1]:
@@ -564,12 +565,12 @@ class Bool(object):
                         if op.value is True:
                             continue
                         return FALSE
-                    if op.equiv_set.inversion in unique_equiv_sets:
+                    if op.inversion in unique_ops:
                         return FALSE
-                    if op.equiv_set not in unique_equiv_sets:
-                        unique_equiv_sets.append(op.equiv_set)
-            if a.equiv_set not in unique_equiv_sets:
-                unique_equiv_sets.append(a.equiv_set)
+                    if op not in unique_ops:
+                        unique_ops.append(op)
+            if a not in unique_ops:
+                unique_ops.append(a)
                 unique_args.append(a)
 
         if len(unique_args) == 0:
@@ -587,10 +588,10 @@ class Bool(object):
         return __class__.get_neq(self, other)
 
     def __invert__(self):
-        if self.equiv_set.inversion is None:
+        if self.inversion is None:
             __class__.from_ops('not', self)
 
-        return self.equiv_set.inversion.simplest
+        return self.inversion
 
     @staticmethod
     def ifelse(cond, a, b):
