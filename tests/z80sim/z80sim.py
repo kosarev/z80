@@ -280,10 +280,7 @@ class Bool(object):
     __eqbools = eqbool.Context()
 
     class __EquivSet(object):
-        def __init__(self, e, term):
-            if not isinstance(term, bool):
-                self.term = term
-
+        def __init__(self, e):
             self.simplest = e
 
             e.equiv_set = self
@@ -308,7 +305,7 @@ class Bool(object):
                 if b.value is not None:
                     assert b.value is term
                 else:
-                    assert b.equiv_set.term == term
+                    assert b.term == term
                     assert b._e is None, (term, b._e)
                 return b
 
@@ -322,8 +319,8 @@ class Bool(object):
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.size = true.size = 0
-                __class__.__EquivSet(false, False)
-                __class__.__EquivSet(true, True)
+                __class__.__EquivSet(false)
+                __class__.__EquivSet(true)
                 false.inversion = true
                 true.inversion = false
                 __class__.__FALSE_TRUE = false, true
@@ -340,10 +337,12 @@ class Bool(object):
             assert term.lower() not in ('', '0', '1', 'true', 'false')
 
         b = __class__()
-        __class__.__EquivSet(b, term)
+        __class__.__EquivSet(b)
         b._e = None
+        b.term = term
         if term is not None:
             b._v = __class__.__eqbools.get(term)
+
         b.size = 1
         b.value = None
         b.inversion = None
@@ -497,16 +496,16 @@ class Bool(object):
             if i is not None:
                 return i
 
-            if q.simplest._e is None:
-                assert q.term is not None
+            if e._e is None:
+                assert e.term is not None
                 kind = ops = None
             else:
-                assert q.term is None
+                assert e.term is None
                 kind, ops = q.simplest._e
                 ops = tuple(self.add(op) for op in ops)
 
             i = len(self.__nodes)
-            self.__nodes.append((q.term, kind, ops))
+            self.__nodes.append((e.term, kind, ops))
             self.__node_indexes[q] = i
             return i
 
