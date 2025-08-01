@@ -281,8 +281,6 @@ class Bool(object):
 
     class __EquivSet(object):
         def __init__(self, e):
-            self.simplest = e
-
             e.equiv_set = self
 
     @staticmethod
@@ -352,10 +350,6 @@ class Bool(object):
             __class__.__cache[term] = b
 
         return b
-
-    @property
-    def simplest_equiv(self):
-        return self.equiv_set.simplest
 
     @property
     def id(self):
@@ -501,7 +495,7 @@ class Bool(object):
                 kind = ops = None
             else:
                 assert e.term is None
-                kind, ops = q.simplest._e
+                kind, ops = e._e
                 ops = tuple(self.add(op) for op in ops)
 
             i = len(self.__nodes)
@@ -550,7 +544,6 @@ class Bool(object):
         unique_ops = []
         unique_args = []
         for a in args:
-            a = a.simplest_equiv
             if a.value is not None:
                 if a.value is True:
                     continue
@@ -559,7 +552,6 @@ class Bool(object):
                 return FALSE
             if a._e is not None and a._e[0] == 'and':
                 for op in a._e[1]:
-                    op = op.simplest_equiv
                     if op.value is not None:
                         if op.value is True:
                             continue
@@ -577,7 +569,7 @@ class Bool(object):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        return __class__.from_ops('and', *unique_args).simplest_equiv
+        return __class__.from_ops('and', *unique_args)
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -595,7 +587,6 @@ class Bool(object):
     @staticmethod
     def ifelse(cond, a, b):
         cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
-        cond, a, b = cond.simplest_equiv, a.simplest_equiv, b.simplest_equiv
 
         if cond.value is not None:
             return a if cond.value else b
@@ -623,7 +614,7 @@ class Bool(object):
             # ~a ? a : b
             return a & b
 
-        return __class__.from_ops('ifelse', cond, a, b).simplest_equiv
+        return __class__.from_ops('ifelse', cond, a, b)
 
     # TODO: Remove ifelse() in favour of this function.
     def xifelse(self, a, b):
@@ -632,8 +623,6 @@ class Bool(object):
     # TODO: This should use ifelse()?
     @staticmethod
     def get_eq(a, b):
-        a, b = a.simplest_equiv, b.simplest_equiv
-
         if a is b:
             return TRUE
         if a is b.__inversion:
@@ -655,7 +644,6 @@ class Bool(object):
 
             if y._e is not None and y.__kind == 'ifelse':
                 p, q, r = y.__ops
-                p, q, r = p.simplest_equiv, q.simplest_equiv, r.simplest_equiv
                 is_eq = q.__inversion is r
                 if is_eq:
                     if x is p:
@@ -669,7 +657,7 @@ class Bool(object):
 
         # ifelse takes the same set of clauses as eq, so no need
         # to have a special operation for it.
-        return __class__.from_ops('ifelse', a, b, ~b).simplest_equiv
+        return __class__.from_ops('ifelse', a, b, ~b)
 
     @staticmethod
     def get_neq(a, b):
@@ -698,7 +686,7 @@ class Bool(object):
             r = cache[n] = OPS[kind](*(get(op) for op in ops))
             return r
 
-        e = get(self.simplest_equiv)
+        e = get(self)
         for t in ('qe2', 'solver-subsumption') * 3:
             e = z3.Tactic(t).apply(e).as_expr()
         if z3.is_false(e):
