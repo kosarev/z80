@@ -293,15 +293,14 @@ class Bool(object):
             assert term in (0, 1), repr(term)
             term = bool(term)
 
-        if term is not None:
-            b = __class__.__cache.get(term)
-            if b is not None:
-                if b.value is not None:
-                    assert b.value is term
-                else:
-                    assert b.term == term
-                    assert b._e is None, (term, b._e)
-                return b
+        b = __class__.__cache.get(term)
+        if b is not None:
+            if b.value is not None:
+                assert b.value is term
+            else:
+                assert b.term == term
+                assert b._e is None, (term, b._e)
+            return b
 
         if isinstance(term, bool):
             if __class__.__FALSE_TRUE is None:
@@ -323,24 +322,20 @@ class Bool(object):
 
             return true if term else false
 
-        if term is not None:
-            assert isinstance(term, str)
-            assert term.strip() == term, repr(term)
-            assert term.lower() not in ('', '0', '1', 'true', 'false')
+        assert isinstance(term, str)
+        assert term.strip() == term, repr(term)
+        assert term.lower() not in ('', '0', '1', 'true', 'false')
 
         b = __class__()
         b._e = None
         b.term = term
-        if term is not None:
-            b._v = __class__.__eqbools.get(term)
-
+        b._v = __class__.__eqbools.get(term)
         b.size = 1
         b.value = None
         b.inversion = None
 
-        if term is not None:
-            assert term not in __class__.__cache
-            __class__.__cache[term] = b
+        assert term not in __class__.__cache
+        __class__.__cache[term] = b
 
         return b
 
@@ -410,9 +405,12 @@ class Bool(object):
         if b is not None:
             return b
 
-        b = __class__.__cache[key] = Bool.get(None)
+        b = __class__.__cache[key] = __class__()
         b._e = kind, ops
         b.size = sum(op.size for op in ops) + 1
+        b.term = None
+        b.value = None
+        b.inversion = None
 
         if kind == 'not':
             op, = ops
