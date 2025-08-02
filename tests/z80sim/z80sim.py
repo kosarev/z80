@@ -379,10 +379,14 @@ class Bool(object):
             v = __class__.__eqbools.ifelse(ops[0]._v, ops[1]._v, ops[2]._v)
         elif kind == 'and':
             v = __class__.__eqbools.get_and(*(op._v for op in ops))
+        elif kind == 'or':
+            v = __class__.__eqbools.get_or(*(op._v for op in ops))
+        elif kind == 'eq':
+            v = __class__.__eqbools.get_eq(ops[0]._v, ops[1]._v)
         else:
             assert 0, kind
 
-        if kind == 'and':
+        if kind in ('and', 'or', 'eq'):
             ops = tuple(sorted(ops))
         elif kind == 'ifelse':
             # Canonicalise.
@@ -462,40 +466,40 @@ class Bool(object):
             self.__nodes = []
             self.__node_indexes = {}
             if image is not None:
-                for s, kind, ops in image:
-                    if kind is None:
-                        assert s is not None
-                        assert ops is None
-                        b = Bool.get(s)
+                for kind, ops in image:
+                    if kind == 'term':
+                        assert isinstance(ops, str)
+                        b = Bool.get(ops)
                     else:
-                        assert s is None
-                        assert ops is not None
                         b = Bool.from_ops(kind,
                                           *(self.get(op) for op in ops))
                     i = len(self.__nodes)
                     self.__nodes.append(b)
                     self.__node_indexes[i] = b
 
-        def add(self, e):
-            if e.value is not None:
-                return e.value
+        def __add(self, v):
+            kind = v.kind
+            if kind in ('false', 'true'):
+                return kind == 'true'
 
-            i = self.__node_indexes.get(e)
+            key = v.id
+            i = self.__node_indexes.get(key)
             if i is not None:
                 return i
 
-            if e._e is None:
-                assert e.term is not None
-                kind = ops = None
+            if kind == 'term':
+                ops = v.term
             else:
-                assert e.term is None
-                kind, ops = e._e
-                ops = tuple(self.add(op) for op in ops)
+                ops = [~v] if kind == 'not' else v.args
+                ops = tuple(self.__add(op) for op in ops)
 
             i = len(self.__nodes)
-            self.__nodes.append((e.term, kind, ops))
-            self.__node_indexes[e] = i
+            self.__nodes.append((kind, ops))
+            self.__node_indexes[key] = i
             return i
+
+        def add(self, e):
+            return self.__add(e._v)
 
         def get(self, image):
             if isinstance(image, bool):
