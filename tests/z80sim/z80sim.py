@@ -293,13 +293,12 @@ class Bool(object):
             assert term in (0, 1), repr(term)
             term = bool(term)
 
-        b = __class__.__cache.get(term)
+        assert isinstance(term, (bool, str))
+        v = __class__.__eqbools.get(term)
+
+        key = v.id
+        b = __class__.__cache.get(key)
         if b is not None:
-            if b.value is not None:
-                assert b.value is term
-            else:
-                assert b.term == term
-                assert b._e is None, (term, b._e)
             return b
 
         if isinstance(term, bool):
@@ -317,8 +316,8 @@ class Bool(object):
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
-            __class__.__cache[False] = false
-            __class__.__cache[True] = true
+            __class__.__cache[false._v.id] = false
+            __class__.__cache[true._v.id] = true
 
             return true if term else false
 
@@ -334,15 +333,14 @@ class Bool(object):
         b.value = None
         b.inversion = None
 
-        assert term not in __class__.__cache
-        __class__.__cache[term] = b
+        __class__.__cache[key] = b
 
         return b
 
     @staticmethod
     def __get_id(v):
         if v.is_const:
-            return 'true' if self.value else 'false'
+            return v.kind
         if v.is_term:
             return v.term
         if v.kind == 'not':
