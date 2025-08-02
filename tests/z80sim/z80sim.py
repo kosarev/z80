@@ -668,23 +668,31 @@ class Bool(object):
     def simplified_sexpr(self):
         cache = {}
 
-        def get(n):
-            if n.value is not None:
-                return z3.BoolVal(n.value)
-            if n._e is None:
-                return z3.Bool(n.id)
+        def get(v):
+            kind = v.kind
+            if kind in ('false', 'true'):
+                return z3.BoolVal(kind == 'true')
+            if kind == 'term':
+                return z3.Bool(v.term)
 
-            r = cache.get(n)
+            key = v.id
+            r = cache.get(key)
             if r is not None:
                 return r
 
-            kind, ops = n._e
-            OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
-                   'ifelse': z3.If}
-            r = cache[n] = OPS[kind](*(get(op) for op in ops))
+            if kind == 'eq':
+                a, b = v.args
+                r = get(a) == get(b)
+            else:
+                ops = [~v] if kind == 'not' else v.args
+                OPS = {'or': z3.Or, 'and': z3.And, 'not': z3.Not,
+                       'ifelse': z3.If}
+                r = OPS[kind](*(get(op) for op in ops))
+
+            cache[key] = r
             return r
 
-        e = get(self)
+        e = get(self._v)
         for t in ('qe2', 'solver-subsumption') * 3:
             e = z3.Tactic(t).apply(e).as_expr()
         if z3.is_false(e):
@@ -700,6 +708,8 @@ TRUE = Bool.get(True)
 
 def test_bools():
     def test(actual, expected):
+        print(repr(actual))
+        print(str(actual))
         if actual is expected:
             return
 
