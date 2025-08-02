@@ -385,19 +385,6 @@ class Bool(object):
         else:
             assert 0, kind
 
-        if kind in ('and', 'or', 'eq'):
-            ops = tuple(sorted(ops))
-        elif kind == 'ifelse':
-            # Canonicalise.
-            i, t, e = ops
-            if t.__inversion is e and t < i:
-                i, t, e = t, i, ~i
-            if i.__is_inversion:
-                i, t, e = i.__inversion, e, t
-            ops = i, t, e
-        else:
-            assert kind == 'not'
-
         key = v.id
         b = __class__.__cache.get(key)
         if b is not None:
