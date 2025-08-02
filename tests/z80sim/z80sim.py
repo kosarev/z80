@@ -373,6 +373,15 @@ class Bool(object):
 
     @staticmethod
     def from_ops(kind, *ops):
+        if kind == 'not':
+            v = ~ops[0]._v
+        elif kind == 'ifelse':
+            v = __class__.__eqbools.ifelse(ops[0]._v, ops[1]._v, ops[2]._v)
+        elif kind == 'and':
+            v = __class__.__eqbools.get_and(*(op._v for op in ops))
+        else:
+            assert 0, kind
+
         if kind == 'and':
             ops = tuple(sorted(ops))
         elif kind == 'ifelse':
@@ -386,7 +395,7 @@ class Bool(object):
         else:
             assert kind == 'not'
 
-        key = kind, ops
+        key = v.id
         b = __class__.__cache.get(key)
         if b is not None:
             return b
@@ -400,14 +409,7 @@ class Bool(object):
             b.inversion = op
             op.inversion = b
 
-        if kind == 'not':
-            b._v = ~ops[0]._v
-        elif kind == 'ifelse':
-            b._v = __class__.__eqbools.ifelse(ops[0]._v, ops[1]._v, ops[2]._v)
-        elif kind == 'and':
-            b._v = __class__.__eqbools.get_and(*(op._v for op in ops))
-        else:
-            assert 0, kind
+        b._v = v
 
         return b
 
@@ -572,7 +574,7 @@ class Bool(object):
 
     def __invert__(self):
         if self.inversion is None:
-            __class__.from_ops('not', self)
+            return __class__.from_ops('not', self)
 
         return self.inversion
 
