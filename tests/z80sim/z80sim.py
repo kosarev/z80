@@ -310,7 +310,6 @@ class Bool(object):
                 true.value = True
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
-                false.size = true.size = 0
                 false.inversion = true
                 true.inversion = false
                 __class__.__FALSE_TRUE = false, true
@@ -329,7 +328,6 @@ class Bool(object):
         b._e = None
         b.term = term
         b._v = __class__.__eqbools.get(term)
-        b.size = 1
         b.value = None
         b.inversion = None
 
@@ -392,7 +390,6 @@ class Bool(object):
 
         b = __class__.__cache[key] = __class__()
         b._e = kind, ops
-        b.size = sum(op.size for op in ops) + 1
         b.term = None
         b.value = None
         b.inversion = None
