@@ -344,13 +344,19 @@ class Bool(object):
 
         return b
 
+    @staticmethod
+    def __get_id(v):
+        if v.is_const:
+            return 'true' if self.value else 'false'
+        if v.is_term:
+            return v.term
+        if v.kind == 'not':
+            return '~' + __class__.__get_id(~v)
+        return f't{v.id}'
+
     @property
     def id(self):
-        if self.value is not None:
-            return 'true' if self.value else 'false'
-        if self.term is not None:
-            return self.term
-        return f't{self._v.id}'
+        return __class__.__get_id(self._v)
 
     @property
     def __kind(self):
@@ -415,44 +421,34 @@ class Bool(object):
 
         b._v = v
 
+        # Status.print(repr(b))
+
         return b
 
     def __repr__(self):
-        if self.value is not None:
-            return repr(int(self.value))
-        if self._e is None:
-            return self.id
+        v = self._v
+        if v.kind in ('false', 'true', 'term', 'not'):
+            return __class__.__get_id(v)
 
         rep = []
         visited = set()
-        worklist = [self]
+        worklist = [v]
         while worklist:
-            n = worklist.pop()
-            if n.value is not None or n in visited:
+            v = worklist.pop()
+            if v.kind in ('false', 'true', 'term', 'not'):
                 continue
-            visited.add(n)
-            if n._e is None:
+            if v.id in visited:
+                continue
+            visited.add(v.id)
+            if v.is_term:
                 continue
             if len(rep) != 0:
                 rep.append('; ')
-            kind, ops = n._e
-            if kind == 'not':
-                op, = ops
-                rep.append(f'{n.id} = ~{op.id}')
+            rep.append(f'{__class__.__get_id(v)} = {v.kind}')
+            for op in v.args:
+                rep.append(f' {__class__.__get_id(op)}')
                 worklist.append(op)
-            else:
-                rep.append(f'{n.id} = {kind}')
 
-                for op in ops:
-                    if op.value is not None:
-                        rep.append(f' {int(op.value)}')
-                    elif op._e is not None and op._e[0] == 'not':
-                        op, = op._e[1]
-                        rep.append(f' ~{op.id}')
-                        worklist.append(op)
-                    else:
-                        rep.append(f' {op.id}')
-                        worklist.append(op)
         return ''.join(rep)
 
     def __str__(self):
@@ -705,11 +701,8 @@ class Bool(object):
 FALSE = Bool.get(False)
 TRUE = Bool.get(True)
 
-
 def test_bools():
     def test(actual, expected):
-        print(repr(actual))
-        print(str(actual))
         if actual is expected:
             return
 
