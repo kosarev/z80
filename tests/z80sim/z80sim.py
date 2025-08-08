@@ -327,7 +327,7 @@ class Bool(object):
         b = __class__()
         b._e = None
         b.term = term
-        b._v = __class__.__eqbools.get(term)
+        b._v = v
         b.value = None
         b.inversion = None
 
