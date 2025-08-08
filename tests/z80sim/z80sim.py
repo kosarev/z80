@@ -326,7 +326,6 @@ class Bool(object):
 
         b = __class__()
         b._e = None
-        b.term = term
         b._v = v
         b.value = None
         b.inversion = None
@@ -386,7 +385,6 @@ class Bool(object):
 
         b = __class__.__cache[key] = __class__()
         b._e = kind, ops
-        b.term = None
         b.value = None
         b.inversion = None
 
