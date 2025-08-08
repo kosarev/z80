@@ -346,10 +346,6 @@ class Bool(object):
         return f't{v.id}'
 
     @property
-    def id(self):
-        return __class__.__get_id(self._v)
-
-    @property
     def __kind(self):
         return self._e[0]
 
