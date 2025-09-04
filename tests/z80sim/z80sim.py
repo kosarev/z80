@@ -437,33 +437,6 @@ class Bool(eqbool.Bool):
     @staticmethod
     def ifelse(cond, a, b):
         cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
-
-        if cond.value is not None:
-            return a if cond.value else b
-        if a.value is not None:
-            return (cond | b) if a.value else (~cond & b)
-        if b.value is not None:
-            return (~cond | a) if b.value else (cond & a)
-
-        if a is b:
-            # cond ? a : a
-            return a
-        if a is b._inversion:
-            # TODO: Is this really a simplification?
-            #       ifelse(cond, a, ~a) is just the same set of
-            #       clauses as eq(cond, a).
-            # cond ? a : ~a
-            return __class__.get_eq(cond, a)
-
-        if cond is a or cond is b._inversion:
-            #  a ? a : b
-            # ~b ? a : b
-            return a | b
-        if cond is b or cond is a._inversion:
-            #  b ? a : b
-            # ~a ? a : b
-            return a & b
-
         return _eqbools.ifelse(cond, a, b)
 
     # TODO: Remove ifelse() in favour of this function.
