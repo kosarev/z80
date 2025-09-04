@@ -353,12 +353,6 @@ class Bool(eqbool.Bool):
         return self._e[1]
 
     @property
-    def __is_inversion(self):
-        return (self.value is None and
-                self._e is not None and
-                self.__kind == 'not')
-
-    @property
     def __inversion(self):
         s = self.inversion
         return None if s is None else s
