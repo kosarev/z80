@@ -351,8 +351,7 @@ class Bool(eqbool.Bool):
 
     @property
     def __inversion(self):
-        s = self.inversion
-        return None if s is None else s
+        return self.inversion
 
     @staticmethod
     def from_ops(kind, *ops):
