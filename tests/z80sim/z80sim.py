@@ -312,25 +312,6 @@ class Bool(eqbool.Bool):
             return '~' + __class__.__get_id(~v)
         return f't{v.id}'
 
-    @staticmethod
-    def from_ops(kind, *ops):
-        if kind == 'not':
-            v = _eqbools.get_inversion(ops[0])
-        elif kind == 'ifelse':
-            # TODO: *ops?
-            v = _eqbools.ifelse(ops[0], ops[1], ops[2])
-        elif kind == 'and':
-            v = _eqbools.get_and(*ops)
-        elif kind == 'or':
-            v = _eqbools.get_or(*ops)
-        elif kind == 'eq':
-            # TODO: *ops?
-            v = _eqbools.get_eq(ops[0], ops[1])
-        else:
-            assert 0, kind
-
-        return v
-
     def __repr__(self):
         v = self  # TODO
         if v.kind in ('false', 'true', 'term', 'not'):
@@ -367,14 +348,17 @@ class Bool(eqbool.Bool):
         def __init__(self, *, image=None):
             self.__nodes = []
             self.__node_indexes = {}
+            OPS = {'not':  _eqbools.get_inversion,
+                   'ifelse': _eqbools.ifelse,
+                   'or': _eqbools.get_or,
+                   'eq': _eqbools.get_eq}
             if image is not None:
                 for kind, ops in image:
                     if kind == 'term':
                         assert isinstance(ops, str)
                         b = Bool.get(ops)
                     else:
-                        b = Bool.from_ops(kind,
-                                          *(self.get(op) for op in ops))
+                        b = OPS[kind](*(self.get(op) for op in ops))
                     i = len(self.__nodes)
                     self.__nodes.append(b)
                     self.__node_indexes[i] = b
@@ -459,7 +443,7 @@ class Bool(eqbool.Bool):
         if len(unique_args) == 1:
             return unique_args[0]
 
-        return __class__.from_ops('and', *unique_args)
+        return _eqbools.get_and(*unique_args)
 
     def __and__(self, other):
         return __class__.get_and(self, other)
@@ -471,7 +455,7 @@ class Bool(eqbool.Bool):
     def __invert__(self):
         # Status.print(super().__repr__())
         if self._inversion is None:
-            return __class__.from_ops('not', self)
+            return _eqbools.get_inversion(self)
 
         return self._inversion
 
@@ -505,18 +489,15 @@ class Bool(eqbool.Bool):
             # ~a ? a : b
             return a & b
 
-        return __class__.from_ops('ifelse', cond, a, b)
+        return _eqbools.ifelse(cond, a, b)
 
     # TODO: Remove ifelse() in favour of this function.
     def xifelse(self, a, b):
         return __class__.ifelse(self, a, b)
 
-    # TODO: This should use ifelse()?
     @staticmethod
     def get_eq(a, b):
-        # ifelse takes the same set of clauses as eq, so no need
-        # to have a special operation for it.
-        return __class__.from_ops('ifelse', a, b, ~b)
+        return _eqbools.get_eq(a, b)
 
     @staticmethod
     def get_neq(a, b):
