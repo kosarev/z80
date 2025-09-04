@@ -276,7 +276,7 @@ class Cache(object):
 
 class Bool(eqbool.Bool):
     # TODO: Should all be part of eqbool.Bool?
-    __slots__ = 'inversion', '_e'
+    __slots__ = 'inversion',
 
     __FALSE_TRUE = None
     __cache = {}
@@ -324,7 +324,6 @@ class Bool(eqbool.Bool):
         assert term.lower() not in ('', '0', '1', 'true', 'false')
 
         b = v
-        b._e = None
         b.inversion = None
 
         __class__.__cache[key] = b
@@ -368,7 +367,6 @@ class Bool(eqbool.Bool):
             return b
 
         b = __class__.__cache[key] = v
-        b._e = kind, ops
         b.inversion = None
 
         if kind == 'not':
@@ -499,16 +497,6 @@ class Bool(eqbool.Bool):
                 return FALSE
             if a.inversion in unique_ops:
                 return FALSE
-            if a._e is not None and a._e[0] == 'and':
-                for op in a._e[1]:
-                    if op.value is not None:
-                        if op.value is True:
-                            continue
-                        return FALSE
-                    if op.inversion in unique_ops:
-                        return FALSE
-                    if op not in unique_ops:
-                        unique_ops.append(op)
             if a not in unique_ops:
                 unique_ops.append(a)
                 unique_args.append(a)
@@ -588,11 +576,11 @@ class Bool(eqbool.Bool):
         # eq(a, ~eq(~a, b))  =>   b
         for x, y in ((a, b), (b, a)):
             f = FALSE
-            if y._e is not None and y._e[0] == 'not':
+            if y.kind == 'not':
                 f = TRUE
-                y, = y._e[1]
+                y = ~y
 
-            if y._e is not None and y.kind == 'ifelse':
+            if y.kind == 'ifelse':
                 p, q, r = y.args
                 is_eq = q.__inversion is r
                 if is_eq:
