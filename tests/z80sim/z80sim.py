@@ -424,18 +424,15 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def get_and(*args):
-        # TODO: unique_ops and unique_args now duplicate each other.
-        unique_ops = []
         unique_args = []
         for a in args:
             if a.value is not None:
                 if a.value is True:
                     continue
                 return FALSE
-            if a._inversion in unique_ops:
+            if a._inversion in unique_args:
                 return FALSE
-            if a not in unique_ops:
-                unique_ops.append(a)
+            if a not in unique_args:
                 unique_args.append(a)
 
         if len(unique_args) == 0:
