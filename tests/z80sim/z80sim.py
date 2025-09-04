@@ -417,33 +417,11 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def get_or(*args):
-        return ~__class__.get_and(*(~a for a in args))
-
-    def __or__(self, other):
-        return __class__.get_or(self, other)
+        return _eqbools.get_or(*args)
 
     @staticmethod
     def get_and(*args):
-        unique_args = []
-        for a in args:
-            if a.value is not None:
-                if a.value is True:
-                    continue
-                return FALSE
-            if a._inversion in unique_args:
-                return FALSE
-            if a not in unique_args:
-                unique_args.append(a)
-
-        if len(unique_args) == 0:
-            return TRUE
-        if len(unique_args) == 1:
-            return unique_args[0]
-
-        return _eqbools.get_and(*unique_args)
-
-    def __and__(self, other):
-        return __class__.get_and(self, other)
+        return _eqbools.get_and(*args)
 
     def __xor__(self, other):
         # TODO: Would probably be more logical for neq to rely on xor?
