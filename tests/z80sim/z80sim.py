@@ -427,13 +427,6 @@ class Bool(eqbool.Bool):
         # TODO: Would probably be more logical for neq to rely on xor?
         return __class__.get_neq(self, other)
 
-    def __invert__(self):
-        # Status.print(super().__repr__())
-        if self._inversion is None:
-            return _eqbools.get_inversion(self)
-
-        return self._inversion
-
     @staticmethod
     def ifelse(cond, a, b):
         cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
