@@ -557,38 +557,6 @@ class Bool(eqbool.Bool):
     # TODO: This should use ifelse()?
     @staticmethod
     def get_eq(a, b):
-        if a is b:
-            return TRUE
-        if a is b.inversion:
-            return FALSE
-        if a.value is not None:
-            return b if a.value else ~b
-        if b.value is not None:
-            return a if b.value else ~a
-
-        # eq(a,  eq( a, b))  =>   b
-        # eq(a,  eq(~a, b))  =>  ~b
-        # eq(a, ~eq( a, b))  =>  ~b
-        # eq(a, ~eq(~a, b))  =>   b
-        for x, y in ((a, b), (b, a)):
-            f = FALSE
-            if y.kind == 'not':
-                f = TRUE
-                y = ~y
-
-            if y.kind == 'ifelse':
-                p, q, r = y.args
-                is_eq = q.inversion is r
-                if is_eq:
-                    if x is p:
-                        return q ^ f
-                    if x is p.inversion:
-                        return q ^ ~f
-                    if x is q:
-                        return p ^ f
-                    if x is q.inversion:
-                        return p ^ ~f
-
         # ifelse takes the same set of clauses as eq, so no need
         # to have a special operation for it.
         return __class__.from_ops('ifelse', a, b, ~b)
