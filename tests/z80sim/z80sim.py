@@ -278,16 +278,15 @@ class Bool(eqbool.Bool):
     # TODO: Should all be part of eqbool.Bool?
     __slots__ = ()
 
-    __FALSE_TRUE = None
-    __cache = {}
-
     @staticmethod
     def clear():
-        __class__.__cache.clear()
+        # TODO: Clear the _eqbool cache?
+        pass
 
     @staticmethod
     def get_cache_size():
-        return len(__class__.__cache)
+        # TODO: Query the _eqbool cache?
+        pass
 
     @staticmethod
     def get(term):
@@ -295,37 +294,13 @@ class Bool(eqbool.Bool):
             assert term in (0, 1), repr(term)
             term = bool(term)
 
-        assert isinstance(term, (bool, str))
-        v = _eqbools.get(term)
+        if isinstance(term, str):
+            assert term.strip() == term, repr(term)
+            assert term.lower() not in ('', '0', '1', 'true', 'false')
+        else:
+            assert isinstance(term, bool)
 
-        key = v.id
-        b = __class__.__cache.get(key)
-        if b is not None:
-            return b
-
-        if isinstance(term, bool):
-            if __class__.__FALSE_TRUE is None:
-                false = _eqbools.get(False)
-                true = _eqbools.get(True)
-                # We want the constants to have the smallest size so
-                # that they are always seen the simplest expressions.
-                __class__.__FALSE_TRUE = false, true
-
-            false, true = __class__.__FALSE_TRUE
-            __class__.__cache[false.id] = false
-            __class__.__cache[true.id] = true
-
-            return true if term else false
-
-        assert isinstance(term, str)
-        assert term.strip() == term, repr(term)
-        assert term.lower() not in ('', '0', '1', 'true', 'false')
-
-        b = v
-
-        __class__.__cache[key] = b
-
-        return b
+        return _eqbools.get(term)
 
     @staticmethod
     def __get_id(v):
@@ -354,16 +329,7 @@ class Bool(eqbool.Bool):
         else:
             assert 0, kind
 
-        key = v.id
-        b = __class__.__cache.get(key)
-        if b is not None:
-            return b
-
-        b = __class__.__cache[key] = v
-
-        # Status.print(repr(b))
-
-        return b
+        return v
 
     def __repr__(self):
         v = self  # TODO
