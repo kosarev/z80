@@ -360,7 +360,6 @@ class Bool(eqbool.Bool):
             return b
 
         b = __class__.__cache[key] = v
-        b._inversion = None
 
         # Status.print(repr(b))
 
