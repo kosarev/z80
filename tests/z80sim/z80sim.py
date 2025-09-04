@@ -342,10 +342,6 @@ class Bool(eqbool.Bool):
         return f't{v.id}'
 
     @property
-    def __kind(self):
-        return self._e[0]
-
-    @property
     def __ops(self):
         return self._e[1]
 
@@ -600,7 +596,7 @@ class Bool(eqbool.Bool):
                 f = TRUE
                 y, = y._e[1]
 
-            if y._e is not None and y.__kind == 'ifelse':
+            if y._e is not None and y.kind == 'ifelse':
                 p, q, r = y.__ops
                 is_eq = q.__inversion is r
                 if is_eq:
