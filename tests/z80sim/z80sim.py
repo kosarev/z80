@@ -276,7 +276,7 @@ class Cache(object):
 
 class Bool(eqbool.Bool):
     # TODO: Should all be part of eqbool.Bool?
-    __slots__ = 'value', 'inversion', '_e'
+    __slots__ = 'inversion', '_e'
 
     __FALSE_TRUE = None
     __cache = {}
@@ -307,8 +307,6 @@ class Bool(eqbool.Bool):
             if __class__.__FALSE_TRUE is None:
                 false = _eqbools.get(False)
                 true = _eqbools.get(True)
-                false.value = False
-                true.value = True
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
                 false.inversion = true
@@ -327,7 +325,6 @@ class Bool(eqbool.Bool):
 
         b = v
         b._e = None
-        b.value = None
         b.inversion = None
 
         __class__.__cache[key] = b
@@ -381,7 +378,6 @@ class Bool(eqbool.Bool):
 
         b = __class__.__cache[key] = v
         b._e = kind, ops
-        b.value = None
         b.inversion = None
 
         if kind == 'not':
