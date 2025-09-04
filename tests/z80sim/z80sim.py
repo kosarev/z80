@@ -276,7 +276,7 @@ class Cache(object):
 
 class Bool(eqbool.Bool):
     # TODO: Should all be part of eqbool.Bool?
-    __slots__ = 'inversion',
+    __slots__ = ()
 
     __FALSE_TRUE = None
     __cache = {}
@@ -309,8 +309,6 @@ class Bool(eqbool.Bool):
                 true = _eqbools.get(True)
                 # We want the constants to have the smallest size so
                 # that they are always seen the simplest expressions.
-                false.inversion = true
-                true.inversion = false
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
@@ -324,7 +322,6 @@ class Bool(eqbool.Bool):
         assert term.lower() not in ('', '0', '1', 'true', 'false')
 
         b = v
-        b.inversion = None
 
         __class__.__cache[key] = b
 
@@ -363,12 +360,7 @@ class Bool(eqbool.Bool):
             return b
 
         b = __class__.__cache[key] = v
-        b.inversion = None
-
-        if kind == 'not':
-            op, = ops
-            b.inversion = op
-            op.inversion = b
+        b._inversion = None
 
         # Status.print(repr(b))
 
@@ -491,7 +483,7 @@ class Bool(eqbool.Bool):
                 if a.value is True:
                     continue
                 return FALSE
-            if a.inversion in unique_ops:
+            if a._inversion in unique_ops:
                 return FALSE
             if a not in unique_ops:
                 unique_ops.append(a)
@@ -513,10 +505,10 @@ class Bool(eqbool.Bool):
 
     def __invert__(self):
         # Status.print(super().__repr__())
-        if self.inversion is None:
+        if self._inversion is None:
             return __class__.from_ops('not', self)
 
-        return self.inversion
+        return self._inversion
 
     @staticmethod
     def ifelse(cond, a, b):
@@ -532,18 +524,18 @@ class Bool(eqbool.Bool):
         if a is b:
             # cond ? a : a
             return a
-        if a is b.inversion:
+        if a is b._inversion:
             # TODO: Is this really a simplification?
             #       ifelse(cond, a, ~a) is just the same set of
             #       clauses as eq(cond, a).
             # cond ? a : ~a
             return __class__.get_eq(cond, a)
 
-        if cond is a or cond is b.inversion:
+        if cond is a or cond is b._inversion:
             #  a ? a : b
             # ~b ? a : b
             return a | b
-        if cond is b or cond is a.inversion:
+        if cond is b or cond is a._inversion:
             #  b ? a : b
             # ~a ? a : b
             return a & b
