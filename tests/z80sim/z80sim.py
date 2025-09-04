@@ -274,10 +274,12 @@ class Cache(object):
         return __class__.__Entry(domain, key)
 
 
-class Bool(object):
+class Bool(eqbool.Bool):
+    # TODO: Should all be part of eqbool.Bool?
+    __slots__ = 'value', 'inversion', '_e'
+
     __FALSE_TRUE = None
     __cache = {}
-    __eqbools = eqbool.Context()
 
     @staticmethod
     def clear():
@@ -294,7 +296,7 @@ class Bool(object):
             term = bool(term)
 
         assert isinstance(term, (bool, str))
-        v = __class__.__eqbools.get(term)
+        v = _eqbools.get(term)
 
         key = v.id
         b = __class__.__cache.get(key)
@@ -303,9 +305,8 @@ class Bool(object):
 
         if isinstance(term, bool):
             if __class__.__FALSE_TRUE is None:
-                false, true = __class__(), __class__()
-                false._v = __class__.__eqbools.get(False)
-                true._v = __class__.__eqbools.get(True)
+                false = _eqbools.get(False)
+                true = _eqbools.get(True)
                 false.value = False
                 true.value = True
                 # We want the constants to have the smallest size so
@@ -315,8 +316,8 @@ class Bool(object):
                 __class__.__FALSE_TRUE = false, true
 
             false, true = __class__.__FALSE_TRUE
-            __class__.__cache[false._v.id] = false
-            __class__.__cache[true._v.id] = true
+            __class__.__cache[false.id] = false
+            __class__.__cache[true.id] = true
 
             return true if term else false
 
@@ -324,9 +325,8 @@ class Bool(object):
         assert term.strip() == term, repr(term)
         assert term.lower() not in ('', '0', '1', 'true', 'false')
 
-        b = __class__()
+        b = v
         b._e = None
-        b._v = v
         b.value = None
         b.inversion = None
 
@@ -366,15 +366,17 @@ class Bool(object):
     @staticmethod
     def from_ops(kind, *ops):
         if kind == 'not':
-            v = ~ops[0]._v
+            v = _eqbools.get_inversion(ops[0])
         elif kind == 'ifelse':
-            v = __class__.__eqbools.ifelse(ops[0]._v, ops[1]._v, ops[2]._v)
+            # TODO: *ops?
+            v = _eqbools.ifelse(ops[0], ops[1], ops[2])
         elif kind == 'and':
-            v = __class__.__eqbools.get_and(*(op._v for op in ops))
+            v = _eqbools.get_and(*ops)
         elif kind == 'or':
-            v = __class__.__eqbools.get_or(*(op._v for op in ops))
+            v = _eqbools.get_or(*ops)
         elif kind == 'eq':
-            v = __class__.__eqbools.get_eq(ops[0]._v, ops[1]._v)
+            # TODO: *ops?
+            v = _eqbools.get_eq(ops[0], ops[1])
         else:
             assert 0, kind
 
@@ -383,7 +385,7 @@ class Bool(object):
         if b is not None:
             return b
 
-        b = __class__.__cache[key] = __class__()
+        b = __class__.__cache[key] = v
         b._e = kind, ops
         b.value = None
         b.inversion = None
@@ -393,14 +395,12 @@ class Bool(object):
             b.inversion = op
             op.inversion = b
 
-        b._v = v
-
         # Status.print(repr(b))
 
         return b
 
     def __repr__(self):
-        v = self._v
+        v = self  # TODO
         if v.kind in ('false', 'true', 'term', 'not'):
             return __class__.__get_id(v)
 
@@ -460,7 +460,7 @@ class Bool(object):
             if kind == 'term':
                 ops = v.term
             else:
-                ops = [~v] if kind == 'not' else v.args
+                ops = [_eqbools.get_inversion(v)] if kind == 'not' else v.args
                 ops = tuple(self.__add(op) for op in ops)
 
             i = len(self.__nodes)
@@ -469,7 +469,7 @@ class Bool(object):
             return i
 
         def add(self, e):
-            return self.__add(e._v)
+            return self.__add(e)
 
         def get(self, image):
             if isinstance(image, bool):
@@ -547,6 +547,7 @@ class Bool(object):
         return __class__.get_neq(self, other)
 
     def __invert__(self):
+        # Status.print(super().__repr__())
         if self.inversion is None:
             return __class__.from_ops('not', self)
 
@@ -633,7 +634,7 @@ class Bool(object):
 
     @staticmethod
     def is_equiv(a, b):
-        return __class__.__eqbools.is_equiv(a._v, b._v)
+        return _eqbools.is_equiv(a, b)
 
     def simplified_sexpr(self):
         cache = {}
@@ -670,6 +671,9 @@ class Bool(object):
         if z3.is_true(e):
             return '1'
         return e.sexpr()
+
+
+_eqbools = eqbool.Context(bool_type=Bool)
 
 
 FALSE = Bool.get(False)
