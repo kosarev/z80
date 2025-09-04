@@ -340,10 +340,6 @@ class Bool(eqbool.Bool):
             return '~' + __class__.__get_id(~v)
         return f't{v.id}'
 
-    @property
-    def __inversion(self):
-        return self.inversion
-
     @staticmethod
     def from_ops(kind, *ops):
         if kind == 'not':
@@ -536,18 +532,18 @@ class Bool(eqbool.Bool):
         if a is b:
             # cond ? a : a
             return a
-        if a is b.__inversion:
+        if a is b.inversion:
             # TODO: Is this really a simplification?
             #       ifelse(cond, a, ~a) is just the same set of
             #       clauses as eq(cond, a).
             # cond ? a : ~a
             return __class__.get_eq(cond, a)
 
-        if cond is a or cond is b.__inversion:
+        if cond is a or cond is b.inversion:
             #  a ? a : b
             # ~b ? a : b
             return a | b
-        if cond is b or cond is a.__inversion:
+        if cond is b or cond is a.inversion:
             #  b ? a : b
             # ~a ? a : b
             return a & b
@@ -563,7 +559,7 @@ class Bool(eqbool.Bool):
     def get_eq(a, b):
         if a is b:
             return TRUE
-        if a is b.__inversion:
+        if a is b.inversion:
             return FALSE
         if a.value is not None:
             return b if a.value else ~b
@@ -582,15 +578,15 @@ class Bool(eqbool.Bool):
 
             if y.kind == 'ifelse':
                 p, q, r = y.args
-                is_eq = q.__inversion is r
+                is_eq = q.inversion is r
                 if is_eq:
                     if x is p:
                         return q ^ f
-                    if x is p.__inversion:
+                    if x is p.inversion:
                         return q ^ ~f
                     if x is q:
                         return p ^ f
-                    if x is q.__inversion:
+                    if x is q.inversion:
                         return p ^ ~f
 
         # ifelse takes the same set of clauses as eq, so no need
