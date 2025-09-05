@@ -401,8 +401,8 @@ class Bool(eqbool.Bool):
         return x if isinstance(x, Bool) else Bool.get(x)
 
     def __bool__(self):
-        assert self.value is not None
-        return self.value
+        assert self.is_const
+        return self.is_true
 
     def __int__(self):
         return int(bool(self))
@@ -771,9 +771,12 @@ class Node(object):
     def id(self):
         if self.pull is None:
             pull = 'n'
+        elif self.pull.is_true:
+            pull = 'p'
+        elif self.pull.is_false:
+            pull = 'm'
         else:
-            PULL_SIGNS = {None: 'x', False: 'm', True: 'p'}
-            pull = PULL_SIGNS[self.pull.value]
+            pull = 'x'
 
         if self.custom_id is None:
             return f'{pull}{self.index}'
