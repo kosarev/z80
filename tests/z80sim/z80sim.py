@@ -400,14 +400,6 @@ class Bool(eqbool.Bool):
     def cast(x):
         return x if isinstance(x, Bool) else Bool.get(x)
 
-    # TODO: Remove and use 'is FALSE' instead.
-    def is_trivially_false(self):
-        return self.value is False
-
-    # TODO: Remove and use 'is TRUE' instead.
-    def is_trivially_true(self):
-        return self.value is True
-
     def __bool__(self):
         assert self.value is not None
         return self.value
