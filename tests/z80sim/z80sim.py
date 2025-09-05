@@ -421,7 +421,6 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def ifelse(cond, a, b):
-        cond, a, b = __class__.cast(cond), __class__.cast(a), __class__.cast(b)
         return _eqbools.ifelse(cond, a, b)
 
     # TODO: Remove ifelse() in favour of this function.
