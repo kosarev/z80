@@ -277,18 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    @staticmethod
-    def ifelse(cond, a, b):
-        return bools.ifelse(cond, a, b)
-
-    # TODO: Remove ifelse() in favour of this function.
-    def xifelse(self, a, b):
-        return __class__.ifelse(self, a, b)
-
-    @staticmethod
-    def is_equiv(a, b):
-        return bools.is_equiv(a, b)
-
 
 class Bools(eqbool.Context):
     def __init__(self):
@@ -933,7 +921,7 @@ def _load_initial_image():
                     __nodes[i] = n
 
                 assert ((n.pull is None and pull is None) or
-                        Bool.is_equiv(n.pull, pull))
+                        bools.is_equiv(n.pull, pull))
 
     def load_transistors():
         def add(t):
@@ -1037,7 +1025,7 @@ class Z80Simulator(object):
         for i in image:
             n = node_storage.get(i[0], i[1:])
             self.__nodes[n.index] = n
-            # if Bool.is_equiv(n.state, bools.get('ei')):
+            # if bools.is_equiv(n.state, bools.get('ei')):
             #     Status.print(n, n.state)
 
         self.__nodes_by_name = {}
@@ -1198,7 +1186,7 @@ class Z80Simulator(object):
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
         # the case of a floating gate.
-        if Bool.is_equiv(new_state, old_state):
+        if bools.is_equiv(new_state, old_state):
             return False
 
         new_states[n] = new_state
@@ -1896,9 +1884,9 @@ def test_node(instrs, n, at_start, at_end, before, after):
             b, a = at_start[n], at_end[n]
         else:
             b, a = before[n], after[n]
-            x = is_active(n).xifelse(x, b)
+            x = is_active(n).ifelse(x, b)
 
-        if Bool.is_equiv(a, x):
+        if bools.is_equiv(a, x):
             return CheckToken()
 
         Status.clear()
@@ -2252,7 +2240,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
         return check(~before[n])
 
     if n == EX_DE_FF and instr == 'exx':
-        ex_de = before[EXX_FF].xifelse(before[EX_DE_FF0], before[EX_DE_FF1])
+        ex_de = before[EXX_FF].ifelse(before[EX_DE_FF0], before[EX_DE_FF1])
         return check(~ex_de)
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
@@ -3093,7 +3081,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     for id, state in s.get_node_states().items():
         if id not in persistent_nodes:
             continue
-        if Bool.is_equiv(state, persistent_nodes[id]):
+        if bools.is_equiv(state, persistent_nodes[id]):
             continue
         # Status.print(f'Found state node: {id}')
         del persistent_nodes[id]
