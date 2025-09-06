@@ -277,14 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    @staticmethod
-    def get_or(*args):
-        return bools.get_or(*args)
-
-    @staticmethod
-    def get_and(*args):
-        return bools.get_and(*args)
-
     def __xor__(self, other):
         # TODO: Would probably be more logical for neq to rely on xor?
         return __class__.get_neq(self, other)
@@ -646,7 +638,7 @@ class Bits(object):
     @staticmethod
     def get_or(*args):
         args = __class__.zero_extend_to_same_width(*args)
-        return __class__(Bool.get_or(*bits) for bits in zip(*args))
+        return __class__(bools.get_or(*bits) for bits in zip(*args))
 
     def __or__(self, other):
         return __class__.get_or(self, other)
@@ -683,7 +675,7 @@ class Bits(object):
 
     def __eq__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
-        return Bool.get_and(*(Bool.get_eq(x, y) for x, y in zip(a, b)))
+        return bools.get_and(*(Bool.get_eq(x, y) for x, y in zip(a, b)))
 
     def __ne__(self, other):
         return ~self.__eq__(other)
@@ -722,7 +714,7 @@ class Bits(object):
         return r
 
     def is_any(self, *args):
-        return Bool.get_or(*(self == a for a in args))
+        return bools.get_or(*(self == a for a in args))
 
 
 class Node(object):
@@ -1159,7 +1151,7 @@ class Z80Simulator(object):
                             p = [TRUE]
                             break
                         p.append(mp)
-            p = Bool.get_or(*p)
+            p = bools.get_or(*p)
             assert stack.pop() == n
 
             if not cyclic:
