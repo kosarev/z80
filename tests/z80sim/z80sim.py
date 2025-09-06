@@ -277,10 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    @staticmethod
-    def cast(x):
-        return x if isinstance(x, Bool) else bools.get(x)
-
     def __bool__(self):
         assert self.is_const
         return self.is_true
@@ -477,6 +473,10 @@ class Bools(eqbool.Context):
         def image(self):
             return tuple(self.__nodes)
 
+    @staticmethod
+    def cast(x):
+        return x if isinstance(x, Bool) else bools.get(x)
+
 
 bools = Bools()
 
@@ -541,7 +541,7 @@ class Bits(object):
             bits = tuple(f'{b}{suffix}' if isinstance(b, str) else b
                          for b in bits)
 
-        bits = tuple(Bool.cast(b) for b in bits)
+        bits = tuple(bools.cast(b) for b in bits)
 
         if width is not None:
             assert len(bits) <= width
@@ -705,7 +705,7 @@ class Bits(object):
 
     @staticmethod
     def ifelse(cond, a, b):
-        cond = Bool.cast(cond)
+        cond = bools.cast(cond)
         a, b = __class__.zero_extend_to_same_width(a, b)
         return __class__(Bool.ifelse(cond, x, y) for x, y in zip(a, b))
 
@@ -1273,7 +1273,7 @@ class Z80Simulator(object):
                             groups.append(t.conns_group)
 
     def __set_node_pull(self, n, pull):
-        pull = Bool.cast(pull)
+        pull = bools.cast(pull)
         if '--show-set-nodes' in sys.argv:
             Status.print(n, pull)
         n.pull = pull
@@ -1767,7 +1767,7 @@ class State(object):
         self.__add_step(('clear_state',))
 
     def set_pin_pull(self, pin, pull):
-        step = 'set_pin_pull', pin, Bool.cast(pull)
+        step = 'set_pin_pull', pin, bools.cast(pull)
         self.__add_step(step)
 
     def update_pin(self, pin):
