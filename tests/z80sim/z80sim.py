@@ -277,10 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    def __xor__(self, other):
-        # TODO: Would probably be more logical for neq to rely on xor?
-        return __class__.get_neq(self, other)
-
     @staticmethod
     def ifelse(cond, a, b):
         return bools.ifelse(cond, a, b)
@@ -288,14 +284,6 @@ class Bool(eqbool.Bool):
     # TODO: Remove ifelse() in favour of this function.
     def xifelse(self, a, b):
         return __class__.ifelse(self, a, b)
-
-    @staticmethod
-    def get_eq(a, b):
-        return bools.get_eq(a, b)
-
-    @staticmethod
-    def get_neq(a, b):
-        return ~__class__.get_eq(a, b)
 
     @staticmethod
     def is_equiv(a, b):
@@ -479,7 +467,7 @@ def test_bools():
         assert 0
 
     a, b, c, t = (bools.get(v) for v in 'abct')
-    eq = Bool.get_eq
+    eq = bools.get_eq
     ifelse = Bool.ifelse
 
     # Canonicalise commutative operations.
@@ -675,7 +663,7 @@ class Bits(object):
 
     def __eq__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
-        return bools.get_and(*(Bool.get_eq(x, y) for x, y in zip(a, b)))
+        return bools.get_and(*(bools.get_eq(x, y) for x, y in zip(a, b)))
 
     def __ne__(self, other):
         return ~self.__eq__(other)
