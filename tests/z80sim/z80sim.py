@@ -277,58 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    class Storage(object):
-        def __init__(self, *, image=None):
-            self.__nodes = []
-            self.__node_indexes = {}
-            OPS = {'not':  bools.get_inversion,
-                   'ifelse': bools.ifelse,
-                   'or': bools.get_or,
-                   'eq': bools.get_eq}
-            if image is not None:
-                for kind, ops in image:
-                    if kind == 'term':
-                        assert isinstance(ops, str)
-                        b = bools.get(ops)
-                    else:
-                        b = OPS[kind](*(self.get(op) for op in ops))
-                    i = len(self.__nodes)
-                    self.__nodes.append(b)
-                    self.__node_indexes[i] = b
-
-        def __add(self, v):
-            kind = v.kind
-            if kind in ('false', 'true'):
-                return kind == 'true'
-
-            key = v.id
-            i = self.__node_indexes.get(key)
-            if i is not None:
-                return i
-
-            if kind == 'term':
-                ops = v.term
-            else:
-                ops = [bools.get_inversion(v)] if kind == 'not' else v.args
-                ops = tuple(self.__add(op) for op in ops)
-
-            i = len(self.__nodes)
-            self.__nodes.append((kind, ops))
-            self.__node_indexes[key] = i
-            return i
-
-        def add(self, e):
-            return self.__add(e)
-
-        def get(self, image):
-            if isinstance(image, bool):
-                return TRUE if image else FALSE
-            return self.__nodes[image]
-
-        @property
-        def image(self):
-            return tuple(self.__nodes)
-
     @staticmethod
     def cast(x):
         return x if isinstance(x, Bool) else bools.get(x)
@@ -476,6 +424,58 @@ class Bools(eqbool.Context):
     def __str__(self):
         return self.simplified_sexpr()
     '''
+
+    class Storage(object):
+        def __init__(self, *, image=None):
+            self.__nodes = []
+            self.__node_indexes = {}
+            OPS = {'not':  bools.get_inversion,
+                   'ifelse': bools.ifelse,
+                   'or': bools.get_or,
+                   'eq': bools.get_eq}
+            if image is not None:
+                for kind, ops in image:
+                    if kind == 'term':
+                        assert isinstance(ops, str)
+                        b = bools.get(ops)
+                    else:
+                        b = OPS[kind](*(self.get(op) for op in ops))
+                    i = len(self.__nodes)
+                    self.__nodes.append(b)
+                    self.__node_indexes[i] = b
+
+        def __add(self, v):
+            kind = v.kind
+            if kind in ('false', 'true'):
+                return kind == 'true'
+
+            key = v.id
+            i = self.__node_indexes.get(key)
+            if i is not None:
+                return i
+
+            if kind == 'term':
+                ops = v.term
+            else:
+                ops = [bools.get_inversion(v)] if kind == 'not' else v.args
+                ops = tuple(self.__add(op) for op in ops)
+
+            i = len(self.__nodes)
+            self.__nodes.append((kind, ops))
+            self.__node_indexes[key] = i
+            return i
+
+        def add(self, e):
+            return self.__add(e)
+
+        def get(self, image):
+            if isinstance(image, bool):
+                return TRUE if image else FALSE
+            return self.__nodes[image]
+
+        @property
+        def image(self):
+            return tuple(self.__nodes)
 
 
 bools = Bools()
@@ -856,7 +856,7 @@ class Transistor(object):
 
 
 def _make_image(nodes, trans):
-    bools = Bool.Storage()
+    bools = Bools.Storage()
     node_storage = Node.Storage(bools)
     trans_storage = Transistor.Storage(bools)
 
@@ -1353,7 +1353,7 @@ class Z80Simulator(object):
         (node_storage, bools,
          node_names, nodes, trans) = image
 
-        bools = Bool.Storage(image=bools)
+        bools = Bools.Storage(image=bools)
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
@@ -1642,7 +1642,7 @@ class State(object):
 
     @staticmethod
     def __get_steps_image(steps):
-        bools = Bool.Storage()
+        bools = Bools.Storage()
 
         def get_step_element_image(e):
             if isinstance(e, (str, int, type(None))):
