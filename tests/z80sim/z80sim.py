@@ -300,7 +300,7 @@ class Bool(eqbool.Bool):
         else:
             assert isinstance(term, bool)
 
-        return _eqbools.get(term)
+        return bools.get(term)
 
     @staticmethod
     def __get_id(v):
@@ -348,10 +348,10 @@ class Bool(eqbool.Bool):
         def __init__(self, *, image=None):
             self.__nodes = []
             self.__node_indexes = {}
-            OPS = {'not':  _eqbools.get_inversion,
-                   'ifelse': _eqbools.ifelse,
-                   'or': _eqbools.get_or,
-                   'eq': _eqbools.get_eq}
+            OPS = {'not':  bools.get_inversion,
+                   'ifelse': bools.ifelse,
+                   'or': bools.get_or,
+                   'eq': bools.get_eq}
             if image is not None:
                 for kind, ops in image:
                     if kind == 'term':
@@ -376,7 +376,7 @@ class Bool(eqbool.Bool):
             if kind == 'term':
                 ops = v.term
             else:
-                ops = [_eqbools.get_inversion(v)] if kind == 'not' else v.args
+                ops = [bools.get_inversion(v)] if kind == 'not' else v.args
                 ops = tuple(self.__add(op) for op in ops)
 
             i = len(self.__nodes)
@@ -409,11 +409,11 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def get_or(*args):
-        return _eqbools.get_or(*args)
+        return bools.get_or(*args)
 
     @staticmethod
     def get_and(*args):
-        return _eqbools.get_and(*args)
+        return bools.get_and(*args)
 
     def __xor__(self, other):
         # TODO: Would probably be more logical for neq to rely on xor?
@@ -421,7 +421,7 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def ifelse(cond, a, b):
-        return _eqbools.ifelse(cond, a, b)
+        return bools.ifelse(cond, a, b)
 
     # TODO: Remove ifelse() in favour of this function.
     def xifelse(self, a, b):
@@ -429,7 +429,7 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def get_eq(a, b):
-        return _eqbools.get_eq(a, b)
+        return bools.get_eq(a, b)
 
     @staticmethod
     def get_neq(a, b):
@@ -437,7 +437,7 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def is_equiv(a, b):
-        return _eqbools.is_equiv(a, b)
+        return bools.is_equiv(a, b)
 
     def simplified_sexpr(self):
         cache = {}
@@ -476,7 +476,12 @@ class Bool(eqbool.Bool):
         return e.sexpr()
 
 
-_eqbools = eqbool.Context(bool_type=Bool)
+class Bools(eqbool.Context):
+    def __init__(self):
+        super().__init__(bool_type=Bool)
+
+
+bools = Bools()
 
 
 FALSE = Bool.get(False)
