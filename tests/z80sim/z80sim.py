@@ -277,45 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    @staticmethod
-    def __get_id(v):
-        if v.is_const:
-            return v.kind
-        if v.is_term:
-            return v.term
-        if v.kind == 'not':
-            return '~' + __class__.__get_id(~v)
-        return f't{v.id}'
-
-    def __repr__(self):
-        v = self  # TODO
-        if v.kind in ('false', 'true', 'term', 'not'):
-            return __class__.__get_id(v)
-
-        rep = []
-        visited = set()
-        worklist = [v]
-        while worklist:
-            v = worklist.pop()
-            if v.kind in ('false', 'true', 'term', 'not'):
-                continue
-            if v.id in visited:
-                continue
-            visited.add(v.id)
-            if v.is_term:
-                continue
-            if len(rep) != 0:
-                rep.append('; ')
-            rep.append(f'{__class__.__get_id(v)} = {v.kind}')
-            for op in v.args:
-                rep.append(f' {__class__.__get_id(op)}')
-                worklist.append(op)
-
-        return ''.join(rep)
-
-    def __str__(self):
-        return self.simplified_sexpr()
-
     def __lt__(self, other):
         return self._v.id < other._v.id
 
@@ -414,6 +375,71 @@ class Bool(eqbool.Bool):
     def is_equiv(a, b):
         return bools.is_equiv(a, b)
 
+
+class Bools(eqbool.Context):
+    def __init__(self):
+        super().__init__(bool_type=Bool)
+
+    @staticmethod
+    def clear():
+        # TODO: Clear the _eqbool cache?
+        pass
+
+    @staticmethod
+    def get_cache_size():
+        # TODO: Query the _eqbool cache?
+        pass
+
+    def get(self, term):
+        if isinstance(term, int):
+            assert term in (0, 1), repr(term)
+            term = bool(term)
+
+        if isinstance(term, str):
+            assert term.strip() == term, repr(term)
+            assert term.lower() not in ('', '0', '1', 'true', 'false')
+        else:
+            assert isinstance(term, bool)
+
+        return super().get(term)
+
+    ''' TODO
+    @staticmethod
+    def __get_id(v):
+        if v.is_const:
+            return v.kind
+        if v.is_term:
+            return v.term
+        if v.kind == 'not':
+            return '~' + __class__.__get_id(~v)
+        return f't{v.id}'
+
+    def __repr__(self):
+        v = self  # TODO
+        if v.kind in ('false', 'true', 'term', 'not'):
+            return __class__.__get_id(v)
+
+        rep = []
+        visited = set()
+        worklist = [v]
+        while worklist:
+            v = worklist.pop()
+            if v.kind in ('false', 'true', 'term', 'not'):
+                continue
+            if v.id in visited:
+                continue
+            visited.add(v.id)
+            if v.is_term:
+                continue
+            if len(rep) != 0:
+                rep.append('; ')
+            rep.append(f'{__class__.__get_id(v)} = {v.kind}')
+            for op in v.args:
+                rep.append(f' {__class__.__get_id(op)}')
+                worklist.append(op)
+
+        return ''.join(rep)
+
     def simplified_sexpr(self):
         cache = {}
 
@@ -450,33 +476,9 @@ class Bool(eqbool.Bool):
             return '1'
         return e.sexpr()
 
-
-class Bools(eqbool.Context):
-    def __init__(self):
-        super().__init__(bool_type=Bool)
-
-    @staticmethod
-    def clear():
-        # TODO: Clear the _eqbool cache?
-        pass
-
-    @staticmethod
-    def get_cache_size():
-        # TODO: Query the _eqbool cache?
-        pass
-
-    def get(self, term):
-        if isinstance(term, int):
-            assert term in (0, 1), repr(term)
-            term = bool(term)
-
-        if isinstance(term, str):
-            assert term.strip() == term, repr(term)
-            assert term.lower() not in ('', '0', '1', 'true', 'false')
-        else:
-            assert isinstance(term, bool)
-
-        return super().get(term)
+    def __str__(self):
+        return self.simplified_sexpr()
+    '''
 
 
 bools = Bools()
