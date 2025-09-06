@@ -277,9 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    def __lt__(self, other):
-        return self._v.id < other._v.id
-
     class Storage(object):
         def __init__(self, *, image=None):
             self.__nodes = []
