@@ -277,13 +277,6 @@ class Cache(object):
 class Bool(eqbool.Bool):
     __slots__ = ()
 
-    def __bool__(self):
-        assert self.is_const
-        return self.is_true
-
-    def __int__(self):
-        return int(bool(self))
-
     @staticmethod
     def get_or(*args):
         return bools.get_or(*args)
@@ -587,10 +580,9 @@ class Bits(object):
         if all(b is None for b in self):
             return None
 
-        values = tuple(b.value for b in self)
-        if all(v is not None for v in values):
+        if all(b.is_const for b in self):
             n = 0
-            for i, v in enumerate(values):
+            for i, v in enumerate(b.is_true for b in self):
                 n |= int(v) << i
             return n
 
@@ -1953,7 +1945,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
     instr = instrs[-1]
     cycles = TestedInstrs.get_cycles(instr, phase)
     opcode, ticks, cond = cycles[0]
-    if opcode in (0xcb, 0xed):
+    if opcode.value in (0xcb, 0xed):
         opcode, ticks, cond = cycles[1]
     opcode = opcode.zero_extended(8)
 
@@ -1964,6 +1956,9 @@ def test_node(instrs, n, at_start, at_end, before, after):
             assert '_p' not in x, x
             return f'{x}_p{phase + offset}'
         return x
+
+    def phased_bool(x):
+        return bools.get(phased(x))
 
     def bits(id):
         return Bits(before[f'{id}{i}'] for i in range(8))
@@ -2083,17 +2078,17 @@ def test_node(instrs, n, at_start, at_end, before, after):
 
     if n in CFF:
         if instr == 'scf/ccf':
-            return check(Bool.ifelse(phased('is_scf'), TRUE,
+            return check(Bool.ifelse(phased_bool('is_scf'), TRUE,
                                      ~get_active(CF)))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            return check(Bool.ifelse(phased('is_rl'), a[7], a[0]))
+            return check(Bool.ifelse(phased_bool('is_rl'), a[7], a[0]))
 
     if n in NFF:
         if instr == 'cpl':
             return check(TRUE)
         if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
-            return check(Bool.ifelse(phased('is_inc'), FALSE, TRUE))
+            return check(Bool.ifelse(phased_bool('is_inc'), FALSE, TRUE))
         if instr in ('scf/ccf', 'rlca/rrca/rla/rra', 'add hl, <rp>'):
             return check(FALSE)
 
@@ -2121,7 +2116,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(Bool.ifelse(ignores_f, a, a | f))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            return check(Bool.ifelse(phased('is_rl'), a[i - 1], a[i + 1]))
+            return check(Bool.ifelse(phased_bool('is_rl'), a[i - 1], a[i + 1]))
 
     if n in HFF:
         if instr == 'cpl':
@@ -2129,7 +2124,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if instr == 'rlca/rrca/rla/rra':
             return check(FALSE)
         if instr == 'scf/ccf':
-            return check(Bool.ifelse(phased('is_scf'), FALSE, get_active(CF)))
+            return check(Bool.ifelse(phased_bool('is_scf'), FALSE, get_active(CF)))
 
     if n.startswith('reg_a'):
         i = int(n[-1])
@@ -2138,7 +2133,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if instr in ('ld a, (nn)/ld (nn), a', 'ld (<rp>), a/ld a, (<rp>)'):
             id = 'rw3' if instr == 'ld a, (nn)/ld (nn), a' else 'rw'
             v = Bits(phased(id), width=8)
-            a = Bits.ifelse(phased('is_store'), get_a(), v)
+            a = Bits.ifelse(phased_bool('is_store'), get_a(), v)
             return check(a[i])
         if instr in ('ld {b, c, d, e, h, l, a}, n',
                      'ld {b, c, d, e, h, l, a}, (hl)'):
@@ -2152,7 +2147,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(a[i])
         if instr == 'in a, (n)/out (n), a':
             v = Bits(phased('io'), width=8)
-            a = Bits.ifelse(phased('is_in'), v, get_a())
+            a = Bits.ifelse(phased_bool('is_in'), v, get_a())
             return check(a[i])
         if instr == 'inc/dec {b, c, d, e, h, l, a}':
             r = Bits(opcode[3:6])
@@ -2232,7 +2227,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             r = Bits(phased('r'), width=8)
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
-            return check(Bool.ifelse(phased('is_in'), in_wz[i], out_wz[i]))
+            return check(Bool.ifelse(phased_bool('is_in'), in_wz[i], out_wz[i]))
         if instr == 'rst n':
             wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
             return check(wz[i])
@@ -2265,7 +2260,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
 
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
-            return check(bools.get(phased('is_ei')))
+            return check(phased_bool('is_ei'))
 
     if n == EX_AF_FF and instr == "ex af, af'":
         return check(~before[n])
@@ -2284,13 +2279,13 @@ def test_node(instrs, n, at_start, at_end, before, after):
         r = get_r(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
         if n in PFF:
-            return check(Bool.ifelse(phased('is_inc'), r == 0x80, r == 0x7f))
+            return check(Bool.ifelse(phased_bool('is_inc'), r == 0x80, r == 0x7f))
         if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i])
         if n in HFF:
             r4 = r.truncated(4)
-            return check(Bool.ifelse(phased('is_inc'), r4 == 0x0, r4 == 0xf))
+            return check(Bool.ifelse(phased_bool('is_inc'), r4 == 0x0, r4 == 0xf))
         if n in ZFF:
             return check(r == 0x00)
         if n in SFF:
@@ -2314,17 +2309,17 @@ def test_node(instrs, n, at_start, at_end, before, after):
         r = Bits.ifelse(phased('is_i_reg'), ri, rr)
         v = Bits.ifelse(phased('is_store'), get_a(), r)
         if n in NFF + HFF:
-            return check(Bool.ifelse(phased('is_store'), before[n], FALSE))
+            return check(Bool.ifelse(phased_bool('is_store'), before[n], FALSE))
         if n in PFF:
-            return check(Bool.ifelse(phased('is_store'), before[n],
+            return check(Bool.ifelse(phased_bool('is_store'), before[n],
                                      before[IFF2]))
         if n in XFF + YFF:
             i = int(n[-1])
-            return check(Bool.ifelse(phased('is_store'), before[n], r[i]))
+            return check(Bool.ifelse(phased_bool('is_store'), before[n], r[i]))
         if n in ZFF:
-            return check(Bool.ifelse(phased('is_store'), before[n], r == 0x00))
+            return check(Bool.ifelse(phased_bool('is_store'), before[n], r == 0x00))
         if n in SFF:
-            return check(Bool.ifelse(phased('is_store'), before[n], r[7]))
+            return check(Bool.ifelse(phased_bool('is_store'), before[n], r[7]))
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(v[i])
@@ -2335,11 +2330,13 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if n.startswith('reg_f'):
             i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
-                                     f'lo_p{phase}_b{i}', before[n]))
+                                     bools.get(f'lo_p{phase}_b{i}'),
+                                     before[n]))
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(Bool.ifelse(p == RP2_AF,
-                                     f'hi_p{phase}_b{i}', before[n]))
+                                     bools.get(f'hi_p{phase}_b{i}'),
+                                     before[n]))
 
     if instr == 'daa':
         a = get_a()
@@ -2437,7 +2434,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
     if instr == 'in/out r, (c)':
         y = Bits(phased('y'), width=3)
         io = Bits(phased('io'), width=8)
-        is_in = bools.get(phased('is_in'))
+        is_in = phased_bool('is_in')
         a = Bits.ifelse(~is_in | (y != A), get_a(), io)
         if n in NFF + HFF:
             return check(Bool.ifelse(is_in, FALSE, before[n]))
