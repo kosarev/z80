@@ -278,20 +278,6 @@ class Bool(eqbool.Bool):
     __slots__ = ()
 
     @staticmethod
-    def get(term):
-        if isinstance(term, int):
-            assert term in (0, 1), repr(term)
-            term = bool(term)
-
-        if isinstance(term, str):
-            assert term.strip() == term, repr(term)
-            assert term.lower() not in ('', '0', '1', 'true', 'false')
-        else:
-            assert isinstance(term, bool)
-
-        return bools.get(term)
-
-    @staticmethod
     def __get_id(v):
         if v.is_const:
             return v.kind
@@ -345,7 +331,7 @@ class Bool(eqbool.Bool):
                 for kind, ops in image:
                     if kind == 'term':
                         assert isinstance(ops, str)
-                        b = Bool.get(ops)
+                        b = bools.get(ops)
                     else:
                         b = OPS[kind](*(self.get(op) for op in ops))
                     i = len(self.__nodes)
@@ -387,7 +373,7 @@ class Bool(eqbool.Bool):
 
     @staticmethod
     def cast(x):
-        return x if isinstance(x, Bool) else Bool.get(x)
+        return x if isinstance(x, Bool) else bools.get(x)
 
     def __bool__(self):
         assert self.is_const
@@ -479,12 +465,25 @@ class Bools(eqbool.Context):
         # TODO: Query the _eqbool cache?
         pass
 
+    def get(self, term):
+        if isinstance(term, int):
+            assert term in (0, 1), repr(term)
+            term = bool(term)
+
+        if isinstance(term, str):
+            assert term.strip() == term, repr(term)
+            assert term.lower() not in ('', '0', '1', 'true', 'false')
+        else:
+            assert isinstance(term, bool)
+
+        return super().get(term)
+
 
 bools = Bools()
 
 
-FALSE = Bool.get(False)
-TRUE = Bool.get(True)
+FALSE = bools.get(False)
+TRUE = bools.get(True)
 
 def test_bools():
     def test(actual, expected):
@@ -495,7 +494,7 @@ def test_bools():
         print('Expected:', expected, repr(expected))
         assert 0
 
-    a, b, c, t = (Bool.get(v) for v in 'abct')
+    a, b, c, t = (bools.get(v) for v in 'abct')
     eq = Bool.get_eq
     ifelse = Bool.ifelse
 
@@ -1067,7 +1066,7 @@ class Z80Simulator(object):
         for i in image:
             n = node_storage.get(i[0], i[1:])
             self.__nodes[n.index] = n
-            # if Bool.is_equiv(n.state, Bool.get('ei')):
+            # if Bool.is_equiv(n.state, bools.get('ei')):
             #     Status.print(n, n.state)
 
         self.__nodes_by_name = {}
@@ -1211,7 +1210,7 @@ class Z80Simulator(object):
         gnd, pwr, pullup, pulldown = self.__get_node_preds(n, new_states)
 
         if len(n.gate_of) == 0:
-            floating = Bool.get('<floating-non-gate>')
+            floating = bools.get('<floating-non-gate>')
         else:
             # TODO: For now we assume that all gates of the node
             # are always in the same state.
@@ -2267,7 +2266,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
 
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
-            return check(Bool.get(phased('is_ei')))
+            return check(bools.get(phased('is_ei')))
 
     if n == EX_AF_FF and instr == "ex af, af'":
         return check(~before[n])
@@ -2439,7 +2438,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
     if instr == 'in/out r, (c)':
         y = Bits(phased('y'), width=3)
         io = Bits(phased('io'), width=8)
-        is_in = Bool.get(phased('is_in'))
+        is_in = bools.get(phased('is_in'))
         a = Bits.ifelse(~is_in | (y != A), get_a(), io)
         if n in NFF + HFF:
             return check(Bool.ifelse(is_in, FALSE, before[n]))
@@ -2457,7 +2456,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
         cf = Bits.ifelse(get_active(CF), 1, 0)
-        is_adc = Bool.get(phased('q') + '_b0')
+        is_adc = bools.get(phased('q') + '_b0')
         r = Bits.ifelse(is_adc, hl + rp + cf, ((hl - rp) ^ 0x10000) - cf)
         if n in CFF:
             return check(r[16])
@@ -2760,8 +2759,8 @@ def test_instr_seq(seq):
     # bools.clear()
     # gc.collect()
 
-    assert FALSE is Bool.get(False)
-    assert TRUE is Bool.get(True)
+    assert FALSE is bools.get(False)
+    assert TRUE is bools.get(True)
 
     try:
         state = build_symbolised_state()
@@ -3000,7 +2999,7 @@ class TestedInstrs(object):
 
         pp = Bits.concat(Bits(0, width=1), Bits('p', width=1))
         yield 'ld (<rp>), a/ld a, (<rp>)', (
-            f(xpqz(0, pp, Bits((~Bool.get(phased('is_store')),)), 2)), rw3())
+            f(xpqz(0, pp, Bits((~bools.get(phased('is_store')),)), 2)), rw3())
 
         yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
         yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
@@ -3095,7 +3094,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     # Symbolise non-persistent nodes.
     for id in s.get_node_states():
         if id not in persistent_nodes:
-            # s.set_node_state(id, Bool.get(id))
+            # s.set_node_state(id, bools.get(id))
             assert 0
     s.power_up()
     s.cache()
