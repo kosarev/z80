@@ -130,7 +130,7 @@ class Status(object):
         d = datetime.datetime.now() - __class__.__start_time
         p = str(datetime.timedelta(seconds=d.seconds))
         if __class__.__profile:
-            num_bools = Bool.get_cache_size()
+            num_bools = bools.get_cache_size()
             mem_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             p += f' [{num_bools} bools, {mem_usage // 1000} MB]'
         return p
@@ -275,18 +275,7 @@ class Cache(object):
 
 
 class Bool(eqbool.Bool):
-    # TODO: Should all be part of eqbool.Bool?
     __slots__ = ()
-
-    @staticmethod
-    def clear():
-        # TODO: Clear the _eqbool cache?
-        pass
-
-    @staticmethod
-    def get_cache_size():
-        # TODO: Query the _eqbool cache?
-        pass
 
     @staticmethod
     def get(term):
@@ -479,6 +468,16 @@ class Bool(eqbool.Bool):
 class Bools(eqbool.Context):
     def __init__(self):
         super().__init__(bool_type=Bool)
+
+    @staticmethod
+    def clear():
+        # TODO: Clear the _eqbool cache?
+        pass
+
+    @staticmethod
+    def get_cache_size():
+        # TODO: Query the _eqbool cache?
+        pass
 
 
 bools = Bools()
@@ -2758,7 +2757,7 @@ def build_symbolised_state():
 
 
 def test_instr_seq(seq):
-    # Bool.clear()
+    # bools.clear()
     # gc.collect()
 
     assert FALSE is Bool.get(False)
