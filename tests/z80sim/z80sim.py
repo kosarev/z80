@@ -438,6 +438,7 @@ bools = Bools()
 FALSE = bools.get(False)
 TRUE = bools.get(True)
 
+
 def test_bools():
     def test(actual, expected):
         if actual is expected:
@@ -2077,7 +2078,8 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(bools.ifelse(ignores_f, a, a | f))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            return check(bools.ifelse(phased_bool('is_rl'), a[i - 1], a[i + 1]))
+            return check(bools.ifelse(phased_bool('is_rl'), a[i - 1],
+                                      a[i + 1]))
 
     if n in HFF:
         if instr == 'cpl':
@@ -2085,7 +2087,8 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if instr == 'rlca/rrca/rla/rra':
             return check(FALSE)
         if instr == 'scf/ccf':
-            return check(bools.ifelse(phased_bool('is_scf'), FALSE, get_active(CF)))
+            return check(bools.ifelse(phased_bool('is_scf'), FALSE,
+                                      get_active(CF)))
 
     if n.startswith('reg_a'):
         i = int(n[-1])
@@ -2188,7 +2191,8 @@ def test_node(instrs, n, at_start, at_end, before, after):
             r = Bits(phased('r'), width=8)
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
-            return check(bools.ifelse(phased_bool('is_in'), in_wz[i], out_wz[i]))
+            return check(bools.ifelse(phased_bool('is_in'), in_wz[i],
+                                      out_wz[i]))
         if instr == 'rst n':
             wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
             return check(wz[i])
@@ -2240,13 +2244,15 @@ def test_node(instrs, n, at_start, at_end, before, after):
         r = get_r(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
         if n in PFF:
-            return check(bools.ifelse(phased_bool('is_inc'), r == 0x80, r == 0x7f))
+            return check(bools.ifelse(phased_bool('is_inc'),
+                         r == 0x80, r == 0x7f))
         if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i])
         if n in HFF:
             r4 = r.truncated(4)
-            return check(bools.ifelse(phased_bool('is_inc'), r4 == 0x0, r4 == 0xf))
+            return check(bools.ifelse(phased_bool('is_inc'),
+                                      r4 == 0x0, r4 == 0xf))
         if n in ZFF:
             return check(r == 0x00)
         if n in SFF:
@@ -2270,17 +2276,21 @@ def test_node(instrs, n, at_start, at_end, before, after):
         r = Bits.ifelse(phased('is_i_reg'), ri, rr)
         v = Bits.ifelse(phased('is_store'), get_a(), r)
         if n in NFF + HFF:
-            return check(bools.ifelse(phased_bool('is_store'), before[n], FALSE))
+            return check(bools.ifelse(phased_bool('is_store'),
+                                      before[n], FALSE))
         if n in PFF:
-            return check(bools.ifelse(phased_bool('is_store'), before[n],
-                                     before[IFF2]))
+            return check(bools.ifelse(phased_bool('is_store'),
+                                      before[n], before[IFF2]))
         if n in XFF + YFF:
             i = int(n[-1])
-            return check(bools.ifelse(phased_bool('is_store'), before[n], r[i]))
+            return check(bools.ifelse(phased_bool('is_store'),
+                                      before[n], r[i]))
         if n in ZFF:
-            return check(bools.ifelse(phased_bool('is_store'), before[n], r == 0x00))
+            return check(bools.ifelse(phased_bool('is_store'),
+                                      before[n], r == 0x00))
         if n in SFF:
-            return check(bools.ifelse(phased_bool('is_store'), before[n], r[7]))
+            return check(bools.ifelse(phased_bool('is_store'),
+                                      before[n], r[7]))
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(v[i])
@@ -2291,13 +2301,13 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if n.startswith('reg_f'):
             i = int(n[-1])
             return check(bools.ifelse(p == RP2_AF,
-                                     bools.get(f'lo_p{phase}_b{i}'),
-                                     before[n]))
+                                      bools.get(f'lo_p{phase}_b{i}'),
+                                      before[n]))
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(bools.ifelse(p == RP2_AF,
-                                     bools.get(f'hi_p{phase}_b{i}'),
-                                     before[n]))
+                                      bools.get(f'hi_p{phase}_b{i}'),
+                                      before[n]))
 
     if instr == 'daa':
         a = get_a()
@@ -2365,7 +2375,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(bools.ifelse(op == CP, s[i], r[i]))
         if n in HFF:
             return check(bools.ifelse(is_bitwise, op == AND,
-                                     r[4] ^ a[4] ^ s[4]))
+                                      r[4] ^ a[4] ^ s[4]))
         if n in ZFF:
             return check(r.truncated(8) == 0x00)
         if n in SFF:
@@ -2465,10 +2475,10 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(bools.ifelse(op == ROT, rot_cf, cf))
         if n in NFF:
             return check(bools.ifelse(op == ROT, FALSE,
-                                     (op != BIT) & before[n]))
+                                      (op != BIT) & before[n]))
         if n in HFF:
             return check(bools.ifelse(op == ROT, FALSE,
-                                     (op == BIT) | before[n]))
+                                      (op == BIT) | before[n]))
         if n in PFF:
             return check(bools.ifelse(
                 op == BIT, bit_r == 0,
@@ -2492,7 +2502,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             return check(bools.ifelse(
                 (op == BIT) | (reg != A), before[n],
                 bools.ifelse(op == ROT, rot_r[i],
-                            bools.ifelse(op == RES, res_r[i], set_r[i]))))
+                             bools.ifelse(op == RES, res_r[i], set_r[i]))))
 
     # Test instruction latch nodes.
     if n.startswith('instr'):
