@@ -11,7 +11,7 @@
 # https://github.com/gdevic/Z80Explorer
 # commit c11574c1d80352b355d297ad3ae33701a7110485 of 19 Jan 2021
 #
-# Symbolic simulation Copyright (C) 2017-2025 Ivan Kosarev.
+# Symbolic simulation Copyright (C) 2017-2026 Ivan Kosarev.
 # mail@ivankosarev.com
 # https://github.com/kosarev/z80
 
@@ -2440,8 +2440,10 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if n in ZFF:
             return check(r.truncated(16) == 0)
 
-    if instr in ('bit (hl)', 'rot/res/set (hl)',
-                 'rot/bit/res/set {b, c, d, e, h, l, a}'):
+    if instr in ('rot {b, c, d, e, h, l, a}', 'rot (hl)',
+                 'bit {b, c, d, e, h, l, a}', 'bit (hl)',
+                 'res {b, c, d, e, h, l, a}', 'res (hl)',
+                 'set {b, c, d, e, h, l, a}', 'set (hl)'):
         y = Bits(phased('y'), width=3)
 
         reg = Bits(opcode[0:3])
@@ -3013,18 +3015,23 @@ class TestedInstrs(object):
         yield 'xnop', (f(0xed), f(xnop))
 
         ROT, BIT, RES, SET = range(4)
-        rot_bit = ifelse('is_rot', ROT, BIT)
-        res_set = ifelse('is_res', RES, SET)
-        rot_bit_res_set = ifelse('is_rot_bit', rot_bit, res_set)
-        yield 'rot/bit/res/set {b, c, d, e, h, l, a}', (
-            f(0xcb), f(xyz(rot_bit_res_set, 'y', get_non_at_hl_r())))
+        for x, m in (
+                (ROT, 'rot'),
+                (BIT, 'bit'),
+                (RES, 'res'),
+                (SET, 'set')):
+            yield f'{m} {{b, c, d, e, h, l, a}}', (
+                f(0xcb), f(xyz(x, 'y', get_non_at_hl_r())))
 
         yield 'bit (hl)', (
             f(0xcb), f(xyz(BIT, 'y', AT_HL)), r4())
 
-        rot_res_set = ifelse('is_rot', ROT, res_set)
-        yield 'rot/res/set (hl)', (
-            f(0xcb), f(xyz(rot_res_set, 'y', AT_HL)), r4(), w3())
+        for x, m in (
+                (ROT, 'rot'),
+                (RES, 'res'),
+                (SET, 'set')):
+            yield f'{m} (hl)', (
+                f(0xcb), f(xyz(x, 'y', AT_HL)), r4(), w3())
 
 
 def test_instructions():
