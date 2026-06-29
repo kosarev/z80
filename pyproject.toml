@@ -26,3 +26,9 @@ packages = ['z80']
 # The transistor-level simulator is excluded from linting the same way it is
 # from type-checking (see .mypy.ini); it is a large, separately-maintained file.
 extend-exclude = ['tests/z80sim']
+
+[tool.cibuildwheel]
+# Build wheels for the supported CPython versions and smoke-test that the
+# compiled extension imports. Used by the release workflow.
+build = 'cp310-* cp311-* cp312-* cp313-*'
+test-command = 'python -c "import z80"'
