@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4.2.2
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade pycodestyle ruff mypy setuptools wheel
+
+    - name: Run pycodestyle, ruff and mypy
+      run: |
+        pycodestyle .
+        ruff check .
+        mypy --config-file .mypy.ini z80 tests
+
+    - name: Install the package
+      run: pip install .
+
+    - name: Run tests
+      run: python tests/testsuite.py
+
+  build-sdist:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4.2.2
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Build sdist
+      run: |
+        python -m pip install --upgrade build
+        python -m build --sdist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: dist-sdist
+        path: dist/
+
+  build-wheels:
+    needs: test
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v4.2.2
+
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v2.23.3
+      with:
+        output-dir: dist/
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: dist-${{ matrix.os }}
+        path: dist/
+
+  # Publishes to PyPI using OIDC Trusted Publishing (no stored tokens).
+  #
+  # One-time setup required in PyPI:
+  #   1. Log in at https://pypi.org and open the 'z80' project's
+  #      "Publishing" page.
+  #   2. Add a new Trusted Publisher with these values:
+  #        PyPI project name:  z80
+  #        Owner:              kosarev
+  #        Repository:         z80
+  #        Workflow filename:  release.yml
+  #        Environment name:   pypi
+  #
+  # One-time setup required in GitHub:
+  #   Go to Settings -> Environments -> New environment, name it "pypi".
+  release:
+    needs: [build-sdist, build-wheels]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    environment: pypi
+
+    steps:
+    - name: Download sdist
+      uses: actions/download-artifact@v4
+      with:
+        pattern: dist-sdist
+        merge-multiple: true
+        path: dist/
+
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        pattern: dist-*-latest
+        merge-multiple: true
+        path: dist/
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
