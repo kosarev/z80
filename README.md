@@ -1,8 +1,11 @@
 # z80
 Fast and flexible Z80/i8080 emulator.
 
-![Python package CI](https://github.com/kosarev/z80/actions/workflows/python-package.yml/badge.svg)
-![C/C++ CI](https://github.com/kosarev/z80/actions/workflows/c-cpp.yml/badge.svg)
+[![Python package CI](https://github.com/kosarev/z80/actions/workflows/python-package.yml/badge.svg)](https://github.com/kosarev/z80/actions/workflows/python-package.yml)
+[![C/C++ CI](https://github.com/kosarev/z80/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/kosarev/z80/actions/workflows/c-cpp.yml)
+[![PyPI](https://img.shields.io/pypi/v/z80)](https://pypi.org/project/z80/)
+[![Python](https://img.shields.io/pypi/pyversions/z80?v=2)](https://pypi.org/project/z80/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/kosarev/z80/blob/master/LICENSE)
 
 
 ## Quick facts
