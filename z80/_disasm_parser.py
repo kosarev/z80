@@ -11,7 +11,6 @@ import typing
 
 from ._disasm import (_IncludeBinaryTag, _InstrTag, _CommentTag,
                       _ByteTag, _InlineCommentTag, _AsmLine)
-from ._disasm import _DisasmError
 from ._disasm import _Tag
 from ._source import _SourceFile
 from ._token import _Token
