@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import inspect
+#   Z80 CPU Emulator.
+#   https://github.com/kosarev/z80
+#
+#   Copyright (C) 2017-2026 Ivan Kosarev.
+#   mail@ivankosarev.com
+#
+#   Published under the MIT license.
+
 import os
 import platform
 from setuptools import Extension, setup
