@@ -1,7 +1,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -9,7 +9,7 @@
 import re
 import typing
 
-from ._disasm import (_Disasm, _IncludeBinaryTag, _InstrTag, _CommentTag,
+from ._disasm import (_IncludeBinaryTag, _InstrTag, _CommentTag,
                       _ByteTag, _InlineCommentTag, _AsmLine)
 from ._disasm import _DisasmError
 from ._disasm import _Tag
