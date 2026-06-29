@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'z80'
-version = '1.0b3'
+version = '1.0.0'
 description = 'Fast and flexible Z80/i8080 emulator'
 readme = 'README.md'
 license = {text = 'MIT'}
@@ -13,7 +13,7 @@ authors = [
 ]
 requires-python = '>=3.7'
 classifiers = [
-  'Development Status :: 4 - Beta',
+  'Development Status :: 5 - Production/Stable',
   'Intended Audience :: Developers',
   'Intended Audience :: Information Technology',
   'Intended Audience :: Education',
