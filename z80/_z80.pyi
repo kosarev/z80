@@ -29,17 +29,14 @@ class _Z80Machine:
             typing.Callable[[int], None]):
         ...
 
-    # TODO: Fix types.
-    def set_reti_callback(self,
-                          callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+    def set_reti_callback(
+            self,
+            callback: typing.Callable[[], None]) -> typing.Callable[[], None]:
         ...
 
-    # TODO: Fix types.
     def set_get_int_vector_callback(
-        self,
-        callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+            self,
+            callback: typing.Callable[[], int]) -> typing.Callable[[], int]:
         ...
 
     def run(self) -> int:
@@ -81,17 +78,14 @@ class _I8080Machine:
             typing.Callable[[int], None]):
         ...
 
-    # TODO: Fix types.
-    def set_reti_callback(self,
-                          callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+    def set_reti_callback(
+            self,
+            callback: typing.Callable[[], None]) -> typing.Callable[[], None]:
         ...
 
-    # TODO: Fix types.
     def set_get_int_vector_callback(
-        self,
-        callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+            self,
+            callback: typing.Callable[[], int]) -> typing.Callable[[], int]:
         ...
 
     def run(self) -> int:
