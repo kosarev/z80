@@ -4,7 +4,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -757,13 +757,15 @@ class _Disasm(object):
             yield '%s\n' % line
 
     def save_output(self, filename: str) -> None:
+        tmp_name: typing.Optional[str] = None
         try:
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                tmp_name = f.name
                 for chunk in self._get_output():
                     f.write(chunk)
 
-            os.rename(f.name, filename)
-            del f
+            os.rename(tmp_name, filename)
+            tmp_name = None
         finally:
-            if f is not None:
-                os.remove(f.name)
+            if tmp_name is not None:
+                os.remove(tmp_name)
