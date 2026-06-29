@@ -21,3 +21,8 @@ z80 = 'z80:main'
 
 [tool.setuptools]
 packages = ['z80']
+
+[tool.ruff]
+# The transistor-level simulator is excluded from linting the same way it is
+# from type-checking (see .mypy.ini); it is a large, separately-maintained file.
+extend-exclude = ['tests/z80sim']

@@ -25,11 +25,12 @@ jobs:
       run: |
         sudo apt-get update
         python -m pip install --upgrade pip
-        python -m pip install --upgrade pycodestyle mypy setuptools wheel
-    - name: Run pycodestyle and mypy
+        python -m pip install --upgrade pycodestyle ruff mypy setuptools wheel
+    - name: Run pycodestyle, ruff and mypy
       run: |
         pycodestyle .
-        mypy z80 tests
+        ruff check .
+        mypy --config-file .mypy.ini z80 tests
     - name: Install the package
       run: |
         pip install .
