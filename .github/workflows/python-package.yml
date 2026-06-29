@@ -25,7 +25,7 @@ jobs:
       run: |
         sudo apt-get update
         python -m pip install --upgrade pip
-        python -m pip install --upgrade pycodestyle ruff mypy setuptools wheel
+        python -m pip install --upgrade pycodestyle ruff pytest mypy setuptools wheel
     - name: Run pycodestyle, ruff and mypy
       run: |
         pycodestyle .
@@ -36,4 +36,4 @@ jobs:
         pip install .
     - name: Run tests
       run: |
-        python tests/testsuite.py
+        pytest tests
