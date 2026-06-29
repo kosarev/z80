@@ -115,7 +115,7 @@ parameter.
 The `main()` function creates an instance of the emulator and
 asks it to execute a few instructions, thus triggering the custom
 version of `on_set_pc()`.
-The following section reveals what are those instructions and
+The following section reveals what those instructions are and
 where the emulator gets them from.
 
 
@@ -183,10 +183,10 @@ write 0x07 at 0x1234
 
 ## Input and output
 
-Aside of memory, another major way the processors use to
+Aside from memory, another major way the processors use to
 communicate with the outside world is via input and output ports.
 If you read the previous sections, it's now easy to guess that
-there is a couple of handlers that do that.
+there are a couple of handlers that do that.
 These are `on_input()` and `on_output()`.
 
 Note that the handlers have different types of parameters that
@@ -238,7 +238,7 @@ Sometimes it's necessary to examine and/or alter the current
 state of the CPU emulator and do that in a way that is
 transparent to the custom code in overridden handlers.
 For this purpose the default state interface implemented in the
-`i8080_state<>` and `z80_state<>` classes provdes a number of
+`i8080_state<>` and `z80_state<>` classes provide a number of
 getters and setters for registers, register pairs, interrupt
 flip-flops and other fields constituting the internal state of
 the emulator.
@@ -300,7 +300,7 @@ class z80_cpu : public z80_executor<z80_decoder<z80_state<root<D>>>>
 Each of these classes is no more than a stack of a few other
 mix-ins.
 The `root<>` template provides helpers that make it possible to
-call handlers of the most derived class in the heirarchy, `D`,
+call handlers of the most derived class in the hierarchy, `D`,
 which is why it takes that class as its type parameter.
 It also contains dummy implementations of the standard handlers,
 such as `on_output()`, so you don't have to define them when you
@@ -313,7 +313,7 @@ They also define corresponding handlers, like `on_set_hl()`, that
 other modules use to inspect and modify the state.
 
 `i8080_decoder<>` and `z80_decoder<>` modules analyze op-codes
-and fire up handlers for specific instructions, e.g, `on_halt()`.
+and fire up handlers for specific instructions, e.g., `on_halt()`.
 
 Finally, the job of `i8080_executor<>` and `z80_executor<>` is to
 implement handlers like `on_halt()` to actually execute
@@ -321,7 +321,7 @@ corresponding instructions.
 
 The convention is that modules shall communicate with each other
 only via handlers.
-Indeed, if they would call the transparent accessors or refer to
+Indeed, if they called the transparent accessors or referred to
 data fields directly, then those accessors wouldn't be
 transparent anymore and handlers would never be called.
 This also means that modules are free to define transparent
@@ -370,7 +370,7 @@ method that other modules can use to call handlers. For example,
 a decoder could do `self().on_ret()` whenever it runs into a
 `ret` instruction.
 
-Aside of that, the module contains dummy implementations of the
+Aside from that, the module contains dummy implementations of the
 standard handlers that do nothing or, if they have to return
 something, return some default values.
 
@@ -432,7 +432,7 @@ required to do so.
     }
 ```
 
-Aside of the usual getters and setters for the registers and
+Aside from the usual getters and setters for the registers and
 flip-flops, both the i8080 and Z80 states have to provide an
 `on_ex_de_hl_regs()` handler that exchanges `hl` and `de`
 registers the same way the `xchg` and `ex de, hl` do.
@@ -446,7 +446,7 @@ register cells without actually transferring their values.
 
 Because the CPUs have a lot of similarities, processor-specific
 variants of modules usually share some common code in helper base
-classes that in turn are defined in the `internal` class.
+classes that in turn are defined in the `internals` class.
 That class defines entities that are internal to the
 implementation of the library.
 The client code is therefore supposed to be written as if the
