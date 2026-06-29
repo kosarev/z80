@@ -39,6 +39,11 @@ z80 = 'z80:main'
 [tool.setuptools]
 packages = ['z80']
 
+[tool.setuptools.package-data]
+# Ship the PEP 561 marker and the C-extension stub so downstream type
+# checkers pick up the package's type information.
+z80 = ['py.typed', '_z80.pyi']
+
 [tool.ruff]
 # The transistor-level simulator is excluded from linting the same way it is
 # from type-checking (see .mypy.ini); it is a large, separately-maintained file.
