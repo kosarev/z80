@@ -4,7 +4,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -12,6 +12,27 @@
 import typing
 
 from ._source import _SourcePos
+
+
+# The public vocabulary re-exported by the package's __init__. This is the
+# single source of truth for what 'import z80' exposes from this module.
+__all__ = [
+    'ADD', 'ADC', 'AND', 'CP', 'CPD', 'CPDR', 'CPI', 'CPIR',
+    'OR', 'SBC', 'SUB', 'XOR', 'BIT', 'CALL', 'CCF', 'CPL',
+    'DAA', 'DEC', 'DI', 'DJNZ', 'EI', 'EX', 'EXX', 'HALT', 'IM', 'XIM',
+    'INC', 'IN', 'IND', 'INDR', 'INI', 'INIR', 'JP', 'JR', 'LD', 'XLD',
+    'LDD', 'LDDR', 'LDI', 'LDIR', 'NEG', 'XNEG', 'NOP', 'XNOP',
+    'RLC', 'RL', 'RR', 'RRC', 'SLA', 'SLL', 'SRA',
+    'SRL', 'OUT', 'OUTD', 'OTDR', 'OUTI', 'OTIR', 'POP', 'PUSH', 'RES',
+    'RET', 'RETN', 'XRETN', 'RETI',
+    'RLA', 'RLCA', 'RLD', 'RRA', 'RRD', 'RRCA',
+    'RST', 'SCF', 'SET',
+    'A', 'AF', 'AF2', 'CF', 'M', 'NC', 'NZ', 'PE', 'PO', 'P', 'Z',
+    'DE', 'BC', 'HL', 'IReg', 'R', 'IY', 'IX', 'SP',
+    'B', 'C', 'D', 'E', 'H', 'L', 'IXH', 'IXL', 'IYH', 'IYL',
+    'UnknownInstr', 'JumpInstr', 'CallInstr', 'RetInstr', 'At',
+    'IndexReg', 'Add',
+]
 
 
 class _InstrElement(type):
