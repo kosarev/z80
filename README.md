@@ -52,6 +52,7 @@ Fast and flexible Z80/i8080 emulator.
 * [Modules](#modules)
 * [The root module](#the-root-module)
 * [State modules](#state-modules)
+* [Using it from Python](#using-it-from-python)
 * [Feedback](#feedback)
 
 
@@ -501,6 +502,51 @@ struct my_state : public B {
 
 ```
 [custom_state.cpp](https://github.com/kosarev/z80/blob/master/examples/custom_state.cpp)
+
+
+## Using it from Python
+
+Besides the C++ library, the emulator ships as a Python package:
+`pip install z80` (prebuilt wheels are available, so no C++ toolchain
+is needed).
+It offers the same processors as `z80.Z80Machine` and
+`z80.I8080Machine`, and lets your code examine and alter the machine
+state directly: registers and flags are exposed as plain attributes,
+and memory through `m.memory` and `m.set_memory_block()`.
+
+```python
+import z80
+
+m = z80.Z80Machine()
+
+# A one-instruction routine that adds the B register to the
+# accumulator and then halts.
+m.set_memory_block(0x0000, bytes((
+    0x80,   # add a, b
+    0x76,   # halt
+)))
+
+# Alter the state: seed the operands into the registers and point
+# the program counter at the routine, all from Python.
+m.a = 30
+m.b = 12
+m.pc = 0x0000
+
+m.run()
+
+# Examine the state: read the result back out of the accumulator.
+print(m.a)   # 42
+```
+[state.py](https://github.com/kosarev/z80/blob/master/examples/state.py)
+
+Here we seed the operands straight into the CPU registers rather than
+baking them into the program, let the emulator execute a real `add`
+instruction, and then read the result back, all without leaving
+Python.
+The machine object also exposes `m.bc`, `m.hl`, `m.sp`, the `halted`
+flag, and handler callbacks (`set_read_callback()`,
+`set_output_callback()`, ...), mirroring the C++ handlers described
+above.
 
 
 ## Feedback
