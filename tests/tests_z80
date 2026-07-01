@@ -727,10 +727,10 @@ dbfe in a, (0xfe)
  6     mreq_wait 0001
  7   set_pc_on_imm8_read 0001 -> 0002
  7 get_a 00
- 7 set_wz 0000 -> 00ff
  7 input at 00fe
  7   set_addr_bus 0001 -> 00fe
 10   iorq_wait 00fe
+11 set_wz 0000 -> 00ff
 11 set_a 00 -> ff
 11 done
 
@@ -757,10 +757,10 @@ ed78 in a, (c)
  8 get_c 00
  8 get_b 00
  8 get_f 00
- 8 set_wz 0000 -> 0001
  8 input at 0000
  8   set_addr_bus 0001 -> 0000
 11   iorq_wait 0000
+12 set_wz 0000 -> 0001
 12 set_a 00 -> ff
 12 set_f 00 -> ac
 12 done
@@ -799,10 +799,10 @@ dded60 (db 0xdd), in h, (c)
 12 get_c 00
 12 get_b 00
 12 get_f 00
-12 set_wz 0000 -> 0001
 12 input at 0000
 12   set_addr_bus 0002 -> 0000
 15   iorq_wait 0000
+16 set_wz 0000 -> 0001
 16 set_h 00 -> ff
 16 set_f 00 -> ac
 16 set_index_rp ix -> hl

@@ -2,7 +2,7 @@
 /*  Z80 CPU Emulator.
     https://github.com/kosarev/z80
 
-    Copyright (c) 2017 Ivan Kosarev <mail@ivankosarev.com>
+    Copyright (c) 2017-2026 Ivan Kosarev <mail@ivankosarev.com>
     Published under the MIT license.
 */
 
@@ -146,6 +146,21 @@ enum class z80_variant {
     common,
     cmos,  // Newer chips.
 };
+
+class events_mask {
+public:
+    typedef fast_u32 type;
+
+    static const type end_of_frame = 1u << 0;
+    static const type breakpoint_hit = 1u << 1;
+    static const type ticks_limit_hit = 1u << 2;
+    static const type end = 1u << 3;
+    static const type retry_input = 1u << 4;
+};
+
+// The value on_input() returns to indicate the port value is not
+// available yet, so the instruction reading it has to be retried later.
+static const fast_u8 retry_input = static_cast<fast_u8>(-1);
 
 // Entities for internal needs of the library.
 class internals {
@@ -576,6 +591,18 @@ public:
         case z80_variant::cmos: return 0xff;
         }
         unreachable("Unknown Z80 variant."); }
+
+    events_mask::type on_get_events() const { return 0; }
+    void on_set_events(events_mask::type events) { unused(events); }
+    void on_raise_events(events_mask::type events) {
+        self().on_set_events(self().on_get_events() | events); }
+
+    // Save and restore the state so an instruction aborted by a not-yet-
+    // available port read (see retry_input) can be retried. What exactly
+    // constitutes the state to save and restore is up to the specific
+    // derived class.
+    void on_save_retry_state() {}
+    void on_restore_retry_state() {}
 
 protected:
     const derived &self() const{ return static_cast<const derived&>(*this); }
@@ -2513,7 +2540,10 @@ public:
         self().on_tick(z80 ? 3 : 2);
         self().on_iorq_wait(port);
         self().on_tick(1);
-        return self().on_input(port); }
+        fast_u8 n = self().on_input(port);
+        if(n == retry_input)
+            self().on_raise_events(events_mask::retry_input);
+        return n; }
     void on_output_cycle(fast_u16 port, fast_u8 n) {
         bool z80 = self().on_is_z80();
         if(z80) {
@@ -3336,20 +3366,31 @@ public:
         self().on_set_a(a);
         self().on_set_f(f); }
     void on_in_a_n(fast_u8 n) {
+        bool z80 = self().on_is_z80();
         fast_u16 port;
-        if(!self().on_is_z80()) {
+        if(!z80) {
             port = n;
         } else {
             fast_u8 a = self().on_get_a();
             port = make16(a, n);
-            self().on_set_wz(inc16(port));
         }
-        self().on_set_a(self().on_input_cycle(port)); }
+        // Don't touch the state past this point until the port value is
+        // known to be available, so the instruction can be retried.
+        fast_u8 v = self().on_input_cycle(port);
+        if(v == retry_input)
+            return;
+        if(z80)
+            self().on_set_wz(inc16(port));
+        self().on_set_a(v); }
     void on_in_r_c(reg r) {
         fast_u16 bc = self().on_get_bc();
         fast_u8 f = self().on_get_f();
-        self().on_set_wz(inc16(bc));
+        // Don't touch the state past this point until the port value is
+        // known to be available, so the instruction can be retried.
         fast_u8 n = self().on_input_cycle(bc);
+        if(n == retry_input)
+            return;
+        self().on_set_wz(inc16(bc));
         if(r != reg::at_hl)
             self().on_set_reg(r, iregp::hl, /* d= */ 0, n);
         f = (f & cf_mask) | (n & (sf_mask | yf_mask | xf_mask)) | zf_ari(n) |
@@ -3605,7 +3646,11 @@ public:
         fast_u8 f = self().on_get_f();
 
         self().on_fetch_cycle_extra_1t();
+        // Don't touch the state past this point until the port value is
+        // known to be available, so the instruction can be retried.
         fast_u8 r = self().on_input_cycle(bc);
+        if(r == retry_input)
+            return;
         bc = sub16(bc, 0x0100);
         self().on_write_cycle(hl, r);
         fast_u8 s = get_high8(bc);
@@ -3678,8 +3723,18 @@ public:
         } }
 
     void on_step() {
+        self().on_save_retry_state();
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
         self().on_fetch_and_decode();
+
+        // A not-yet-available port read (see retry_input) aborts the
+        // instruction so it can be retried later. Roll the state back and,
+        // as the instruction is not considered executed, drop any other
+        // events it might have raised, reporting just retry_input.
+        if(self().on_get_events() & events_mask::retry_input) {
+            self().on_restore_retry_state();
+            self().on_set_events(events_mask::retry_input);
+        }
     }
 
 private:
@@ -3937,16 +3992,6 @@ private:
     memory_image image;
 };
 
-class events_mask {
-public:
-    typedef fast_u32 type;
-
-    static const type end_of_frame = 1u << 0;
-    static const type breakpoint_hit = 1u << 1;
-    static const type ticks_limit_hit = 1u << 2;
-    static const type end = 1u << 3;
-};
-
 template<typename B>
 class machine_state : public B {
 public:
@@ -4005,9 +4050,11 @@ public:
         base::on_set_pc(n);
     }
 
-    void on_raise_events(events_mask::type new_events) {
-        fields.events |= new_events;
-    }
+    ticks_type get_frame_tick() const { return fields.frame_tick; }
+    void set_frame_tick(ticks_type frame_tick) { fields.frame_tick = frame_tick; }
+
+    events_mask::type on_get_events() const { return fields.events; }
+    void on_set_events(events_mask::type events) { fields.events = events; }
 
     events_mask::type on_run() {
         fields.events = 0;
