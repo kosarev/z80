@@ -28,12 +28,12 @@ Fast and flexible Z80/i8080 emulator.
 * Offers default modules for the breakpoint support and generic
   memory.
 
-* Supports multiple independently customized emulator instances.
+* Supports multiple independently customised emulator instances.
 
 * Written in strict C++11.
 
 * Does not rely on implementation-defined or unspecified
-  behavior.
+  behaviour.
 
 * Single-header implementation.
 
@@ -270,7 +270,7 @@ public:
 ## Modules
 
 By overriding handlers we can extend and otherwise alter the
-default behavior of CPU emulators.
+default behaviour of CPU emulators.
 That's good, but what do we do if it's not enough?
 For example, what if the default representation of the
 processor's internal state doesn't fit the needs of your
@@ -313,7 +313,7 @@ the processor state, e.g., `set_hl()`.
 They also define corresponding handlers, like `on_set_hl()`, that
 other modules use to inspect and modify the state.
 
-`i8080_decoder<>` and `z80_decoder<>` modules analyze op-codes
+`i8080_decoder<>` and `z80_decoder<>` modules analyse op-codes
 and fire up handlers for specific instructions, e.g., `on_halt()`.
 
 Finally, the job of `i8080_executor<>` and `z80_executor<>` is to
@@ -329,7 +329,7 @@ This also means that modules are free to define transparent
 accessors in a way that seems best for their purpose or even not
 define them at all.
 
-All and any of the standard modules can be used and customized
+All and any of the standard modules can be used and customised
 independently of each other.
 Moreover, all and any of the modules can be replaced with custom
 implementations.
