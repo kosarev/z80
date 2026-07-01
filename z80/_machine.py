@@ -2,7 +2,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -28,7 +28,7 @@ def _set_u16(image: WritableBytes, value: int) -> None:
 
 def _get_u32(image: Bytes) -> int:
     return (image[0] + image[1] * 0x100 +
-            image[2] * 0x10000 + image[2] * 0x1000000)
+            image[2] * 0x10000 + image[3] * 0x1000000)
 
 
 def _set_u32(image: WritableBytes, value: int) -> None:
