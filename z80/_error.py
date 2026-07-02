@@ -1,7 +1,7 @@
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -15,7 +15,7 @@ class Error(Exception):
         self.reason = reason
 
     def verbalize(self, program_name: str | None = None) -> str:
-        def g() -> typing.Generator[str]:
+        def g() -> typing.Generator[str, None, None]:
             if program_name is not None:
                 yield '%s: ' % program_name
 
