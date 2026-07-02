@@ -165,10 +165,9 @@ public:
     static const type end_of_frame = type(1) << (base::unused_bit + 0);
     static const type breakpoint_hit = type(1) << (base::unused_bit + 1);
     static const type ticks_limit_hit = type(1) << (base::unused_bit + 2);
-    static const type end = type(1) << (base::unused_bit + 3);
-    static const type retry_input = type(1) << (base::unused_bit + 4);
+    static const type retry_input = type(1) << (base::unused_bit + 3);
 
-    static const unsigned unused_bit = base::unused_bit + 5;
+    static const unsigned unused_bit = base::unused_bit + 4;
 };
 
 // The value on_input() returns to indicate the port value is not
