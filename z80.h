@@ -147,15 +147,28 @@ enum class z80_variant {
     cmos,  // Newer chips.
 };
 
-class events_mask {
+// The root class for bit masks. Bits are allocated by deriving from
+// the mask class to extend, declaring the new fields relative to its
+// 'unused_bit' and then shadowing 'unused_bit' with the new number of
+// used bits.
+class bitmask {
 public:
-    typedef fast_u32 type;
+    using type = fast_u32;
 
-    static const type end_of_frame = 1u << 0;
-    static const type breakpoint_hit = 1u << 1;
-    static const type ticks_limit_hit = 1u << 2;
-    static const type end = 1u << 3;
-    static const type retry_input = 1u << 4;
+    static const unsigned unused_bit = 0;
+};
+
+class events_mask : public bitmask {
+public:
+    using base = bitmask;
+
+    static const type end_of_frame = type(1) << (base::unused_bit + 0);
+    static const type breakpoint_hit = type(1) << (base::unused_bit + 1);
+    static const type ticks_limit_hit = type(1) << (base::unused_bit + 2);
+    static const type end = type(1) << (base::unused_bit + 3);
+    static const type retry_input = type(1) << (base::unused_bit + 4);
+
+    static const unsigned unused_bit = base::unused_bit + 5;
 };
 
 // The value on_input() returns to indicate the port value is not
