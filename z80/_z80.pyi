@@ -16,8 +16,8 @@ class _Z80Machine:
         ...
 
     def set_write_callback(self,
-                           callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+                           callback: typing.Callable[[int, int], None]) -> (
+            typing.Callable[[int, int], None]):
         ...
 
     def set_input_callback(self, callback: typing.Callable[[int], int]) -> (
@@ -25,8 +25,8 @@ class _Z80Machine:
         ...
 
     def set_output_callback(self,
-                            callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+                            callback: typing.Callable[[int, int], None]) -> (
+            typing.Callable[[int, int], None]):
         ...
 
     def set_reti_callback(
@@ -65,8 +65,8 @@ class _I8080Machine:
         ...
 
     def set_write_callback(self,
-                           callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+                           callback: typing.Callable[[int, int], None]) -> (
+            typing.Callable[[int, int], None]):
         ...
 
     def set_input_callback(self, callback: typing.Callable[[int], int]) -> (
@@ -74,8 +74,8 @@ class _I8080Machine:
         ...
 
     def set_output_callback(self,
-                            callback: typing.Callable[[int], None]) -> (
-            typing.Callable[[int], None]):
+                            callback: typing.Callable[[int, int], None]) -> (
+            typing.Callable[[int, int], None]):
         ...
 
     def set_reti_callback(
