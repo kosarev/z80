@@ -49,6 +49,10 @@ z80 = ['py.typed', '_z80.pyi']
 # from type-checking (see .mypy.ini); it is a large, separately-maintained file.
 extend-exclude = ['tests/z80sim']
 
+[tool.ruff.lint.per-file-ignores]
+# E743 would reject the 'l' register accessor, 'def l'.
+'z80/_machine.py' = ['E743']
+
 [tool.cibuildwheel]
 # Build wheels for the supported CPython versions and smoke-test that the
 # compiled extension imports. Used by the release workflow.

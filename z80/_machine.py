@@ -40,16 +40,6 @@ class _ImageParser(object):
         return self.parse_block(4)
 
 
-def _rename_attr_to_silence_pip8_e741(old: typing.Any,
-                                      new: typing.Any) -> typing.Any:
-    def rename(cls: typing.Any) -> typing.Any:
-        setattr(cls, new, getattr(cls, old))
-        delattr(cls, old)
-        return cls
-    return rename
-
-
-@_rename_attr_to_silence_pip8_e741('plain_l', 'l')
 class _StateBase(object):
     def __init__(self, image: Bytes) -> None:
         self._image = image
@@ -142,13 +132,12 @@ class _StateBase(object):
         assert isinstance(self.__hl, WritableBytes)
         self.__hl[1] = value
 
-    # The class decorator above renames this to just 'l'.
     @property
-    def plain_l(self) -> int:
+    def l(self) -> int:
         return self.__hl[0]
 
-    @plain_l.setter
-    def plain_l(self, value: int) -> None:
+    @l.setter
+    def l(self, value: int) -> None:
         assert isinstance(self.__hl, WritableBytes)
         self.__hl[0] = value
 
