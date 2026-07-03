@@ -19,6 +19,38 @@ def test_ticks_to_stop_round_trip() -> None:
     assert m.ticks_to_stop == 0x12345678
 
 
+def test_registers_round_trip() -> None:
+    # All registers must be accessible as public properties,
+    # including 'alt_af' and 'ir' (issue #68).
+    m = z80.Z80Machine()
+
+    REGPS = ('bc', 'de', 'hl', 'af', 'pc', 'sp', 'ix', 'iy',
+             'alt_bc', 'alt_de', 'alt_hl', 'alt_af', 'ir')
+    values = {rp: ((2 * i + 1) << 8) | (2 * i + 2)
+              for i, rp in enumerate(REGPS)}
+    for rp, value in values.items():
+        setattr(m, rp, value)
+    for rp, value in values.items():
+        assert getattr(m, rp) == value, rp
+
+    # All register pairs except 'pc' and 'sp' have their 8-bit
+    # halves accessible as registers on their own.
+    for rp, value in values.items():
+        if rp in ('pc', 'sp'):
+            continue
+        if rp in ('ix', 'iy'):
+            high, low = rp + 'h', rp + 'l'
+        else:
+            prefix, pair = rp[:-2], rp[-2:]
+            high, low = prefix + pair[0], prefix + pair[1]
+        assert getattr(m, high) == value >> 8, high
+        assert getattr(m, low) == value & 0xff, low
+
+        setattr(m, high, (value >> 8) ^ 0xff)
+        setattr(m, low, (value & 0xff) ^ 0xff)
+        assert getattr(m, rp) == value ^ 0xffff, rp
+
+
 def test_exit_halted_state() -> None:
     # Clearing the 'halted' field must let a halted machine resume
     # execution (issue #65).

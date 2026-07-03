@@ -285,6 +285,24 @@ class Z80State(_StateBase):
         _set_u16(self.__ix, value)
 
     @property
+    def ixh(self) -> int:
+        return self.__ix[1]
+
+    @ixh.setter
+    def ixh(self, value: int) -> None:
+        assert isinstance(self.__ix, WritableBytes)
+        self.__ix[1] = value
+
+    @property
+    def ixl(self) -> int:
+        return self.__ix[0]
+
+    @ixl.setter
+    def ixl(self, value: int) -> None:
+        assert isinstance(self.__ix, WritableBytes)
+        self.__ix[0] = value
+
+    @property
     def iy(self) -> int:
         return _get_u16(self.__iy)
 
@@ -292,6 +310,24 @@ class Z80State(_StateBase):
     def iy(self, value: int) -> None:
         assert isinstance(self.__iy, WritableBytes)
         _set_u16(self.__iy, value)
+
+    @property
+    def iyh(self) -> int:
+        return self.__iy[1]
+
+    @iyh.setter
+    def iyh(self, value: int) -> None:
+        assert isinstance(self.__iy, WritableBytes)
+        self.__iy[1] = value
+
+    @property
+    def iyl(self) -> int:
+        return self.__iy[0]
+
+    @iyl.setter
+    def iyl(self, value: int) -> None:
+        assert isinstance(self.__iy, WritableBytes)
+        self.__iy[0] = value
 
     @property
     def alt_bc(self) -> int:
@@ -303,6 +339,24 @@ class Z80State(_StateBase):
         _set_u16(self.__alt_bc, value)
 
     @property
+    def alt_b(self) -> int:
+        return self.__alt_bc[1]
+
+    @alt_b.setter
+    def alt_b(self, value: int) -> None:
+        assert isinstance(self.__alt_bc, WritableBytes)
+        self.__alt_bc[1] = value
+
+    @property
+    def alt_c(self) -> int:
+        return self.__alt_bc[0]
+
+    @alt_c.setter
+    def alt_c(self, value: int) -> None:
+        assert isinstance(self.__alt_bc, WritableBytes)
+        self.__alt_bc[0] = value
+
+    @property
     def alt_de(self) -> int:
         return _get_u16(self.__alt_de)
 
@@ -312,6 +366,24 @@ class Z80State(_StateBase):
         _set_u16(self.__alt_de, value)
 
     @property
+    def alt_d(self) -> int:
+        return self.__alt_de[1]
+
+    @alt_d.setter
+    def alt_d(self, value: int) -> None:
+        assert isinstance(self.__alt_de, WritableBytes)
+        self.__alt_de[1] = value
+
+    @property
+    def alt_e(self) -> int:
+        return self.__alt_de[0]
+
+    @alt_e.setter
+    def alt_e(self, value: int) -> None:
+        assert isinstance(self.__alt_de, WritableBytes)
+        self.__alt_de[0] = value
+
+    @property
     def alt_hl(self) -> int:
         return _get_u16(self.__alt_hl)
 
@@ -319,6 +391,78 @@ class Z80State(_StateBase):
     def alt_hl(self, value: int) -> None:
         assert isinstance(self.__alt_hl, WritableBytes)
         _set_u16(self.__alt_hl, value)
+
+    @property
+    def alt_h(self) -> int:
+        return self.__alt_hl[1]
+
+    @alt_h.setter
+    def alt_h(self, value: int) -> None:
+        assert isinstance(self.__alt_hl, WritableBytes)
+        self.__alt_hl[1] = value
+
+    @property
+    def alt_l(self) -> int:
+        return self.__alt_hl[0]
+
+    @alt_l.setter
+    def alt_l(self, value: int) -> None:
+        assert isinstance(self.__alt_hl, WritableBytes)
+        self.__alt_hl[0] = value
+
+    @property
+    def alt_af(self) -> int:
+        return _get_u16(self.__alt_af)
+
+    @alt_af.setter
+    def alt_af(self, value: int) -> None:
+        assert isinstance(self.__alt_af, WritableBytes)
+        _set_u16(self.__alt_af, value)
+
+    @property
+    def alt_a(self) -> int:
+        return self.__alt_af[1]
+
+    @alt_a.setter
+    def alt_a(self, value: int) -> None:
+        assert isinstance(self.__alt_af, WritableBytes)
+        self.__alt_af[1] = value
+
+    @property
+    def alt_f(self) -> int:
+        return self.__alt_af[0]
+
+    @alt_f.setter
+    def alt_f(self, value: int) -> None:
+        assert isinstance(self.__alt_af, WritableBytes)
+        self.__alt_af[0] = value
+
+    @property
+    def ir(self) -> int:
+        return _get_u16(self.__ir)
+
+    @ir.setter
+    def ir(self, value: int) -> None:
+        assert isinstance(self.__ir, WritableBytes)
+        _set_u16(self.__ir, value)
+
+    @property
+    def i(self) -> int:
+        return self.__ir[1]
+
+    @i.setter
+    def i(self, value: int) -> None:
+        assert isinstance(self.__ir, WritableBytes)
+        self.__ir[1] = value
+
+    @property
+    def r(self) -> int:
+        return self.__ir[0]
+
+    @r.setter
+    def r(self, value: int) -> None:
+        assert isinstance(self.__ir, WritableBytes)
+        self.__ir[0] = value
 
     @property
     def int_disabled(self) -> bool:
