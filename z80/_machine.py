@@ -17,27 +17,6 @@ WritableBytes: typing.TypeAlias = bytearray | memoryview
 Bytes: typing.TypeAlias = bytes | WritableBytes
 
 
-def _get_u16(image: Bytes) -> int:
-    return image[0] + image[1] * 0x100
-
-
-def _set_u16(image: WritableBytes, value: int) -> None:
-    image[0] = value % 0x100
-    image[1] = value // 0x100
-
-
-def _get_u32(image: Bytes) -> int:
-    return (image[0] + image[1] * 0x100 +
-            image[2] * 0x10000 + image[3] * 0x1000000)
-
-
-def _set_u32(image: WritableBytes, value: int) -> None:
-    image[0] = value % 0x100
-    image[1] = (value // 0x100) % 0x100
-    image[2] = (value // 0x10000) % 0x100
-    image[3] = value // 0x1000000
-
-
 class _ImageParser(object):
     def __init__(self, image: Bytes) -> None:
         self.__image = image
@@ -102,12 +81,12 @@ class _StateBase(object):
 
     @property
     def af(self) -> int:
-        return _get_u16(self.__af)
+        return int.from_bytes(self.__af, 'little')
 
     @af.setter
     def af(self, value: int) -> None:
         assert isinstance(self.__af, WritableBytes)
-        _set_u16(self.__af, value)
+        self.__af[:] = value.to_bytes(2, 'little')
 
     @property
     def a(self) -> int:
@@ -184,57 +163,57 @@ class _StateBase(object):
 
     @property
     def bc(self) -> int:
-        return _get_u16(self.__bc)
+        return int.from_bytes(self.__bc, 'little')
 
     @bc.setter
     def bc(self, value: int) -> None:
         assert isinstance(self.__bc, WritableBytes)
-        _set_u16(self.__bc, value)
+        self.__bc[:] = value.to_bytes(2, 'little')
 
     @property
     def de(self) -> int:
-        return _get_u16(self.__de)
+        return int.from_bytes(self.__de, 'little')
 
     @de.setter
     def de(self, value: int) -> None:
         assert isinstance(self.__de, WritableBytes)
-        _set_u16(self.__de, value)
+        self.__de[:] = value.to_bytes(2, 'little')
 
     @property
     def hl(self) -> int:
-        return _get_u16(self.__hl)
+        return int.from_bytes(self.__hl, 'little')
 
     @hl.setter
     def hl(self, value: int) -> None:
         assert isinstance(self.__hl, WritableBytes)
-        _set_u16(self.__hl, value)
+        self.__hl[:] = value.to_bytes(2, 'little')
 
     @property
     def pc(self) -> int:
-        return _get_u16(self.__pc)
+        return int.from_bytes(self.__pc, 'little')
 
     @pc.setter
     def pc(self, value: int) -> None:
         assert isinstance(self.__pc, WritableBytes)
-        _set_u16(self.__pc, value)
+        self.__pc[:] = value.to_bytes(2, 'little')
 
     @property
     def sp(self) -> int:
-        return _get_u16(self.__sp)
+        return int.from_bytes(self.__sp, 'little')
 
     @sp.setter
     def sp(self, value: int) -> None:
         assert isinstance(self.__sp, WritableBytes)
-        _set_u16(self.__sp, value)
+        self.__sp[:] = value.to_bytes(2, 'little')
 
     @property
     def ticks_to_stop(self) -> int:
-        return _get_u32(self.__ticks_to_stop)
+        return int.from_bytes(self.__ticks_to_stop, 'little')
 
     @ticks_to_stop.setter
     def ticks_to_stop(self, value: int) -> None:
         assert isinstance(self.__ticks_to_stop, WritableBytes)
-        _set_u32(self.__ticks_to_stop, value)
+        self.__ticks_to_stop[:] = value.to_bytes(4, 'little')
 
     def set_memory_block(self, addr: int, block: Bytes) -> None:
         assert isinstance(self.memory, WritableBytes)
@@ -277,12 +256,12 @@ class Z80State(_StateBase):
 
     @property
     def ix(self) -> int:
-        return _get_u16(self.__ix)
+        return int.from_bytes(self.__ix, 'little')
 
     @ix.setter
     def ix(self, value: int) -> None:
         assert isinstance(self.__ix, WritableBytes)
-        _set_u16(self.__ix, value)
+        self.__ix[:] = value.to_bytes(2, 'little')
 
     @property
     def ixh(self) -> int:
@@ -304,12 +283,12 @@ class Z80State(_StateBase):
 
     @property
     def iy(self) -> int:
-        return _get_u16(self.__iy)
+        return int.from_bytes(self.__iy, 'little')
 
     @iy.setter
     def iy(self, value: int) -> None:
         assert isinstance(self.__iy, WritableBytes)
-        _set_u16(self.__iy, value)
+        self.__iy[:] = value.to_bytes(2, 'little')
 
     @property
     def iyh(self) -> int:
@@ -331,12 +310,12 @@ class Z80State(_StateBase):
 
     @property
     def alt_bc(self) -> int:
-        return _get_u16(self.__alt_bc)
+        return int.from_bytes(self.__alt_bc, 'little')
 
     @alt_bc.setter
     def alt_bc(self, value: int) -> None:
         assert isinstance(self.__alt_bc, WritableBytes)
-        _set_u16(self.__alt_bc, value)
+        self.__alt_bc[:] = value.to_bytes(2, 'little')
 
     @property
     def alt_b(self) -> int:
@@ -358,12 +337,12 @@ class Z80State(_StateBase):
 
     @property
     def alt_de(self) -> int:
-        return _get_u16(self.__alt_de)
+        return int.from_bytes(self.__alt_de, 'little')
 
     @alt_de.setter
     def alt_de(self, value: int) -> None:
         assert isinstance(self.__alt_de, WritableBytes)
-        _set_u16(self.__alt_de, value)
+        self.__alt_de[:] = value.to_bytes(2, 'little')
 
     @property
     def alt_d(self) -> int:
@@ -385,12 +364,12 @@ class Z80State(_StateBase):
 
     @property
     def alt_hl(self) -> int:
-        return _get_u16(self.__alt_hl)
+        return int.from_bytes(self.__alt_hl, 'little')
 
     @alt_hl.setter
     def alt_hl(self, value: int) -> None:
         assert isinstance(self.__alt_hl, WritableBytes)
-        _set_u16(self.__alt_hl, value)
+        self.__alt_hl[:] = value.to_bytes(2, 'little')
 
     @property
     def alt_h(self) -> int:
@@ -412,12 +391,12 @@ class Z80State(_StateBase):
 
     @property
     def alt_af(self) -> int:
-        return _get_u16(self.__alt_af)
+        return int.from_bytes(self.__alt_af, 'little')
 
     @alt_af.setter
     def alt_af(self, value: int) -> None:
         assert isinstance(self.__alt_af, WritableBytes)
-        _set_u16(self.__alt_af, value)
+        self.__alt_af[:] = value.to_bytes(2, 'little')
 
     @property
     def alt_a(self) -> int:
@@ -439,12 +418,12 @@ class Z80State(_StateBase):
 
     @property
     def ir(self) -> int:
-        return _get_u16(self.__ir)
+        return int.from_bytes(self.__ir, 'little')
 
     @ir.setter
     def ir(self, value: int) -> None:
         assert isinstance(self.__ir, WritableBytes)
-        _set_u16(self.__ir, value)
+        self.__ir[:] = value.to_bytes(2, 'little')
 
     @property
     def i(self) -> int:
