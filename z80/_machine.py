@@ -65,15 +65,6 @@ class _StateBase(object):
         self.__last_read_addr = parser.parse_word()
         self.__ticks_to_stop = parser.parse_u32()
 
-        self.__a = self.__af[1:2]
-        self.__b = self.__bc[1:2]
-        self.__c = self.__bc[0:1]
-        self.__d = self.__de[1:2]
-        self.__e = self.__de[0:1]
-        self.__f = self.__af[0:1]
-        self.__h = self.__hl[1:2]
-        self.__l = self.__hl[0:1]
-
     def _parse_memory(self, parser: _ImageParser) -> None:
         block = parser.parse_rest()
         assert len(block) == 0x10000, len(block)
@@ -90,76 +81,76 @@ class _StateBase(object):
 
     @property
     def a(self) -> int:
-        return self.__a[0]
+        return self.__af[1]
 
     @a.setter
     def a(self, value: int) -> None:
-        assert isinstance(self.__a, WritableBytes)
-        self.__a[0] = value
+        assert isinstance(self.__af, WritableBytes)
+        self.__af[1] = value
 
     @property
     def b(self) -> int:
-        return self.__b[0]
+        return self.__bc[1]
 
     @b.setter
     def b(self, value: int) -> None:
-        assert isinstance(self.__b, WritableBytes)
-        self.__b[0] = value
+        assert isinstance(self.__bc, WritableBytes)
+        self.__bc[1] = value
 
     @property
     def c(self) -> int:
-        return self.__c[0]
+        return self.__bc[0]
 
     @c.setter
     def c(self, value: int) -> None:
-        assert isinstance(self.__c, WritableBytes)
-        self.__c[0] = value
+        assert isinstance(self.__bc, WritableBytes)
+        self.__bc[0] = value
 
     @property
     def d(self) -> int:
-        return self.__d[0]
+        return self.__de[1]
 
     @d.setter
     def d(self, value: int) -> None:
-        assert isinstance(self.__d, WritableBytes)
-        self.__d[0] = value
+        assert isinstance(self.__de, WritableBytes)
+        self.__de[1] = value
 
     @property
     def e(self) -> int:
-        return self.__e[0]
+        return self.__de[0]
 
     @e.setter
     def e(self, value: int) -> None:
-        assert isinstance(self.__e, WritableBytes)
-        self.__e[0] = value
+        assert isinstance(self.__de, WritableBytes)
+        self.__de[0] = value
 
     @property
     def f(self) -> int:
-        return self.__f[0]
+        return self.__af[0]
 
     @f.setter
     def f(self, value: int) -> None:
-        assert isinstance(self.__f, WritableBytes)
-        self.__f[0] = value
+        assert isinstance(self.__af, WritableBytes)
+        self.__af[0] = value
 
     @property
     def h(self) -> int:
-        return self.__h[0]
+        return self.__hl[1]
 
     @h.setter
     def h(self, value: int) -> None:
-        assert isinstance(self.__h, WritableBytes)
-        self.__h[0] = value
+        assert isinstance(self.__hl, WritableBytes)
+        self.__hl[1] = value
 
     # The class decorator above renames this to just 'l'.
     @property
     def plain_l(self) -> int:
-        return self.__l[0]
+        return self.__hl[0]
 
     @plain_l.setter
     def plain_l(self, value: int) -> None:
-        assert isinstance(self.__l, WritableBytes)
-        self.__l[0] = value
+        assert isinstance(self.__hl, WritableBytes)
+        self.__hl[0] = value
 
     @property
     def bc(self) -> int:
