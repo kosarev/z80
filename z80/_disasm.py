@@ -139,23 +139,59 @@ class _InstrTag(_Tag):
         super().__init__(origin, addr, size=0)
 
 
-# Same as _InstrTag, except that there can only be one entry tag.
+# Same as _InstrTag, except that there can only be one entry tag,
+# and that it can carry facts about the state of the machine as
+# execution enters the tagged address, such as the value of SP.
 class _EntryTag(_Tag):
     ID = 'entry'
 
-    def __init__(self, origin: _SourcePos, addr: int) -> None:
+    def __init__(self, origin: _SourcePos, addr: int,
+                 sp: int | None = None) -> None:
         super().__init__(origin, addr, size=0)
+        self.sp = sp
+
+
+# The machine state as known at a specific point of execution:
+# for every field, the set of values it is known to possibly
+# have, with an empty set meaning no knowledge. While memory is
+# known to possibly be unwritten since the recorded instant that
+# the entry tag's facts and the image bytes jointly describe
+# (False in memory_clobbered), stack words still hold their image
+# values, so returns can be followed.
+class _State(object):
+    def __init__(self, sp: int | None = None,
+                 memory_clobbered: bool | None = None) -> None:
+        self.sps = set() if sp is None else {sp}
+        self.memory_clobbered = (set() if memory_clobbered is None
+                                 else {memory_clobbered})
+
+    # Accumulates the facts of another state, returning whether
+    # anything new has been learnt.
+    def update(self, other: '_State') -> bool:
+        updated = False
+
+        if not other.sps <= self.sps:
+            self.sps |= other.sps
+            updated = True
+
+        if not other.memory_clobbered <= self.memory_clobbered:
+            self.memory_clobbered |= other.memory_clobbered
+            updated = True
+
+        return updated
 
 
 # Marks an address as reachable by execution and therefore
-# considered an instruction.
+# considered an instruction, in a given machine state.
 class _DisasmTag(_Tag):
     instr: Instr
 
     ID = 'disasm'
 
-    def __init__(self, origin: _SourcePos | None, addr: int) -> None:
+    def __init__(self, origin: _SourcePos | None, addr: int,
+                 state: _State | None = None) -> None:
         super().__init__(origin, addr, size=0)
+        self.state = _State() if state is None else state
 
 
 class _UnknownInstrError(Exception):
@@ -542,33 +578,45 @@ class _Disasm(object):
 
         self.__entry_tag = tag
         self.__tags[tag.addr].inline_tags.append(tag)
-        self.add_tags(_DisasmTag(tag.origin, tag.addr))
+
+        # At the recorded instant the entry tag describes, memory
+        # is still exactly as the image bytes have it.
+        self.add_tags(_DisasmTag(tag.origin, tag.addr,
+                                 _State(tag.sp, memory_clobbered=False)))
 
     def __process_disasm_tag(self, tag: _Tag) -> None:
         assert isinstance(tag, _DisasmTag)
         tags = self.__tags[tag.addr]
-        if tags.disasm_tag is not None:
-            return
+        prev_tag = tags.disasm_tag
+        if prev_tag is not None:
+            # The instruction is already disassembled; reconsider
+            # it if and only if the tag brings new information.
+            assert isinstance(prev_tag, _DisasmTag)
+            if not prev_tag.state.update(tag.state):
+                return
 
-        MAX_INSTR_SIZE = 4
+            tag = prev_tag
+        else:
+            MAX_INSTR_SIZE = 4
 
-        instr_image = []
-        assert isinstance(tag.addr, int), tag.addr
-        for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
-            if self.__tags[i].byte_tag is None:
-                break
+            instr_image = []
+            assert isinstance(tag.addr, int), tag.addr
+            for i in range(tag.addr, tag.addr + MAX_INSTR_SIZE):
+                if self.__tags[i].byte_tag is None:
+                    break
 
-            t = self.__tags[i].byte_tag
-            assert isinstance(t, _ByteTag)
-            instr_image.append(t.value)
+                t = self.__tags[i].byte_tag
+                assert isinstance(t, _ByteTag)
+                instr_image.append(t.value)
 
-        if len(instr_image) == 0:
-            return
+            if len(instr_image) == 0:
+                return
 
-        instr = self.__instr_builder.build_instr(tag.addr,
-                                                 bytes(instr_image))
-        tag.instr = instr
-        self.__tags[tag.addr].disasm_tag = tag
+            tag.instr = self.__instr_builder.build_instr(
+                tag.addr, bytes(instr_image))
+            tags.disasm_tag = tag
+
+        instr = tag.instr
 
         if not isinstance(instr, UnknownInstr):
             # Disassemble the following instruction.
