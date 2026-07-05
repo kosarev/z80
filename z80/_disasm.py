@@ -159,17 +159,17 @@ class _EntryTag(_Tag):
 
 # The machine state as known at a specific point of execution:
 # for every field, the set of values it is known to possibly
-# have, with an empty set meaning no knowledge. While memory is
-# known to possibly be unwritten since the recorded instant that
-# the entry tag's facts and the image bytes jointly describe
-# (False in memory_clobbered), stack words still hold their image
-# values, so returns can be followed.
+# have, with None standing for values that cannot be known. While
+# memory is known to be never written on any path since the
+# recorded instant that the entry tag's facts and the image bytes
+# jointly describe (memory_clobbered is exactly {False}), stack
+# words still hold their image values, so returns can be
+# followed.
 class _State(object):
     def __init__(self, sp: int | None = None,
                  memory_clobbered: bool | None = None) -> None:
-        self.sps = set() if sp is None else {sp}
-        self.memory_clobbered = (set() if memory_clobbered is None
-                                 else {memory_clobbered})
+        self.sps: set[int | None] = {sp}
+        self.memory_clobbered: set[bool | None] = {memory_clobbered}
 
     # Accumulates the facts of another state, returning whether
     # anything new has been learnt.
@@ -642,6 +642,27 @@ class _Disasm(object):
                 if not isinstance(target, At):
                     assert isinstance(target, int)
                     self.add_tags(_DisasmTag(instr.origin, target))
+
+            # Disassemble return targets. Only where memory is
+            # known to be never written on any path, the words at
+            # the possible SP values still hold their image values.
+            if (isinstance(instr, RetInstr) and
+                    tag.state.memory_clobbered == {False}):
+                for sp in tag.state.sps:
+                    if sp is None:
+                        continue
+
+                    lo = self.__tags[sp].byte_tag
+                    hi = self.__tags[(sp + 1) % 0x10000].byte_tag
+                    if lo is None or hi is None:
+                        continue
+
+                    assert isinstance(lo, _ByteTag)
+                    assert isinstance(hi, _ByteTag)
+                    target = hi.value * 0x100 + lo.value
+                    state = _State(sp=(sp + 2) % 0x10000,
+                                   memory_clobbered=False)
+                    self.add_tags(_DisasmTag(instr.origin, target, state))
 
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
