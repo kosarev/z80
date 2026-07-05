@@ -11,6 +11,7 @@ import typing
 
 from ._disasm import (_IncludeBinaryTag, _InstrTag, _EntryTag, _CommentTag,
                       _ByteTag, _InlineCommentTag, _AsmLine)
+from ._disasm import _DisasmError
 from ._disasm import _Tag
 from ._source import _SourceFile
 from ._token import _Token
@@ -45,16 +46,14 @@ class _DisasmTagParser(object):
 
         if tok.literal is None:
             if error is not None:
-                assert 0  # TODO
-                # raise _DisasmError(tok.pos, error)
+                raise _DisasmError(tok, error)
 
             tok = None
         else:
             # Translate escape sequences.
             if tok.literal.startswith("'"):
                 if tok.literal == "'":
-                    assert 0  # TODO
-                    # raise _DisasmError(tok.pos, 'Unterminated string.')
+                    raise _DisasmError(tok, 'Unterminated string.')
 
                 tok.literal = (tok.literal[1:-1].
                                replace('\\\\', '\\').
@@ -131,8 +130,7 @@ class _DisasmTagParser(object):
                 assert tok is not None and tok.literal is not None
                 parser = self.__TAG_PARSERS.get(tok.literal, None)
                 if not parser:
-                    assert 0  # TODO
-                    # raise _DisasmError(tok, 'Unknown tag.')
+                    raise _DisasmError(tok, 'Unknown tag.')
 
                 assert addr is not None
                 subject_tag = parser(self, addr, tok)
@@ -140,9 +138,8 @@ class _DisasmTagParser(object):
                 tok = self.__tok
 
                 if tok is not None and tok != '--':
-                    assert 0  # TODO
-                    # raise _DisasmError(tok,
-                    #                    'End of line or a comment expected.')
+                    raise _DisasmError(
+                        tok, 'End of line or a comment expected.')
 
             # Parse comment, if specified.
             if tok == '--':

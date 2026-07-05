@@ -37,11 +37,17 @@ from ._token import _Token
 
 
 class _DisasmError(Error):
-    def __init__(self, subject: '_Tag', message: str,
+    def __init__(self, subject: '_Tag | _Token', message: str,
                  *notes: '_DisasmError') -> None:
         assert isinstance(subject.origin, _SourcePos)
-        super().__init__('%s: %s: %s' % (subject.origin.inline_text,
-                                         subject, message))
+        if isinstance(subject, _Token) and subject.literal is None:
+            # There is nothing to name at positions past the last
+            # token of the line.
+            super().__init__('%s: %s' % (subject.origin.inline_text,
+                                         message))
+        else:
+            super().__init__('%s: %s: %s' % (subject.origin.inline_text,
+                                             subject, message))
         self.subject = subject
         self.message = message
         self.notes = notes
