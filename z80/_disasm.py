@@ -139,6 +139,8 @@ class _InstrTag(_Tag):
         super().__init__(origin, addr, size=0)
 
 
+# Marks an address as reachable by execution and therefore
+# considered an instruction.
 class _DisasmTag(_Tag):
     instr: Instr
 

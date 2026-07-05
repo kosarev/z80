@@ -241,6 +241,10 @@ class Instr(object):
         return s
 
 
+# TODO: This only exists because the instruction-building facility
+# does not cover all codes yet; there is no such thing as an unknown
+# instruction otherwise. Replace with an assert once all codes are
+# supported.
 class UnknownInstr(Instr):
     text: str | None
 
