@@ -623,46 +623,47 @@ class _Disasm(object):
             tags.disasm_tag = tag
 
         instr = tag.instr
+        if isinstance(instr, UnknownInstr):
+            return
 
-        if not isinstance(instr, UnknownInstr):
-            # Disassemble the following instruction.
-            if (not isinstance(instr, JumpInstr) or
-                    isinstance(instr, CallInstr) or
-                    instr.conditional):
-                assert isinstance(instr.addr, int)
-                assert isinstance(instr.size, int)
-                target = instr.addr + instr.size
+        # Disassemble the following instruction.
+        if (not isinstance(instr, JumpInstr) or
+                isinstance(instr, CallInstr) or
+                instr.conditional):
+            assert isinstance(instr.addr, int)
+            assert isinstance(instr.size, int)
+            target = instr.addr + instr.size
+            self.add_tags(_DisasmTag(instr.origin, target))
+
+        # Disassemble jump targets.
+        if (isinstance(instr, JumpInstr) and
+                not isinstance(instr, RetInstr)):
+            assert isinstance(instr.target, int)
+            target = instr.target
+            if not isinstance(target, At):
+                assert isinstance(target, int)
                 self.add_tags(_DisasmTag(instr.origin, target))
 
-            # Disassemble jump targets.
-            if (isinstance(instr, JumpInstr) and
-                    not isinstance(instr, RetInstr)):
-                assert isinstance(instr.target, int)
-                target = instr.target
-                if not isinstance(target, At):
-                    assert isinstance(target, int)
-                    self.add_tags(_DisasmTag(instr.origin, target))
+        # Disassemble return targets. Only where memory is known
+        # to be never written on any path, the words at the
+        # possible SP values still hold their image values.
+        if (isinstance(instr, RetInstr) and
+                tag.state.memory_clobbered == {False}):
+            for sp in tag.state.sps:
+                if sp is None:
+                    continue
 
-            # Disassemble return targets. Only where memory is
-            # known to be never written on any path, the words at
-            # the possible SP values still hold their image values.
-            if (isinstance(instr, RetInstr) and
-                    tag.state.memory_clobbered == {False}):
-                for sp in tag.state.sps:
-                    if sp is None:
-                        continue
+                lo = self.__tags[sp].byte_tag
+                hi = self.__tags[(sp + 1) % 0x10000].byte_tag
+                if lo is None or hi is None:
+                    continue
 
-                    lo = self.__tags[sp].byte_tag
-                    hi = self.__tags[(sp + 1) % 0x10000].byte_tag
-                    if lo is None or hi is None:
-                        continue
-
-                    assert isinstance(lo, _ByteTag)
-                    assert isinstance(hi, _ByteTag)
-                    target = hi.value * 0x100 + lo.value
-                    state = _State(sp=(sp + 2) % 0x10000,
-                                   memory_clobbered=False)
-                    self.add_tags(_DisasmTag(instr.origin, target, state))
+                assert isinstance(lo, _ByteTag)
+                assert isinstance(hi, _ByteTag)
+                target = hi.value * 0x100 + lo.value
+                state = _State(sp=(sp + 2) % 0x10000,
+                               memory_clobbered=False)
+                self.add_tags(_DisasmTag(instr.origin, target, state))
 
     __TAG_PROCESSORS = {
         _ByteTag: __process_byte_tag,
