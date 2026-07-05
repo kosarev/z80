@@ -9,7 +9,7 @@
 import re
 import typing
 
-from ._disasm import (_IncludeBinaryTag, _InstrTag, _CommentTag,
+from ._disasm import (_IncludeBinaryTag, _InstrTag, _EntryTag, _CommentTag,
                       _ByteTag, _InlineCommentTag, _AsmLine)
 from ._disasm import _Tag
 from ._source import _SourceFile
@@ -87,9 +87,14 @@ class _DisasmTagParser(object):
         self.__fetch_token()
         return _InstrTag(name.pos, addr)
 
+    def __parse_entry_tag(self, addr: int, name: _Token) -> _EntryTag:
+        self.__fetch_token()
+        return _EntryTag(name.pos, addr)
+
     __TAG_PARSERS = {
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
         _InstrTag.ID: __parse_instr_tag,
+        _EntryTag.ID: __parse_entry_tag,
     }
 
     # Parses and returns a subsequent tag.

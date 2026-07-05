@@ -139,6 +139,14 @@ class _InstrTag(_Tag):
         super().__init__(origin, addr, size=0)
 
 
+# Same as _InstrTag, except that there can only be one entry tag.
+class _EntryTag(_Tag):
+    ID = 'entry'
+
+    def __init__(self, origin: _SourcePos, addr: int) -> None:
+        super().__init__(origin, addr, size=0)
+
+
 # Marks an address as reachable by execution and therefore
 # considered an instruction.
 class _DisasmTag(_Tag):
@@ -446,6 +454,7 @@ class _Disasm(object):
         _ByteTag: 0,
         _IncludeBinaryTag: 0,
         _InstrTag: 0,
+        _EntryTag: 0,
 
         _DisasmTag: 1,
 
@@ -464,6 +473,9 @@ class _Disasm(object):
 
         # Tags to process stored in order.
         self.__worklists: dict[int, typing.Deque[_Tag]] = dict()
+
+        # The entry tag, if there is one.
+        self.__entry_tag: _EntryTag | None = None
 
     def __get_worklist(self, tag: _Tag) -> typing.Deque[_Tag]:
         # Use deque because of its popleft() being much faster
@@ -520,6 +532,18 @@ class _Disasm(object):
         self.__tags[tag.addr].inline_tags.append(tag)
         self.add_tags(_DisasmTag(tag.origin, tag.addr))
 
+    def __process_entry_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _EntryTag)
+        prev_tag = self.__entry_tag
+        if prev_tag is not None:
+            raise _DisasmError(
+                tag, 'Entry redefined.',
+                _DisasmError(prev_tag, 'Previously defined here.'))
+
+        self.__entry_tag = tag
+        self.__tags[tag.addr].inline_tags.append(tag)
+        self.add_tags(_DisasmTag(tag.origin, tag.addr))
+
     def __process_disasm_tag(self, tag: _Tag) -> None:
         assert isinstance(tag, _DisasmTag)
         tags = self.__tags[tag.addr]
@@ -571,6 +595,7 @@ class _Disasm(object):
         _IncludeBinaryTag: __process_include_binary_tag,
         _InlineCommentTag: __process_inline_comment_tag,
         _InstrTag: __process_instr_tag,
+        _EntryTag: __process_entry_tag,
         _DisasmTag: __process_disasm_tag,
     }
 
@@ -595,8 +620,8 @@ class _Disasm(object):
             first_instr_byte: bool = False) -> (
                 typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
-            if isinstance(tag, _InstrTag):
-                comment = '.instr'
+            if isinstance(tag, (_InstrTag, _EntryTag)):
+                comment = '.%s' % tag.ID
                 if tag.comment is not None:
                     assert isinstance(tag.comment, _Token)
                     assert isinstance(tag.comment.literal, str)
