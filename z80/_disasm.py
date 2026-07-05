@@ -676,6 +676,8 @@ class _Disasm(object):
         for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, (_InstrTag, _EntryTag)):
                 comment = '.%s' % tag.ID
+                if isinstance(tag, _EntryTag) and tag.sp is not None:
+                    comment += f' sp={tag.sp:#06x}'
                 if tag.comment is not None:
                     assert isinstance(tag.comment, _Token)
                     assert isinstance(tag.comment.literal, str)

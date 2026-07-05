@@ -86,9 +86,37 @@ class _DisasmTagParser(object):
         self.__fetch_token()
         return _InstrTag(name.pos, addr)
 
+    # Fetches a subsequent token and checks it is the expected one.
+    def __parse_expected_token(self, literal: str) -> _Token:
+        error = '%r expected.' % literal
+        tok = self.__fetch_token(error)
+        assert tok is not None
+        if tok != literal:
+            raise _DisasmError(tok, error)
+
+        return tok
+
+    # Fetches a subsequent token and evaluates it as a number.
+    def __parse_number(self) -> int:
+        error = 'A number expected.'
+        tok = self.__fetch_token(error)
+        assert tok is not None and tok.literal is not None
+        value = self.__evaluate_numeric_literal(tok.literal)
+        if value is None:
+            raise _DisasmError(tok, error)
+
+        return value
+
     def __parse_entry_tag(self, addr: int, name: _Token) -> _EntryTag:
-        self.__fetch_token()
-        return _EntryTag(name.pos, addr)
+        tok = self.__fetch_token()
+
+        sp = None
+        if tok == 'sp':
+            self.__parse_expected_token('=')
+            sp = self.__parse_number()
+            self.__fetch_token()
+
+        return _EntryTag(name.pos, addr, sp)
 
     __TAG_PARSERS = {
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
