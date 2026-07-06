@@ -80,6 +80,36 @@ def test_exit_halted_state() -> None:
     assert (m.pc, m.a, m.halted) == (0x0003, 0x02, False)
 
 
+def test_iff_and_int_disabled() -> None:
+    # The interrupt flip-flops are accessible as public properties,
+    # and 'int_disabled' tells whether accepting interrupts is
+    # temporarily suppressed, and not whether they are enabled
+    # (issue #69).
+    EI = 0xfb
+    NOP = 0x00
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([EI, NOP]))
+
+    def step() -> None:
+        m.ticks_to_stop = 1
+        m.run()
+
+    assert (m.iff1, m.iff2, m.int_disabled) == (False, False, False)
+
+    # 'ei' enables interrupts, but suppresses accepting them until
+    # after the following instruction.
+    step()
+    assert (m.iff1, m.iff2, m.int_disabled) == (True, True, True)
+
+    step()
+    assert (m.iff1, m.iff2, m.int_disabled) == (True, True, False)
+
+    # The flip-flops are also writable.
+    m.iff1 = False
+    m.iff2 = True
+    assert (m.iff1, m.iff2) == (False, True)
+
+
 # On Z80, output callbacks get the full 16-bit port address, with
 # the value of A in the high byte.
 @pytest.mark.parametrize('machine_type, output_addr', [

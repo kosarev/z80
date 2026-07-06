@@ -424,6 +424,28 @@ class Z80State(_StateBase):
         self.__ir[0] = value
 
     @property
+    def iff1(self) -> bool:
+        return bool(self.__iff1[0])
+
+    @iff1.setter
+    def iff1(self, value: int) -> None:
+        assert isinstance(self.__iff1, WritableBytes)
+        self.__iff1[0] = int(value)
+
+    @property
+    def iff2(self) -> bool:
+        return bool(self.__iff2[0])
+
+    @iff2.setter
+    def iff2(self, value: int) -> None:
+        assert isinstance(self.__iff2, WritableBytes)
+        self.__iff2[0] = int(value)
+
+    # Tells whether the CPU is at a point where maskable interrupts
+    # cannot be accepted, e.g., just after an EI instruction. Not to
+    # be confused with iff1, which tells whether maskable interrupts
+    # are enabled (issue #69).
+    @property
     def int_disabled(self) -> bool:
         return bool(self.__int_disabled[0])
 
