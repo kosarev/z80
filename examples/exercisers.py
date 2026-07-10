@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+#   Z80 CPU Emulator.
+#   https://github.com/kosarev/z80
+#
+#   Copyright (C) 2019-2026 Ivan Kosarev.
+#   mail@ivankosarev.com
+#
+#   Published under the MIT license.
+
 import sys
 import z80
 
@@ -75,6 +83,10 @@ class _CPMLikeMachineMixin(object):
             if events & self._BREAKPOINT_HIT:
                 if not self._handle_breakpoint():
                     break
+
+                # Resume by executing the instruction under the
+                # breakpoint.
+                self.step_over_breakpoint()
 
         self.output('\n')
 

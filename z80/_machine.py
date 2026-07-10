@@ -469,6 +469,7 @@ class _MachineBase(object):
     _NO_EVENTS = 0
     _END_OF_FRAME = 1 << 0
     _BREAKPOINT_HIT = 1 << 1
+    _TICKS_LIMIT_HIT = 1 << 2
 
     # Address marks.
     _NO_MARKS = 0

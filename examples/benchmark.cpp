@@ -1,4 +1,12 @@
 
+
+/*  Z80 CPU Emulator.
+    https://github.com/kosarev/z80
+
+    Copyright (c) 2019-2026 Ivan Kosarev <mail@ivankosarev.com>
+    Published under the MIT license.
+*/
+
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
@@ -79,11 +87,11 @@ public:
         }
     }
 
-    void on_step() {
+    z80::events_mask::type on_step() {
         if(base::get_pc() == bdos_addr)
             handle_bdos_call();
 
-        base::on_step();
+        return base::on_step();
     }
 
     void on_report() {}

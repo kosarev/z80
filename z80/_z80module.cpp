@@ -2,7 +2,7 @@
 /*  Z80 Machine Emulation Module for Python.
     https://github.com/kosarev/z80
 
-    Copyright (C) 2019-2025 Ivan Kosarev.
+    Copyright (C) 2019-2026 Ivan Kosarev.
     mail@ivankosarev.com
 
     Published under the MIT license.
@@ -291,7 +291,7 @@ public:
     }
 
 #if 0  // TODO
-    void on_step() {
+    z80::events_mask::type on_step() {
         fprintf(stderr, "PC=%04x SP=%04x BC=%04x DE=%04x HL=%04x AF=%04x %02x%02x%02x%02x\n",
                 static_cast<unsigned>(state.pc),
                 static_cast<unsigned>(state.sp),
@@ -303,7 +303,7 @@ public:
                 static_cast<unsigned>(state.memory[(state.pc + 1) & 0xffff]),
                 static_cast<unsigned>(state.memory[(state.pc + 2) & 0xffff]),
                 static_cast<unsigned>(state.memory[(state.pc + 3) & 0xffff]));
-        base::on_step();
+        return base::on_step();
     }
 #endif
 

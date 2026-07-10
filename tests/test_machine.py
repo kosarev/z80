@@ -140,3 +140,124 @@ def test_write_and_output_callbacks(
 
     assert writes == [(0x8000, 0x42)]
     assert outputs == [(output_addr, 0x42)]
+
+
+def test_breakpoint_trip_and_resume() -> None:
+    # A breakpoint fires on the attempt to execute the marked
+    # instruction, before it makes any progress; resuming means
+    # explicitly stepping over it (issue #70).
+    NOP = 0x00
+    INC_A = 0x3c
+    JP = 0xc3
+    m = z80.Z80Machine()
+    # 0x0000: nop
+    # 0x0001: inc a
+    # 0x0002: jp 0x0001
+    m.set_memory_block(0x0000, bytes([NOP, INC_A, JP, 0x01, 0x00]))
+    m.set_breakpoint(0x0001)
+
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.a) == (0x0001, 0x00)
+
+    # Running again is just another attempt to execute the marked
+    # instruction, so it re-traps with no progress made.
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.a) == (0x0001, 0x00)
+
+    # Stepping over the breakpoint executes the marked instruction;
+    # the 'jp' then loops back and the breakpoint fires again.
+    events = m.step_over_breakpoint()
+    assert events == m._NO_EVENTS
+    assert (m.pc, m.a) == (0x0002, 0x01)
+
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.a) == (0x0001, 0x01)
+
+
+def test_breakpoint_beyond_jp() -> None:
+    # Reading the operand of a 'jp' walks PC across the following
+    # addresses; a breakpoint there must not fire when the 'jp'
+    # executes (issue #70).
+    NOP = 0x00
+    JP = 0xc3
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([NOP, JP, 0x00, 0x00]))
+    m.set_breakpoint(0x0004)
+
+    m.ticks_to_stop = 100
+    events = m.run()
+    assert events == m._TICKS_LIMIT_HIT
+    assert m.pc == 0x0001
+
+
+def test_breakpoint_while_halted() -> None:
+    # While halted, the CPU keeps fetching the byte after the 'halt'
+    # without executing it, so a breakpoint there must not fire until
+    # the instruction is actually attempted (issue #70).
+    HALT = 0x76
+    NOP = 0x00
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([HALT, NOP]))
+    m.set_breakpoint(0x0000)
+    m.set_breakpoint(0x0001)
+
+    # The breakpoint on the 'halt' itself fires once, before it
+    # executes.
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.halted) == (0x0000, False)
+
+    # Stepping over it executes the 'halt'.
+    events = m.step_over_breakpoint()
+    assert events == m._NO_EVENTS
+    assert (m.pc, m.halted) == (0x0001, True)
+
+    # The halted steps do not trip the breakpoint at PC.
+    m.ticks_to_stop = 100
+    events = m.run()
+    assert events == m._TICKS_LIMIT_HIT
+    assert (m.pc, m.halted) == (0x0001, True)
+
+    # Once the machine is un-halted, as by an interrupt, the next run
+    # does attempt the marked instruction.
+    m.halted = False
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.halted) == (0x0001, False)
+
+
+def test_breakpoint_on_ldir() -> None:
+    # Every iteration of 'ldir' rewinds PC and re-attempts the
+    # instruction, so a breakpoint on it fires once per iteration and
+    # each resume advances the copying by one byte (issue #70).
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([0xed, 0xb0]))  # ldir
+    m.set_memory_block(0x1000, b'abc')
+    m.bc = 3
+    m.hl = 0x1000
+    m.de = 0x2000
+    m.set_breakpoint(0x0000)
+
+    events = m.run()
+    assert events == m._BREAKPOINT_HIT
+    assert (m.pc, m.bc) == (0x0000, 3)
+
+    # All iterations but the last end with PC rewound back to the
+    # instruction, so each resume copies one byte and re-traps.
+    for count in 2, 1:
+        events = m.step_over_breakpoint()
+        assert events == m._NO_EVENTS
+        assert (m.pc, m.bc) == (0x0000, count)
+
+        events = m.run()
+        assert events == m._BREAKPOINT_HIT
+        assert (m.pc, m.bc) == (0x0000, count)
+
+    # The last iteration moves past the instruction.
+    events = m.step_over_breakpoint()
+    assert events == m._NO_EVENTS
+    assert (m.pc, m.bc) == (0x0002, 0)
+    assert bytes(m.memory[0x2000:0x2003]) == b'abc'

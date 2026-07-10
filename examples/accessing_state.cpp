@@ -1,4 +1,11 @@
 
+/*  Z80 CPU Emulator.
+    https://github.com/kosarev/z80
+
+    Copyright (c) 2019-2026 Ivan Kosarev <mail@ivankosarev.com>
+    Published under the MIT license.
+*/
+
 #include "z80.h"
 
 using z80::fast_u8;
@@ -21,12 +28,14 @@ public:
         memory[addr] = static_cast<least_u8>(n);
     }
 
-    void on_step() {
+    z80::events_mask::type on_step() {
         std::printf("hl = %04x\n", static_cast<unsigned>(get_hl()));
-        base::on_step();
+        z80::events_mask::type events = base::on_step();
 
         // Start over on every new instruction.
         set_pc(0x0000);
+
+        return events;
     }
 
 private:

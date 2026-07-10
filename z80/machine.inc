@@ -2,7 +2,7 @@
 /*  Z80 Machine Emulation Module for Python.
     https://github.com/kosarev/z80
 
-    Copyright (C) 2019-2025 Ivan Kosarev.
+    Copyright (C) 2019-2026 Ivan Kosarev.
     mail@ivankosarev.com
 
     Published under the MIT license.
@@ -307,6 +307,14 @@ static PyObject *run(PyObject *self, PyObject *args) {
     return Py_BuildValue("i", events);
 }
 
+static PyObject *step_over_breakpoint(PyObject *self, PyObject *args) {
+    auto &machine = cast_machine(self);
+    z80::events_mask::type events = machine.on_step_over_breakpoint();
+    if(PyErr_Occurred())
+        return nullptr;
+    return Py_BuildValue("i", events);
+}
+
 #if defined(Z80_MACHINE)
 static PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
     bool int_initiated = cast_machine(self).on_handle_active_int();
@@ -363,6 +371,10 @@ static PyMethodDef methods[] = {
      "Set a callback function handling the interrupt mode 2 vector address."},
     {"run", run, METH_NOARGS,
      "Run emulator until one or several events are signaled."},
+    {"step_over_breakpoint", step_over_breakpoint, METH_NOARGS,
+     "Execute one instruction with breakpoints not consulted, thus "
+     "stepping over a breakpoint at PC, and return the events raised "
+     "during the step."},
 #if defined(Z80_MACHINE)
     {"on_handle_active_int", on_handle_active_int, METH_NOARGS,
      "Attempts to initiate a masked interrupt."},

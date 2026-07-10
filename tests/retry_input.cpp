@@ -52,14 +52,12 @@ static void test_retry_input() {
     e.set_af(0x0000);  // Read the port into a known A.
 
     // IN A, (0xfe) at 0x0000, followed by a breakpoint.
-    e.on_write(0x0000, 0xdb);
-    e.on_write(0x0001, 0xfe);
+    e.write(0x0000, 0xdb);
+    e.write(0x0001, 0xfe);
     e.set_breakpoint(0x0002);
 
     // The port isn't available yet, so the instruction is aborted and all
-    // its state changes are rolled back -- including the PC having reached
-    // the breakpoint while fetching the operand, so only retry_input gets
-    // reported, not breakpoint_hit.
+    // its state changes are rolled back, reporting just retry_input.
     z80::events_mask::type events = e.on_run();
     CHECK(events == z80::events_mask::retry_input);
     CHECK(e.get_pc() == 0x0000);

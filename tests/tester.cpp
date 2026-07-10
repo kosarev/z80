@@ -2,7 +2,7 @@
 /*  Z80 CPU Emulator.
     https://github.com/kosarev/z80
 
-    Copyright (c) 2017 Ivan Kosarev <mail@ivankosarev.com>
+    Copyright (c) 2017-2026 Ivan Kosarev <mail@ivankosarev.com>
     Published under the MIT license.
 */
 
@@ -824,9 +824,10 @@ public:
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", 0, wz);
                                   return base::on_set_wz(wz); }
 
-    void on_step() {
-        base::on_step();
+    z80::events_mask::type on_step() {
+        z80::events_mask::type events = base::on_step();
         context.match("done", static_cast<unsigned>(get_ticks()));
+        return events;
     }
 
     [[noreturn]] void set_variant(z80_variant v, const test_input &input) {
@@ -882,14 +883,15 @@ public:
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);
                                   return base::on_set_wz(wz); }
 
-    void on_step() {
-        base::on_step();
+    z80::events_mask::type on_step() {
+        z80::events_mask::type events = base::on_step();
 
         // Do one more step if the previous opcode was a prefix.
         if(base::get_iregp_kind() != z80::iregp::hl)
-            base::on_step();
+            events = base::on_step();
 
         context.match("done", static_cast<unsigned>(get_ticks()));
+        return events;
     }
 
     void set_variant(z80_variant v, const test_input &input) {

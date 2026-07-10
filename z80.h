@@ -609,6 +609,13 @@ public:
     void on_raise_events(events_mask::type events) {
         self().on_set_events(self().on_get_events() | events); }
 
+    // Tells if there is a breakpoint at the given address, consulted at
+    // every attempt to execute an instruction. The default is a constant
+    // false, letting the whole check compile away.
+    bool on_is_breakpoint_addr(fast_u16 addr) const {
+        unused(addr);
+        return false; }
+
     // Save and restore the state so an instruction aborted by a not-yet-
     // available port read (see retry_input) can be retried. What exactly
     // constitutes the state to save and restore is up to the specific
@@ -3734,7 +3741,10 @@ public:
             self().set_pc_on_block_instr(sub16(pc, 2));
         } }
 
-    void on_step() {
+    events_mask::type on_step_over_breakpoint() {
+        // Return the events raised during this specific step.
+        self().on_set_events(0);
+
         self().on_save_retry_state();
         self().on_set_is_int_disabled(false);  // TODO: Should we really do that for both the CPUs?
         self().on_fetch_and_decode();
@@ -3747,6 +3757,27 @@ public:
             self().on_restore_retry_state();
             self().on_set_events(events_mask::retry_input);
         }
+
+        return self().on_get_events();
+    }
+
+    events_mask::type on_step() {
+        // Catch breakpoints at attempts to execute the marked instruction.
+        // While halted, the CPU keeps fetching at PC without executing
+        // anything, so such steps must not trap.
+        if(!self().on_is_halted() &&
+                self().on_is_breakpoint_addr(self().on_get_pc())) {
+            // A trap commits nothing, so it can raise no further events
+            // and its per-step events are exactly breakpoint_hit. Set
+            // rather than raise the event, so events left from a
+            // preceding explicitly stepped-over instruction are not
+            // re-reported.
+            events_mask::type events = events_mask::breakpoint_hit;
+            self().on_set_events(events);
+            return events;
+        }
+
+        return self().on_step_over_breakpoint();
     }
 
 private:
@@ -4038,6 +4069,10 @@ public:
         return is_marked_addr(addr, state_fields::breakpoint_mark);
     }
 
+    bool on_is_breakpoint_addr(fast_u16 addr) const {
+        return is_breakpoint_addr(addr);
+    }
+
     void set_breakpoint(fast_u16 addr) {
         mark_addr(addr, state_fields::breakpoint_mark);
     }
@@ -4056,12 +4091,6 @@ public:
         }
     }
 
-    void on_set_pc(fast_u16 n) {
-        if(is_breakpoint_addr(n))
-            fields.events |= events_mask::breakpoint_hit;
-        base::on_set_pc(n);
-    }
-
     ticks_type get_frame_tick() const { return fields.frame_tick; }
     void set_frame_tick(ticks_type frame_tick) { fields.frame_tick = frame_tick; }
 
@@ -4069,10 +4098,8 @@ public:
     void on_set_events(events_mask::type events) { fields.events = events; }
 
     events_mask::type on_run() {
-        fields.events = 0;
-        while(!fields.events)
-            self().on_step();
-        return fields.events;
+        while(self().on_step() == 0) {}
+        return self().on_get_events();
     }
 
     void on_reset(bool soft = false) {

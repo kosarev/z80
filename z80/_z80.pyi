@@ -42,6 +42,9 @@ class _Z80Machine:
     def run(self) -> int:
         ...
 
+    def step_over_breakpoint(self) -> int:
+        ...
+
     def on_handle_active_int(self) -> None:
         ...
 
@@ -89,6 +92,9 @@ class _I8080Machine:
         ...
 
     def run(self) -> int:
+        ...
+
+    def step_over_breakpoint(self) -> int:
         ...
 
     @staticmethod

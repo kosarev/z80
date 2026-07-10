@@ -256,12 +256,14 @@ class my_emulator : public z80::z80_cpu<my_emulator> {
 public:
     ...
 
-    void on_step() {
+    z80::events_mask::type on_step() {
         std::printf("hl = %04x\n", static_cast<unsigned>(get_hl()));
-        base::on_step();
+        z80::events_mask::type events = base::on_step();
 
         // Start over on every new instruction.
         set_pc(0x0000);
+
+        return events;
     }
 ```
 [accessing_state.cpp](https://github.com/kosarev/z80/blob/master/examples/accessing_state.cpp)
