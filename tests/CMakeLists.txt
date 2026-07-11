@@ -10,6 +10,7 @@ set(TESTS
     reset
     retry_input
     root
+    timing
     )
 
 foreach(test ${TESTS})

@@ -535,9 +535,9 @@ public:
         self().on_tick(3); }
     fast_u8 on_read_cycle(fast_u16 addr) {
         self().on_set_addr_bus(addr);
-        fast_u8 n = self().on_read(addr);
         self().on_tick(2);
         self().on_mreq_wait(addr);
+        fast_u8 n = self().on_read(addr);
         self().on_tick(1);
         return n; }
     void on_read_cycle_extra_1t() {
@@ -546,9 +546,9 @@ public:
         self().on_tick(2); }
     void on_write_cycle(fast_u16 addr, fast_u8 n) {
         self().on_set_addr_bus(addr);
-        self().on_write(addr, n);
         self().on_tick(2);
         self().on_mreq_wait(addr);
+        self().on_write(addr, n);
         self().on_tick(1); }
     void on_write_cycle_extra_2t() {
         self().on_tick(2); }
@@ -2490,9 +2490,9 @@ public:
     fast_u8 on_fetch_cycle() {
         fast_u16 addr = self().get_pc_on_fetch();
         self().on_set_addr_bus(addr);
-        fast_u8 n = self().on_read(addr);
         self().on_tick(2);
         self().on_mreq_wait(addr);
+        fast_u8 n = self().on_read(addr);
         if(self().on_is_z80())
             self().on_set_addr_bus(self().get_ir_on_refresh());
         self().on_tick(2);
@@ -2564,10 +2564,10 @@ public:
         }
         self().on_tick(z80 ? 3 : 2);
         self().on_iorq_wait(port);
-        self().on_tick(1);
         fast_u8 n = self().on_input(port);
         if(n == retry_input)
             self().on_raise_events(events_mask::retry_input);
+        self().on_tick(1);
         return n; }
     void on_output_cycle(fast_u16 port, fast_u8 n) {
         bool z80 = self().on_is_z80();
@@ -2577,8 +2577,8 @@ public:
         }
         self().on_tick(z80 ? 3 : 2);
         self().on_iorq_wait(port);
-        self().on_tick(1);
-        self().on_output(port, n); }
+        self().on_output(port, n);
+        self().on_tick(1); }
 
     void on_set_addr_bus(fast_u16 addr) {
         unused(addr); }

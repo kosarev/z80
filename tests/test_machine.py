@@ -163,6 +163,24 @@ def test_write_and_output_callbacks(
     assert outputs == [(output_addr, 0x42)]
 
 
+def test_read_callback_timing() -> None:
+    # Callbacks observe the clock at the hardware sampling positions:
+    # an opcode read fires entering the t3 of its fetch cycle, with
+    # two ticks of the cycle completed.
+    m = z80.Z80Machine()
+    ticks: list[int] = []
+
+    def read(addr: int) -> int:
+        ticks.append(m.frame_tick)
+        return 0x00  # nop
+
+    m.set_read_callback(read)
+    m.ticks_to_stop = 8  # Two nops.
+    events = m.run()
+    assert events == m._TICKS_LIMIT_HIT
+    assert ticks == [2, 6]
+
+
 def test_read_callback_exception() -> None:
     # An exception raised in a callback stops the run at the end of
     # the current instruction and propagates unchanged; no further
