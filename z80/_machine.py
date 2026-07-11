@@ -471,7 +471,8 @@ class Z80State(_StateBase):
 
 class _MachineBase(object):
     # Events. The bit values follow the composition of the modules
-    # declaring them; bit 1 is retry_input, not exposed here.
+    # declaring them; the bits not listed (retry_input,
+    # stop_requested) are internal and not exposed here.
     _NO_EVENTS = 0
     _BREAKPOINT_HIT = 1 << 0
     _TICKS_LIMIT_HIT = 1 << 2

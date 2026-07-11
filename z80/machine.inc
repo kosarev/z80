@@ -318,6 +318,8 @@ static PyObject *step_over_breakpoint(PyObject *self, PyObject *args) {
 #if defined(Z80_MACHINE)
 static PyObject *on_handle_active_int(PyObject *self, PyObject *args) {
     bool int_initiated = cast_machine(self).on_handle_active_int();
+    if(PyErr_Occurred())
+        return nullptr;
     return PyBool_FromLong(int_initiated);
 }
 #endif  // defined(Z80_MACHINE)

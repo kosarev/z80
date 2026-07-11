@@ -163,6 +163,73 @@ def test_write_and_output_callbacks(
     assert outputs == [(output_addr, 0x42)]
 
 
+def test_read_callback_exception() -> None:
+    # An exception raised in a callback stops the run at the end of
+    # the current instruction and propagates unchanged; no further
+    # callbacks are invoked.
+    m = z80.Z80Machine()
+    calls: list[int] = []
+
+    def read(addr: int) -> int:
+        calls.append(addr)
+        raise RuntimeError('boom')
+
+    m.set_read_callback(read)
+    with pytest.raises(RuntimeError, match='boom'):
+        m.run()
+    assert calls == [0x0000]
+
+
+def test_read_callback_bad_result() -> None:
+    # A callback returning a non-integer raises a TypeError.
+    m = z80.Z80Machine()
+    m.set_read_callback(
+        lambda addr: 'xyzzy')  # type: ignore[arg-type, return-value]
+    with pytest.raises(TypeError, match='must be integer'):
+        m.run()
+
+
+def test_write_callback_exception() -> None:
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([0x32, 0x00, 0x80]))  # ld (0x8000), a
+
+    def write(addr: int, value: int) -> None:
+        raise RuntimeError('boom')
+
+    m.set_write_callback(write)
+    with pytest.raises(RuntimeError, match='boom'):
+        m.run()
+
+
+def test_input_callback_exception() -> None:
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([0xdb, 0xfe]))  # in a, (0xfe)
+
+    def input_(addr: int) -> int:
+        raise RuntimeError('boom')
+
+    m.set_input_callback(input_)
+    with pytest.raises(RuntimeError, match='boom'):
+        m.run()
+
+
+def test_int_vector_callback_exception() -> None:
+    # Execute 'ei; im 2', then attempt an interrupt whose vector
+    # callback raises.
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, bytes([0xfb, 0xed, 0x5e]))
+    m.ticks_to_stop = 12
+    events = m.run()
+    assert events == m._TICKS_LIMIT_HIT
+
+    def vector() -> int:
+        raise RuntimeError('boom')
+
+    m.set_get_int_vector_callback(vector)
+    with pytest.raises(RuntimeError, match='boom'):
+        m.on_handle_active_int()
+
+
 def test_breakpoint_trip_and_resume() -> None:
     # A breakpoint fires on the attempt to execute the marked
     # instruction, before it makes any progress; resuming means

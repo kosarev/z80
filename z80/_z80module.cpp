@@ -74,8 +74,10 @@ public:
             type(1) << (base::events_mask::unused_bit + 0);
         static const type end_of_frame =
             type(1) << (base::events_mask::unused_bit + 1);
+        static const type stop_requested =
+            type(1) << (base::events_mask::unused_bit + 2);
 
-        static const unsigned unused_bit = base::events_mask::unused_bit + 2;
+        static const unsigned unused_bit = base::events_mask::unused_bit + 3;
     };
 
     static const unsigned ticks_per_frame = 100 * 1000;
@@ -126,20 +128,27 @@ public:
             return state.memory[addr];
         }
 
+        // Never call back into Python with an exception pending;
+        // produce the default value instead.
+        if(PyErr_Occurred())
+            return default_value;
+
         PyObject *arg = Py_BuildValue("(i)", addr);
         decref_guard arg_guard(arg);
 
         PyObject *result = PyObject_CallObject(on_read_callback, arg);
         decref_guard result_guard(result);
 
+        // On errors, stop the run so the pending exception can
+        // propagate on its end.
         if(!result) {
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
         if(!PyLong_Check(result)) {
             PyErr_SetString(PyExc_TypeError, "returning value must be integer");
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
@@ -160,11 +169,17 @@ public:
             return;
         }
 
+        if(PyErr_Occurred())
+            return;
+
         PyObject *args = Py_BuildValue("(i, i)", addr, n);
         decref_guard arg_guard(args);
 
         PyObject *result = PyObject_CallObject(on_write_callback, args);
         decref_guard result_guard(result);
+
+        if(!result)
+            self().on_raise_events(events_mask::stop_requested);
     }
 
     PyObject *set_write_callback(PyObject *callback) {
@@ -178,6 +193,9 @@ public:
         if(!on_input_callback)
             return default_value;
 
+        if(PyErr_Occurred())
+            return default_value;
+
         PyObject *arg = Py_BuildValue("(i)", addr);
         decref_guard arg_guard(arg);
 
@@ -185,13 +203,13 @@ public:
         decref_guard result_guard(result);
 
         if(!result) {
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
         if(!PyLong_Check(result)) {
             PyErr_SetString(PyExc_TypeError, "returning value must be integer");
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
@@ -208,11 +226,17 @@ public:
         if(!on_output_callback)
             return;
 
+        if(PyErr_Occurred())
+            return;
+
         PyObject *args = Py_BuildValue("(i, i)", addr, value);
         decref_guard arg_guard(args);
 
         PyObject *result = PyObject_CallObject(on_output_callback, args);
         decref_guard result_guard(result);
+
+        if(!result)
+            self().on_raise_events(events_mask::stop_requested);
     }
 
     PyObject *set_output_callback(PyObject *callback) {
@@ -224,9 +248,12 @@ public:
     void on_reti() {
         base::on_reti();
 
-        if(on_reti_callback) {
+        if(on_reti_callback && !PyErr_Occurred()) {
             PyObject *result = PyObject_CallObject(on_reti_callback, NULL);
             decref_guard result_guard(result);
+
+            if(!result)
+                self().on_raise_events(events_mask::stop_requested);
         }
     }
 
@@ -241,17 +268,20 @@ public:
         if(!on_get_int_vector_callback)
             return base::on_get_int_vector();
 
+        if(PyErr_Occurred())
+            return default_value;
+
         PyObject *result = PyObject_CallObject(on_get_int_vector_callback, NULL);
         decref_guard result_guard(result);
 
         if(!result) {
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
         if(!PyLong_Check(result)) {
             PyErr_SetString(PyExc_TypeError, "returning value must be integer");
-            assert(0);  // TODO: stop();
+            self().on_raise_events(events_mask::stop_requested);
             return default_value;
         }
 
