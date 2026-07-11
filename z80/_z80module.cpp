@@ -72,14 +72,50 @@ public:
 
         static const type ticks_limit_hit =
             type(1) << (base::events_mask::unused_bit + 0);
+        static const type end_of_frame =
+            type(1) << (base::events_mask::unused_bit + 1);
 
-        static const unsigned unused_bit = base::events_mask::unused_bit + 1;
+        static const unsigned unused_bit = base::events_mask::unused_bit + 2;
     };
+
+    static const unsigned ticks_per_frame = 100 * 1000;
+
+    static const fast_u8 breakpoint_mark = 1u << 0;
 
     machine() {}
 
     machine_state &get_state() {
         return state;
+    }
+
+    bool is_marked_addr(fast_u16 addr, fast_u8 marks) const {
+        return (address_marks[z80::mask16(addr)] & marks) != 0;
+    }
+
+    void mark_addrs(fast_u16 addr, fast_u16 size, fast_u8 marks) {
+        for(fast_u16 i = 0; i != size; ++i)
+            address_marks[z80::mask16(addr + i)] |=
+                static_cast<least_u8>(marks);
+    }
+
+    void unmark_addrs(fast_u16 addr, fast_u16 size, fast_u8 marks) {
+        for(fast_u16 i = 0; i != size; ++i)
+            address_marks[z80::mask16(addr + i)] &=
+                static_cast<least_u8>(~marks);
+    }
+
+    bool on_is_breakpoint_addr(fast_u16 addr) const {
+        return is_marked_addr(addr, breakpoint_mark);
+    }
+
+    typename events_mask::type on_get_events() const { return events; }
+    void on_set_events(typename events_mask::type new_events) {
+        events = new_events;
+    }
+
+    typename events_mask::type on_run() {
+        while(self().on_step() == 0) {}
+        return self().on_get_events();
     }
 
     fast_u8 on_read(fast_u16 addr) {
@@ -299,6 +335,13 @@ public:
                 self().on_raise_events(events_mask::ticks_limit_hit);
             }
         }
+
+        // Account the ticks toward the current frame.
+        state.frame_tick += t;
+        if(state.frame_tick >= ticks_per_frame) {
+            state.frame_tick %= ticks_per_frame;
+            self().on_raise_events(events_mask::end_of_frame);
+        }
     }
 
 #if 0  // TODO
@@ -323,6 +366,9 @@ protected:
     machine_state state;
 
 private:
+    typename events_mask::type events = 0;
+    least_u8 address_marks[z80::address_space_size] = {};
+
     PyObject *on_read_callback = nullptr;
     PyObject *on_write_callback = nullptr;
     PyObject *on_input_callback = nullptr;

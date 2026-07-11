@@ -30,6 +30,7 @@ struct __attribute__((packed)) object_state {
     least_u16 last_read_addr = 0;
 
     least_u32 ticks_to_stop = 0;  // Null means no limit.
+    least_u32 frame_tick = 0;
 
 #if defined(I8080_MACHINE)
     least_u8 iff = 0;
@@ -73,10 +74,9 @@ struct __attribute__((packed)) object_state {
 
 #if defined(I8080_MACHINE)
 class machine_object
-    : public z80::machine_state<
-        machine<z80::i8080_executor<
-            z80::i8080_decoder<z80::root<machine_object>>>,
-        object_state>> {
+    : public machine<z80::i8080_executor<
+          z80::i8080_decoder<z80::root<machine_object>>>,
+      object_state> {
 public:
     bool on_get_iff() const { return state.iff != 0; }
     void on_set_iff(bool f) { state.iff = f; }
@@ -86,10 +86,9 @@ class disasm : public disasm_base<z80::i8080_disasm<disasm>>
 {};
 #elif defined(Z80_MACHINE)
 class machine_object
-    : public z80::machine_state<
-        machine<z80::z80_executor<
-            z80::z80_decoder<z80::root<machine_object>>>,
-        object_state>> {
+    : public machine<z80::z80_executor<
+          z80::z80_decoder<z80::root<machine_object>>>,
+      object_state> {
 public:
     iregp on_get_iregp_kind() const {
         return static_cast<iregp>(state.irp_kind); }

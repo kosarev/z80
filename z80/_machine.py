@@ -54,6 +54,7 @@ class _StateBase(object):
         self.__wz = parser.parse_word()
         self.__last_read_addr = parser.parse_word()
         self.__ticks_to_stop = parser.parse_u32()
+        parser.parse_u32()  # frame_tick.
 
     def _parse_memory(self, parser: _ImageParser) -> None:
         block = parser.parse_rest()
