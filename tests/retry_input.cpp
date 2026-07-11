@@ -47,6 +47,8 @@ private:
     unsigned saved_ticks = 0;
 };
 
+using events_mask = my_emulator::events_mask;
+
 static void test_retry_input() {
     my_emulator e;
     e.set_af(0x0000);  // Read the port into a known A.
@@ -58,8 +60,8 @@ static void test_retry_input() {
 
     // The port isn't available yet, so the instruction is aborted and all
     // its state changes are rolled back, reporting just retry_input.
-    z80::events_mask::type events = e.on_run();
-    CHECK(events == z80::events_mask::retry_input);
+    events_mask::type events = e.on_run();
+    CHECK(events == events_mask::retry_input);
     CHECK(e.get_pc() == 0x0000);
     CHECK(e.get_r() == 0x00);
     CHECK(e.get_frame_tick() == 0);
@@ -69,7 +71,7 @@ static void test_retry_input() {
     // On retry the port is available, so the instruction completes and
     // execution stops at the following breakpoint.
     events = e.on_run();
-    CHECK(events == z80::events_mask::breakpoint_hit);
+    CHECK(events == events_mask::breakpoint_hit);
     CHECK(e.get_pc() == 0x0002);
     CHECK(e.get_a() == 0x5a);
     CHECK(e.input_attempts == 2);

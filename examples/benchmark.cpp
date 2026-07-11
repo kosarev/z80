@@ -87,7 +87,7 @@ public:
         }
     }
 
-    z80::events_mask::type on_step() {
+    typename base::events_mask::type on_step() {
         if(base::get_pc() == bdos_addr)
             handle_bdos_call();
 

@@ -824,8 +824,8 @@ public:
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", 0, wz);
                                   return base::on_set_wz(wz); }
 
-    z80::events_mask::type on_step() {
-        z80::events_mask::type events = base::on_step();
+    events_mask::type on_step() {
+        events_mask::type events = base::on_step();
         context.match("done", static_cast<unsigned>(get_ticks()));
         return events;
     }
@@ -883,8 +883,8 @@ public:
     void on_set_wz(fast_u16 wz) { match_set_rp("wz", base::get_wz(), wz);
                                   return base::on_set_wz(wz); }
 
-    z80::events_mask::type on_step() {
-        z80::events_mask::type events = base::on_step();
+    events_mask::type on_step() {
+        events_mask::type events = base::on_step();
 
         // Do one more step if the previous opcode was a prefix.
         if(base::get_iregp_kind() != z80::iregp::hl)

@@ -65,6 +65,17 @@ public:
     typedef B base;
     typedef S machine_state;
 
+    // The events this module's logic raises.
+    class events_mask : public base::events_mask {
+    public:
+        using typename base::events_mask::type;
+
+        static const type ticks_limit_hit =
+            type(1) << (base::events_mask::unused_bit + 0);
+
+        static const unsigned unused_bit = base::events_mask::unused_bit + 1;
+    };
+
     machine() {}
 
     machine_state &get_state() {
@@ -285,13 +296,13 @@ public:
                 state.ticks_to_stop -= t;
             } else {
                 state.ticks_to_stop = 0;
-                self().on_raise_events(z80::events_mask::ticks_limit_hit);
+                self().on_raise_events(events_mask::ticks_limit_hit);
             }
         }
     }
 
 #if 0  // TODO
-    z80::events_mask::type on_step() {
+    events_mask::type on_step() {
         fprintf(stderr, "PC=%04x SP=%04x BC=%04x DE=%04x HL=%04x AF=%04x %02x%02x%02x%02x\n",
                 static_cast<unsigned>(state.pc),
                 static_cast<unsigned>(state.sp),

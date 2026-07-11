@@ -301,7 +301,7 @@ static PyObject *set_get_int_vector_callback(PyObject *self, PyObject *args) {
 
 static PyObject *run(PyObject *self, PyObject *args) {
     auto &machine = cast_machine(self);
-    z80::events_mask::type events = machine.on_run();
+    machine_object::events_mask::type events = machine.on_run();
     if(PyErr_Occurred())
         return nullptr;
     return Py_BuildValue("i", events);
@@ -309,7 +309,8 @@ static PyObject *run(PyObject *self, PyObject *args) {
 
 static PyObject *step_over_breakpoint(PyObject *self, PyObject *args) {
     auto &machine = cast_machine(self);
-    z80::events_mask::type events = machine.on_step_over_breakpoint();
+    machine_object::events_mask::type events =
+        machine.on_step_over_breakpoint();
     if(PyErr_Occurred())
         return nullptr;
     return Py_BuildValue("i", events);

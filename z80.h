@@ -158,18 +158,6 @@ public:
     static const unsigned unused_bit = 0;
 };
 
-class events_mask : public bitmask {
-public:
-    using base = bitmask;
-
-    static const type end_of_frame = type(1) << (base::unused_bit + 0);
-    static const type breakpoint_hit = type(1) << (base::unused_bit + 1);
-    static const type ticks_limit_hit = type(1) << (base::unused_bit + 2);
-    static const type retry_input = type(1) << (base::unused_bit + 3);
-
-    static const unsigned unused_bit = base::unused_bit + 4;
-};
-
 // The value on_input() returns to indicate the port value is not
 // available yet, so the instruction reading it has to be retried later.
 static const fast_u8 retry_input = static_cast<fast_u8>(-1);
@@ -204,6 +192,11 @@ template<typename D>
 class root {
 public:
     typedef D derived;
+
+    // The seed of the events mask composition: no events. A module
+    // whose logic raises events extends the mask of its base module,
+    // the same way modules extend behaviour.
+    using events_mask = bitmask;
 
     iregp on_get_iregp_kind() const { return iregp::hl; }
     void on_set_iregp_kind(iregp r) { unused(r); }
@@ -2429,6 +2422,19 @@ class internals::executor_base : public B {
 public:
     typedef B base;
 
+    // The events this module's logic raises.
+    class events_mask : public base::events_mask {
+    public:
+        using typename base::events_mask::type;
+
+        static const type breakpoint_hit =
+            type(1) << (base::events_mask::unused_bit + 0);
+        static const type retry_input =
+            type(1) << (base::events_mask::unused_bit + 1);
+
+        static const unsigned unused_bit = base::events_mask::unused_bit + 2;
+    };
+
     executor_base() {}
 
     // TODO: Eliminate?
@@ -3741,7 +3747,7 @@ public:
             self().set_pc_on_block_instr(sub16(pc, 2));
         } }
 
-    events_mask::type on_step_over_breakpoint() {
+    typename events_mask::type on_step_over_breakpoint() {
         // Return the events raised during this specific step.
         self().on_set_events(0);
 
@@ -3761,7 +3767,7 @@ public:
         return self().on_get_events();
     }
 
-    events_mask::type on_step() {
+    typename events_mask::type on_step() {
         // Catch breakpoints at attempts to execute the marked instruction.
         // While halted, the CPU keeps fetching at PC without executing
         // anything, so such steps must not trap.
@@ -3772,7 +3778,7 @@ public:
             // rather than raise the event, so events left from a
             // preceding explicitly stepped-over instruction are not
             // re-reported.
-            events_mask::type events = events_mask::breakpoint_hit;
+            typename events_mask::type events = events_mask::breakpoint_hit;
             self().on_set_events(events);
             return events;
         }
@@ -4041,6 +4047,17 @@ public:
     typedef B base;
     typedef unsigned ticks_type;
 
+    // The events this module's logic raises.
+    class events_mask : public base::events_mask {
+    public:
+        using typename base::events_mask::type;
+
+        static const type end_of_frame =
+            type(1) << (base::events_mask::unused_bit + 0);
+
+        static const unsigned unused_bit = base::events_mask::unused_bit + 1;
+    };
+
     machine_state() {}
 
     bool is_marked_addr(fast_u16 addr, fast_u8 marks) const {
@@ -4094,10 +4111,11 @@ public:
     ticks_type get_frame_tick() const { return fields.frame_tick; }
     void set_frame_tick(ticks_type frame_tick) { fields.frame_tick = frame_tick; }
 
-    events_mask::type on_get_events() const { return fields.events; }
-    void on_set_events(events_mask::type events) { fields.events = events; }
+    typename events_mask::type on_get_events() const { return fields.events; }
+    void on_set_events(typename events_mask::type events) {
+        fields.events = events; }
 
-    events_mask::type on_run() {
+    typename events_mask::type on_run() {
         while(self().on_step() == 0) {}
         return self().on_get_events();
     }
@@ -4115,7 +4133,7 @@ private:
         ticks_type frame_tick = 0;
         static const ticks_type ticks_per_frame = 100 * 1000;
 
-        events_mask::type events = 0;
+        typename events_mask::type events = 0;
 
         static const fast_u8 breakpoint_mark = 1u << 0;
         least_u8 address_marks[address_space_size] = {};

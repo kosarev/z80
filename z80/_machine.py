@@ -465,11 +465,12 @@ class Z80State(_StateBase):
 
 
 class _MachineBase(object):
-    # Events.
+    # Events. The bit values follow the composition of the modules
+    # declaring them; bit 1 is retry_input, not exposed here.
     _NO_EVENTS = 0
-    _END_OF_FRAME = 1 << 0
-    _BREAKPOINT_HIT = 1 << 1
+    _BREAKPOINT_HIT = 1 << 0
     _TICKS_LIMIT_HIT = 1 << 2
+    _END_OF_FRAME = 1 << 3
 
     # Address marks.
     _NO_MARKS = 0

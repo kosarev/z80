@@ -256,9 +256,9 @@ class my_emulator : public z80::z80_cpu<my_emulator> {
 public:
     ...
 
-    z80::events_mask::type on_step() {
+    events_mask::type on_step() {
         std::printf("hl = %04x\n", static_cast<unsigned>(get_hl()));
-        z80::events_mask::type events = base::on_step();
+        events_mask::type events = base::on_step();
 
         // Start over on every new instruction.
         set_pc(0x0000);
@@ -349,6 +349,8 @@ class root {
 public:
     typedef D derived;
 
+    using events_mask = bitmask;
+
     ...
 
     fast_u8 on_read(fast_u16 addr) {
@@ -376,6 +378,18 @@ a decoder could do `self().on_ret()` whenever it runs into a
 Aside from that, the module contains dummy implementations of the
 standard handlers that do nothing or, if they have to return
 something, return some default values.
+
+The root module also seeds the `events_mask` type with an empty
+set of events.
+A module whose logic raises events shadows the name with an
+extension of its base module's mask, declaring the new bits
+relative to the base mask's `unused_bit`, so the set of events
+composes automatically as modules are layered: the executor
+declares `breakpoint_hit` and `retry_input`, the `machine_state<>`
+module declares `end_of_frame`, and custom modules declare their
+own events the same way.
+The composed mask is then available on the most derived class,
+e.g., `my_emulator::events_mask::breakpoint_hit`.
 
 
 ## State modules

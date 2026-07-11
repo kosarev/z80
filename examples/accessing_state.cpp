@@ -28,9 +28,9 @@ public:
         memory[addr] = static_cast<least_u8>(n);
     }
 
-    z80::events_mask::type on_step() {
+    events_mask::type on_step() {
         std::printf("hl = %04x\n", static_cast<unsigned>(get_hl()));
-        z80::events_mask::type events = base::on_step();
+        events_mask::type events = base::on_step();
 
         // Start over on every new instruction.
         set_pc(0x0000);
