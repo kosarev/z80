@@ -54,7 +54,7 @@ class _StateBase(object):
         self.__wz = parser.parse_word()
         self.__last_read_addr = parser.parse_word()
         self.__ticks_to_stop = parser.parse_u32()
-        parser.parse_u32()  # frame_tick.
+        self.__frame_tick = parser.parse_u32()
 
     def _parse_memory(self, parser: _ImageParser) -> None:
         block = parser.parse_rest()
@@ -195,6 +195,10 @@ class _StateBase(object):
     def ticks_to_stop(self, value: int) -> None:
         assert isinstance(self.__ticks_to_stop, WritableBytes)
         self.__ticks_to_stop[:] = value.to_bytes(4, 'little')
+
+    @property
+    def frame_tick(self) -> int:
+        return int.from_bytes(self.__frame_tick, 'little')
 
     def set_memory_block(self, addr: int, block: Bytes) -> None:
         assert isinstance(self.memory, WritableBytes)

@@ -19,6 +19,27 @@ def test_ticks_to_stop_round_trip() -> None:
     assert m.ticks_to_stop == 0x12345678
 
 
+@pytest.mark.parametrize('machine_type', [z80.Z80Machine, z80.I8080Machine])
+def test_frame_tick_counts_and_wraps(
+        machine_type: type[z80.I8080Machine | z80.Z80Machine]) -> None:
+    # 'frame_tick' exposes the number of ticks into the current
+    # 100000-tick frame (issue #67).
+    m = machine_type()
+    assert m.frame_tick == 0
+
+    # Execute nops for exactly 1000 ticks.
+    m.ticks_to_stop = 1000
+    events = m.run()
+    assert events == m._TICKS_LIMIT_HIT
+    assert m.frame_tick == 1000
+
+    # Completing the frame raises the end-of-frame event and wraps
+    # the counter.
+    events = m.run()
+    assert events == m._END_OF_FRAME
+    assert m.frame_tick == 0
+
+
 def test_registers_round_trip() -> None:
     # All registers must be accessible as public properties,
     # including 'alt_af' and 'ir' (issue #68).
