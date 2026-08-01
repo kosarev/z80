@@ -12,6 +12,7 @@ import typing
 from ._disasm import (
     _AsmLine,
     _ByteTag,
+    _CallConvTag,
     _CommentTag,
     _DisasmError,
     _EntryTag,
@@ -150,12 +151,38 @@ class _DisasmTagParser:
 
         return _EntryTag(name.pos, addr, sp)
 
+    def __parse_callconv_tag(self, addr: int,
+                             name: _Token) -> _CallConvTag:
+        error = 'A calling convention expected.'
+        tok = self.__fetch_token(error)
+        assert tok is not None and tok.literal is not None
+
+        args_size = None
+        args_end = None
+        noreturn = False
+        if tok == 'noreturn':
+            noreturn = True
+        elif tok == 'args_size':
+            self.__parse_expected_token('=')
+            args_size = self.__parse_number()
+        elif tok == 'args_end':
+            self.__parse_expected_token('=')
+            args_end = self.__parse_number()
+        else:
+            raise _DisasmError(tok, 'Unknown calling convention.')
+
+        self.__fetch_token()
+
+        return _CallConvTag(name.pos, addr, args_size, args_end,
+                            noreturn)
+
     __TAG_PARSERS: typing.ClassVar[dict[
         str,
         typing.Callable[['_DisasmTagParser', int, _Token], _Tag]]] = {
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
         _InstrTag.ID: __parse_instr_tag,
         _EntryTag.ID: __parse_entry_tag,
+        _CallConvTag.ID: __parse_callconv_tag,
         _LabelTag.ID: __parse_label_tag,
     }
 

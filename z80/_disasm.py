@@ -259,6 +259,24 @@ class _EntryTag(_Tag):
         self.sp = sp
 
 
+# Declares the calling convention of the routine at the tagged
+# address: each call to it is followed by args_size inline argument
+# bytes, or by argument bytes running up to and including the
+# args_end terminator, or, with noreturn, execution never comes
+# back at all.
+class _CallConvTag(_Tag):
+    ID = 'callconv'
+
+    def __init__(self, origin: _SourcePos, addr: int,
+                 args_size: int | None = None,
+                 args_end: int | None = None,
+                 noreturn: bool = False) -> None:
+        super().__init__(origin, addr, size=0)
+        self.args_size = args_size
+        self.args_end = args_end
+        self.noreturn = noreturn
+
+
 # The machine state as known at a specific point of execution:
 # for every field, the set of values it is known to possibly
 # have, with None standing for values that cannot be known. While
@@ -623,6 +641,7 @@ class _Disasm:
         _IncludeBinaryTag: 0,
         _InstrTag: 0,
         _EntryTag: 0,
+        _CallConvTag: 0,
         _LabelTag: 0,
 
         _DisasmTag: 1,
@@ -645,6 +664,10 @@ class _Disasm:
 
         # The entry tag, if there is one.
         self.__entry_tag: _EntryTag | None = None
+
+        # Translates routine addresses to their declared calling
+        # conventions.
+        self.__callconvs: dict[int, _CallConvTag] = {}
 
         # Translates label names to their tags.
         self.__label_names: dict[str, _LabelTag] = {}
@@ -738,6 +761,41 @@ class _Disasm:
         self.add_tags(_DisasmTag(tag.origin, tag.addr,
                                  _State(tag.sp, memory_clobbered=False)))
 
+    def __process_callconv_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _CallConvTag)
+        prev_tag = self.__callconvs.get(tag.addr)
+        if prev_tag is not None:
+            raise _DisasmError(
+                tag, 'Call convention redefined.',
+                _DisasmError(prev_tag, 'Previously defined here.'))
+
+        self.__callconvs[tag.addr] = tag
+        self.__tags[tag.addr].inline_tags.append(tag)
+
+    # The fall-through address of a call to a routine of the given
+    # convention: past the inline argument bytes, or nowhere for a
+    # non-returning routine or where the argument bytes run into
+    # unknown memory.
+    def __get_fallthrough_addr(self, conv: _CallConvTag,
+                               next_addr: int) -> int | None:
+        if conv.noreturn:
+            return None
+
+        if conv.args_size is not None:
+            return (next_addr + conv.args_size) % 0x10000
+
+        assert conv.args_end is not None
+        addr = next_addr
+        while True:
+            t = self.__tags[addr].byte_tag
+            if t is None:
+                return None
+
+            assert isinstance(t, _ByteTag)
+            addr = (addr + 1) % 0x10000
+            if t.value == conv.args_end:
+                return addr
+
     def __process_disasm_tag(self, tag: _Tag) -> None:
         assert isinstance(tag, _DisasmTag)
         tags = self.__tags[tag.addr]
@@ -815,9 +873,26 @@ class _Disasm:
                 self.add_tags(_DisasmTag(instr.origin, jump_target))
 
             # Calls are assumed to return, and conditional jumps
-            # may fall through.
+            # may fall through.  An unconditional call obeys its
+            # target's declared calling convention: inline argument
+            # bytes shift the fall-through address and stay data,
+            # and a non-returning target has no fall-through at
+            # all.  A conditional call ignores the convention, as
+            # its not-taken path genuinely runs the following
+            # bytes.
             if isinstance(instr, CallInstr) or instr.conditional:
-                self.add_tags(_DisasmTag(instr.origin, next_addr))
+                fallthrough_addr: int | None = next_addr
+                if (isinstance(instr, CallInstr) and
+                        not instr.conditional and
+                        not isinstance(jump_target, At)):
+                    conv = self.__callconvs.get(jump_target)
+                    if conv is not None:
+                        fallthrough_addr = self.__get_fallthrough_addr(
+                            conv, next_addr)
+
+                if fallthrough_addr is not None:
+                    self.add_tags(_DisasmTag(instr.origin,
+                                             fallthrough_addr))
 
             return
 
@@ -833,6 +908,7 @@ class _Disasm:
         _InlineCommentTag: __process_inline_comment_tag,
         _InstrTag: __process_instr_tag,
         _EntryTag: __process_entry_tag,
+        _CallConvTag: __process_callconv_tag,
         _LabelTag: __process_label_tag,
         _DisasmTag: __process_disasm_tag,
     }
@@ -858,10 +934,18 @@ class _Disasm:
             first_instr_byte: bool = False) -> (
                 typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
-            if isinstance(tag, (_InstrTag, _EntryTag)):
+            if isinstance(tag, (_InstrTag, _EntryTag, _CallConvTag)):
                 comment = f'.{tag.ID}'
                 if isinstance(tag, _EntryTag) and tag.sp is not None:
                     comment += f' sp={tag.sp:#06x}'
+                if isinstance(tag, _CallConvTag):
+                    if tag.noreturn:
+                        comment += ' noreturn'
+                    elif tag.args_size is not None:
+                        comment += f' args_size={tag.args_size}'
+                    else:
+                        assert tag.args_end is not None
+                        comment += f' args_end={tag.args_end:#04x}'
                 if tag.comment is not None:
                     assert isinstance(tag.comment, _Token)
                     assert isinstance(tag.comment.literal, str)
