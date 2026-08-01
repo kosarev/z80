@@ -20,6 +20,7 @@ from ._token import _Tokeniser
 
 class _DisasmTagParser(object):
     __TAG_LEADER = re.compile('@@')
+    __BYTE_LITERAL = re.compile(r'(0x)?[0-9a-f]{2}$')
 
     __tok: _Token | None
 
@@ -161,13 +162,17 @@ class _DisasmTagParser(object):
 
             tags: list[_Tag] = []
 
-            # Collect bytes, if any specified.
+            # Collect bytes, if any specified. Byte values are
+            # always two lowercase hex digits, optionally
+            # 0x-prefixed; comment words that happen to read as
+            # hex numbers, such as 'CF' or 'A', do not qualify.
             byte_offset = 0
             while tok is not None:
                 assert tok is not None and tok.literal is not None
-                value = self.__evaluate_numeric_literal(tok.literal, base=16)
-                if value is None:
+                if not self.__BYTE_LITERAL.match(tok.literal):
                     break
+
+                value = int(tok.literal, 16)
 
                 assert addr is not None
                 tags.append(_ByteTag(tok.pos, addr + byte_offset, value))
