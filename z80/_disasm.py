@@ -104,6 +104,15 @@ class _InlineCommentTag(_Tag):
         self.comment = comment
 
 
+class _LabelTag(_Tag):
+    ID = 'label'
+
+    def __init__(self, origin: _SourcePos | None, addr: int,
+                 name: str) -> None:
+        super().__init__(origin, addr, size=0)
+        self.name = name
+
+
 class _HintTag(_Tag):
     ID = 'hint'
 
@@ -422,13 +431,15 @@ class _TagSet(object):
         self.inline_tags: list[_Tag] = []
         self.byte_tag: _Tag | None = None
         self.disasm_tag: _Tag | None = None
+        self.label_tag: _Tag | None = None
 
     @property
     def empty(self) -> bool:
         return (len(self.infront_tags) == 0 and
                 len(self.inline_tags) == 0 and
                 self.byte_tag is None and
-                self.disasm_tag is None)
+                self.disasm_tag is None and
+                self.label_tag is None)
 
 
 class _AsmLine(object):
@@ -440,12 +451,14 @@ class _AsmLine(object):
 
     def __init__(self, command: str | _Tag | None = None,
                  addr: int | None = None, xbytes: list[int] = [],
-                 comment: str | _Tag | None = None, size: int = 0):
+                 comment: str | _Tag | None = None, size: int = 0,
+                 as_equ: bool = False):
         self.command = command
         self.addr = addr
         self.xbytes = xbytes
         self.comment = comment
         self.size = size
+        self.as_equ = as_equ
 
     @staticmethod
     def _verbalize_comment(comment: str, force_leader: bool = True) -> str:
@@ -456,6 +469,26 @@ class _AsmLine(object):
         return comment
 
     def __str__(self) -> str:
+        if isinstance(self.command, _LabelTag):
+            # Label definitions render as real assembly so the
+            # roundtrip check sees them; the annotation remains
+            # the source of truth. Labels at addresses that do
+            # not start a line become equ definitions.
+            assert isinstance(self.addr, int)
+            name = self.command.name
+            if self.as_equ:
+                line = '%s equ %#06x' % (name, self.addr)
+            else:
+                line = '%s:' % name
+            line = line.ljust(self._BYTES_INDENT)
+            line += '; @@ %#06x .label %s' % (self.addr, name)
+            comment = self.command.comment
+            if comment is not None:
+                assert isinstance(comment, _Token)
+                assert isinstance(comment.literal, str)
+                line += ' %s' % self._verbalize_comment(comment.literal)
+            return line.rstrip()
+
         line = ' ' * 4
         out_of_line = isinstance(self.command, _Tag)
         if self.command is not None and not out_of_line:
@@ -497,6 +530,7 @@ class _Disasm(object):
         _IncludeBinaryTag: 0,
         _InstrTag: 0,
         _EntryTag: 0,
+        _LabelTag: 0,
 
         _DisasmTag: 1,
 
@@ -518,6 +552,9 @@ class _Disasm(object):
 
         # The entry tag, if there is one.
         self.__entry_tag: _EntryTag | None = None
+
+        # Translates label names to their tags.
+        self.__label_names: dict[str, _LabelTag] = {}
 
     def __get_worklist(self, tag: _Tag) -> typing.Deque[_Tag]:
         # Use deque because of its popleft() being much faster
@@ -573,6 +610,24 @@ class _Disasm(object):
         assert isinstance(tag, _InstrTag)
         self.__tags[tag.addr].inline_tags.append(tag)
         self.add_tags(_DisasmTag(tag.origin, tag.addr))
+
+    def __process_label_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _LabelTag)
+        tags = self.__tags[tag.addr]
+        prev_tag = tags.label_tag
+        if prev_tag is not None:
+            raise _DisasmError(
+                tag, 'Label redefined.',
+                _DisasmError(prev_tag, 'Previously defined here.'))
+
+        prev_name_tag = self.__label_names.get(tag.name)
+        if prev_name_tag is not None:
+            raise _DisasmError(
+                tag, 'Label name redefined.',
+                _DisasmError(prev_name_tag, 'Previously defined here.'))
+
+        tags.label_tag = tag
+        self.__label_names[tag.name] = tag
 
     def __process_entry_tag(self, tag: _Tag) -> None:
         assert isinstance(tag, _EntryTag)
@@ -683,6 +738,7 @@ class _Disasm(object):
         _InlineCommentTag: __process_inline_comment_tag,
         _InstrTag: __process_instr_tag,
         _EntryTag: __process_entry_tag,
+        _LabelTag: __process_label_tag,
         _DisasmTag: __process_disasm_tag,
     }
 
@@ -743,14 +799,34 @@ class _Disasm(object):
         if tags.disasm_tag is not None or len(tags.infront_tags) != 0:
             return False
 
+        if tags.label_tag is not None:
+            return False
+
         if any(True for _ in self.__get_inline_comments(addr)):
             return False
 
         return True
 
+    def __get_instr_text(self, instr: Instr) -> str:
+        text = str(instr)
+
+        # Render jump and call targets at labelled addresses by
+        # their names. The target is the only numeric operand of
+        # these instructions, so plain text substitution is exact.
+        if (isinstance(instr, JumpInstr) and
+                not isinstance(instr, (RetInstr, RST))):
+            target = instr.target
+            if isinstance(target, int):
+                label_tag = self.__tags[target].label_tag
+                if label_tag is not None:
+                    assert isinstance(label_tag, _LabelTag)
+                    text = text.replace('%#x' % target, label_tag.name)
+
+        return text
+
     def __get_instr_lines(self, instr: Instr) -> (
             typing.Generator[_AsmLine, None, None]):
-        command: None | str = str(instr)
+        command: None | str = self.__get_instr_text(instr)
         addr = instr.addr
         assert isinstance(addr, int)
         t = self.__tags[addr].byte_tag
@@ -773,6 +849,11 @@ class _Disasm(object):
 
             for tag in self.__tags[addr].infront_tags:
                 yield _AsmLine(addr=addr, command=tag)
+
+            label_tag = self.__tags[addr].label_tag
+            if label_tag is not None:
+                yield _AsmLine(command=label_tag, addr=addr,
+                               as_equ=addr != instr.addr)
 
             first_instr_byte = addr == instr.addr
             inline_comments = list(
@@ -797,6 +878,9 @@ class _Disasm(object):
         tags = self.__tags[addr]
         for tag in tags.infront_tags:
             yield _AsmLine(addr=addr, command=tag)
+
+        if tags.label_tag is not None:
+            yield _AsmLine(command=tags.label_tag, addr=addr)
 
         if tags.byte_tag is None:
             return

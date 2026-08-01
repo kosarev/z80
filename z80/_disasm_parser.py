@@ -10,7 +10,7 @@ import re
 import typing
 
 from ._disasm import (_IncludeBinaryTag, _InstrTag, _EntryTag, _CommentTag,
-                      _ByteTag, _InlineCommentTag, _AsmLine)
+                      _ByteTag, _InlineCommentTag, _LabelTag, _AsmLine)
 from ._disasm import _DisasmError
 from ._disasm import _Tag
 from ._source import _SourceFile
@@ -107,6 +107,29 @@ class _DisasmTagParser(object):
 
         return value
 
+    # Names that would clash with assembler syntax if used as
+    # labels.
+    __RESERVED_LABEL_NAMES = frozenset(
+        'a b c d e f h l i r af bc de hl ix iy sp '
+        'ixh ixl iyh iyl nz z nc po pe p m '
+        'org db dw ds equ end include'.split())
+
+    __LABEL_NAME = re.compile(r'[a-zA-Z_][_0-9a-zA-Z]*$')
+
+    def __parse_label_tag(self, addr: int, name: _Token) -> _LabelTag:
+        error = 'A label name expected.'
+        tok = self.__fetch_token(error)
+        assert tok is not None and tok.literal is not None
+
+        if (not self.__LABEL_NAME.match(tok.literal) or
+                tok.literal.lower() in self.__RESERVED_LABEL_NAMES):
+            raise _DisasmError(tok, 'Not a valid label name.')
+
+        label_name = tok.literal
+        self.__fetch_token()
+
+        return _LabelTag(name.pos, addr, label_name)
+
     def __parse_entry_tag(self, addr: int, name: _Token) -> _EntryTag:
         tok = self.__fetch_token()
 
@@ -122,6 +145,7 @@ class _DisasmTagParser(object):
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
         _InstrTag.ID: __parse_instr_tag,
         _EntryTag.ID: __parse_entry_tag,
+        _LabelTag.ID: __parse_label_tag,
     }
 
     # Parses and returns a subsequent tag.
