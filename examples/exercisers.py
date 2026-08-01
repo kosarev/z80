@@ -9,10 +9,11 @@
 #   Published under the MIT license.
 
 import sys
+
 import z80
 
 
-class _CPMLikeMachineMixin(object):
+class _CPMLikeMachineMixin:
     _QUIT = 0x0000
     _BDOS_CALL = 0x0005
     _ENTRY = 0x0100
@@ -62,7 +63,7 @@ class _CPMLikeMachineMixin(object):
         elif c == self._C_WRITESTR:
             self._handle_writestr()
         else:
-            assert 0, 'BDOS call: c = 0x%02x' % c
+            assert 0, f'BDOS call: c = 0x{c:02x}'
 
     def _handle_breakpoint(self):
         pc = self.pc
@@ -72,7 +73,7 @@ class _CPMLikeMachineMixin(object):
         elif pc == 0x0005:
             self._handle_bdos_call()
         else:
-            assert 0, 'Breakpoint hit: pc = 0x%04x' % pc
+            assert 0, f'Breakpoint hit: pc = 0x{pc:04x}'
 
         return True
 

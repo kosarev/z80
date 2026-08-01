@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
 
 import sys
+
 from ._disasm import _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
@@ -25,7 +23,7 @@ def _pop_argument(args: list[str], error: str) -> str:
 
 def _handle_extra_arguments(args: list[str]) -> None:
     if args:
-        raise Error('Extra argument %r.' % args[0])
+        raise Error(f'Extra argument {args[0]!r}.')
 
 
 def _disasm(args: list[str]) -> None:
@@ -47,7 +45,7 @@ def _handle_command_line(args: list[str]) -> None:
         _disasm(args)
         return
 
-    raise Error('Unknown command %r.' % command)
+    raise Error(f'Unknown command {command!r}.')
 
 
 def main() -> None:

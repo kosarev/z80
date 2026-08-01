@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
@@ -11,8 +10,8 @@
 
 import os
 import platform
-from setuptools import Extension, setup
 
+from setuptools import Extension, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 

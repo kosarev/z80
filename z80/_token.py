@@ -1,21 +1,17 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
 
 import re
 
-from ._source import _SourceFile
-from ._source import _SourcePos
+from ._source import _SourceFile, _SourcePos
 
 
-class _Token(object):
+class _Token:
     def __init__(self, literal: str | None, pos: _SourcePos):
         self.literal = literal
         self.pos = pos
@@ -25,7 +21,7 @@ class _Token(object):
         return self.literal == literal
 
     def __repr__(self) -> str:
-        return '%s: %s' % (self.pos, self.literal)
+        return f'{self.pos}: {self.literal}'
 
     def __str__(self) -> str:
         # TODO
@@ -37,7 +33,7 @@ class _Token(object):
         return self.pos
 
 
-class _Tokeniser(object):
+class _Tokeniser:
     __WHITESPACE = re.compile(r'(\ |\t)+')
     __END_OF_LINE = re.compile(r'(\n|$)')
 

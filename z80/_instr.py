@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
@@ -13,32 +10,125 @@ import typing
 
 from ._source import _SourcePos
 
-
 # The public vocabulary re-exported by the package's __init__. This is the
 # single source of truth for what 'import z80' exposes from this module.
 __all__ = [
-    'ADD', 'ADC', 'AND', 'CP', 'CPD', 'CPDR', 'CPI', 'CPIR',
-    'OR', 'SBC', 'SUB', 'XOR', 'BIT', 'CALL', 'CCF', 'CPL',
-    'DAA', 'DEC', 'DI', 'DJNZ', 'EI', 'EX', 'EXX', 'HALT', 'IM', 'XIM',
-    'INC', 'IN', 'IND', 'INDR', 'INI', 'INIR', 'JP', 'JR', 'LD', 'XLD',
-    'LDD', 'LDDR', 'LDI', 'LDIR', 'NEG', 'XNEG', 'NOP', 'XNOP',
-    'RLC', 'RL', 'RR', 'RRC', 'SLA', 'SLL', 'SRA',
-    'SRL', 'OUT', 'OUTD', 'OTDR', 'OUTI', 'OTIR', 'POP', 'PUSH', 'RES',
-    'RET', 'RETN', 'XRETN', 'RETI',
-    'RLA', 'RLCA', 'RLD', 'RRA', 'RRD', 'RRCA',
-    'RST', 'SCF', 'SET',
-    'A', 'AF', 'AF2', 'CF', 'M', 'NC', 'NZ', 'PE', 'PO', 'P', 'Z',
-    'DE', 'BC', 'HL', 'IReg', 'R', 'IY', 'IX', 'SP',
-    'B', 'C', 'D', 'E', 'H', 'L', 'IXH', 'IXL', 'IYH', 'IYL',
-    'UnknownInstr', 'JumpInstr', 'CallInstr', 'RetInstr', 'At',
-    'IndexReg', 'Add',
+    'ADC',
+    'ADD',
+    'AF',
+    'AF2',
+    'AND',
+    'BC',
+    'BIT',
+    'CALL',
+    'CCF',
+    'CF',
+    'CP',
+    'CPD',
+    'CPDR',
+    'CPI',
+    'CPIR',
+    'CPL',
+    'DAA',
+    'DE',
+    'DEC',
+    'DI',
+    'DJNZ',
+    'EI',
+    'EX',
+    'EXX',
+    'HALT',
+    'HL',
+    'IM',
+    'IN',
+    'INC',
+    'IND',
+    'INDR',
+    'INI',
+    'INIR',
+    'IX',
+    'IXH',
+    'IXL',
+    'IY',
+    'IYH',
+    'IYL',
+    'JP',
+    'JR',
+    'LD',
+    'LDD',
+    'LDDR',
+    'LDI',
+    'LDIR',
+    'NC',
+    'NEG',
+    'NOP',
+    'NZ',
+    'OR',
+    'OTDR',
+    'OTIR',
+    'OUT',
+    'OUTD',
+    'OUTI',
+    'PE',
+    'PO',
+    'POP',
+    'PUSH',
+    'RES',
+    'RET',
+    'RETI',
+    'RETN',
+    'RL',
+    'RLA',
+    'RLC',
+    'RLCA',
+    'RLD',
+    'RR',
+    'RRA',
+    'RRC',
+    'RRCA',
+    'RRD',
+    'RST',
+    'SBC',
+    'SCF',
+    'SET',
+    'SLA',
+    'SLL',
+    'SP',
+    'SRA',
+    'SRL',
+    'SUB',
+    'XIM',
+    'XLD',
+    'XNEG',
+    'XNOP',
+    'XOR',
+    'XRETN',
+    'A',
+    'Add',
+    'At',
+    'B',
+    'C',
+    'CallInstr',
+    'D',
+    'E',
+    'H',
+    'IReg',
+    'IndexReg',
+    'JumpInstr',
+    'L',
+    'M',
+    'P',
+    'R',
+    'RetInstr',
+    'UnknownInstr',
+    'Z',
 ]
 
 
 class _InstrElement(type):
     _str: str
 
-    def __new__(cls: typing.Type[type], name: str, bases: tuple[type, ...],
+    def __new__(cls: type[type], name: str, bases: tuple[type, ...],
                 attrs: dict[str, typing.Any]) -> typing.Any:
         attrs.setdefault('_str', name.lower())
         return type.__new__(cls, name, bases, attrs)
@@ -178,34 +268,34 @@ class SP(metaclass=Reg):
     pass
 
 
-Op: typing.TypeAlias = typing.Union[int, str, Reg, 'At', 'Add']
+Op: typing.TypeAlias = typing.Union[int, str, Reg, CondFlag, 'At', 'Add']
 
 
 def _str_op(op: Op) -> str:
     if isinstance(op, int):
-        return '%#x' % op
+        return f'{op:#x}'
 
     return str(op)
 
 
-class At(object):
+class At:
     def __init__(self, op: Op) -> None:
         self.ops = [op]
 
     def __repr__(self) -> str:
-        return 'At(%r)' % tuple(self.ops)
+        return f'At({tuple(self.ops)!r})'
 
     def __str__(self) -> str:
         op, = tuple(self.ops)
-        return '(%s)' % _str_op(op)
+        return f'({_str_op(op)})'
 
 
-class Add(object):
+class Add:
     def __init__(self, a: Op, b: Op) -> None:
         self.ops = [a, b]
 
     def __repr__(self) -> str:
-        return 'Add(%r, %r)' % tuple(self.ops)
+        return 'Add({!r}, {!r})'.format(*tuple(self.ops))
 
     def __str__(self) -> str:
         a, b = tuple(self.ops)
@@ -215,11 +305,11 @@ class Add(object):
             sign = '-'
             b = -b
 
-        return '%s %c %s' % (_str_op(a), sign, _str_op(b))
+        return f'{_str_op(a)} {sign} {_str_op(b)}'
 
 
 # Base class for all instructions.
-class Instr(object):
+class Instr:
     addr: int | None
     size: int | None
     origin: _SourcePos | None
@@ -256,7 +346,7 @@ class UnknownInstr(Instr):
         self.text = None
 
     def __str__(self) -> str:
-        return 'db %#04x' % self.opcode
+        return f'db {self.opcode:#04x}'
 
 
 # Instructions that may affect control flow.

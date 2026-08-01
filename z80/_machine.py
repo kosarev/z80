@@ -9,15 +9,14 @@
 
 import typing
 
-from ._instr import HL, IX, IY
-from ._instr import Reg
+from ._instr import HL, IX, IY, Reg
 from ._z80 import _I8080Machine, _Z80Machine
 
 WritableBytes: typing.TypeAlias = bytearray | memoryview
 Bytes: typing.TypeAlias = bytes | WritableBytes
 
 
-class _ImageParser(object):
+class _ImageParser:
     def __init__(self, image: Bytes) -> None:
         self.__image = image
 
@@ -40,7 +39,7 @@ class _ImageParser(object):
         return self.parse_block(4)
 
 
-class _StateBase(object):
+class _StateBase:
     def __init__(self, image: Bytes) -> None:
         self._image = image
 
@@ -469,7 +468,7 @@ class Z80State(_StateBase):
         return IREGPS[self.__index_rp_kind[0]]
 
 
-class _MachineBase(object):
+class _MachineBase:
     # Events. The bit values follow the composition of the modules
     # declaring them; the bits not listed (retry_input,
     # stop_requested) are internal and not exposed here.

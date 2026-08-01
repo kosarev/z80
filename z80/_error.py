@@ -17,7 +17,7 @@ class Error(Exception):
     def verbalize(self, program_name: str | None = None) -> str:
         def g() -> typing.Generator[str, None, None]:
             if program_name is not None:
-                yield '%s: ' % program_name
+                yield f'{program_name}: '
 
             yield self.reason
 

@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
@@ -15,22 +12,119 @@ import tempfile
 import typing
 
 from ._error import Error
-from ._instr import (ADD, ADC, AND, CP, CPD, CPDR, CPI, CPIR,
-                     OR, SBC, SUB, XOR, BIT, CALL, CCF, CPL,
-                     DAA, DEC, DI, DJNZ, EI, EX, EXX, HALT, IM, XIM,
-                     INC, IN, IND, INDR, INI, INIR, JP, JR, LD, XLD,
-                     LDD, LDDR, LDI, LDIR, NEG, XNEG, NOP, XNOP,
-                     RLC, RL, RR, RRC, SLA, SLL, SRA,
-                     SRL, OUT, OUTD, OTDR, OUTI, OTIR, POP, PUSH, RES,
-                     RET, RETN, XRETN, RETI,
-                     RLA, RLCA, RLD, RRA, RRD, RRCA,
-                     RST, SCF, SET, A, AF, AF2, CF, M, NC, NZ, PE, PO, P, Z,
-                     DE, BC, HL, IReg, R, IY, IX, SP,
-                     B, C, D, E, H, L, IXH, IXL, IYH, IYL,
-                     UnknownInstr, JumpInstr, CallInstr, RetInstr, At,
-                     IndexReg, Add)
-from ._instr import Instr
-from ._instr import Op
+from ._instr import (
+    ADC,
+    ADD,
+    AF,
+    AF2,
+    AND,
+    BC,
+    BIT,
+    CALL,
+    CCF,
+    CF,
+    CP,
+    CPD,
+    CPDR,
+    CPI,
+    CPIR,
+    CPL,
+    DAA,
+    DE,
+    DEC,
+    DI,
+    DJNZ,
+    EI,
+    EX,
+    EXX,
+    HALT,
+    HL,
+    IM,
+    IN,
+    INC,
+    IND,
+    INDR,
+    INI,
+    INIR,
+    IX,
+    IXH,
+    IXL,
+    IY,
+    IYH,
+    IYL,
+    JP,
+    JR,
+    LD,
+    LDD,
+    LDDR,
+    LDI,
+    LDIR,
+    NC,
+    NEG,
+    NOP,
+    NZ,
+    OR,
+    OTDR,
+    OTIR,
+    OUT,
+    OUTD,
+    OUTI,
+    PE,
+    PO,
+    POP,
+    PUSH,
+    RES,
+    RET,
+    RETI,
+    RETN,
+    RL,
+    RLA,
+    RLC,
+    RLCA,
+    RLD,
+    RR,
+    RRA,
+    RRC,
+    RRCA,
+    RRD,
+    RST,
+    SBC,
+    SCF,
+    SET,
+    SLA,
+    SLL,
+    SP,
+    SRA,
+    SRL,
+    SUB,
+    XIM,
+    XLD,
+    XNEG,
+    XNOP,
+    XOR,
+    XRETN,
+    A,
+    Add,
+    At,
+    B,
+    C,
+    CallInstr,
+    D,
+    E,
+    H,
+    IndexReg,
+    Instr,
+    IReg,
+    JumpInstr,
+    L,
+    M,
+    Op,
+    P,
+    R,
+    RetInstr,
+    UnknownInstr,
+    Z,
+)
 from ._machine import Z80Machine
 from ._source import _SourcePos
 from ._token import _Token
@@ -43,11 +137,10 @@ class _DisasmError(Error):
         if isinstance(subject, _Token) and subject.literal is None:
             # There is nothing to name at positions past the last
             # token of the line.
-            super().__init__('%s: %s' % (subject.origin.inline_text,
-                                         message))
+            super().__init__(f'{subject.origin.inline_text}: {message}')
         else:
-            super().__init__('%s: %s: %s' % (subject.origin.inline_text,
-                                             subject, message))
+            super().__init__(
+                f'{subject.origin.inline_text}: {subject}: {message}')
         self.subject = subject
         self.message = message
         self.notes = notes
@@ -58,9 +151,9 @@ class _DisasmError(Error):
             yield self.subject.origin.context_text
 
             if program_name is not None:
-                yield '%s: ' % program_name
+                yield f'{program_name}: '
 
-            yield '%s' % self.reason
+            yield f'{self.reason}'
 
             for n in self.notes:
                 yield '\n'
@@ -69,7 +162,7 @@ class _DisasmError(Error):
         return ''.join(g())
 
 
-class _Tag(object):
+class _Tag:
     ID: str
     comment: str | _Token | None  # TODO
 
@@ -81,10 +174,10 @@ class _Tag(object):
         self.comment = None
 
     def __str__(self) -> str:
-        return '%s tag' % self.ID
+        return f'{self.ID} tag'
 
     def __repr__(self) -> str:
-        return '(%#06x, %s, %r)' % (self.addr, self.ID, self.comment)
+        return f'({self.addr:#06x}, {self.ID}, {self.comment!r})'
 
 
 class _CommentTag(_Tag):
@@ -129,8 +222,8 @@ class _ByteTag(_Tag):
         self.value = value
 
     def __repr__(self) -> str:
-        return '(%#06x, %s, %#04x, %r)' % (
-            self.addr, self.ID, self.value, self.comment)
+        return (f'({self.addr:#06x}, {self.ID}, {self.value:#04x}, '
+                f'{self.comment!r})')
 
 
 class _IncludeBinaryTag(_Tag):
@@ -143,8 +236,8 @@ class _IncludeBinaryTag(_Tag):
         self.image = image
 
     def __repr__(self) -> str:
-        return '(%#06x, %s, %s, %s)' % (
-            self.addr, self.ID, self.filename, self.comment)
+        return (f'({self.addr:#06x}, {self.ID}, {self.filename}, '
+                f'{self.comment})')
 
 
 class _InstrTag(_Tag):
@@ -174,7 +267,7 @@ class _EntryTag(_Tag):
 # jointly describe (memory_clobbered is exactly {False}), stack
 # words still hold their image values, so returns can be
 # followed.
-class _State(object):
+class _State:
     def __init__(self, sp: int | None = None,
                  memory_clobbered: bool | None = None) -> None:
         self.sps: set[int | None] = {sp}
@@ -213,8 +306,8 @@ class _UnknownInstrError(Exception):
     pass
 
 
-class Z80InstrBuilder(object):
-    __INSTRS = {
+class Z80InstrBuilder:
+    __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
         'Aadd': ADD,
         'Aadc': ADC,
         'Aand': AND,
@@ -293,7 +386,7 @@ class Z80InstrBuilder(object):
         'Totir': OTIR,
     }
 
-    __OPS = {
+    __OPS: typing.ClassVar[dict[str, Op]] = {
         'a': A,
         'af': AF,
         'af\'': AF2,
@@ -425,7 +518,7 @@ class Z80InstrBuilder(object):
         return instr
 
 
-class _TagSet(object):
+class _TagSet:
     def __init__(self) -> None:
         self.infront_tags: list[_Tag] = []
         self.inline_tags: list[_Tag] = []
@@ -442,7 +535,7 @@ class _TagSet(object):
                 self.label_tag is None)
 
 
-class _AsmLine(object):
+class _AsmLine:
     _MAX_NUM_OF_BYTES_PER_LINE = 4
     _BYTES_INDENT = 40
     __COMMENT_INDENT = (_BYTES_INDENT + len('; @@ 0x0000') +
@@ -450,12 +543,12 @@ class _AsmLine(object):
                         len('  '))
 
     def __init__(self, command: str | _Tag | None = None,
-                 addr: int | None = None, xbytes: list[int] = [],
+                 addr: int | None = None, xbytes: list[int] | None = None,
                  comment: str | _Tag | None = None, size: int = 0,
                  as_equ: bool = False):
         self.command = command
         self.addr = addr
-        self.xbytes = xbytes
+        self.xbytes = [] if xbytes is None else xbytes
         self.comment = comment
         self.size = size
         self.as_equ = as_equ
@@ -465,7 +558,7 @@ class _AsmLine(object):
         if comment.startswith('.'):
             force_leader = True
         if force_leader:
-            comment = '-- %s' % comment
+            comment = f'-- {comment}'
         return comment
 
     def __str__(self) -> str:
@@ -477,16 +570,16 @@ class _AsmLine(object):
             assert isinstance(self.addr, int)
             name = self.command.name
             if self.as_equ:
-                line = '%s equ %#06x' % (name, self.addr)
+                line = f'{name} equ {self.addr:#06x}'
             else:
-                line = '%s:' % name
+                line = f'{name}:'
             line = line.ljust(self._BYTES_INDENT)
-            line += '; @@ %#06x .label %s' % (self.addr, name)
+            line += f'; @@ {self.addr:#06x} .label {name}'
             comment = self.command.comment
             if comment is not None:
                 assert isinstance(comment, _Token)
                 assert isinstance(comment.literal, str)
-                line += ' %s' % self._verbalize_comment(comment.literal)
+                line += f' {self._verbalize_comment(comment.literal)}'
             return line.rstrip()
 
         line = ' ' * 4
@@ -504,15 +597,15 @@ class _AsmLine(object):
                 line += ' @@'
             else:
                 line += '   '
-            line += ' %#06x' % self.addr
+            line += f' {self.addr:#06x}'
         if len(self.xbytes) > 0:
             assert self.addr is not None
-            line += ' %s' % ' '.join('%02x' % b for b in self.xbytes)
+            line += ' {}'.format(' '.join(f'{b:02x}' for b in self.xbytes))
         if out_of_line:
             assert isinstance(self.command, _Tag)
             assert isinstance(self.command.comment, str)
-            line += ' %s' % self._verbalize_comment(self.command.comment,
-                                                    force_leader=False)
+            line += ' ' + self._verbalize_comment(self.command.comment,
+                                                  force_leader=False)
         if self.comment is not None:
             line = line.ljust(self.__COMMENT_INDENT)
             if isinstance(self.comment, _HintTag):
@@ -522,8 +615,8 @@ class _AsmLine(object):
         return line.rstrip()
 
 
-class _Disasm(object):
-    __TAG_PRIORITIES = {
+class _Disasm:
+    __TAG_PRIORITIES: typing.ClassVar[dict[type['_Tag'], int]] = {
         # These form the binary image so they have to be
         # processed first.
         _ByteTag: 0,
@@ -544,11 +637,11 @@ class _Disasm(object):
 
         # Translates addresses to tags associated with those
         # addresses.
-        self.__tags: typing.DefaultDict[int, _TagSet] = (
+        self.__tags: collections.defaultdict[int, _TagSet] = (
             collections.defaultdict(_TagSet))
 
         # Tags to process stored in order.
-        self.__worklists: dict[int, typing.Deque[_Tag]] = dict()
+        self.__worklists: dict[int, collections.deque[_Tag]] = {}
 
         # The entry tag, if there is one.
         self.__entry_tag: _EntryTag | None = None
@@ -556,7 +649,7 @@ class _Disasm(object):
         # Translates label names to their tags.
         self.__label_names: dict[str, _LabelTag] = {}
 
-    def __get_worklist(self, tag: _Tag) -> typing.Deque[_Tag]:
+    def __get_worklist(self, tag: _Tag) -> collections.deque[_Tag]:
         # Use deque because of its popleft() being much faster
         # than list's pop(0).
         Worklist = collections.deque
@@ -583,7 +676,7 @@ class _Disasm(object):
         assert isinstance(tag, _IncludeBinaryTag)
         new_tags: list[_Tag] = []
 
-        comment = 'Included from binary file %r.' % tag.filename.literal
+        comment = f'Included from binary file {tag.filename.literal!r}.'
         new_tags.append(_CommentTag(tag.origin, tag.addr, comment))
 
         if tag.comment is not None:
@@ -731,7 +824,9 @@ class _Disasm(object):
         # Disassemble the following instruction.
         self.add_tags(_DisasmTag(instr.origin, next_addr))
 
-    __TAG_PROCESSORS = {
+    __TAG_PROCESSORS: typing.ClassVar[dict[
+        type['_Tag'],
+        typing.Callable[['_Disasm', typing.Any], None]]] = {
         _ByteTag: __process_byte_tag,
         _CommentTag: __process_comment_tag,
         _IncludeBinaryTag: __process_include_binary_tag,
@@ -764,14 +859,14 @@ class _Disasm(object):
                 typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, (_InstrTag, _EntryTag)):
-                comment = '.%s' % tag.ID
+                comment = f'.{tag.ID}'
                 if isinstance(tag, _EntryTag) and tag.sp is not None:
                     comment += f' sp={tag.sp:#06x}'
                 if tag.comment is not None:
                     assert isinstance(tag.comment, _Token)
                     assert isinstance(tag.comment.literal, str)
-                    comment += ' %s' % (
-                        _AsmLine._verbalize_comment(tag.comment.literal))
+                    comment += ' ' + _AsmLine._verbalize_comment(
+                        tag.comment.literal)
                 yield comment
             elif isinstance(tag, _InlineCommentTag):
                 assert isinstance(tag.comment, str)
@@ -787,12 +882,12 @@ class _Disasm(object):
             if not first_instr_byte:
                 yield _HintTag(instr.origin, addr,
                                'warning: overlapping instruction: '
-                               '%r' % str(instr))
+                               f'{str(instr)!r}')
 
             if isinstance(instr, UnknownInstr):
                 yield _HintTag(instr.origin, addr,
                                'warning: unknown instruction: '
-                               '%r' % instr.text)
+                               f'{instr.text!r}')
 
     def __is_commentless_addr(self, addr: int) -> bool:
         tags = self.__tags[addr]
@@ -802,10 +897,7 @@ class _Disasm(object):
         if tags.label_tag is not None:
             return False
 
-        if any(True for _ in self.__get_inline_comments(addr)):
-            return False
-
-        return True
+        return not any(True for _ in self.__get_inline_comments(addr))
 
     def __get_instr_text(self, instr: Instr) -> str:
         text = str(instr)
@@ -820,7 +912,7 @@ class _Disasm(object):
                 label_tag = self.__tags[target].label_tag
                 if label_tag is not None:
                     assert isinstance(label_tag, _LabelTag)
-                    text = text.replace('%#x' % target, label_tag.name)
+                    text = text.replace(f'{target:#x}', label_tag.name)
 
         # Likewise for memory operands, whose brackets make the
         # substitution unambiguous. I/O ports look the same but
@@ -837,8 +929,8 @@ class _Disasm(object):
                 label_tag = self.__tags[target].label_tag
                 if label_tag is not None:
                     assert isinstance(label_tag, _LabelTag)
-                    text = text.replace('(%#x)' % target,
-                                        '(%s)' % label_tag.name)
+                    text = text.replace(f'({target:#x})',
+                                        f'({label_tag.name})')
 
         return text
 
@@ -935,7 +1027,7 @@ class _Disasm(object):
             if len(inline_comments) > 0:
                 comment = inline_comments.pop(0)
 
-            command = 'db %s' % ', '.join('%#04x' % b for b in xbytes)
+            command = 'db {}'.format(', '.join(f'{b:#04x}' for b in xbytes))
 
             yield _AsmLine(command=command, addr=addr, xbytes=xbytes,
                            comment=comment, size=len(xbytes))
@@ -957,11 +1049,11 @@ class _Disasm(object):
         for a in sorted(a for a, t in self.__tags.items() if not t.empty):
             if addr is None:
                 addr = a
-                yield _AsmLine(command='org 0x%x' % addr)
+                yield _AsmLine(command=f'org 0x{addr:x}')
             elif a < addr:
                 continue
             elif a > addr:
-                yield _AsmLine(command='.space %d' % (a - addr))
+                yield _AsmLine(command=f'.space {a - addr}')
                 addr = a
 
             assert a == addr
@@ -972,10 +1064,10 @@ class _Disasm(object):
 
     def _get_output(self) -> typing.Generator[str, None, None]:
         for line in self.__get_asm_lines():
-            yield '%s\n' % line
+            yield f'{line}\n'
 
     def save_output(self, filename: str) -> None:
-        tmp_name: typing.Optional[str] = None
+        tmp_name: str | None = None
         try:
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
                 tmp_name = f.name

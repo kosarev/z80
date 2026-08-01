@@ -1,10 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
 #
-#   Copyright (C) 2017-2025 Ivan Kosarev.
+#   Copyright (C) 2017-2026 Ivan Kosarev.
 #   mail@ivankosarev.com
 #
 #   Published under the MIT license.
@@ -12,7 +9,7 @@
 import bisect
 
 
-class _SourcePos(object):
+class _SourcePos:
     def __init__(self, offset: int, file: '_SourceFile') -> None:
         self.__offset = offset
         self.__file = file
@@ -23,24 +20,24 @@ class _SourcePos(object):
 
     @property
     def column_no(self) -> int:
-        line, line_no, column_no = self.__coordinates
+        _, _, column_no = self.__coordinates
         return column_no
 
     @property
     def inline_text(self) -> str:
-        line, line_no, column_no = self.__coordinates
-        return '%s:%s:%s' % (self.__file, line_no, column_no)
+        _, line_no, column_no = self.__coordinates
+        return f'{self.__file}:{line_no}:{column_no}'
 
     def __str__(self) -> str:
         return self.inline_text
 
     @property
     def context_text(self) -> str:
-        line, line_no, column_no = self.__coordinates
-        return '%s\n%s^\n' % (line, ' ' * column_no)
+        line, _, column_no = self.__coordinates
+        return '{}\n{}^\n'.format(line, ' ' * column_no)
 
 
-class _SourceFile(object):
+class _SourceFile:
     def __init__(self, filename: str, image: str | None = None) -> None:
         self.__filename = filename
 

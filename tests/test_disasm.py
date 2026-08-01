@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
@@ -9,9 +8,10 @@
 #   Published under the MIT license.
 
 import os
-import pytest
-import z80
 
+import pytest
+
+import z80
 
 _DISASM_DIR = os.path.join(os.path.dirname(__file__), 'disasm')
 _CASES = sorted(f for f in os.listdir(_DISASM_DIR) if f.endswith('.asm'))
@@ -54,7 +54,7 @@ def test_disasm(name: str) -> None:
             output = ''.join(d._get_output())
             assert output == expected_output
         except z80.Error as e:
-            error = '\n%s\n' % e.verbalize()
+            error = f'\n{e.verbalize()}\n'
 
         assert error == expected_error
     finally:

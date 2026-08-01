@@ -9,16 +9,23 @@
 import re
 import typing
 
-from ._disasm import (_IncludeBinaryTag, _InstrTag, _EntryTag, _CommentTag,
-                      _ByteTag, _InlineCommentTag, _LabelTag, _AsmLine)
-from ._disasm import _DisasmError
-from ._disasm import _Tag
+from ._disasm import (
+    _AsmLine,
+    _ByteTag,
+    _CommentTag,
+    _DisasmError,
+    _EntryTag,
+    _IncludeBinaryTag,
+    _InlineCommentTag,
+    _InstrTag,
+    _LabelTag,
+    _Tag,
+)
 from ._source import _SourceFile
-from ._token import _Token
-from ._token import _Tokeniser
+from ._token import _Token, _Tokeniser
 
 
-class _DisasmTagParser(object):
+class _DisasmTagParser:
     __TAG_LEADER = re.compile('@@')
     __BYTE_LITERAL = re.compile(r'(0x)?[0-9a-f]{2}$')
 
@@ -89,7 +96,7 @@ class _DisasmTagParser(object):
 
     # Fetches a subsequent token and checks it is the expected one.
     def __parse_expected_token(self, literal: str) -> _Token:
-        error = '%r expected.' % literal
+        error = f'{literal!r} expected.'
         tok = self.__fetch_token(error)
         assert tok is not None
         if tok != literal:
@@ -111,9 +118,10 @@ class _DisasmTagParser(object):
     # Names that would clash with assembler syntax if used as
     # labels.
     __RESERVED_LABEL_NAMES = frozenset(
-        'a b c d e f h l i r af bc de hl ix iy sp '
-        'ixh ixl iyh iyl nz z nc po pe p m '
-        'org db dw ds equ end include'.split())
+        ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'l', 'i', 'r',
+         'af', 'bc', 'de', 'hl', 'ix', 'iy', 'sp',
+         'ixh', 'ixl', 'iyh', 'iyl', 'nz', 'z', 'nc', 'po', 'pe', 'p', 'm',
+         'org', 'db', 'dw', 'ds', 'equ', 'end', 'include'])
 
     __LABEL_NAME = re.compile(r'[a-zA-Z_][_0-9a-zA-Z]*$')
 
@@ -142,7 +150,9 @@ class _DisasmTagParser(object):
 
         return _EntryTag(name.pos, addr, sp)
 
-    __TAG_PARSERS = {
+    __TAG_PARSERS: typing.ClassVar[dict[
+        str,
+        typing.Callable[['_DisasmTagParser', int, _Token], _Tag]]] = {
         _IncludeBinaryTag.ID: __parse_include_binary_tag,
         _InstrTag.ID: __parse_instr_tag,
         _EntryTag.ID: __parse_entry_tag,

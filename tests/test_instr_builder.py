@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 #   Z80 CPU Emulator.
 #   https://github.com/kosarev/z80
@@ -9,8 +8,8 @@
 #   Published under the MIT license.
 
 import pytest
-import z80
 
+import z80
 
 _TESTS = (
     (b'\xcb\x30', 'sll b'),
