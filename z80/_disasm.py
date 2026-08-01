@@ -822,6 +822,24 @@ class _Disasm(object):
                     assert isinstance(label_tag, _LabelTag)
                     text = text.replace('%#x' % target, label_tag.name)
 
+        # Likewise for memory operands, whose brackets make the
+        # substitution unambiguous. I/O ports look the same but
+        # are not addresses.
+        if not isinstance(instr, (IN, OUT)):
+            for op in instr.ops:
+                if not isinstance(op, At):
+                    continue
+
+                target = op.ops[0]
+                if not isinstance(target, int):
+                    continue
+
+                label_tag = self.__tags[target].label_tag
+                if label_tag is not None:
+                    assert isinstance(label_tag, _LabelTag)
+                    text = text.replace('(%#x)' % target,
+                                        '(%s)' % label_tag.name)
+
         return text
 
     def __get_instr_lines(self, instr: Instr) -> (
