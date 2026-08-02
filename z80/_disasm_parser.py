@@ -13,7 +13,9 @@ from ._disasm import (
     _AsmLine,
     _ByteTag,
     _CallConvTag,
+    _CodeRefTag,
     _CommentTag,
+    _DataRefTag,
     _DisasmError,
     _EntryTag,
     _IncludeBinaryTag,
@@ -142,6 +144,16 @@ class _DisasmTagParser:
 
         return _LabelTag(name.pos, addr, label_name)
 
+    def __parse_data_ref_tag(self, addr: int,
+                             name: _Token) -> _DataRefTag:
+        self.__fetch_token()
+        return _DataRefTag(name.pos, addr)
+
+    def __parse_code_ref_tag(self, addr: int,
+                             name: _Token) -> _CodeRefTag:
+        self.__fetch_token()
+        return _CodeRefTag(name.pos, addr)
+
     def __parse_entry_tag(self, addr: int, name: _Token) -> _EntryTag:
         tok = self.__fetch_token()
 
@@ -222,6 +234,8 @@ class _DisasmTagParser:
         _LabelTag.ID: __parse_label_tag,
         _WordTag.ID: __parse_word_tag,
         _JumpTableTag.ID: __parse_jump_table_tag,
+        _DataRefTag.ID: __parse_data_ref_tag,
+        _CodeRefTag.ID: __parse_code_ref_tag,
     }
 
     # Parses and returns a subsequent tag.

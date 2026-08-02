@@ -180,7 +180,18 @@ class Reg(_InstrElement):
     pass
 
 
+# Registers holding a 16-bit value. Loading one takes an immediate
+# wide enough to be an address, which the 8-bit registers cannot.
+class Reg16(Reg):
+    pass
+
+
 class IndexReg(Reg):
+    pass
+
+
+# The index registers themselves, as opposed to their halves.
+class IndexReg16(IndexReg, Reg16):
     pass
 
 
@@ -220,27 +231,27 @@ class R(metaclass=Reg):
     pass
 
 
-class AF(metaclass=Reg):
+class AF(metaclass=Reg16):
     pass
 
 
-class AF2(metaclass=Reg):
+class AF2(metaclass=Reg16):
     _str = "af'"
 
 
-class BC(metaclass=Reg):
+class BC(metaclass=Reg16):
     pass
 
 
-class DE(metaclass=Reg):
+class DE(metaclass=Reg16):
     pass
 
 
-class HL(metaclass=Reg):
+class HL(metaclass=Reg16):
     pass
 
 
-class IX(metaclass=IndexReg):
+class IX(metaclass=IndexReg16):
     pass
 
 
@@ -252,7 +263,7 @@ class IXL(metaclass=IndexReg):
     pass
 
 
-class IY(metaclass=IndexReg):
+class IY(metaclass=IndexReg16):
     pass
 
 
@@ -264,7 +275,7 @@ class IYL(metaclass=IndexReg):
     pass
 
 
-class SP(metaclass=Reg):
+class SP(metaclass=Reg16):
     pass
 
 

@@ -121,6 +121,7 @@ from ._instr import (
     Op,
     P,
     R,
+    Reg16,
     RetInstr,
     UnknownInstr,
     Z,
@@ -298,6 +299,27 @@ class _WordTag(_Tag):
 # instruction address.
 class _JumpTableTag(_WordTag):
     ID = 'jump_table'
+
+
+# Declares the immediate operand of the instruction at the tagged
+# address to be an address rather than a plain number, so that it
+# renders by the label of whatever it points at. Jump and call
+# targets need no such tag, being addresses by their nature;
+# immediates are ambiguous, so the source has to say which of them
+# are references and the tool never guesses.
+class _DataRefTag(_Tag):
+    ID = 'data_ref'
+
+    def __init__(self, origin: _SourcePos, addr: int) -> None:
+        super().__init__(origin, addr, size=0)
+
+
+# Same as _DataRefTag, except that the referenced address is also
+# declared to hold an instruction, as evidenced by the code that
+# eventually passes control to it: routines called through a
+# register, and continuations pushed as return addresses.
+class _CodeRefTag(_DataRefTag):
+    ID = 'code_ref'
 
 
 # The machine state as known at a specific point of execution:
@@ -567,6 +589,7 @@ class _TagSet:
         self.disasm_tag: _Tag | None = None
         self.label_tag: _Tag | None = None
         self.word_tag: _Tag | None = None
+        self.ref_tag: _Tag | None = None
 
         # The first tag found to reference the address as code,
         # set as the referencing tags are processed. Marked
@@ -685,9 +708,12 @@ class _Disasm:
         _LabelTag: 0,
 
         # These need the image bytes to be in place: they read
-        # word values out of them.
+        # word values out of them, or the operands of the
+        # instructions decoded from them.
         _WordTag: 1,
         _JumpTableTag: 1,
+        _DataRefTag: 1,
+        _CodeRefTag: 1,
 
         _DisasmTag: 1,
 
@@ -853,6 +879,64 @@ class _Disasm:
         self.__callconvs[tag.addr] = tag
         self.__tags[tag.addr].inline_tags.append(tag)
 
+    # Registers a reference tag and applies it as soon as the
+    # instruction carrying the operand is disassembled.
+    def __process_ref_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _DataRefTag)
+        prev_tag = self.__tags[tag.addr].ref_tag
+        if prev_tag is not None:
+            raise _DisasmError(
+                tag, 'Reference redefined.',
+                _DisasmError(prev_tag, 'Previously defined here.'))
+
+        self.__tags[tag.addr].ref_tag = tag
+        self.__tags[tag.addr].inline_tags.append(tag)
+
+        # The tagged address holds the instruction whose operand
+        # is the reference, so it is an instruction address too.
+        self.add_tags(_DisasmTag(tag.origin, tag.addr))
+        self.__apply_ref_tag(tag.addr)
+
+    # The address the immediate operand of the given instruction
+    # refers to. Only loads of a 16-bit register can carry one;
+    # jump and call targets are references already.
+    def __get_ref_target(self, tag: _Tag, instr: Instr) -> int | None:
+        if isinstance(instr, UnknownInstr):
+            return None
+
+        if isinstance(instr, JumpInstr):
+            raise _DisasmError(
+                tag, 'Jump and call targets are references already.')
+
+        ops = instr.ops
+        if (len(ops) != 2 or not isinstance(ops[1], int) or
+                not isinstance(ops[0], Reg16)):
+            raise _DisasmError(
+                tag, 'No immediate operand to refer with.')
+
+        return ops[1]
+
+    # Makes the referenced address an instruction, where the
+    # reference says it is code. Runs once the tagged instruction
+    # is disassembled, from whichever of the two tags comes last.
+    def __apply_ref_tag(self, addr: int) -> None:
+        tags = self.__tags[addr]
+        tag = tags.ref_tag
+        if not isinstance(tag, _CodeRefTag):
+            return
+
+        disasm_tag = tags.disasm_tag
+        if disasm_tag is None:
+            return
+
+        assert isinstance(disasm_tag, _DisasmTag)
+        target = self.__get_ref_target(tag, disasm_tag.instr)
+        if target is None:
+            return
+
+        self.__mark_code_target(target, tag)
+        self.add_tags(_DisasmTag(tag.origin, target))
+
     # Marks an address as referenced as code by the given tag,
     # the first referencing tag serving as the mark's provenance.
     def __mark_code_target(self, addr: int, tag: _Tag) -> None:
@@ -915,6 +999,7 @@ class _Disasm:
             tag.instr = self.__instr_builder.build_instr(
                 tag.addr, bytes(instr_image))
             tags.disasm_tag = tag
+            self.__apply_ref_tag(tag.addr)
 
         instr = tag.instr
         if isinstance(instr, UnknownInstr):
@@ -1005,6 +1090,8 @@ class _Disasm:
         _LabelTag: __process_label_tag,
         _WordTag: __process_word_tag,
         _JumpTableTag: __process_word_tag,
+        _DataRefTag: __process_ref_tag,
+        _CodeRefTag: __process_ref_tag,
         _DisasmTag: __process_disasm_tag,
     }
 
@@ -1030,7 +1117,7 @@ class _Disasm:
                 typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
             if isinstance(tag, (_InstrTag, _EntryTag, _CallConvTag,
-                                _WordTag)):
+                                _WordTag, _DataRefTag)):
                 comment = f'.{tag.ID}'
                 if isinstance(tag, _EntryTag) and tag.sp is not None:
                     comment += f' sp={tag.sp:#06x}'
@@ -1139,6 +1226,19 @@ class _Disasm:
                 name = self.__get_label_name(target)
                 if name is not None:
                     text = text.replace(f'{target:#x}', name)
+
+        # Immediate operands are plain numbers unless the source
+        # says otherwise; where it does, render them by the label
+        # of what they point at.
+        instr_addr = instr.addr
+        if isinstance(instr_addr, int):
+            ref_tag = self.__tags[instr_addr].ref_tag
+            if isinstance(ref_tag, _DataRefTag):
+                ref_target = self.__get_ref_target(ref_tag, instr)
+                if ref_target is not None:
+                    ref_name = self.__get_label_name(ref_target)
+                    if ref_name is not None:
+                        text = text.replace(f'{ref_target:#x}', ref_name)
 
         # Likewise for memory operands, whose brackets make the
         # substitution unambiguous. I/O ports look the same but
