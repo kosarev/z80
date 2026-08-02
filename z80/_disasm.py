@@ -277,6 +277,25 @@ class _CallConvTag(_Tag):
         self.noreturn = noreturn
 
 
+# Presents the n words at the tagged address as dw directives,
+# their values rendered by label where one is defined.
+class _WordTag(_Tag):
+    ID = 'word'
+
+    def __init__(self, origin: _SourcePos, addr: int,
+                 n: int = 1) -> None:
+        super().__init__(origin, addr, size=0)
+        self.n = n
+
+
+# Declares the n words at the tagged address to be a table of code
+# addresses, as evidenced by some dispatching code reading it:
+# implies the word presentation and makes every entry's value an
+# instruction address.
+class _JumpTableTag(_WordTag):
+    ID = 'jump_table'
+
+
 # The machine state as known at a specific point of execution:
 # for every field, the set of values it is known to possibly
 # have, with None standing for values that cannot be known. While
@@ -543,6 +562,7 @@ class _TagSet:
         self.byte_tag: _Tag | None = None
         self.disasm_tag: _Tag | None = None
         self.label_tag: _Tag | None = None
+        self.word_tag: _Tag | None = None
 
     @property
     def empty(self) -> bool:
@@ -550,7 +570,8 @@ class _TagSet:
                 len(self.inline_tags) == 0 and
                 self.byte_tag is None and
                 self.disasm_tag is None and
-                self.label_tag is None)
+                self.label_tag is None and
+                self.word_tag is None)
 
 
 class _AsmLine:
@@ -643,6 +664,11 @@ class _Disasm:
         _EntryTag: 0,
         _CallConvTag: 0,
         _LabelTag: 0,
+
+        # These need the image bytes to be in place: they read
+        # word values out of them.
+        _WordTag: 1,
+        _JumpTableTag: 1,
 
         _DisasmTag: 1,
 
@@ -760,6 +786,41 @@ class _Disasm:
         # is still exactly as the image bytes have it.
         self.add_tags(_DisasmTag(tag.origin, tag.addr,
                                  _State(tag.sp, memory_clobbered=False)))
+
+    # The value of the word at the given address, or None if
+    # either of its bytes is not known.
+    def __get_word_value(self, addr: int) -> int | None:
+        lo = self.__tags[addr].byte_tag
+        hi = self.__tags[(addr + 1) % 0x10000].byte_tag
+        if lo is None or hi is None:
+            return None
+
+        assert isinstance(lo, _ByteTag)
+        assert isinstance(hi, _ByteTag)
+        return hi.value * 0x100 + lo.value
+
+    def __process_word_tag(self, tag: _Tag) -> None:
+        assert isinstance(tag, _WordTag)
+        self.__tags[tag.addr].inline_tags.append(tag)
+
+        for i in range(tag.n):
+            addr = (tag.addr + i * 2) % 0x10000
+            tags = self.__tags[addr]
+            prev_tag = tags.word_tag
+            if prev_tag is not None:
+                raise _DisasmError(
+                    tag, 'Word redefined.',
+                    _DisasmError(prev_tag, 'Previously defined here.'))
+
+            value = self.__get_word_value(addr)
+            if value is None:
+                raise _DisasmError(
+                    tag, f'No byte value for the word at {addr:#06x}.')
+
+            tags.word_tag = tag
+
+            if isinstance(tag, _JumpTableTag):
+                self.add_tags(_DisasmTag(tag.origin, value))
 
     def __process_callconv_tag(self, tag: _Tag) -> None:
         assert isinstance(tag, _CallConvTag)
@@ -910,6 +971,8 @@ class _Disasm:
         _EntryTag: __process_entry_tag,
         _CallConvTag: __process_callconv_tag,
         _LabelTag: __process_label_tag,
+        _WordTag: __process_word_tag,
+        _JumpTableTag: __process_word_tag,
         _DisasmTag: __process_disasm_tag,
     }
 
@@ -934,10 +997,13 @@ class _Disasm:
             first_instr_byte: bool = False) -> (
                 typing.Generator[str | _Tag, None, None]):
         for tag in self.__tags[addr].inline_tags:
-            if isinstance(tag, (_InstrTag, _EntryTag, _CallConvTag)):
+            if isinstance(tag, (_InstrTag, _EntryTag, _CallConvTag,
+                                _WordTag)):
                 comment = f'.{tag.ID}'
                 if isinstance(tag, _EntryTag) and tag.sp is not None:
                     comment += f' sp={tag.sp:#06x}'
+                if isinstance(tag, _WordTag):
+                    comment += f' n={tag.n}'
                 if isinstance(tag, _CallConvTag):
                     if tag.noreturn:
                         comment += ' noreturn'
@@ -1077,6 +1143,38 @@ class _Disasm:
             yield _AsmLine(command=tags.label_tag, addr=addr)
 
         if tags.byte_tag is None:
+            return
+
+        # Words render as dw directives, their values by label
+        # where one is defined, so the reference survives
+        # reassembly.
+        if tags.word_tag is not None:
+            value = self.__get_word_value(addr)
+            assert value is not None
+            label_tag = self.__tags[value].label_tag
+            if label_tag is not None:
+                assert isinstance(label_tag, _LabelTag)
+                operand = label_tag.name
+            else:
+                operand = f'{value:#06x}'
+
+            assert isinstance(tags.byte_tag, _ByteTag)
+            hi_tag = self.__tags[(addr + 1) % 0x10000].byte_tag
+            assert isinstance(hi_tag, _ByteTag)
+            xbytes = [tags.byte_tag.value, hi_tag.value]
+            inline_comments = list(self.__get_inline_comments(addr))
+
+            command: str | None = f'dw {operand}'
+            while len(xbytes) > 0 or len(inline_comments) > 0:
+                comment = None
+                if len(inline_comments) > 0:
+                    comment = inline_comments.pop(0)
+
+                yield _AsmLine(command=command, addr=addr, xbytes=xbytes,
+                               comment=comment, size=len(xbytes))
+                command = None
+                xbytes = []
+
             return
 
         assert isinstance(tags.byte_tag, _ByteTag)

@@ -19,8 +19,10 @@ from ._disasm import (
     _IncludeBinaryTag,
     _InlineCommentTag,
     _InstrTag,
+    _JumpTableTag,
     _LabelTag,
     _Tag,
+    _WordTag,
 )
 from ._source import _SourceFile
 from ._token import _Token, _Tokeniser
@@ -176,6 +178,40 @@ class _DisasmTagParser:
         return _CallConvTag(name.pos, addr, args_size, args_end,
                             noreturn)
 
+    # Parses an n=<count> clause and checks the count makes sense.
+    def __parse_count(self) -> int:
+        self.__parse_expected_token('=')
+        n = self.__parse_number()
+        if n < 1:
+            tok = self.__tok
+            assert tok is not None
+            raise _DisasmError(tok, 'A positive count expected.')
+
+        return n
+
+    def __parse_word_tag(self, addr: int, name: _Token) -> _WordTag:
+        tok = self.__fetch_token()
+
+        n = 1
+        if tok == 'n':
+            n = self.__parse_count()
+            self.__fetch_token()
+
+        return _WordTag(name.pos, addr, n)
+
+    def __parse_jump_table_tag(self, addr: int,
+                               name: _Token) -> _JumpTableTag:
+        error = "'n' expected."
+        tok = self.__fetch_token(error)
+        assert tok is not None
+        if tok != 'n':
+            raise _DisasmError(tok, error)
+
+        n = self.__parse_count()
+        self.__fetch_token()
+
+        return _JumpTableTag(name.pos, addr, n)
+
     __TAG_PARSERS: typing.ClassVar[dict[
         str,
         typing.Callable[['_DisasmTagParser', int, _Token], _Tag]]] = {
@@ -184,6 +220,8 @@ class _DisasmTagParser:
         _EntryTag.ID: __parse_entry_tag,
         _CallConvTag.ID: __parse_callconv_tag,
         _LabelTag.ID: __parse_label_tag,
+        _WordTag.ID: __parse_word_tag,
+        _JumpTableTag.ID: __parse_jump_table_tag,
     }
 
     # Parses and returns a subsequent tag.
