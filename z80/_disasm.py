@@ -197,6 +197,10 @@ class _InlineCommentTag(_Tag):
         self.comment = comment
 
 
+# A label naming an address. Parsed tags carry their source
+# position; labels the disassembler derives for unnamed code
+# targets have no origin and render as bare definition lines, so
+# they are regenerated on every run rather than parsed back.
 class _LabelTag(_Tag):
     ID = 'label'
 
@@ -564,6 +568,15 @@ class _TagSet:
         self.label_tag: _Tag | None = None
         self.word_tag: _Tag | None = None
 
+        # The first tag found to reference the address as code,
+        # set as the referencing tags are processed. Marked
+        # addresses with no .label tag get derived l_xxxx labels,
+        # so their references render symbolically and the output
+        # reassembles into relocatable form. A mark alone
+        # produces no output, so it does not make the set
+        # non-empty.
+        self.code_target_tag: _Tag | None = None
+
     @property
     def empty(self) -> bool:
         return (len(self.infront_tags) == 0 and
@@ -601,6 +614,12 @@ class _AsmLine:
         return comment
 
     def __str__(self) -> str:
+        if isinstance(self.command, _LabelTag) and self.command.origin is None:
+            # Derived labels render as bare definitions carrying
+            # no annotation, so they are regenerated rather than
+            # parsed back.
+            return f'{self.command.name}:'
+
         if isinstance(self.command, _LabelTag):
             # Label definitions render as real assembly so the
             # roundtrip check sees them; the annotation remains
@@ -820,6 +839,7 @@ class _Disasm:
             tags.word_tag = tag
 
             if isinstance(tag, _JumpTableTag):
+                self.__mark_code_target(value, tag)
                 self.add_tags(_DisasmTag(tag.origin, value))
 
     def __process_callconv_tag(self, tag: _Tag) -> None:
@@ -832,6 +852,13 @@ class _Disasm:
 
         self.__callconvs[tag.addr] = tag
         self.__tags[tag.addr].inline_tags.append(tag)
+
+    # Marks an address as referenced as code by the given tag,
+    # the first referencing tag serving as the mark's provenance.
+    def __mark_code_target(self, addr: int, tag: _Tag) -> None:
+        tags = self.__tags[addr]
+        if tags.code_target_tag is None:
+            tags.code_target_tag = tag
 
     # The fall-through address of a call to a routine of the given
     # convention: past the inline argument bytes, or nowhere for a
@@ -927,10 +954,15 @@ class _Disasm:
             return
 
         if isinstance(instr, JumpInstr):
-            # Disassemble the jump target, unless indirect.
+            # Disassemble the jump target, unless indirect. The
+            # target of an explicit operand is referenced as
+            # code; rst targets are encoded in the opcode and
+            # reference theirs implicitly.
             jump_target = instr.target
             if not isinstance(jump_target, At):
                 assert isinstance(jump_target, int)
+                if not isinstance(instr, RST):
+                    self.__mark_code_target(jump_target, tag)
                 self.add_tags(_DisasmTag(instr.origin, jump_target))
 
             # Calls are assumed to return, and conditional jumps
@@ -1039,6 +1071,51 @@ class _Disasm:
                                'warning: unknown instruction: '
                                f'{instr.text!r}')
 
+    # Whether the address gets a derived label: it must be
+    # referenced as code, carry no .label tag of its own, start a
+    # decoded instruction that is not hidden inside another
+    # rendered span, and its derived name must be free. Spans are
+    # at most four bytes, so any covering one starts within three
+    # bytes back.
+    def __has_derived_label(self, addr: int) -> bool:
+        tags = self.__tags[addr]
+        if tags.code_target_tag is None or tags.label_tag is not None:
+            return False
+
+        if tags.disasm_tag is None:
+            return False
+
+        for back in range(1, 4):
+            t = self.__tags[(addr - back) % 0x10000].disasm_tag
+            if t is not None:
+                assert isinstance(t, _DisasmTag)
+                size = t.instr.size
+                if isinstance(size, int) and size > back:
+                    return False
+
+            if (back < 2 and
+                    self.__tags[(addr - back) % 0x10000].word_tag
+                    is not None):
+                return False
+
+        # A free-standing label elsewhere may own the derived
+        # name; better to leave the references numeric than to
+        # bind them wrongly.
+        return f'l_{addr:04x}' not in self.__label_names
+
+    # The name the given address renders by, if any: its label's,
+    # or its derived one's.
+    def __get_label_name(self, addr: int) -> str | None:
+        label_tag = self.__tags[addr].label_tag
+        if label_tag is not None:
+            assert isinstance(label_tag, _LabelTag)
+            return label_tag.name
+
+        if self.__has_derived_label(addr):
+            return f'l_{addr:04x}'
+
+        return None
+
     def __is_commentless_addr(self, addr: int) -> bool:
         tags = self.__tags[addr]
         if tags.disasm_tag is not None or len(tags.infront_tags) != 0:
@@ -1059,10 +1136,9 @@ class _Disasm:
                 not isinstance(instr, (RetInstr, RST))):
             target = instr.target
             if isinstance(target, int):
-                label_tag = self.__tags[target].label_tag
-                if label_tag is not None:
-                    assert isinstance(label_tag, _LabelTag)
-                    text = text.replace(f'{target:#x}', label_tag.name)
+                name = self.__get_label_name(target)
+                if name is not None:
+                    text = text.replace(f'{target:#x}', name)
 
         # Likewise for memory operands, whose brackets make the
         # substitution unambiguous. I/O ports look the same but
@@ -1114,6 +1190,10 @@ class _Disasm:
             if label_tag is not None:
                 yield _AsmLine(command=label_tag, addr=addr,
                                as_equ=addr != instr.addr)
+            elif addr == instr.addr and self.__has_derived_label(addr):
+                yield _AsmLine(command=_LabelTag(None, addr,
+                                                 f'l_{addr:04x}'),
+                               addr=addr)
 
             first_instr_byte = addr == instr.addr
             inline_comments = list(
@@ -1151,12 +1231,8 @@ class _Disasm:
         if tags.word_tag is not None:
             value = self.__get_word_value(addr)
             assert value is not None
-            label_tag = self.__tags[value].label_tag
-            if label_tag is not None:
-                assert isinstance(label_tag, _LabelTag)
-                operand = label_tag.name
-            else:
-                operand = f'{value:#06x}'
+            name = self.__get_label_name(value)
+            operand = f'{value:#06x}' if name is None else name
 
             assert isinstance(tags.byte_tag, _ByteTag)
             hi_tag = self.__tags[(addr + 1) % 0x10000].byte_tag
