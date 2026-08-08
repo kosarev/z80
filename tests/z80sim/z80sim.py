@@ -1009,6 +1009,25 @@ def _load_initial_image():
     return load_defs()
 
 
+class ObservedStates(object):
+    # A single gate-state evaluation observes the states of other
+    # gates through this class. Observations are memoised, so
+    # every gate is observed at most once per evaluation and all
+    # traversals of the evaluation see the same state. This is
+    # the single point where pending updates of other gates
+    # become visible to an evaluation, and thus where the order
+    # of updates manifests itself.
+    def __init__(self, new_states):
+        self.__new_states = new_states
+        self.__observed = {}
+
+    def observe(self, t):
+        gate = t.gate
+        if gate not in self.__observed:
+            self.__observed[gate] = self.__new_states.get(gate, t.state)
+        return self.__observed[gate]
+
+
 class Z80Simulator(object):
     @property
     def image(self):
@@ -1085,7 +1104,7 @@ class Z80Simulator(object):
 
             assert t.conns_group is not None
 
-    def __get_node_preds(self, n, new_states):
+    def __get_node_preds(self, n, observed):
         def get_group_pred(n, get_node_pred, stack, preds):
             cyclic = False
 
@@ -1107,7 +1126,7 @@ class Z80Simulator(object):
             p = [] if p is None else [p]
             stack.append(n)
             for t in n.conn_of:
-                state = new_states.get(t.gate, t.state)
+                state = observed.observe(t)
                 if state is not FALSE:
                     m = t.get_other_conn(n)
                     if m in stack:
@@ -1160,7 +1179,8 @@ class Z80Simulator(object):
         if new_states is None:
             new_states = {}
 
-        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, new_states)
+        observed = ObservedStates(new_states)
+        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
 
         if len(n.gate_of) == 0:
             floating = bools.get('<floating-non-gate>')
