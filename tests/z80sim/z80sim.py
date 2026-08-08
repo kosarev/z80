@@ -575,49 +575,50 @@ class PartialOrders(object):
         return ' | '.join(f'({o!r})' for o in self.orders)
 
     @staticmethod
-    def __cancel(o1, o2):
-        f1, f2 = set(o1.facts), set(o2.facts)
-        d1, d2 = f1 - f2, f2 - f1
-        if len(d1) != 1 or len(d2) != 1:
-            return None
-        (a, b), = d1
-        if (b, a) not in d2:
-            return None
-        return PartialOrder.get(f1 & f2)
-
-    @staticmethod
     def get(orders):
-        orders = [o for o in orders if o is not None]
-        orders = list(dict.fromkeys(orders))
+        present = {}
+        for o in orders:
+            if o is not None and o.facts not in present:
+                present[o.facts] = o
 
-        changed = True
-        while changed:
-            changed = False
-
-            # Cancel facts stated in opposite directions in
-            # otherwise-identical orders.
-            for i, o1 in enumerate(orders):
-                for o2 in orders[i + 1:]:
-                    o = __class__.__cancel(o1, o2)
-                    if o is not None:
-                        orders.remove(o1)
-                        orders.remove(o2)
-                        if o not in orders:
-                            orders.append(o)
-                        changed = True
-                        break
-                if changed:
-                    break
-            if changed:
+        # Cancel facts stated in opposite directions in
+        # otherwise-identical orders, cascading as the weaker
+        # orders produced cancel in turn. Partners are found via
+        # the index, not pairwise scans.
+        worklist = list(present.values())
+        while worklist:
+            o = worklist.pop()
+            if present.get(o.facts) is not o or not o.facts:
                 continue
+            fs = set(o.facts)
+            for a, b in o.facts:
+                rest = fs - {(a, b)}
+                partner_key = tuple(sorted(rest | {(b, a)}))
+                partner = present.get(partner_key)
+                if partner is None:
+                    continue
+                del present[o.facts]
+                del present[partner_key]
+                merged = PartialOrder.get(rest)
+                if merged.facts not in present:
+                    present[merged.facts] = merged
+                    worklist.append(merged)
+                break
 
-            # Drop orders covered by other present orders.
-            for i, o1 in enumerate(orders):
-                if any(o2 is not o1 and o2.covers(o1)
-                       for o2 in orders):
-                    del orders[i]
-                    changed = True
-                    break
+        if () in present:
+            # The empty order covers everything.
+            orders = [present[()]]
+        else:
+            # Drop orders covered by other present orders. A
+            # covering order's facts all follow from the covered
+            # one's, so it never has more of them.
+            orders = sorted(present.values(),
+                            key=lambda o: len(o.followers))
+            kept = []
+            for o in orders:
+                if not any(k.covers(o) for k in kept):
+                    kept.append(o)
+            orders = kept
 
         key = tuple(sorted(orders, key=lambda o: o.facts))
         r = __class__.__cache.get(key)
