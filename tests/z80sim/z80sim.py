@@ -2015,6 +2015,9 @@ class Z80Simulator(object):
     def get_node(self, id):
         return self.__nodes_by_name[id]
 
+    def get_node_id(self, index):
+        return self.__nodes[index].id
+
     def read_nodes(self, id, width=8):
         return Bits(self.get_node_state(self.__nodes_by_name[f'{id}{i}'])
                     for i in range(width))
@@ -3274,6 +3277,47 @@ def build_symbolised_state():
     return s
 
 
+def get_z3_simplified(b, rename_term=None):
+    # Verbalises an eqbool value via z3's simplification tactics
+    # -- the sole use of z3 in this simulator.
+    cache = {}
+
+    def get(v):
+        kind = v.kind
+        if kind in ('false', 'true'):
+            return z3.BoolVal(kind == 'true')
+        if kind == 'term':
+            t = v.term
+            if rename_term is not None:
+                t = rename_term(t)
+            return z3.Bool(str(t))
+
+        key = v.id
+        r = cache.get(key)
+        if r is not None:
+            return r
+
+        if kind == 'eq':
+            x, y = v.args
+            r = get(x) == get(y)
+        elif kind == 'not':
+            r = z3.Not(get(~v))
+        else:
+            OPS = {'or': z3.Or, 'and': z3.And, 'ifelse': z3.If}
+            r = OPS[kind](*(get(op) for op in v.args))
+        cache[key] = r
+        return r
+
+    e = get(b)
+    for t in ('qe2', 'solver-subsumption') * 3:
+        e = z3.Tactic(t).apply(e).as_expr()
+    if z3.is_false(e):
+        return '0'
+    if z3.is_true(e):
+        return '1'
+    return str(e)
+
+
 def run_all_orders(instr):
     # Executes the given instruction on a live simulator in
     # all-orders mode, starting from the symbolised state, then
@@ -3316,18 +3360,27 @@ def run_all_orders(instr):
     # get_effective_states() does.
     run_cycle('settle', 0x00, 3)
 
-    Status.clear()
+    def rename_event(t):
+        (s1, i1), (s2, i2) = t
+        return (f'{sim.get_node_id(i1)}@{s1} < '
+                f'{sim.get_node_id(i2)}@{s2}')
+
     for r in ('reg_f', 'reg_ff', 'reg_a', 'reg_aa'):
         for i in range(8):
             id = f'{r}{i}'
             pv = sim.get_node_entries(sim.get_node(id), {})
-            if pv.is_single:
-                print(f'{id}: {pv.single_value}')
-            else:
-                print(f'{id}: {len(pv.entries)} possible values')
-                for v, orders in pv.entries:
-                    print(f'  {v}')
-                    print(f'    under {orders!r}')
+            with Status.do(f'verbalise {id}'):
+                if pv.is_single:
+                    line = f'{id}: {get_z3_simplified(pv.single_value)}'
+                else:
+                    lines = [f'{id}: {len(pv.entries)} possible values']
+                    for v, orders in pv.entries:
+                        lines.append(f'  {get_z3_simplified(v)}')
+                        lines.append('    under ' + get_z3_simplified(
+                            orders.e, rename_event))
+                    line = '\n'.join(lines)
+            Status.clear()
+            print(line)
 
 
 def test_instr_seq(seq):
