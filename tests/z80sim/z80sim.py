@@ -3383,7 +3383,7 @@ def run_all_orders(instr):
             else:
                 lines = [f'{id}: {len(pv.entries)} possible values']
                 for no, (v, orders) in enumerate(pv.entries):
-                    lines.append(f'  #{no} {get_z3_simplified(v)}')
+                    lines.append(f'  {no}) {get_z3_simplified(v)}')
                     lines.append('    under ' + get_z3_simplified(
                         orders.e, rename_event))
                 line = '\n'.join(lines)
@@ -3411,7 +3411,7 @@ def run_all_orders(instr):
                            if bools.is_equiv(u, v)]
                 assert len(matches) == 1, (seed, id)
                 if not results[id].is_single:
-                    takes.append(f'{id} #{matches[0]}')
+                    takes.append(f'{id} {matches[0]})')
         Status.clear()
         print(f'seed {seed}: single-order results are all among '
               f'the possible values; ' + ', '.join(takes))
