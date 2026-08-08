@@ -1321,12 +1321,23 @@ class ObservedStates(object):
     # together with the entries of the old state, each extended
     # with the fact stated the other way round. The node's own
     # state and non-racing observations contribute no facts.
+    #
+    # The order question of a competing pair is asked once per
+    # settling: the first observation carries the race, and any
+    # later observation of the same pair within the settling
+    # sees the pending state deterministically -- the reader is
+    # then re-evaluating after the competing update has landed.
+    # Without this, re-evaluation trips around feedback loops
+    # re-ask the same questions against already-conditioned
+    # states and derive different conditions every trip, and the
+    # settling never converges.
     def __init__(self, new_states, evaluated=None, all_orders=False,
-                 sweep_no=None):
+                 sweep_no=None, raced=None):
         self.__new_states = new_states
         self.__evaluated = evaluated
         self.__all_orders = all_orders
         self.__sweep_no = sweep_no
+        self.__raced = raced
         self.__observed = {}
 
     def __fact(self, before, after):
@@ -1374,11 +1385,16 @@ class ObservedStates(object):
             state = pending
         else:
             e, g = self.__evaluated, gate
-            state = PossibleValues.get(tuple(
-                (v, os.combine(self.__fact(g, e)))
-                for v, os in pending.entries) + tuple(
-                (v, os.combine(self.__fact(e, g)))
-                for v, os in applied.entries))
+            pair = g.index, e.index
+            if pair in self.__raced:
+                state = pending
+            else:
+                self.__raced.add(pair)
+                state = PossibleValues.get(tuple(
+                    (v, os.combine(self.__fact(g, e)))
+                    for v, os in pending.entries) + tuple(
+                    (v, os.combine(self.__fact(e, g)))
+                    for v, os in applied.entries))
 
         self.__observed[gate] = state
         return state
@@ -1660,7 +1676,8 @@ class Z80Simulator(object):
         # merging at every operation.
         observed = ObservedStates(new_states, evaluated=n,
                                   all_orders=True,
-                                  sweep_no=self.sweep_no)
+                                  sweep_no=self.sweep_no,
+                                  raced=self.__raced_pairs)
         gnd, pwr, pullup, pulldown = self.__get_all_node_preds(n, observed)
 
         if len(n.gate_of) == 0:
@@ -1703,8 +1720,11 @@ class Z80Simulator(object):
         # nodes = list(self.__nodes.values())
 
         # Every settling of the circuit is a new scope of update
-        # events for the facts partial orders are made of.
+        # events for the facts partial orders are made of, and a
+        # fresh chance for every competing pair to be asked its
+        # order question.
         self.sweep_no += 1
+        self.__raced_pairs = set()
 
         groups = []
         for n in nodes:
@@ -1865,6 +1885,10 @@ class Z80Simulator(object):
 
         # Counts settlings of the circuit; scopes update events.
         self.sweep_no = 0
+
+        # The competing pairs whose order questions the current
+        # settling has already asked.
+        self.__raced_pairs = set()
 
         if memory is None:
             self.__memory = None
