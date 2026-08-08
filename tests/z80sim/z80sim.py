@@ -660,8 +660,10 @@ class PossibleValues(object):
 
     @property
     def is_single(self):
-        return (len(self.entries) == 1 and
-                self.entries[0][1] is PartialOrders.ALWAYS)
+        # A sole possible value holds under every possible
+        # execution, whatever its orders say: orders only ever
+        # distinguish values from each other.
+        return len(self.entries) == 1
 
     @property
     def single_value(self):
@@ -671,7 +673,9 @@ class PossibleValues(object):
     @staticmethod
     def get(entries):
         # Merges equivalent values by uniting their orders and
-        # drops values that arise never.
+        # drops values that arise never. Entries are kept sorted
+        # by their orders, so equal sets store their entries
+        # identically.
         merged = []
         for v, orders in entries:
             if orders is PartialOrders.NEVER:
@@ -682,13 +686,59 @@ class PossibleValues(object):
                     break
             else:
                 merged.append((v, orders))
+        merged.sort(key=lambda e: tuple(o.facts for o in e[1].orders))
         return PossibleValues(tuple(merged))
+
+    @staticmethod
+    def is_same(a, b):
+        # Whether the two states -- plain values or sets of
+        # possible values -- are known to be the same.
+        if isinstance(a, PossibleValues) or isinstance(b, PossibleValues):
+            a, b = __class__.cast(a), __class__.cast(b)
+            if len(a.entries) != len(b.entries):
+                return False
+            return all(ao is bo and bools.is_equiv(av, bv)
+                       for (av, ao), (bv, bo) in zip(a.entries, b.entries))
+        return bools.is_equiv(a, b)
 
     @staticmethod
     def cast(x):
         if isinstance(x, PossibleValues):
             return x
         return PossibleValues(((x, PartialOrders.ALWAYS),))
+
+    @staticmethod
+    def apply(f, *args):
+        # Applies a function over plain values to every
+        # combination of the possible values of the arguments,
+        # dropping combinations whose orders are impossible and
+        # merging equivalent results. Merging at every operation
+        # is what keeps propagating all orders tractable: masked
+        # and equal alternatives collapse as they arise.
+        args = tuple(__class__.cast(a) for a in args)
+
+        if all(a.is_single for a in args):
+            orders = PartialOrders.ALWAYS
+            for a in args:
+                orders = orders.combine(a.entries[0][1])
+            if orders is PartialOrders.NEVER:
+                return __class__(())
+            return __class__(((f(*(a.entries[0][0] for a in args)),
+                               orders),))
+
+        results = []
+
+        def combos(i, values, orders):
+            if i == len(args):
+                results.append((f(*values), orders))
+                return
+            for v, os in args[i].entries:
+                combined = orders.combine(os)
+                if combined is not PartialOrders.NEVER:
+                    combos(i + 1, values + (v,), combined)
+
+        combos(0, (), PartialOrders.ALWAYS)
+        return __class__.get(results)
 
 
 def test_orders():
@@ -1286,35 +1336,33 @@ class ObservedStates(object):
     # become visible to an evaluation, and thus where the order
     # of updates manifests itself.
     #
-    # With no choices given, pending updates are observed as they
-    # are, matching the usual single-order behaviour. Otherwise,
-    # states are sets of possible values, and every observation
-    # chooses one of its candidate entries. For a racing
-    # observation -- one where the observed gate has a pending
-    # update differing from the state it is about to replace --
-    # the candidates are the entries of the pending update, each
-    # extended with the fact 'the observed gate is updated before
-    # the evaluated node', followed by the entries of the old
-    # state, each extended with the fact stated the other way
-    # round. The node's own state and non-racing observations
-    # contribute no facts. Choices map nodes to candidate
-    # indexes; unchosen observations take candidate 0,
-    # reproducing the usual behaviour, and observations with more
-    # than one candidate are recorded, ready to become branch
-    # points. The orders of everything observed combine into the
-    # orders of the evaluation itself.
-    def __init__(self, new_states, evaluated=None, choices=None):
+    # Normally, pending updates are observed as they are,
+    # matching the usual single-order behaviour. With all_orders
+    # set, states are sets of possible values and observations
+    # return such sets. For a racing observation -- one where
+    # the observed gate has a pending update differing from the
+    # state it is about to replace -- the observed set holds the
+    # entries of the pending update, each extended with the fact
+    # 'the observed gate is updated before the evaluated node',
+    # together with the entries of the old state, each extended
+    # with the fact stated the other way round. The node's own
+    # state and non-racing observations contribute no facts.
+    def __init__(self, new_states, evaluated=None, all_orders=False,
+                 sweep_no=None):
         self.__new_states = new_states
         self.__evaluated = evaluated
-        self.__choices = choices
+        self.__all_orders = all_orders
+        self.__sweep_no = sweep_no
         self.__observed = {}
-        self.taken = []
-        self.orders = PartialOrders.ALWAYS
 
-    @staticmethod
-    def __fact(before, after):
+    def __fact(self, before, after):
+        # An update event is a node updating within a given
+        # settling of the circuit, so facts surviving a settling
+        # are never confused with facts about later updates of
+        # the same nodes.
+        s = self.__sweep_no
         return PartialOrders.get(
-            (PartialOrder.get(((before.index, after.index),)),))
+            (PartialOrder.get((((s, before.index), (s, after.index)),)),))
 
     @staticmethod
     def __is_same(a, b):
@@ -1326,25 +1374,16 @@ class ObservedStates(object):
         (bv, bos), = b.entries
         return aos is bos and bools.is_equiv(av, bv)
 
-    def __observe_node(self, node, candidates):
-        index = 0
-        if self.__choices is not None:
-            index = self.__choices.get(node, 0)
-        if len(candidates) > 1:
-            self.taken.append((node, index, len(candidates)))
-
-        state, orders = candidates[index]
-        self.orders = self.orders.combine(orders)
-        self.__observed[node] = state
-        return state
-
     def observe(self, t):
         gate = t.gate
         if gate in self.__observed:
             return self.__observed[gate]
 
-        if self.__choices is None:
+        if not self.__all_orders:
             state = self.__new_states.get(gate, t.state)
+            # A node with several possible values cannot be
+            # observed the single-order way.
+            assert not isinstance(state, PossibleValues), gate
             self.__observed[gate] = state
             return state
 
@@ -1357,31 +1396,35 @@ class ObservedStates(object):
             # A node's own update is not something the node's
             # evaluation can race with, and with no pending
             # update there is nothing to race with at all.
-            latest = applied if pending is None else pending
-            candidates = latest.entries
+            state = applied if pending is None else pending
         elif __class__.__is_same(applied, pending):
-            candidates = pending.entries
+            state = pending
         else:
             e, g = self.__evaluated, gate
-            candidates = tuple(
-                (v, os.combine(__class__.__fact(g, e)))
+            state = PossibleValues.get(tuple(
+                (v, os.combine(self.__fact(g, e)))
                 for v, os in pending.entries) + tuple(
-                (v, os.combine(__class__.__fact(e, g)))
-                for v, os in applied.entries)
+                (v, os.combine(self.__fact(e, g)))
+                for v, os in applied.entries))
 
-        return self.__observe_node(gate, candidates)
+        self.__observed[gate] = state
+        return state
 
     def observe_floating(self, n):
         # The state the node keeps while floating: its own
         # latest state, not subject to ordering.
-        if self.__choices is None:
-            return self.__new_states.get(n, n.gate_of[0].state)
+        if not self.__all_orders:
+            state = self.__new_states.get(n, n.gate_of[0].state)
+            assert not isinstance(state, PossibleValues), n
+            return state
 
         if n in self.__observed:
             return self.__observed[n]
 
-        latest = self.__new_states.get(n, n.gate_of[0].state)
-        return self.__observe_node(n, PossibleValues.cast(latest).entries)
+        state = PossibleValues.cast(
+            self.__new_states.get(n, n.gate_of[0].state))
+        self.__observed[n] = state
+        return state
 
 
 class Z80Simulator(object):
@@ -1531,12 +1574,11 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def get_node_state(self, n, new_states=None, observed=None):
+    def get_node_state(self, n, new_states=None):
         if new_states is None:
             new_states = {}
 
-        if observed is None:
-            observed = ObservedStates(new_states)
+        observed = ObservedStates(new_states)
         gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
 
         if len(n.gate_of) == 0:
@@ -1548,51 +1590,136 @@ class Z80Simulator(object):
         pull = bools.ifelse(pulldown | pullup, ~pulldown, floating)
         return bools.ifelse(gnd | pwr, ~gnd, pull)
 
+    def __get_all_node_preds(self, n, observed):
+        # The counterpart of __get_node_preds() over sets of
+        # possible values.
+        def is_const(pv, const):
+            return pv.is_single and pv.entries[0][0] is const
+
+        PV_TRUE = PossibleValues.cast(TRUE)
+        PV_FALSE = PossibleValues.cast(FALSE)
+
+        def get_group_pred(n, get_node_pred, stack, preds):
+            cyclic = False
+
+            p = preds.get(n)
+            if p is not None:
+                return cyclic, p
+
+            p = get_node_pred(n)
+            if p is not None:
+                p = PossibleValues.cast(p)
+                if is_const(p, TRUE):
+                    preds[n] = p
+                    return cyclic, p
+
+            if n.is_gnd_or_pwr:
+                assert p is None
+                preds[n] = PV_FALSE
+                return cyclic, PV_FALSE
+
+            p = [] if p is None else [p]
+            stack.append(n)
+            for t in n.conn_of:
+                state = observed.observe(t)
+                if not is_const(state, FALSE):
+                    m = t.get_other_conn(n)
+                    if m in stack:
+                        cyclic = True
+                    else:
+                        cc, pp = get_group_pred(m, get_node_pred,
+                                                stack, preds)
+                        cyclic |= cc
+
+                        mp = PossibleValues.apply(
+                            lambda s, q: s & q, state, pp)
+                        if is_const(mp, TRUE):
+                            p = [PV_TRUE]
+                            break
+                        p.append(mp)
+
+            # Fold pairwise: merging after every operation is
+            # what keeps the sets small.
+            r = None
+            for x in p:
+                r = x if r is None else \
+                    PossibleValues.apply(bools.get_or, r, x)
+            p = PossibleValues.apply(bools.get_or) if r is None else r
+            assert stack.pop() == n
+
+            if not cyclic:
+                preds[n] = p
+
+            return cyclic, p
+
+        def get_gnd_pred(n):
+            return TRUE if n.is_gnd else None
+
+        def get_pwr_pred(n):
+            return TRUE if n.is_pwr else None
+
+        def get_pullup_pred(n):
+            if n.pull is None:
+                return None
+
+            assert isinstance(n.pull, eqbool.Bool)
+            return n.pull
+
+        def get_pulldown_pred(n):
+            if n.pull is None:
+                return None
+
+            assert isinstance(n.pull, eqbool.Bool)
+            return ~n.pull
+
+        _, gnd = get_group_pred(n, get_gnd_pred, [], {})
+        _, pwr = get_group_pred(n, get_pwr_pred, [], {})
+        _, pullup = get_group_pred(n, get_pullup_pred, [], {})
+        _, pulldown = get_group_pred(n, get_pulldown_pred, [], {})
+
+        return gnd, pwr, pullup, pulldown
+
     def get_node_entries(self, n, new_states):
-        # All possible results of evaluating the state of node n,
-        # over all orders of updates: enumerates the candidate
-        # choices of the evaluation's observations, branching
-        # adaptively as altered choices make the evaluation
-        # observe new candidates, and merges equivalent resulting
-        # values by uniting their orders. Combinations whose
-        # orders are impossible drop out.
-        results = []
-        worklist = [{}]
-        count = 0
-        while worklist:
-            count += 1
-            assert count <= 1 << 16, n
+        # The full state of node n over all orders of updates:
+        # the set of its possible values, each with the partial
+        # orders of updates under which the evaluation arrives at
+        # it. Sets propagate through the whole computation,
+        # merging at every operation.
+        observed = ObservedStates(new_states, evaluated=n,
+                                  all_orders=True,
+                                  sweep_no=self.sweep_no)
+        gnd, pwr, pullup, pulldown = self.__get_all_node_preds(n, observed)
 
-            choices = worklist.pop()
-            observed = ObservedStates(new_states, evaluated=n,
-                                      choices=choices)
-            v = self.get_node_state(n, new_states, observed=observed)
-
-            for i, (node, index, num) in enumerate(observed.taken):
-                if node in choices:
-                    continue
-                forked = dict(choices)
-                for node2, index2, _ in observed.taken[:i]:
-                    forked.setdefault(node2, index2)
-                for alt in range(num):
-                    if alt != index:
-                        f = dict(forked)
-                        f[node] = alt
-                        worklist.append(f)
-
-            results.append((v, observed.orders))
-        return PossibleValues.get(results)
+        if len(n.gate_of) == 0:
+            floating = PossibleValues.cast(
+                bools.get('<floating-non-gate>'))
+        else:
+            floating = observed.observe_floating(n)
+        pull = PossibleValues.apply(
+            lambda pd, pu, f: bools.ifelse(pd | pu, ~pd, f),
+            pulldown, pullup, floating)
+        return PossibleValues.apply(
+            lambda g, p, pl: bools.ifelse(g | p, ~g, pl),
+            gnd, pwr, pull)
 
     def __update_gate_state(self, n, new_states):
         assert not n.is_gnd_or_pwr
 
         old_state = new_states.get(n, n.gate_of[0].state)
-        new_state = self.get_node_state(n, new_states)
+        if not self.track_orders:
+            new_state = self.get_node_state(n, new_states)
+        else:
+            new_state = self.get_node_entries(n, new_states)
+
+            # Nodes down to a single value arising under all
+            # orders store it plainly, dropping the orders.
+            if new_state.is_single:
+                new_state = new_state.single_value
 
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
         # the case of a floating gate.
-        if bools.is_equiv(new_state, old_state):
+        if PossibleValues.is_same(new_state, old_state):
             return False
 
         new_states[n] = new_state
@@ -1601,6 +1728,10 @@ class Z80Simulator(object):
     def __update_groups_of(self, nodes):
         # TODO: Does always updating all nodes lead to any failures?
         # nodes = list(self.__nodes.values())
+
+        # Every settling of the circuit is a new scope of update
+        # events for the facts partial orders are made of.
+        self.sweep_no += 1
 
         groups = []
         for n in nodes:
@@ -1751,6 +1882,16 @@ class Z80Simulator(object):
         self.__t4 = self.__nodes_by_name['t4']
         self.__t5 = self.__nodes_by_name['t5']
         self.__t6 = self.__nodes_by_name['t6']
+
+        # When set, gate-state updates evaluate all possible
+        # values with their partial orders of updates via
+        # get_node_entries(); nodes with several possible values
+        # store them as PossibleValues instances. Off by
+        # default, preserving the usual single-order behaviour.
+        self.track_orders = False
+
+        # Counts settlings of the circuit; scopes update events.
+        self.sweep_no = 0
 
         if memory is None:
             self.__memory = None
