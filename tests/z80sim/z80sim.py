@@ -647,6 +647,50 @@ PartialOrders.ALWAYS = PartialOrders.get((PartialOrder.get(()),))
 PartialOrders.NEVER = PartialOrders.get(())
 
 
+class PossibleValues(object):
+    # The set of possible values of a node, each associated with
+    # the partial orders of updates under which the simulation
+    # arrives at that value. Almost everywhere a node has a
+    # single possible value arising under all orders.
+    def __init__(self, entries):
+        self.entries = entries
+
+    def __repr__(self):
+        return ' / '.join(f'{v!r} [{os!r}]' for v, os in self.entries)
+
+    @property
+    def is_single(self):
+        return (len(self.entries) == 1 and
+                self.entries[0][1] is PartialOrders.ALWAYS)
+
+    @property
+    def single_value(self):
+        assert self.is_single
+        return self.entries[0][0]
+
+    @staticmethod
+    def get(entries):
+        # Merges equivalent values by uniting their orders and
+        # drops values that arise never.
+        merged = []
+        for v, orders in entries:
+            if orders is PartialOrders.NEVER:
+                continue
+            for i, (u, uorders) in enumerate(merged):
+                if bools.is_equiv(u, v):
+                    merged[i] = u, uorders.unite(orders)
+                    break
+            else:
+                merged.append((v, orders))
+        return PossibleValues(tuple(merged))
+
+    @staticmethod
+    def cast(x):
+        if isinstance(x, PossibleValues):
+            return x
+        return PossibleValues(((x, PartialOrders.ALWAYS),))
+
+
 def test_orders():
     def order(*facts):
         return PartialOrder.get(facts)
@@ -1236,20 +1280,108 @@ def _load_initial_image():
 class ObservedStates(object):
     # A single gate-state evaluation observes the states of other
     # gates through this class. Observations are memoised, so
-    # every gate is observed at most once per evaluation and all
+    # every node is observed at most once per evaluation and all
     # traversals of the evaluation see the same state. This is
     # the single point where pending updates of other gates
     # become visible to an evaluation, and thus where the order
     # of updates manifests itself.
-    def __init__(self, new_states):
+    #
+    # With no choices given, pending updates are observed as they
+    # are, matching the usual single-order behaviour. Otherwise,
+    # states are sets of possible values, and every observation
+    # chooses one of its candidate entries. For a racing
+    # observation -- one where the observed gate has a pending
+    # update differing from the state it is about to replace --
+    # the candidates are the entries of the pending update, each
+    # extended with the fact 'the observed gate is updated before
+    # the evaluated node', followed by the entries of the old
+    # state, each extended with the fact stated the other way
+    # round. The node's own state and non-racing observations
+    # contribute no facts. Choices map nodes to candidate
+    # indexes; unchosen observations take candidate 0,
+    # reproducing the usual behaviour, and observations with more
+    # than one candidate are recorded, ready to become branch
+    # points. The orders of everything observed combine into the
+    # orders of the evaluation itself.
+    def __init__(self, new_states, evaluated=None, choices=None):
         self.__new_states = new_states
+        self.__evaluated = evaluated
+        self.__choices = choices
         self.__observed = {}
+        self.taken = []
+        self.orders = PartialOrders.ALWAYS
+
+    @staticmethod
+    def __fact(before, after):
+        return PartialOrders.get(
+            (PartialOrder.get(((before.index, after.index),)),))
+
+    @staticmethod
+    def __is_same(a, b):
+        if a is b:
+            return True
+        if len(a.entries) != 1 or len(b.entries) != 1:
+            return False
+        (av, aos), = a.entries
+        (bv, bos), = b.entries
+        return aos is bos and bools.is_equiv(av, bv)
+
+    def __observe_node(self, node, candidates):
+        index = 0
+        if self.__choices is not None:
+            index = self.__choices.get(node, 0)
+        if len(candidates) > 1:
+            self.taken.append((node, index, len(candidates)))
+
+        state, orders = candidates[index]
+        self.orders = self.orders.combine(orders)
+        self.__observed[node] = state
+        return state
 
     def observe(self, t):
         gate = t.gate
-        if gate not in self.__observed:
-            self.__observed[gate] = self.__new_states.get(gate, t.state)
-        return self.__observed[gate]
+        if gate in self.__observed:
+            return self.__observed[gate]
+
+        if self.__choices is None:
+            state = self.__new_states.get(gate, t.state)
+            self.__observed[gate] = state
+            return state
+
+        applied = PossibleValues.cast(t.state)
+        pending = self.__new_states.get(gate)
+        if pending is not None:
+            pending = PossibleValues.cast(pending)
+
+        if gate is self.__evaluated or pending is None:
+            # A node's own update is not something the node's
+            # evaluation can race with, and with no pending
+            # update there is nothing to race with at all.
+            latest = applied if pending is None else pending
+            candidates = latest.entries
+        elif __class__.__is_same(applied, pending):
+            candidates = pending.entries
+        else:
+            e, g = self.__evaluated, gate
+            candidates = tuple(
+                (v, os.combine(__class__.__fact(g, e)))
+                for v, os in pending.entries) + tuple(
+                (v, os.combine(__class__.__fact(e, g)))
+                for v, os in applied.entries)
+
+        return self.__observe_node(gate, candidates)
+
+    def observe_floating(self, n):
+        # The state the node keeps while floating: its own
+        # latest state, not subject to ordering.
+        if self.__choices is None:
+            return self.__new_states.get(n, n.gate_of[0].state)
+
+        if n in self.__observed:
+            return self.__observed[n]
+
+        latest = self.__new_states.get(n, n.gate_of[0].state)
+        return self.__observe_node(n, PossibleValues.cast(latest).entries)
 
 
 class Z80Simulator(object):
@@ -1399,11 +1531,12 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def get_node_state(self, n, new_states=None):
+    def get_node_state(self, n, new_states=None, observed=None):
         if new_states is None:
             new_states = {}
 
-        observed = ObservedStates(new_states)
+        if observed is None:
+            observed = ObservedStates(new_states)
         gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
 
         if len(n.gate_of) == 0:
@@ -1411,9 +1544,44 @@ class Z80Simulator(object):
         else:
             # TODO: For now we assume that all gates of the node
             # are always in the same state.
-            floating = new_states.get(n, n.gate_of[0].state)
+            floating = observed.observe_floating(n)
         pull = bools.ifelse(pulldown | pullup, ~pulldown, floating)
         return bools.ifelse(gnd | pwr, ~gnd, pull)
+
+    def get_node_entries(self, n, new_states):
+        # All possible results of evaluating the state of node n,
+        # over all orders of updates: enumerates the candidate
+        # choices of the evaluation's observations, branching
+        # adaptively as altered choices make the evaluation
+        # observe new candidates, and merges equivalent resulting
+        # values by uniting their orders. Combinations whose
+        # orders are impossible drop out.
+        results = []
+        worklist = [{}]
+        count = 0
+        while worklist:
+            count += 1
+            assert count <= 1 << 16, n
+
+            choices = worklist.pop()
+            observed = ObservedStates(new_states, evaluated=n,
+                                      choices=choices)
+            v = self.get_node_state(n, new_states, observed=observed)
+
+            for i, (node, index, num) in enumerate(observed.taken):
+                if node in choices:
+                    continue
+                forked = dict(choices)
+                for node2, index2, _ in observed.taken[:i]:
+                    forked.setdefault(node2, index2)
+                for alt in range(num):
+                    if alt != index:
+                        f = dict(forked)
+                        f[node] = alt
+                        worklist.append(f)
+
+            results.append((v, observed.orders))
+        return PossibleValues.get(results)
 
     def __update_gate_state(self, n, new_states):
         assert not n.is_gnd_or_pwr
