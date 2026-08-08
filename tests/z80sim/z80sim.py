@@ -478,174 +478,141 @@ def test_bools():
     test(ifelse(c, ~t2, t2), t)
 
 
-class PartialOrder(object):
-    # A partial order of node updates: a set of facts of the
-    # form 'node x is updated before node y', stored in a
-    # standard form with the facts implied by transitivity
-    # removed, and uniquified, so equal orders are the same
-    # object. The order with no facts requires nothing.
-    __cache = {}
-
-    def __init__(self, facts, followers):
-        # Use get() instead.
-        self.facts = facts
-        self.followers = followers
-
-    def __repr__(self):
-        return '; '.join(f'{a}<{b}' for a, b in self.facts) or '{}'
-
-    @staticmethod
-    def get(facts):
-        # Returns the order in standard form, or None whenever
-        # the given facts require a cycle, meaning an impossible
-        # order.
-        facts = set(facts)
-
-        following = {}
-        for a, b in facts:
-            following.setdefault(a, set()).add(b)
-
-        # Compute the set of nodes known to be updated after
-        # each node.
-        followers = {a: set(bs) for a, bs in following.items()}
-        changed = True
-        while changed:
-            changed = False
-            for a, bs in followers.items():
-                new = set()
-                for b in bs:
-                    new |= followers.get(b, set()) - bs
-                if new:
-                    bs |= new
-                    changed = True
-
-        # Cyclic orders are impossible.
-        if any(a in bs for a, bs in followers.items()):
-            return None
-
-        # Remove facts implied by transitivity.
-        reduced = []
-        for a, b in facts:
-            if not any(c != b and b in followers.get(c, ())
-                       for c in following[a]):
-                reduced.append((a, b))
-
-        key = tuple(sorted(reduced))
-        order = __class__.__cache.get(key)
-        if order is None:
-            followers = frozenset(
-                (a, b) for a, bs in followers.items() for b in bs)
-            order = PartialOrder(key, followers)
-            __class__.__cache[key] = order
-        return order
-
-    def combine(self, other):
-        # The order requiring the facts of both, or None if they
-        # contradict each other.
-        if self is other:
-            return self
-        return __class__.get(self.facts + other.facts)
-
-    def covers(self, other):
-        # Whether this order's facts all follow from the other's,
-        # so whenever the other order holds, this one holds too.
-        return self.followers <= other.followers
-
-
 class PartialOrders(object):
-    # A set of partial orders under which a value arises: the
-    # value arises whenever any of the orders holds. Sets are
-    # simplified on construction: a fact stated in opposite
-    # directions in otherwise-identical orders does not matter
-    # and cancels; an order covered by another one present is
-    # dropped; impossible orders are dropped. The set of just
-    # the empty order means the value arises under all orders;
-    # the empty set means it arises never.
+    # The set of partial orders of node updates under which a
+    # value arises, represented as a condition over facts of the
+    # form 'x is updated before y'. Facts are terms of a
+    # dedicated eqbool context, entirely separate from the one
+    # holding node values; a fact stated the other way round is
+    # the negation of the same term, so two-way cycles vanish on
+    # construction, and the propositional simplifications --
+    # cancellation of facts stated both ways in otherwise-equal
+    # orders, absorption of orders that merely add facts --
+    # are eqbool's ordinary business. Combining and uniting are
+    # single operations on shared structure, so no products of
+    # alternatives ever get materialised.
+    #
+    # What is not propositional is transitivity, and it is
+    # supplied at the queries instead: is_never() decides
+    # whether a condition can hold at all under axioms saying
+    # that among any three events there is no cycle, and same()
+    # escalates from identity to equivalence to equivalence
+    # modulo those axioms.
     __cache = {}
+    __never_cache = {}
+    __seq = 0
 
-    def __init__(self, orders):
+    def __init__(self, e):
         # Use get() instead.
-        self.orders = orders
+        self.e = e
+        self.seq = __class__.__seq
+        __class__.__seq += 1
 
     def __repr__(self):
-        if self is __class__.ALWAYS:
+        if self.e.is_true:
             return 'always'
-        if self is __class__.NEVER:
+        if self.e.is_false:
             return 'never'
-        return ' | '.join(f'({o!r})' for o in self.orders)
+        return str(self.e)
 
     @staticmethod
-    def get(orders):
-        present = {}
-        for o in orders:
-            if o is not None and o.facts not in present:
-                present[o.facts] = o
-
-        # Cancel facts stated in opposite directions in
-        # otherwise-identical orders, cascading as the weaker
-        # orders produced cancel in turn. Partners are found via
-        # the index, not pairwise scans.
-        worklist = list(present.values())
-        while worklist:
-            o = worklist.pop()
-            if present.get(o.facts) is not o or not o.facts:
-                continue
-            fs = set(o.facts)
-            for a, b in o.facts:
-                rest = fs - {(a, b)}
-                partner_key = tuple(sorted(rest | {(b, a)}))
-                partner = present.get(partner_key)
-                if partner is None:
-                    continue
-                del present[o.facts]
-                del present[partner_key]
-                merged = PartialOrder.get(rest)
-                if merged.facts not in present:
-                    present[merged.facts] = merged
-                    worklist.append(merged)
-                break
-
-        if () in present:
-            # The empty order covers everything.
-            orders = [present[()]]
-        else:
-            # Drop orders covered by other present orders. A
-            # covering order's facts all follow from the covered
-            # one's, so it never has more of them.
-            orders = sorted(present.values(),
-                            key=lambda o: len(o.followers))
-            kept = []
-            for o in orders:
-                if not any(k.covers(o) for k in kept):
-                    kept.append(o)
-            orders = kept
-
-        key = tuple(sorted(orders, key=lambda o: o.facts))
-        r = __class__.__cache.get(key)
+    def get(e):
+        r = __class__.__cache.get(e)
         if r is None:
-            r = PartialOrders(key)
-            __class__.__cache[key] = r
+            r = PartialOrders(e)
+            __class__.__cache[e] = r
         return r
 
+    @staticmethod
+    def __atom(before, after):
+        # The term for the fact 'before is updated before
+        # after', in canonical polarity.
+        assert before != after
+        if before > after:
+            return ~order_bools.get((after, before))
+        return order_bools.get((before, after))
+
+    @staticmethod
+    def get_fact(before, after):
+        return __class__.get(__class__.__atom(before, after))
+
+    @property
+    def obviously_never(self):
+        return self.e.is_false
+
+    def is_never(self):
+        # Whether the condition cannot hold under any order of
+        # updates, transitivity taken into account.
+        e = self.e
+        if e.is_false:
+            return True
+        if e.is_true:
+            return False
+
+        r = __class__.__never_cache.get(e)
+        if r is not None:
+            return r
+
+        # Collect the events the condition mentions.
+        events = set()
+        seen = set()
+        worklist = [e]
+        while worklist:
+            v = worklist.pop()
+            if v.id in seen:
+                continue
+            seen.add(v.id)
+            kind = v.kind
+            if kind == 'term':
+                events.update(v.term)
+            elif kind == 'not':
+                worklist.append(~v)
+            elif kind not in ('false', 'true'):
+                worklist.extend(v.args)
+
+        # In any single execution the mentioned events happen in
+        # some total order: forbid cycles among every three of
+        # them. That makes every satisfying assignment a total
+        # order, so satisfiability means some order allows the
+        # condition.
+        query = e
+        for x, y, z in itertools.combinations(sorted(events), 3):
+            a = __class__.__atom(x, y)
+            b = __class__.__atom(y, z)
+            c = __class__.__atom(x, z)
+            query &= ~(a & b & ~c)
+            query &= ~(~a & ~b & c)
+
+        r = order_bools.is_equiv(query, order_bools.false)
+        __class__.__never_cache[e] = r
+        return r
+
+    def same(self, other):
+        # Whether the two conditions mean the same set of
+        # orders.
+        if self is other:
+            return True
+        if order_bools.is_equiv(self.e, other.e):
+            return True
+        return __class__.get(self.e ^ other.e).is_never()
+
     def unite(self, other):
-        # The value arises whenever an order of either set
-        # holds.
+        # The value arises whenever either condition holds.
         if self is other:
             return self
-        return __class__.get(self.orders + other.orders)
+        return __class__.get(self.e | other.e)
 
     def combine(self, other):
-        # The value arises whenever an order of one set holds
-        # together with an order of the other.
+        # The value arises whenever both conditions hold.
         if self is other:
             return self
-        return __class__.get(o1.combine(o2)
-                             for o1 in self.orders
-                             for o2 in other.orders)
+        return __class__.get(self.e & other.e)
 
 
-PartialOrders.ALWAYS = PartialOrders.get((PartialOrder.get(()),))
-PartialOrders.NEVER = PartialOrders.get(())
+order_bools = eqbool.Context()
+
+PartialOrders.ALWAYS = PartialOrders.get(order_bools.true)
+PartialOrders.NEVER = PartialOrders.get(order_bools.false)
 
 
 class PossibleValues(object):
@@ -679,7 +646,7 @@ class PossibleValues(object):
         # identically.
         merged = []
         for v, orders in entries:
-            if orders is PartialOrders.NEVER:
+            if orders.obviously_never:
                 continue
             for i, (u, uorders) in enumerate(merged):
                 if bools.is_equiv(u, v):
@@ -688,25 +655,40 @@ class PossibleValues(object):
             else:
                 merged.append((v, orders))
 
+        # Values whose orders cannot hold once transitivity is
+        # taken into account arise never.
+        if len(merged) > 1:
+            merged = [(v, orders) for v, orders in merged
+                      if not orders.is_never()]
+
         # A sole possible value holds under every possible
         # execution, so it sheds the orders of the ways of
         # arriving at it.
         if len(merged) == 1:
             merged[0] = merged[0][0], PartialOrders.ALWAYS
 
-        merged.sort(key=lambda e: tuple(o.facts for o in e[1].orders))
+        merged.sort(key=lambda e: e[1].seq)
         return PossibleValues(tuple(merged))
 
     @staticmethod
     def is_same(a, b):
         # Whether the two states -- plain values or sets of
-        # possible values -- are known to be the same.
+        # possible values -- are known to be the same. Entries
+        # are matched by value, as freshly built sets hold their
+        # entries in an unrelated order.
         if isinstance(a, PossibleValues) or isinstance(b, PossibleValues):
             a, b = __class__.cast(a), __class__.cast(b)
             if len(a.entries) != len(b.entries):
                 return False
-            return all(ao is bo and bools.is_equiv(av, bv)
-                       for (av, ao), (bv, bo) in zip(a.entries, b.entries))
+            remaining = list(b.entries)
+            for av, ao in a.entries:
+                for i, (bv, bo) in enumerate(remaining):
+                    if bools.is_equiv(av, bv) and ao.same(bo):
+                        del remaining[i]
+                        break
+                else:
+                    return False
+            return True
         return bools.is_equiv(a, b)
 
     @staticmethod
@@ -729,7 +711,7 @@ class PossibleValues(object):
             orders = PartialOrders.ALWAYS
             for a in args:
                 orders = orders.combine(a.entries[0][1])
-            if orders is PartialOrders.NEVER:
+            if orders.obviously_never:
                 return __class__(())
             return __class__(((f(*(a.entries[0][0] for a in args)),
                                orders),))
@@ -742,7 +724,7 @@ class PossibleValues(object):
                 return
             for v, os in args[i].entries:
                 combined = orders.combine(os)
-                if combined is not PartialOrders.NEVER:
+                if not combined.obviously_never:
                     combos(i + 1, values + (v,), combined)
 
         combos(0, (), PartialOrders.ALWAYS)
@@ -750,58 +732,42 @@ class PossibleValues(object):
 
 
 def test_orders():
-    def order(*facts):
-        return PartialOrder.get(facts)
+    f = PartialOrders.get_fact
 
-    def orders(*os):
-        return PartialOrders.get(os)
+    a_b, b_a = f('a', 'b'), f('b', 'a')
+    b_c, a_c = f('b', 'c'), f('a', 'c')
+    c_d = f('c', 'd')
+    x_y, y_x = f('x', 'y'), f('y', 'x')
 
-    a_b, b_a = ('a', 'b'), ('b', 'a')
-    b_c, a_c = ('b', 'c'), ('a', 'c')
-    c_d = ('c', 'd')
-    x_y, y_x = ('x', 'y'), ('y', 'x')
+    # The reverse of a fact is its negation, so two-way cycles
+    # vanish on construction.
+    assert a_b.combine(b_a) is PartialOrders.NEVER
+    assert x_y.unite(y_x) is PartialOrders.ALWAYS
 
-    # Orders are uniquified.
-    assert order(a_b, b_c) is order(b_c, a_b)
-
-    # Facts implied by transitivity are removed.
-    assert order(a_b, b_c, a_c) is order(a_b, b_c)
-
-    # Cyclic orders are impossible.
-    assert order(a_b, b_a) is None
-    assert order(('a', 'a')) is None
-    assert order(a_b, b_c, ('c', 'a')) is None
-
-    # Combining orders unites their facts.
-    assert order(a_b).combine(order(b_c)) is order(a_b, b_c)
-    assert order(a_b).combine(order(b_a)) is None
-
-    # Sets are uniquified, and impossible orders are dropped.
-    assert orders(order(b_c), order(a_b)) is orders(order(a_b), order(b_c))
-    assert orders(order(a_b), None) is orders(order(a_b))
+    # Conditions are uniquified.
+    assert a_b.combine(b_c) is b_c.combine(a_b)
 
     # A fact stated in opposite directions in otherwise-identical
     # orders does not matter.
-    assert orders(order(a_b, x_y), order(a_b, y_x)) is orders(order(a_b))
-    assert orders(order(x_y), order(y_x)) is PartialOrders.ALWAYS
+    assert a_b.combine(x_y).unite(a_b.combine(y_x)).same(a_b)
 
     # An order that merely adds facts to another one present is
-    # covered by it, including via transitivity.
-    assert orders(order(a_b), order(a_b, c_d)) is orders(order(a_b))
-    assert orders(order(a_c), order(a_b, b_c)) is orders(order(a_c))
+    # covered by it.
+    assert a_b.unite(a_b.combine(c_d)).same(a_b)
 
-    # Uniting and combining sets.
-    assert (orders(order(a_b)).unite(orders(order(c_d))) is
-            orders(order(a_b), order(c_d)))
-    assert (orders(order(a_b)).combine(orders(order(b_c))) is
-            orders(order(a_b, b_c)))
-    assert (orders(order(a_b)).combine(orders(order(b_a))) is
-            PartialOrders.NEVER)
-    assert (PartialOrders.ALWAYS.combine(orders(order(b_c))) is
-            orders(order(b_c)))
-    assert PartialOrders.NEVER.unite(orders(order(b_c))) is orders(order(b_c))
-    assert PartialOrders.NEVER.combine(orders(order(b_c))) is (
-        PartialOrders.NEVER)
+    # Cycles via transitivity are impossible.
+    assert a_b.combine(b_c).combine(f('c', 'a')).is_never()
+    assert not a_b.combine(b_c).is_never()
+
+    # Covering via transitivity: a_b and b_c together imply a_c.
+    assert a_c.unite(a_b.combine(b_c)).same(a_c)
+    assert not a_c.unite(a_b.combine(c_d)).same(a_c)
+
+    # Combining and uniting with the constants.
+    assert PartialOrders.ALWAYS.combine(b_c) is b_c
+    assert PartialOrders.NEVER.unite(b_c) is b_c
+    assert PartialOrders.NEVER.combine(b_c) is PartialOrders.NEVER
+    assert PartialOrders.ALWAYS.combine(PartialOrders.NEVER).is_never()
 
 
 class Bits(object):
@@ -1369,8 +1335,7 @@ class ObservedStates(object):
         # are never confused with facts about later updates of
         # the same nodes.
         s = self.__sweep_no
-        return PartialOrders.get(
-            (PartialOrder.get((((s, before.index), (s, after.index)),)),))
+        return PartialOrders.get_fact((s, before.index), (s, after.index))
 
     @staticmethod
     def __is_same(a, b):
@@ -1380,7 +1345,7 @@ class ObservedStates(object):
             return False
         (av, aos), = a.entries
         (bv, bos), = b.entries
-        return aos is bos and bools.is_equiv(av, bv)
+        return aos.same(bos) and bools.is_equiv(av, bv)
 
     def observe(self, t):
         gate = t.gate
