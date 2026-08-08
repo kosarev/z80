@@ -3274,6 +3274,62 @@ def build_symbolised_state():
     return s
 
 
+def run_all_orders(instr):
+    # Executes the given instruction on a live simulator in
+    # all-orders mode, starting from the symbolised state, then
+    # reports the possible values of the flag and register
+    # nodes. Unlike the usual step replay, this never loads
+    # cached states for the executed steps.
+    state = build_symbolised_state()
+    state.cache()
+
+    with Status.do('build simulator'):
+        sim = Z80Simulator(image=state.image)
+
+    sim.track_orders = True
+
+    def set_db(d):
+        if isinstance(d, str):
+            d = Bits(d, width=8)
+        else:
+            d = Bits.cast(d, width=8)
+        for i, b in enumerate(d):
+            sim.set_pin_pull(f'db{i}', b)
+            sim.update_pin(f'db{i}')
+
+    def run_cycle(what, d, ticks):
+        with Status.do(f'{what} set db'):
+            set_db(d)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with Status.do(f'{what} tick {t}.{ht}'):
+                    sim.half_tick()
+
+    phase = 1
+    for cycle_no, (d, ticks, cond) in enumerate(
+            TestedInstrs.get_cycles(instr, phase)):
+        # TODO: Support conditional ticks.
+        assert cond is None, (instr, cond)
+        run_cycle(f'cycle {cycle_no}', d, ticks)
+
+    # Let the values settle into their nodes, the same way
+    # get_effective_states() does.
+    run_cycle('settle', 0x00, 3)
+
+    Status.clear()
+    for r in ('reg_f', 'reg_ff', 'reg_a', 'reg_aa'):
+        for i in range(8):
+            id = f'{r}{i}'
+            pv = sim.get_node_entries(sim.get_node(id), {})
+            if pv.is_single:
+                print(f'{id}: {pv.single_value}')
+            else:
+                print(f'{id}: {len(pv.entries)} possible values')
+                for v, orders in pv.entries:
+                    print(f'  {v}')
+                    print(f'    under {orders!r}')
+
+
 def test_instr_seq(seq):
     # bools.clear()
     # gc.collect()
@@ -3749,6 +3805,11 @@ def main():
 
     if '--identify-state-nodes' in sys.argv:
         identify_state_nodes()
+        return
+
+    all_orders_instr = get_opt('--all-orders', str)
+    if all_orders_instr is not None:
+        run_all_orders(all_orders_instr)
         return
 
     build_symbolic_states()
