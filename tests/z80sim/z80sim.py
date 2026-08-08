@@ -686,6 +686,13 @@ class PossibleValues(object):
                     break
             else:
                 merged.append((v, orders))
+
+        # A sole possible value holds under every possible
+        # execution, so it sheds the orders of the ways of
+        # arriving at it.
+        if len(merged) == 1:
+            merged[0] = merged[0][0], PartialOrders.ALWAYS
+
         merged.sort(key=lambda e: tuple(o.facts for o in e[1].orders))
         return PossibleValues(tuple(merged))
 
