@@ -478,6 +478,230 @@ def test_bools():
     test(ifelse(c, ~t2, t2), t)
 
 
+class PartialOrder(object):
+    # A partial order of node updates: a set of facts of the
+    # form 'node x is updated before node y', stored in a
+    # standard form with the facts implied by transitivity
+    # removed, and uniquified, so equal orders are the same
+    # object. The order with no facts requires nothing.
+    __cache = {}
+
+    def __init__(self, facts, followers):
+        # Use get() instead.
+        self.facts = facts
+        self.followers = followers
+
+    def __repr__(self):
+        return '; '.join(f'{a}<{b}' for a, b in self.facts) or '{}'
+
+    @staticmethod
+    def get(facts):
+        # Returns the order in standard form, or None whenever
+        # the given facts require a cycle, meaning an impossible
+        # order.
+        facts = set(facts)
+
+        following = {}
+        for a, b in facts:
+            following.setdefault(a, set()).add(b)
+
+        # Compute the set of nodes known to be updated after
+        # each node.
+        followers = {a: set(bs) for a, bs in following.items()}
+        changed = True
+        while changed:
+            changed = False
+            for a, bs in followers.items():
+                new = set()
+                for b in bs:
+                    new |= followers.get(b, set()) - bs
+                if new:
+                    bs |= new
+                    changed = True
+
+        # Cyclic orders are impossible.
+        if any(a in bs for a, bs in followers.items()):
+            return None
+
+        # Remove facts implied by transitivity.
+        reduced = []
+        for a, b in facts:
+            if not any(c != b and b in followers.get(c, ())
+                       for c in following[a]):
+                reduced.append((a, b))
+
+        key = tuple(sorted(reduced))
+        order = __class__.__cache.get(key)
+        if order is None:
+            followers = frozenset(
+                (a, b) for a, bs in followers.items() for b in bs)
+            order = PartialOrder(key, followers)
+            __class__.__cache[key] = order
+        return order
+
+    def combine(self, other):
+        # The order requiring the facts of both, or None if they
+        # contradict each other.
+        if self is other:
+            return self
+        return __class__.get(self.facts + other.facts)
+
+    def covers(self, other):
+        # Whether this order's facts all follow from the other's,
+        # so whenever the other order holds, this one holds too.
+        return self.followers <= other.followers
+
+
+class PartialOrders(object):
+    # A set of partial orders under which a value arises: the
+    # value arises whenever any of the orders holds. Sets are
+    # simplified on construction: a fact stated in opposite
+    # directions in otherwise-identical orders does not matter
+    # and cancels; an order covered by another one present is
+    # dropped; impossible orders are dropped. The set of just
+    # the empty order means the value arises under all orders;
+    # the empty set means it arises never.
+    __cache = {}
+
+    def __init__(self, orders):
+        # Use get() instead.
+        self.orders = orders
+
+    def __repr__(self):
+        if self is __class__.ALWAYS:
+            return 'always'
+        if self is __class__.NEVER:
+            return 'never'
+        return ' | '.join(f'({o!r})' for o in self.orders)
+
+    @staticmethod
+    def __cancel(o1, o2):
+        f1, f2 = set(o1.facts), set(o2.facts)
+        d1, d2 = f1 - f2, f2 - f1
+        if len(d1) != 1 or len(d2) != 1:
+            return None
+        (a, b), = d1
+        if (b, a) not in d2:
+            return None
+        return PartialOrder.get(f1 & f2)
+
+    @staticmethod
+    def get(orders):
+        orders = [o for o in orders if o is not None]
+        orders = list(dict.fromkeys(orders))
+
+        changed = True
+        while changed:
+            changed = False
+
+            # Cancel facts stated in opposite directions in
+            # otherwise-identical orders.
+            for i, o1 in enumerate(orders):
+                for o2 in orders[i + 1:]:
+                    o = __class__.__cancel(o1, o2)
+                    if o is not None:
+                        orders.remove(o1)
+                        orders.remove(o2)
+                        if o not in orders:
+                            orders.append(o)
+                        changed = True
+                        break
+                if changed:
+                    break
+            if changed:
+                continue
+
+            # Drop orders covered by other present orders.
+            for i, o1 in enumerate(orders):
+                if any(o2 is not o1 and o2.covers(o1)
+                       for o2 in orders):
+                    del orders[i]
+                    changed = True
+                    break
+
+        key = tuple(sorted(orders, key=lambda o: o.facts))
+        r = __class__.__cache.get(key)
+        if r is None:
+            r = PartialOrders(key)
+            __class__.__cache[key] = r
+        return r
+
+    def unite(self, other):
+        # The value arises whenever an order of either set
+        # holds.
+        if self is other:
+            return self
+        return __class__.get(self.orders + other.orders)
+
+    def combine(self, other):
+        # The value arises whenever an order of one set holds
+        # together with an order of the other.
+        if self is other:
+            return self
+        return __class__.get(o1.combine(o2)
+                             for o1 in self.orders
+                             for o2 in other.orders)
+
+
+PartialOrders.ALWAYS = PartialOrders.get((PartialOrder.get(()),))
+PartialOrders.NEVER = PartialOrders.get(())
+
+
+def test_orders():
+    def order(*facts):
+        return PartialOrder.get(facts)
+
+    def orders(*os):
+        return PartialOrders.get(os)
+
+    a_b, b_a = ('a', 'b'), ('b', 'a')
+    b_c, a_c = ('b', 'c'), ('a', 'c')
+    c_d = ('c', 'd')
+    x_y, y_x = ('x', 'y'), ('y', 'x')
+
+    # Orders are uniquified.
+    assert order(a_b, b_c) is order(b_c, a_b)
+
+    # Facts implied by transitivity are removed.
+    assert order(a_b, b_c, a_c) is order(a_b, b_c)
+
+    # Cyclic orders are impossible.
+    assert order(a_b, b_a) is None
+    assert order(('a', 'a')) is None
+    assert order(a_b, b_c, ('c', 'a')) is None
+
+    # Combining orders unites their facts.
+    assert order(a_b).combine(order(b_c)) is order(a_b, b_c)
+    assert order(a_b).combine(order(b_a)) is None
+
+    # Sets are uniquified, and impossible orders are dropped.
+    assert orders(order(b_c), order(a_b)) is orders(order(a_b), order(b_c))
+    assert orders(order(a_b), None) is orders(order(a_b))
+
+    # A fact stated in opposite directions in otherwise-identical
+    # orders does not matter.
+    assert orders(order(a_b, x_y), order(a_b, y_x)) is orders(order(a_b))
+    assert orders(order(x_y), order(y_x)) is PartialOrders.ALWAYS
+
+    # An order that merely adds facts to another one present is
+    # covered by it, including via transitivity.
+    assert orders(order(a_b), order(a_b, c_d)) is orders(order(a_b))
+    assert orders(order(a_c), order(a_b, b_c)) is orders(order(a_c))
+
+    # Uniting and combining sets.
+    assert (orders(order(a_b)).unite(orders(order(c_d))) is
+            orders(order(a_b), order(c_d)))
+    assert (orders(order(a_b)).combine(orders(order(b_c))) is
+            orders(order(a_b, b_c)))
+    assert (orders(order(a_b)).combine(orders(order(b_a))) is
+            PartialOrders.NEVER)
+    assert (PartialOrders.ALWAYS.combine(orders(order(b_c))) is
+            orders(order(b_c)))
+    assert PartialOrders.NEVER.unite(orders(order(b_c))) is orders(order(b_c))
+    assert PartialOrders.NEVER.combine(orders(order(b_c))) is (
+        PartialOrders.NEVER)
+
+
 class Bits(object):
     def __init__(self, bits, width=None, suffix=None):
         if isinstance(bits, int):
@@ -3204,6 +3428,7 @@ def play_sandbox():
 
 def main():
     test_bools()
+    test_orders()
 
     if '--print-start-time' in sys.argv:
         Status.print('started')
