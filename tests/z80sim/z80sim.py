@@ -1470,6 +1470,9 @@ class Z80Simulator(object):
     def get_node_states(self, ids=None):
         if ids is None:
             ids = (n.id for n in self.__nodes.values())
+        if self.track_orders:
+            return {id: self.get_node_entries(self.__nodes_by_name[id], {})
+                    for id in ids}
         return {id: self.get_node_state(self.__nodes_by_name[id])
                 for id in ids}
 
@@ -1722,11 +1725,6 @@ class Z80Simulator(object):
         else:
             new_state = self.get_node_entries(n, new_states)
 
-            # Nodes down to a single value arising under all
-            # orders store it plainly, dropping the orders.
-            if new_state.is_single:
-                new_state = new_state.single_value
-
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
         # the case of a floating gate.
@@ -1921,6 +1919,11 @@ class Z80Simulator(object):
 
     @property
     def nclk(self):
+        if self.track_orders:
+            # The clock is pin-driven and must never race.
+            pv = self.get_node_entries(self.__nclk, {})
+            assert pv.is_single, pv
+            return pv.single_value
         return self.get_node_state(self.__nclk)
 
     @nclk.setter
