@@ -1328,17 +1328,18 @@ class ObservedStates(object):
     # become visible to an evaluation, and thus where the order
     # of updates manifests itself.
     #
-    # Normally, pending updates are observed as they are,
-    # matching the usual single-order behaviour. With all_orders
-    # set, states are sets of possible values and observations
-    # return such sets. For a racing observation -- one where
-    # the observed gate has a pending update differing from the
-    # state it is about to replace -- the observed set holds the
-    # entries of the pending update, each extended with the fact
-    # 'the observed gate is updated before the evaluated node',
-    # together with the entries of the old state, each extended
-    # with the fact stated the other way round. The node's own
-    # state and non-racing observations contribute no facts.
+    # Observations return sets of possible values. For a racing
+    # observation -- one where the observed gate has a pending
+    # update differing from the state it is about to replace --
+    # a settling simulated in all orders forks: the observed set
+    # holds the entries of the pending update, each extended
+    # with the fact 'the observed gate is updated before the
+    # evaluated node', together with the entries of the old
+    # state, each extended with the fact stated the other way
+    # round. A settling simulated in a single order sees the
+    # pending update, as its reader is taken to follow the
+    # writer. The node's own state and non-racing observations
+    # contribute no facts either way.
     #
     # The order question of a competing pair is asked once per
     # settling: the first observation carries the race, and any
@@ -1382,30 +1383,24 @@ class ObservedStates(object):
         if gate in self.__observed:
             return self.__observed[gate]
 
-        if not self.__all_orders:
-            state = self.__new_states.get(gate, t.state)
-            # A node with several possible values cannot be
-            # observed the single-order way.
-            assert not isinstance(state, PossibleValues), gate
-            self.__observed[gate] = state
-            return state
-
-        applied = PossibleValues.cast(t.state)
         pending = self.__new_states.get(gate)
-        if pending is not None:
-            pending = PossibleValues.cast(pending)
 
         if gate is self.__evaluated or pending is None:
             # A node's own update is not something the node's
             # evaluation can race with, and with no pending
             # update there is nothing to race with at all.
-            state = applied if pending is None else pending
-        elif __class__.__is_same(applied, pending):
-            state = pending
+            state = t.state if pending is None else pending
+            state = PossibleValues.cast(state)
+        elif not self.__all_orders:
+            state = PossibleValues.cast(pending)
         else:
+            applied = PossibleValues.cast(t.state)
+            pending = PossibleValues.cast(pending)
             e, g = self.__evaluated, gate
             pair = g.index, e.index
-            if pair in self.__raced:
+            if __class__.__is_same(applied, pending):
+                state = pending
+            elif pair in self.__raced:
                 state = pending
             else:
                 self.__raced.add(pair)
@@ -1421,11 +1416,6 @@ class ObservedStates(object):
     def observe_floating(self, n):
         # The state the node keeps while floating: its own
         # latest state, not subject to ordering.
-        if not self.__all_orders:
-            state = self.__new_states.get(n, n.gate_of[0].state)
-            assert not isinstance(state, PossibleValues), n
-            return state
-
         if n in self.__observed:
             return self.__observed[n]
 
@@ -1464,17 +1454,17 @@ class Z80Simulator(object):
             index, i = i[0], i[1:]
             t = trans_storage.get(index, i, self.__nodes)
             self.__trans[index] = t
-            if isinstance(t.state, PossibleValues):
-                self.track_orders = True
 
     def get_node_states(self, ids=None):
+        # A state with a single possible value is sampled as
+        # that value.
         if ids is None:
             ids = (n.id for n in self.__nodes.values())
-        if self.track_orders:
-            return {id: self.get_node_entries(self.__nodes_by_name[id], {})
-                    for id in ids}
-        return {id: self.get_node_state(self.__nodes_by_name[id])
-                for id in ids}
+        states = {}
+        for id in ids:
+            pv = self.get_node_entries(self.__nodes_by_name[id])
+            states[id] = pv.single_value if pv.is_single else pv
+        return states
 
     def __identify_group_of(self, n):
         nodes = []
@@ -1516,96 +1506,14 @@ class Z80Simulator(object):
 
             assert t.conns_group is not None
 
-    def __get_node_preds(self, n, observed):
-        def get_group_pred(n, get_node_pred, stack, preds):
-            cyclic = False
-
-            p = preds.get(n)
-            if p is not None:
-                return cyclic, p
-
-            p = get_node_pred(n)
-            if p is TRUE:
-                preds[n] = p
-                return cyclic, p
-
-            if n.is_gnd_or_pwr:
-                assert p is None
-                p = FALSE
-                preds[n] = p
-                return cyclic, p
-
-            p = [] if p is None else [p]
-            stack.append(n)
-            for t in n.conn_of:
-                state = observed.observe(t)
-                if state is not FALSE:
-                    m = t.get_other_conn(n)
-                    if m in stack:
-                        cyclic = True
-                    else:
-                        cc, pp = get_group_pred(m, get_node_pred, stack, preds)
-                        cyclic |= cc
-
-                        mp = state & pp
-                        if mp is TRUE:
-                            p = [TRUE]
-                            break
-                        p.append(mp)
-            p = bools.get_or(*p)
-            assert stack.pop() == n
-
-            if not cyclic:
-                preds[n] = p
-
-            return cyclic, p
-
-        def get_gnd_pred(n):
-            return TRUE if n.is_gnd else None
-
-        def get_pwr_pred(n):
-            return TRUE if n.is_pwr else None
-
-        def get_pullup_pred(n):
-            if n.pull is None:
-                return None
-
-            assert isinstance(n.pull, eqbool.Bool)
-            return n.pull
-
-        def get_pulldown_pred(n):
-            if n.pull is None:
-                return None
-
-            assert isinstance(n.pull, eqbool.Bool)
-            return ~n.pull
-
-        _, gnd = get_group_pred(n, get_gnd_pred, [], {})
-        _, pwr = get_group_pred(n, get_pwr_pred, [], {})
-        _, pullup = get_group_pred(n, get_pullup_pred, [], {})
-        _, pulldown = get_group_pred(n, get_pulldown_pred, [], {})
-
-        return gnd, pwr, pullup, pulldown
-
     def get_node_state(self, n, new_states=None):
-        if new_states is None:
-            new_states = {}
+        # The value of a node known to have a single possible
+        # one; the sampler behind the pin-level accessors.
+        pv = self.get_node_entries(n, new_states)
+        assert pv.is_single, (n, pv)
+        return pv.single_value
 
-        observed = ObservedStates(new_states)
-        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
-
-        if len(n.gate_of) == 0:
-            floating = bools.get('<floating-non-gate>')
-        else:
-            # TODO: For now we assume that all gates of the node
-            # are always in the same state.
-            floating = observed.observe_floating(n)
-        pull = bools.ifelse(pulldown | pullup, ~pulldown, floating)
-        return bools.ifelse(gnd | pwr, ~gnd, pull)
-
-    def __get_all_node_preds(self, n, observed):
-        # The counterpart of __get_node_preds() over sets of
-        # possible values.
+    def __get_node_preds(self, n, observed):
         def is_const(pv, const):
             return pv.is_single and pv.entries[0][0] is const
 
@@ -1692,17 +1600,20 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def get_node_entries(self, n, new_states):
-        # The full state of node n over all orders of updates:
-        # the set of its possible values, each with the partial
-        # orders of updates under which the evaluation arrives at
-        # it. Sets propagate through the whole computation,
+    def get_node_entries(self, n, new_states=None, all_orders=False):
+        # The full state of node n: the set of its possible
+        # values, each with the partial orders of updates under
+        # which the evaluation arrives at it -- a sole value
+        # arising under all orders wherever no racing observation
+        # forks. Sets propagate through the whole computation,
         # merging at every operation.
+        if new_states is None:
+            new_states = {}
         observed = ObservedStates(new_states, evaluated=n,
-                                  all_orders=True,
+                                  all_orders=all_orders,
                                   sweep_no=self.sweep_no,
                                   raced=self.__raced_pairs)
-        gnd, pwr, pullup, pulldown = self.__get_all_node_preds(n, observed)
+        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
 
         if len(n.gate_of) == 0:
             floating = PossibleValues.cast(
@@ -1716,14 +1627,11 @@ class Z80Simulator(object):
             lambda g, p, pl: bools.ifelse(g | p, ~g, pl),
             gnd, pwr, pull)
 
-    def __update_gate_state(self, n, new_states):
+    def __update_gate_state(self, n, new_states, all_orders):
         assert not n.is_gnd_or_pwr
 
         old_state = new_states.get(n, n.gate_of[0].state)
-        if not self.track_orders:
-            new_state = self.get_node_state(n, new_states)
-        else:
-            new_state = self.get_node_entries(n, new_states)
+        new_state = self.get_node_entries(n, new_states, all_orders)
 
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
@@ -1734,7 +1642,7 @@ class Z80Simulator(object):
         new_states[n] = new_state
         return True
 
-    def __update_groups_of(self, nodes):
+    def __update_groups_of(self, nodes, all_orders=False):
         # TODO: Does always updating all nodes lead to any failures?
         # nodes = list(self.__nodes.values())
 
@@ -1771,7 +1679,8 @@ class Z80Simulator(object):
                     repeat = False
                     for i, n in enumerate(gates):
                         # with Status.do(f'gate {i}/{len(gates)}'):
-                        repeat |= self.__update_gate_state(n, new_states)
+                        repeat |= self.__update_gate_state(
+                            n, new_states, all_orders)
 
                 # Apply new states.
                 groups = []
@@ -1787,11 +1696,11 @@ class Z80Simulator(object):
             Status.print(n, pull)
         n.pull = pull
 
-    def __set_node(self, n, pull):
+    def __set_node(self, n, pull, all_orders=False):
         self.__set_node_pull(n, pull)
-        self.__update_groups_of([n])
+        self.__update_groups_of([n], all_orders)
 
-    def half_tick(self, *, cond=None):
+    def half_tick(self, *, cond=None, all_orders=False):
         if self.__memory is not None and self.clk:
             if self.mreq and not self.rfsh and not self.iorq:
                 if self.m1 and self.rd and self.t2:
@@ -1800,7 +1709,8 @@ class Z80Simulator(object):
         if cond is None:
             cond = TRUE
 
-        self.nclk = bools.ifelse(cond, ~self.nclk, self.nclk)
+        nclk = bools.ifelse(cond, ~self.nclk, self.nclk)
+        self.__set_node(self.__nclk, nclk, all_orders)
 
         # self.__print_state()
 
@@ -1866,15 +1776,6 @@ class Z80Simulator(object):
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
-        # When set, gate-state updates evaluate all possible
-        # values with their partial orders of updates via
-        # get_node_entries(); states are then PossibleValues
-        # instances. Off by default, preserving the usual
-        # single-order behaviour; restoring a state with several
-        # possible values turns it on, so sampling such states
-        # works over all orders.
-        self.track_orders = False
-
         # Counts settlings of the circuit; scopes update events.
         self.sweep_no = 0
 
@@ -1919,11 +1820,6 @@ class Z80Simulator(object):
 
     @property
     def nclk(self):
-        if self.track_orders:
-            # The clock is pin-driven and must never race.
-            pv = self.get_node_entries(self.__nclk, {})
-            assert pv.is_single, pv
-            return pv.single_value
         return self.get_node_state(self.__nclk)
 
     @nclk.setter
@@ -2083,9 +1979,9 @@ class Z80Simulator(object):
         assert pin in _PINS
         self.__set_node_pull(self.__nodes_by_name[pin], pull)
 
-    def update_pin(self, pin):
+    def update_pin(self, pin, all_orders=False):
         n = self.__nodes_by_name[pin]
-        self.__update_groups_of([n])
+        self.__update_groups_of([n], all_orders)
 
     def power_up(self):
         assert len(self.__gnd.gate_of) == 0
@@ -2274,8 +2170,7 @@ class State(object):
             sim.set_pin_pull(pin, pull)
         elif kind == 'update_pin':
             _, _, pin, *mode = step
-            sim.track_orders = bool(mode)
-            sim.update_pin(pin)
+            sim.update_pin(pin, all_orders=bool(mode))
         elif kind == 'power_up':
             _, _, = step
             sim.power_up()
@@ -2284,12 +2179,10 @@ class State(object):
             sim.reset(propagation_delay, waiting_for_m1_delay)
         elif kind == 'half_tick':
             _, _, *mode = step
-            sim.track_orders = bool(mode)
-            sim.half_tick()
+            sim.half_tick(all_orders=bool(mode))
         elif kind == 'conditional_half_tick':
             _, _, cond, *mode = step
-            sim.track_orders = bool(mode)
-            sim.half_tick(cond=cond)
+            sim.half_tick(cond=cond, all_orders=bool(mode))
         else:
             assert 0, step
 
@@ -3373,7 +3266,7 @@ def run_all_orders(instr):
     phase = 1
     cycles = TestedInstrs.get_cycles(instr, phase)
 
-    def execute(sim):
+    def execute(sim, all_orders):
         def set_db(d):
             if isinstance(d, str):
                 d = Bits(d, width=8)
@@ -3381,7 +3274,7 @@ def run_all_orders(instr):
                 d = Bits.cast(d, width=8)
             for i, b in enumerate(d):
                 sim.set_pin_pull(f'db{i}', b)
-                sim.update_pin(f'db{i}')
+                sim.update_pin(f'db{i}', all_orders)
 
         def run_cycle(what, d, ticks):
             with Status.do(f'{what} set db'):
@@ -3389,7 +3282,7 @@ def run_all_orders(instr):
             for t in range(ticks):
                 for ht in (0, 1):
                     with Status.do(f'{what} tick {t}.{ht}'):
-                        sim.half_tick()
+                        sim.half_tick(all_orders=all_orders)
 
         for cycle_no, (d, ticks, cond) in enumerate(cycles):
             # TODO: Support conditional ticks.
@@ -3402,8 +3295,7 @@ def run_all_orders(instr):
 
     with Status.do('build simulator'):
         sim = Z80Simulator(image=state.image)
-    sim.track_orders = True
-    execute(sim)
+    execute(sim, all_orders=True)
 
     def rename_event(t):
         def rename(event):
@@ -3445,7 +3337,7 @@ def run_all_orders(instr):
             random.seed(seed)
         with Status.do(f'seed {seed}'):
             s = Z80Simulator(image=state.image)
-            execute(s)
+            execute(s, all_orders=False)
 
             takes = []
             for id in NODES:
