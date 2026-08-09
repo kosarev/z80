@@ -2273,7 +2273,8 @@ class State(object):
             _, _, pin, pull = step
             sim.set_pin_pull(pin, pull)
         elif kind == 'update_pin':
-            _, _, pin = step
+            _, _, pin, *mode = step
+            sim.track_orders = bool(mode)
             sim.update_pin(pin)
         elif kind == 'power_up':
             _, _, = step
@@ -2282,10 +2283,12 @@ class State(object):
             _, _, propagation_delay, waiting_for_m1_delay = step
             sim.reset(propagation_delay, waiting_for_m1_delay)
         elif kind == 'half_tick':
-            _, _, = step
+            _, _, *mode = step
+            sim.track_orders = bool(mode)
             sim.half_tick()
         elif kind == 'conditional_half_tick':
-            _, _, cond = step
+            _, _, cond, *mode = step
+            sim.track_orders = bool(mode)
             sim.half_tick(cond=cond)
         else:
             assert 0, step
@@ -2303,23 +2306,32 @@ class State(object):
         step = 'set_pin_pull', pin, bools.cast(pull)
         self.__add_step(step)
 
-    def update_pin(self, pin):
-        self.__add_step(('update_pin', pin))
+    # Order tracking is a property of how a settling is
+    # simulated, so it is a parameter of the steps that cause
+    # settlings, present in the step only when tracking -- the
+    # step list remains the complete description of the
+    # computation, and cache keys, being hashes of step lists,
+    # come out mode-specific automatically.
+    def update_pin(self, pin, all_orders=False):
+        step = ('update_pin', pin)
+        if all_orders:
+            step += True,
+        self.__add_step(step)
 
-    def set_pin_and_update(self, pin, pull):
+    def set_pin_and_update(self, pin, pull, all_orders=False):
         self.set_pin_pull(pin, pull)
-        self.update_pin(pin)
+        self.update_pin(pin, all_orders)
 
-    def set_pins_and_update(self, pin, bits):
+    def set_pins_and_update(self, pin, bits, all_orders=False):
         for i, b in enumerate(Bits.cast(bits)):
-            self.set_pin_and_update(f'{pin}{i}', b)
+            self.set_pin_and_update(f'{pin}{i}', b, all_orders)
 
-    def set_db(self, bits):
+    def set_db(self, bits, all_orders=False):
         if isinstance(bits, str):
             bits = Bits(bits, width=8)
         else:
             bits = Bits.cast(bits, width=8)
-        self.set_pins_and_update('db', bits)
+        self.set_pins_and_update('db', bits, all_orders)
 
     def set_db_and_wait(self, bits, ticks):
         self.set_db(bits)
@@ -2332,11 +2344,14 @@ class State(object):
         self.__add_step(('reset', propagation_delay,
                          waiting_for_m1_delay))
 
-    def half_tick(self, *, cond=None):
+    def half_tick(self, *, cond=None, all_orders=False):
         if cond is None:
-            self.__add_step(('half_tick',))
+            step = ('half_tick',)
         else:
-            self.__add_step(('conditional_half_tick', cond))
+            step = ('conditional_half_tick', cond)
+        if all_orders:
+            step += True,
+        self.__add_step(step)
 
     def tick(self):
         self.half_tick()
@@ -3093,18 +3108,18 @@ def test_node(instrs, n, at_start, at_end, before, after):
     return check(before[n])
 
 
-def get_effective_states(s, nodes=None):
+def get_effective_states(s, nodes=None, all_orders=False):
     # Additional ticks are necessary for new values
     # to reach their nodes.
     EXTRA_TICKS = 3
 
     s = State(s)
 
-    s.set_db(0x00)  # nop
+    s.set_db(0x00, all_orders)  # nop
     for t in range(EXTRA_TICKS):
         for ht in (0, 1):
             with s.status(f'extra tick {t}.{ht}'):
-                s.half_tick()
+                s.half_tick(all_orders=all_orders)
     s.cache()
 
     return s.get_node_states(nodes)
@@ -3144,18 +3159,18 @@ def get_cond_as_expr(cond, phase, before):
     assert 0, cond
 
 
-def execute_instr(s, id, phase, before):
+def execute_instr(s, id, phase, before, all_orders=False):
     if SEED is not None:
         random.seed(SEED)
 
     cycles = TestedInstrs.get_cycles(id, phase)
     for cycle_no, (d, ticks, cond) in enumerate(cycles):
         cond = get_cond_as_expr(cond, phase, before)
-        s.set_db(d)
+        s.set_db(d, all_orders)
         for t in range(ticks):
             for ht in (0, 1):
                 with s.status(f'tick {cycle_no}-{t}.{ht}'):
-                    s.half_tick(cond=cond)
+                    s.half_tick(cond=cond, all_orders=all_orders)
         s.cache(intermediate=True)
 
 
