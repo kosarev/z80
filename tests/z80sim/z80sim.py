@@ -481,11 +481,12 @@ def test_bools():
 class PartialOrders(object):
     # The set of partial orders of node updates under which a
     # value arises, represented as a condition over facts of the
-    # form 'x is updated before y'. Facts are terms of a
-    # dedicated eqbool context, entirely separate from the one
-    # holding node values; a fact stated the other way round is
-    # the negation of the same term, so two-way cycles vanish on
-    # construction, and the propositional simplifications --
+    # form 'x is updated before y'. Facts are ordinary string
+    # terms, like 'u29.674<u29.675'; they never appear inside
+    # node value expressions, and a fact stated the other way
+    # round is the negation of the same term, so two-way cycles
+    # vanish on construction, and the propositional
+    # simplifications --
     # cancellation of facts stated both ways in otherwise-equal
     # orders, absorption of orders that merely add facts --
     # are eqbool's ordinary business. Combining and uniting are
@@ -528,9 +529,10 @@ class PartialOrders(object):
         # The term for the fact 'before is updated before
         # after', in canonical polarity.
         assert before != after
+        assert '<' not in before and '<' not in after
         if before > after:
-            return ~order_bools.get((after, before))
-        return order_bools.get((before, after))
+            return ~bools.get(f'{after}<{before}')
+        return bools.get(f'{before}<{after}')
 
     @staticmethod
     def get_fact(before, after):
@@ -564,7 +566,7 @@ class PartialOrders(object):
             seen.add(v.id)
             kind = v.kind
             if kind == 'term':
-                events.update(v.term)
+                events.update(v.term.split('<'))
             elif kind == 'not':
                 worklist.append(~v)
             elif kind not in ('false', 'true'):
@@ -583,7 +585,7 @@ class PartialOrders(object):
             query &= ~(a & b & ~c)
             query &= ~(~a & ~b & c)
 
-        r = order_bools.is_equiv(query, order_bools.false)
+        r = bools.is_equiv(query, FALSE)
         __class__.__never_cache[e] = r
         return r
 
@@ -592,7 +594,7 @@ class PartialOrders(object):
         # orders.
         if self is other:
             return True
-        if order_bools.is_equiv(self.e, other.e):
+        if bools.is_equiv(self.e, other.e):
             return True
         return __class__.get(self.e ^ other.e).is_never()
 
@@ -609,10 +611,8 @@ class PartialOrders(object):
         return __class__.get(self.e & other.e)
 
 
-order_bools = eqbool.Context()
-
-PartialOrders.ALWAYS = PartialOrders.get(order_bools.true)
-PartialOrders.NEVER = PartialOrders.get(order_bools.false)
+PartialOrders.ALWAYS = PartialOrders.get(TRUE)
+PartialOrders.NEVER = PartialOrders.get(FALSE)
 
 
 class PossibleValues(object):
@@ -1346,7 +1346,8 @@ class ObservedStates(object):
         # are never confused with facts about later updates of
         # the same nodes.
         s = self.__sweep_no
-        return PartialOrders.get_fact((s, before.index), (s, after.index))
+        return PartialOrders.get_fact(f'u{s}.{before.index}',
+                                      f'u{s}.{after.index}')
 
     @staticmethod
     def __is_same(a, b):
@@ -3365,9 +3366,12 @@ def run_all_orders(instr):
     execute(sim)
 
     def rename_event(t):
-        (s1, i1), (s2, i2) = t
-        return (f'{sim.get_node_id(i1)}@{s1} < '
-                f'{sim.get_node_id(i2)}@{s2}')
+        def rename(event):
+            s, index = event.removeprefix('u').split('.')
+            return f'{sim.get_node_id(int(index))}@{s}'
+
+        before, after = t.split('<')
+        return f'{rename(before)} < {rename(after)}'
 
     NODES = tuple(f'{r}{i}'
                   for r in ('reg_f', 'reg_ff', 'reg_a', 'reg_aa')
