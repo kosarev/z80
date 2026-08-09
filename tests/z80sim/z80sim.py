@@ -1078,13 +1078,31 @@ class Transistor(object):
             self.__bools = bool_storage
 
         def add(self, t):
-            state = None if t.state is None else self.__bools.add(t.state)
+            state = t.state
+            if isinstance(state, PossibleValues):
+                # A state with a single possible value stores
+                # it plainly.
+                if state.is_single:
+                    state = self.__bools.add(state.single_value)
+                else:
+                    state = ['pv'] + [[self.__bools.add(v),
+                                       self.__bools.add(orders.e)]
+                                      for v, orders in state.entries]
+            elif state is not None:
+                state = self.__bools.add(state)
             return t.gate.index, t.c1.index, t.c2.index, state
 
         def get(self, index, image, nodes):
             gate, c1, c2, state = image
             gate, c1, c2 = nodes[gate], nodes[c1], nodes[c2]
-            state = None if state is None else self.__bools.get(state)
+            if isinstance(state, (list, tuple)):
+                assert state[0] == 'pv'
+                state = PossibleValues(tuple(
+                    (self.__bools.get(v),
+                     PartialOrders.get(self.__bools.get(orders)))
+                    for v, orders in state[1:]))
+            elif state is not None:
+                state = self.__bools.get(state)
 
             t = Transistor(index, gate, c1, c2, state=state)
             gate.gate_of.append(t)
@@ -1446,6 +1464,8 @@ class Z80Simulator(object):
             index, i = i[0], i[1:]
             t = trans_storage.get(index, i, self.__nodes)
             self.__trans[index] = t
+            if isinstance(t.state, PossibleValues):
+                self.track_orders = True
 
     def get_node_states(self, ids=None):
         if ids is None:
@@ -1848,6 +1868,22 @@ class Z80Simulator(object):
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
+        # When set, gate-state updates evaluate all possible
+        # values with their partial orders of updates via
+        # get_node_entries(); states are then PossibleValues
+        # instances. Off by default, preserving the usual
+        # single-order behaviour; restoring a state with several
+        # possible values turns it on, so sampling such states
+        # works over all orders.
+        self.track_orders = False
+
+        # Counts settlings of the circuit; scopes update events.
+        self.sweep_no = 0
+
+        # The competing pairs whose order questions the current
+        # settling has already asked.
+        self.__raced_pairs = set()
+
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
         self.__restore_transistors_from_image(trans_storage, trans)
 
@@ -1876,20 +1912,6 @@ class Z80Simulator(object):
         self.__t4 = self.__nodes_by_name['t4']
         self.__t5 = self.__nodes_by_name['t5']
         self.__t6 = self.__nodes_by_name['t6']
-
-        # When set, gate-state updates evaluate all possible
-        # values with their partial orders of updates via
-        # get_node_entries(); nodes with several possible values
-        # store them as PossibleValues instances. Off by
-        # default, preserving the usual single-order behaviour.
-        self.track_orders = False
-
-        # Counts settlings of the circuit; scopes update events.
-        self.sweep_no = 0
-
-        # The competing pairs whose order questions the current
-        # settling has already asked.
-        self.__raced_pairs = set()
 
         if memory is None:
             self.__memory = None
