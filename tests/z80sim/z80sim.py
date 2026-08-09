@@ -433,6 +433,7 @@ class Bools(eqbool.Context):
 
 
 bools = Bools()
+orders = eqbool.OrderContext(bools)
 
 
 FALSE = bools.get(False)
@@ -494,13 +495,12 @@ class PartialOrders(object):
     # alternatives ever get materialised.
     #
     # What is not propositional is transitivity, and it is
-    # supplied at the queries instead: is_never() decides
-    # whether a condition can hold at all under axioms saying
-    # that among any three events there is no cycle, and same()
-    # escalates from identity to equivalence to equivalence
-    # modulo those axioms.
+    # supplied at the queries instead, by eqbool's order
+    # context, where the facts are registered as order terms:
+    # is_never() decides whether a condition can hold under any
+    # consistent order, and same() escalates from identity to
+    # equivalence to equivalence under consistent orders.
     __cache = {}
-    __never_cache = {}
     __seq = 0
 
     def __init__(self, e):
@@ -525,18 +525,17 @@ class PartialOrders(object):
         return r
 
     @staticmethod
-    def __atom(before, after):
+    def get_fact(before, after):
         # The term for the fact 'before is updated before
         # after', in canonical polarity.
         assert before != after
         assert '<' not in before and '<' not in after
-        if before > after:
-            return ~bools.get(f'{after}<{before}')
-        return bools.get(f'{before}<{after}')
-
-    @staticmethod
-    def get_fact(before, after):
-        return __class__.get(__class__.__atom(before, after))
+        inverted = before > after
+        if inverted:
+            before, after = after, before
+        e = bools.get(f'{before}<{after}')
+        orders.register_order(e, before, after)
+        return __class__.get(~e if inverted else e)
 
     @property
     def obviously_never(self):
@@ -545,49 +544,7 @@ class PartialOrders(object):
     def is_never(self):
         # Whether the condition cannot hold under any order of
         # updates, transitivity taken into account.
-        e = self.e
-        if e.is_false:
-            return True
-        if e.is_true:
-            return False
-
-        r = __class__.__never_cache.get(e)
-        if r is not None:
-            return r
-
-        # Collect the events the condition mentions.
-        events = set()
-        seen = set()
-        worklist = [e]
-        while worklist:
-            v = worklist.pop()
-            if v.id in seen:
-                continue
-            seen.add(v.id)
-            kind = v.kind
-            if kind == 'term':
-                events.update(v.term.split('<'))
-            elif kind == 'not':
-                worklist.append(~v)
-            elif kind not in ('false', 'true'):
-                worklist.extend(v.args)
-
-        # In any single execution the mentioned events happen in
-        # some total order: forbid cycles among every three of
-        # them. That makes every satisfying assignment a total
-        # order, so satisfiability means some order allows the
-        # condition.
-        query = e
-        for x, y, z in itertools.combinations(sorted(events), 3):
-            a = __class__.__atom(x, y)
-            b = __class__.__atom(y, z)
-            c = __class__.__atom(x, z)
-            query &= ~(a & b & ~c)
-            query &= ~(~a & ~b & c)
-
-        r = bools.is_equiv(query, FALSE)
-        __class__.__never_cache[e] = r
-        return r
+        return orders.is_never(self.e)
 
     def same(self, other):
         # Whether the two conditions mean the same set of
@@ -596,7 +553,7 @@ class PartialOrders(object):
             return True
         if bools.is_equiv(self.e, other.e):
             return True
-        return __class__.get(self.e ^ other.e).is_never()
+        return orders.is_equiv(self.e, other.e)
 
     def unite(self, other):
         # The value arises whenever either condition holds.
