@@ -2786,8 +2786,10 @@ def test_node(instrs, n, at_start, at_end, before, after):
             i = int(n[-1])
             return check(r[i])
 
-    if instr in ('<alu> {b, c, d, e, h, l, a}', '<alu> (hl)', '<alu> n',
-                 'neg/xneg'):
+    alu_ops = 'add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'
+    if instr == 'neg/xneg' or any(
+            instr in (f'{m} {{b, c, d, e, h, l, a}}', f'{m} (hl)', f'{m} n')
+            for m in alu_ops):
         ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
 
         if instr == 'neg/xneg':
@@ -3537,10 +3539,14 @@ class TestedInstrs(object):
         yield 'ld (hl), n', (
             f(xyz(0, AT_HL, 6)), r3(), w3())
 
-        yield '<alu> {b, c, d, e, h, l, a}', (
-            f(xyz(2, 'op', get_non_at_hl_r())),)
-        yield '<alu> (hl)', (f(xyz(2, 'op', AT_HL)), r3())
-        yield '<alu> n', (f(xyz(3, 'op', 6)), r3())
+        ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
+        for op, m in (
+                (ADD, 'add'), (ADC, 'adc'), (SUB, 'sub'), (SBC, 'sbc'),
+                (AND, 'and'), (XOR, 'xor'), (OR, 'or'), (CP, 'cp')):
+            yield f'{m} {{b, c, d, e, h, l, a}}', (
+                f(xyz(2, op, get_non_at_hl_r())),)
+            yield f'{m} (hl)', (f(xyz(2, op, AT_HL)), r3())
+            yield f'{m} n', (f(xyz(3, op, 6)), r3())
 
         yield 'ld hl, (nn)/ld (nn), hl', (
             f(ifelse('is_store', 0x22, 0x2a)),
@@ -3720,8 +3726,11 @@ def identify_state_nodes():
     # Make sure there are initially no nodes with symbolic states.
     assert all(s.value is not None for s in persistent_nodes.values())
 
-    for instr in ('nop', '<alu> (hl)', '<alu> n',
-                  '<alu> {b, c, d, e, h, l, a}'):
+    alu_instrs = tuple(
+        f'{m} {rest}'
+        for m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp')
+        for rest in ('(hl)', 'n', '{b, c, d, e, h, l, a}'))
+    for instr in ('nop',) + alu_instrs:
         while True:
             pn = persistent_nodes.copy()
             with Status.do(f'{len(persistent_nodes)} persistent nodes'):
