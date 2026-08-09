@@ -2367,7 +2367,11 @@ def test_node(instrs, n, at_start, at_end, before, after):
             b, a = before[n], after[n]
             x = is_active(n).ifelse(x, b)
 
-        if bools.is_equiv(a, x):
+        # A state with several possible values fails its check:
+        # the expected values are yet to be extended to embrace
+        # order-dependent outcomes.
+        a = PossibleValues.cast(a)
+        if a.is_single and bools.is_equiv(a.single_value, x):
             return CheckToken()
 
         Status.clear()
@@ -2385,8 +2389,9 @@ def test_node(instrs, n, at_start, at_end, before, after):
             lines.extend((
                 f'  before: {b}',
                 f'  after: {a}',
-                f'  expected: {x}',
-                f'  diff: {a ^ x}'))
+                f'  expected: {x}'))
+            if a.is_single:
+                lines.append(f'  diff: {a.single_value ^ x}')
         print('\n'.join(lines), file=sys.stderr, flush=True)
         raise TestFailure()
 
@@ -3067,7 +3072,7 @@ def execute_instr(s, id, phase, before, all_orders=False):
         s.cache(intermediate=True)
 
 
-def process_instr(instrs, base_state, *, test=False):
+def process_instr(instrs, base_state, *, test=False, all_orders=False):
     SAMPLED_NODES = set(TESTED_NODES)
     for i in range(8):
         for r in 'bcdehl':
@@ -3082,7 +3087,10 @@ def process_instr(instrs, base_state, *, test=False):
     at_start = s.get_node_states(SAMPLED_NODES)
     before = get_effective_states(s, SAMPLED_NODES)
 
-    execute_instr(s, id, phase, before)
+    # The tested instruction and the extra ticks following it
+    # simulate all orders of updates when so asked; the
+    # preparation stays shared with plain runs.
+    execute_instr(s, id, phase, before, all_orders=all_orders)
 
     s.cache()
     after_instr_state = State(s)
@@ -3093,7 +3101,7 @@ def process_instr(instrs, base_state, *, test=False):
     # Status.print('; '.join(instr_ids))
 
     at_end = s.get_node_states(SAMPLED_NODES)
-    after = get_effective_states(s, SAMPLED_NODES)
+    after = get_effective_states(s, SAMPLED_NODES, all_orders=all_orders)
 
     for n in sorted(TESTED_NODES):
         token = test_node(instrs, n, at_start, at_end, before, after)
@@ -3354,7 +3362,7 @@ def run_all_orders(instr):
     SEED = orig_seed
 
 
-def test_instr_seq(seq):
+def test_instr_seq(seq, all_orders=False):
     # bools.clear()
     # gc.collect()
 
@@ -3366,17 +3374,17 @@ def test_instr_seq(seq):
         with Status.do('; '.join(seq)):
             for i in range(len(seq) - 1):
                 state = process_instr(seq[:i + 1], state)
-            process_instr(seq, state, test=True)
+            process_instr(seq, state, test=True, all_orders=all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
 
 
 def test_instr_seq_concurrently(args):
-    i, seq = args
+    i, seq, all_orders = args
     with Status.suppress():
         try:
-            return i, test_instr_seq(seq)
+            return i, test_instr_seq(seq, all_orders)
         except Exception:
             return i, traceback.format_exc()
 
@@ -3385,13 +3393,16 @@ def get_instr_seq_id(seq):
     return '; '.join(seq)
 
 
-def get_instr_seq_cache_entry(domain, seq):
+def get_instr_seq_cache_entry(domain, seq, all_orders):
     assert domain in ('passed', 'failed')
-    return Cache.get_entry(domain, get_instr_seq_id(seq))
+    key = get_instr_seq_id(seq)
+    if all_orders:
+        key = key, 'all-orders'
+    return Cache.get_entry(domain, key)
 
 
-def get_instr_seq_time_stamp(domain, seq):
-    t = get_instr_seq_cache_entry(domain, seq).load()
+def get_instr_seq_time_stamp(domain, seq, all_orders):
+    t = get_instr_seq_cache_entry(domain, seq, all_orders).load()
     if t is None:
         t = 0
     else:
@@ -3399,17 +3410,17 @@ def get_instr_seq_time_stamp(domain, seq):
     return t
 
 
-def test_instr_seqs(seqs):
+def test_instr_seqs(seqs, all_orders=False):
     def sort_key(seq):
-        last_passed_at = get_instr_seq_time_stamp('passed', seq)
-        last_failed_at = get_instr_seq_time_stamp('failed', seq)
+        last_passed_at = get_instr_seq_time_stamp('passed', seq, all_orders)
+        last_failed_at = get_instr_seq_time_stamp('failed', seq, all_orders)
         seq_id = get_instr_seq_id(seq)
         return -last_failed_at, -last_passed_at, len(seq), seq_id
 
     def mark(ok, seq):
         domain = 'passed' if ok else 'failed'
         now = datetime.datetime.timestamp(datetime.datetime.now())
-        get_instr_seq_cache_entry(domain, seq).store((now,))
+        get_instr_seq_cache_entry(domain, seq, all_orders).store((now,))
 
     def process_results(i, seq, res):
         if isinstance(res, str):
@@ -3425,7 +3436,8 @@ def test_instr_seqs(seqs):
     ok = True
     if '--single-thread' in sys.argv:
         for i, seq in enumerate(seqs):
-            if not process_results(i, seqs[i], test_instr_seq(seq)):
+            if not process_results(i, seqs[i],
+                                   test_instr_seq(seq, all_orders)):
                 assert 0
     else:
         seqs = tuple(seqs)
@@ -3434,7 +3446,8 @@ def test_instr_seqs(seqs):
             num_threads = max(1, num_threads - 1)
         with multiprocessing.Pool(num_threads) as p:
             queue = p.imap_unordered(test_instr_seq_concurrently,
-                                     enumerate(seqs))
+                                     ((i, seq, all_orders)
+                                      for i, seq in enumerate(seqs)))
             for i, res in queue:
                 ok &= process_results(i, seqs[i], res)
 
@@ -3665,18 +3678,27 @@ class TestedInstrs(object):
 
 
 def test_instructions():
+    # With --all-orders, the tested instructions' settlings
+    # simulate all orders of updates, so a pass means the
+    # expected values hold under every order. Nodes coming out
+    # with several possible values fail their checks: the
+    # expected values are yet to be extended to embrace
+    # order-dependent outcomes.
+    all_orders = '--all-orders' in sys.argv
+
     seqs = []
 
     def add(ss):
         # Make sure short sequences that work as prefixes for
         # longer sequences are generated and tested first.
-        ss = {s: get_instr_seq_time_stamp('passed', s) for s in ss}
+        ss = {s: get_instr_seq_time_stamp('passed', s, all_orders)
+              for s in ss}
 
         if '--new-only' in sys.argv:
             ss = {s: t for s, t in ss.items() if t == 0}
 
         if 0 in ss.values():
-            return test_instr_seqs(ss.keys())
+            return test_instr_seqs(ss.keys(), all_orders)
 
         seqs.extend(ss.keys())
         return True
@@ -3686,7 +3708,7 @@ def test_instructions():
     ok &= add((i,) for i in instrs)
     if '--two-instr-seqs' in sys.argv:
         ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
-    ok &= test_instr_seqs(seqs)
+    ok &= test_instr_seqs(seqs, all_orders)
 
     Status.clear()
     print('OK' if ok else 'FAILED')
