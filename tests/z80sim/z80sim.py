@@ -3507,7 +3507,14 @@ def test_instr_seqs(seqs, all_orders=False):
             num_threads = multiprocessing.cpu_count()
             if '--spare-thread' in sys.argv:
                 num_threads = max(1, num_threads - 1)
-        with multiprocessing.Pool(num_threads) as p:
+        # One instruction sequence per worker process: the
+        # expression contexts only ever grow -- hash-consing
+        # never frees -- so a worker serving several sequences
+        # accumulates every one of them. A fresh process returns
+        # the memory wholesale and reloads from the shared cache
+        # in seconds, keeping the peak at the number of workers
+        # times one sequence's worth.
+        with multiprocessing.Pool(num_threads, maxtasksperchild=1) as p:
             queue = p.imap_unordered(test_instr_seq_concurrently,
                                      ((i, seq, all_orders)
                                       for i, seq in enumerate(seqs)))
