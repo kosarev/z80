@@ -91,6 +91,21 @@ def get_opt(id, type):
 
 SEED = get_opt('--seed', int)
 
+# The memory cap for concurrent test workers, in GiB.
+WORKER_MEMORY = get_opt('--worker-memory', float)
+
+
+class MemoryCapReached(Exception):
+    # Raised when a worker process exceeds --worker-memory,
+    # right after securing a resumable cached state, so a fresh
+    # process can pick the sequence up from that very point.
+    pass
+
+
+def get_rss():
+    with open('/proc/self/statm') as f:
+        return int(f.read().split()[1]) * os.sysconf('SC_PAGESIZE')
+
 
 def _ceil_div(a, b):
     return -(a // -b)
@@ -2329,6 +2344,18 @@ class State(object):
             __class__.__cache_state(self.__current_steps,
                                     self.__current_image)
 
+            # The expression contexts only ever grow --
+            # hash-consing never frees -- so a long computation
+            # accumulates expressions nothing references any
+            # more. With the state just stored, a worker over
+            # the memory cap can stop here and let a fresh
+            # process resume from this very point, holding only
+            # what the state actually references.
+            if (WORKER_MEMORY is not None and
+                    '--single-thread' not in sys.argv and
+                    get_rss() > WORKER_MEMORY * (1 << 30)):
+                raise MemoryCapReached()
+
     def status(self, s):
         def enter():
             self.__status.append(s)
@@ -3446,6 +3473,8 @@ def test_instr_seq_concurrently(args):
     with Status.suppress():
         try:
             return i, test_instr_seq(seq, all_orders)
+        except MemoryCapReached:
+            return i, None
         except Exception:
             return i, traceback.format_exc()
 
@@ -3513,13 +3542,27 @@ def test_instr_seqs(seqs, all_orders=False):
         # accumulates every one of them. A fresh process returns
         # the memory wholesale and reloads from the shared cache
         # in seconds, keeping the peak at the number of workers
-        # times one sequence's worth.
-        with multiprocessing.Pool(num_threads, maxtasksperchild=1) as p:
-            queue = p.imap_unordered(test_instr_seq_concurrently,
-                                     ((i, seq, all_orders)
-                                      for i, seq in enumerate(seqs)))
-            for i, res in queue:
-                ok &= process_results(i, seqs[i], res)
+        # times one sequence's worth. Sequences whose workers
+        # hit the memory cap get requeued and resume from their
+        # cached states.
+        pending = tuple(enumerate(seqs))
+        while pending:
+            retries = []
+            with multiprocessing.Pool(num_threads,
+                                      maxtasksperchild=1) as p:
+                queue = p.imap_unordered(test_instr_seq_concurrently,
+                                         ((i, seq, all_orders)
+                                          for i, seq in pending))
+                for i, res in queue:
+                    if res is None:
+                        Status.print(
+                            f'{i + 1}/{len(seqs)} '
+                            f'{get_instr_seq_id(seqs[i])} '
+                            f'to resume after hitting the memory cap')
+                        retries.append((i, seqs[i]))
+                        continue
+                    ok &= process_results(i, seqs[i], res)
+            pending = tuple(retries)
 
     return ok
 
