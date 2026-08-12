@@ -3502,9 +3502,11 @@ def test_instr_seqs(seqs, all_orders=False):
                 assert 0
     else:
         seqs = tuple(seqs)
-        num_threads = multiprocessing.cpu_count()
-        if '--spare-thread' in sys.argv:
-            num_threads = max(1, num_threads - 1)
+        num_threads = get_opt('--threads', int)
+        if num_threads is None:
+            num_threads = multiprocessing.cpu_count()
+            if '--spare-thread' in sys.argv:
+                num_threads = max(1, num_threads - 1)
         with multiprocessing.Pool(num_threads) as p:
             queue = p.imap_unordered(test_instr_seq_concurrently,
                                      ((i, seq, all_orders)
