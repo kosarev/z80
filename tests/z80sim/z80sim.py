@@ -2792,7 +2792,7 @@ def test_node(instrs, n, at_start, at_end, before, after):
             store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
             wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
             return check(wz[i])
-        if instr == 'in/out r, (c)':
+        if instr in ('in r, (c)', 'out (c), r'):
             wz = get_bc() + 1
             return check(wz[i])
         if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
@@ -2982,20 +2982,21 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if n in ZFF:
             return check(a == 0x00)
 
-    if instr == 'in/out r, (c)':
+    # out (c), r changes no tested node except WZ, covered above,
+    # so the default unchanged check covers it.
+    if instr == 'in r, (c)':
         y = Bits(phased('y'), width=3)
         io = Bits(phased('io'), width=8)
-        is_in = phased_bool('is_in')
-        a = Bits.ifelse(~is_in | (y != A), get_a(), io)
+        a = Bits.ifelse(y != A, get_a(), io)
         if n in NFF + HFF:
-            return check(bools.ifelse(is_in, FALSE, before[n]))
+            return check(FALSE)
         if n in PFF:
-            return check(bools.ifelse(is_in, io.parity(), before[n]))
+            return check(io.parity())
         if n in XFF + YFF + SFF:
             i = int(n[-1])
-            return check(bools.ifelse(is_in, io[i], before[n]))
+            return check(io[i])
         if n in ZFF:
-            return check(bools.ifelse(is_in, io == 0, before[n]))
+            return check(io == 0)
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(a[i])
@@ -3752,8 +3753,10 @@ class TestedInstrs(object):
                                ifelse('is_store', 0x4f, 0x5f))))
         yield 'rrd/rld', (
             f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
-        yield 'in/out r, (c)', (
-            f(0xed), f(xyz(1, 'y', ifelse('is_in', 0, 1))), io4())
+        yield 'in r, (c)', (
+            f(0xed), f(xyz(1, 'y', 0)), io4())
+        yield 'out (c), r', (
+            f(0xed), f(xyz(1, 'y', 1)), io4())
         yield 'adc/sbc hl, <rp>', (
             f(0xed), f(xpqz(1, 'p', 'q', 2)), e4(), e3())
         yield 'ld <rp>, (nn)/ld (nn), <rp>', (
