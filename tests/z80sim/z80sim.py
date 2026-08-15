@@ -2281,11 +2281,14 @@ class State(object):
     # settlings, present in the step only when tracking -- the
     # step list remains the complete description of the
     # computation, and cache keys, being hashes of step lists,
-    # come out mode-specific automatically.
+    # come out mode-specific automatically. The parameter's
+    # value is the clipping budget: it bounds what the settled
+    # states hold, so states computed under different budgets
+    # must never share a cache entry.
     def update_pin(self, pin, all_orders=False):
         step = ('update_pin', pin)
         if all_orders:
-            step += True,
+            step += PossibleValues.BUDGET,
         self.__add_step(step)
 
     def set_pin_and_update(self, pin, pull, all_orders=False):
@@ -2320,7 +2323,7 @@ class State(object):
         else:
             step = ('conditional_half_tick', cond)
         if all_orders:
-            step += True,
+            step += PossibleValues.BUDGET,
         self.__add_step(step)
 
     def tick(self):
