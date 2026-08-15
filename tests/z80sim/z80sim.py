@@ -1748,13 +1748,16 @@ class Z80Simulator(object):
 
                 # Compute new states.
                 new_states = {}
+                pass_no = 0
                 repeat = True
                 while repeat:
+                    pass_no += 1
                     repeat = False
-                    for i, n in enumerate(gates):
-                        # with Status.do(f'gate {i}/{len(gates)}'):
-                        repeat |= self.__update_gate_state(
-                            n, new_states, all_orders)
+                    with Status.do(f'pass {pass_no}'):
+                        for i, n in enumerate(gates):
+                            with Status.do(f'gate {i}/{len(gates)}'):
+                                repeat |= self.__update_gate_state(
+                                    n, new_states, all_orders)
 
                 # Apply new states.
                 groups = []
