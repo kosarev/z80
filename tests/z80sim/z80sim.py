@@ -522,9 +522,25 @@ class PartialOrders(object):
     __cache = {}
     __seq = 0
 
-    def __init__(self, e):
+    # Conditions carry the pairs of sides they force to order
+    # one way -- pairs true in every assignment satisfying the
+    # condition. Combining conditions unions the pairs, and a
+    # cycle in the union means the combination holds under no
+    # consistent order -- found at the very combine that creates
+    # it, where the dead entry would otherwise multiply through
+    # further cross-applications and cost a solver query to
+    # bury. Raw stated pairs suffice: transitive closure adds no
+    # new cycles. Uniting alternatives keeps only the pairs all
+    # alternatives force -- an honest weakening, with the solver
+    # remaining the backstop for whatever the pairs cannot see.
+    # Past the cap a condition states no pairs, which is always
+    # sound.
+    MAX_FORCED_PAIRS = 128
+
+    def __init__(self, e, forced=frozenset()):
         # Use get() instead.
         self.e = e
+        self.forced = forced
         self.seq = __class__.__seq
         __class__.__seq += 1
 
@@ -536,10 +552,10 @@ class PartialOrders(object):
         return str(self.e)
 
     @staticmethod
-    def get(e):
+    def get(e, forced=frozenset()):
         r = __class__.__cache.get(e)
         if r is None:
-            r = PartialOrders(e)
+            r = PartialOrders(e, forced)
             __class__.__cache[e] = r
         return r
 
@@ -554,7 +570,9 @@ class PartialOrders(object):
             before, after = after, before
         e = bools.get(f'{before}<{after}')
         orders.register_order(e, before, after)
-        return __class__.get(~e if inverted else e)
+        if inverted:
+            return __class__.get(~e, frozenset(((after, before),)))
+        return __class__.get(e, frozenset(((before, after),)))
 
     @property
     def obviously_never(self):
@@ -574,11 +592,43 @@ class PartialOrders(object):
             return True
         return orders.is_equiv(self.e, other.e)
 
+    @staticmethod
+    def __has_cycle(pairs):
+        following = {}
+        for before, after in pairs:
+            following.setdefault(before, []).append(after)
+
+        # Sides are white (unvisited), grey (on the path) or
+        # black (done).
+        colours = {}
+        for side in following:
+            if colours.get(side, 0) != 0:
+                continue
+            path = [(side, 0)]
+            colours[side] = 1
+            while path:
+                s, i = path[-1]
+                nexts = following.get(s)
+                if nexts is None or i >= len(nexts):
+                    colours[s] = 2
+                    path.pop()
+                    continue
+                path[-1] = s, i + 1
+                to = nexts[i]
+                colour = colours.get(to, 0)
+                if colour == 1:
+                    return True
+                if colour == 0:
+                    colours[to] = 1
+                    path.append((to, 0))
+        return False
+
     def unite(self, other):
         # The value arises whenever either condition holds.
         if self is other:
             return self
-        return __class__.get(self.e | other.e)
+        return __class__.get(self.e | other.e,
+                             self.forced & other.forced)
 
     @staticmethod
     def unite_all(orders):
@@ -588,17 +638,24 @@ class PartialOrders(object):
         # expression on every step, and one union over the whole
         # run stalls the underlying construction, whose
         # per-argument reduction is quadratic.
-        es = [o.e for o in {id(o): o for o in orders}.values()]
+        os = list({id(o): o for o in orders}.values())
+        forced = frozenset.intersection(*(o.forced for o in os))
+        es = [o.e for o in os]
         while len(es) > 1:
             es = [bools.get_or(*es[i:i + 256])
                   for i in range(0, len(es), 256)]
-        return __class__.get(es[0])
+        return __class__.get(es[0], forced)
 
     def combine(self, other):
         # The value arises whenever both conditions hold.
         if self is other:
             return self
-        return __class__.get(self.e & other.e)
+        forced = self.forced | other.forced
+        if len(forced) > __class__.MAX_FORCED_PAIRS:
+            forced = frozenset()
+        elif __class__.__has_cycle(forced):
+            return __class__.NEVER
+        return __class__.get(self.e & other.e, forced)
 
 
 PartialOrders.ALWAYS = PartialOrders.get(TRUE)
