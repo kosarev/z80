@@ -1831,6 +1831,7 @@ class Z80Simulator(object):
         self.__raced_pairs = set()
         self.__clipped_nodes = {}
         self.__settle_start_states = {}
+        self.__oscillating_nodes = set()
         self.__num_unpin_waves = 0
 
         groups = []
@@ -1878,7 +1879,17 @@ class Z80Simulator(object):
                     state = self.get_node_entries(
                         n, all_orders=all_orders,
                         budget=PossibleValues.UNPIN_BUDGET)
-                    if PossibleValues.get_num_clipped() != num_clipped:
+
+                    # An oscillating node's fresh evaluation
+                    # just wraps its loop once more; committing
+                    # it would ping-pong through the waves, so
+                    # anything but a confirmed hold turns
+                    # opaque.
+                    lost = PossibleValues.get_num_clipped() != num_clipped
+                    if not lost and n in self.__oscillating_nodes:
+                        lost = not PossibleValues.is_same(
+                            state, self.__clipped_nodes[n])
+                    if lost:
                         # The value is lost for good.
                         id = f'clipped.{self.sweep_no}.{n.index}'
                         state = PossibleValues.cast(bools.get(id))
@@ -1931,8 +1942,32 @@ class Z80Simulator(object):
                     with Status.do(f'pass {pass_no}'):
                         for i, n in enumerate(gates):
                             with Status.do(f'gate {i}/{len(gates)}'):
-                                repeat |= self.__update_gate_state(
+                                changed = self.__update_gate_state(
                                     n, new_states, all_orders)
+                                repeat |= changed
+
+                                # A gate still changing this
+                                # deep into the pass loop has no
+                                # fixpoint to find: under some
+                                # of its conditions the loop it
+                                # is on genuinely oscillates,
+                                # its value wrapping the loop
+                                # once more per pass. Pin it;
+                                # the fixpoint verification then
+                                # confirms a held value or
+                                # honestly turns the node
+                                # opaque.
+                                if changed and pass_no > 100 \
+                                        and n not in self.__clipped_nodes:
+                                    stand_in = \
+                                        self.__settle_start_states.get(
+                                            n, n.gate_of[0].state)
+                                    self.__clipped_nodes[n] = stand_in
+                                    self.__oscillating_nodes.add(n)
+                                    new_states[n] = stand_in
+                                    Status.print(
+                                        f'{n} pinned as oscillating '
+                                        f'at {Status.get_context()}')
 
                 # Apply new states, keeping each node's state
                 # from before the settling first touched it --
@@ -2047,6 +2082,10 @@ class Z80Simulator(object):
         # The state each node had before the current settling
         # first touched it -- the pinning stand-in.
         self.__settle_start_states = {}
+
+        # The nodes the current settling found oscillating --
+        # changing on every pass with no fixpoint to reach.
+        self.__oscillating_nodes = set()
 
         # Pin-verification waves already run in the current
         # settling; the cap bounds the resolve-and-re-pin
