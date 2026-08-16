@@ -2690,21 +2690,9 @@ class TestFailure(Exception):
     pass
 
 
-def test_node(instrs, n, at_start, at_end, before, after):
-    def check(x):
-        if n.startswith('instr'):
-            b, a = at_start[n], at_end[n]
-        else:
-            b, a = before[n], after[n]
-            x = is_active(n).ifelse(x, b)
-
-        # A state with several possible values fails its check:
-        # the expected values are yet to be extended to embrace
-        # order-dependent outcomes.
-        a = PossibleValues.cast(a)
-        if a.is_single and bools.is_equiv(a.single_value, x):
-            return CheckToken()
-
+def test_node(instrs, n, at_start, at_end, before, after,
+              all_orders=False):
+    def fail(b, a, get_expected_lines):
         Status.clear()
 
         NAMES = {CF: 'cf', NF: 'nf', PF: 'pf', XF: 'xf',
@@ -2732,13 +2720,64 @@ def test_node(instrs, n, at_start, at_end, before, after):
                         lines.append(f'    {no}) {get_z3_simplified(v)}')
                         lines.append(
                             f'       under {get_z3_simplified(os.e)}')
-                lines.append(f'  expected: {get_z3_simplified(x)}')
-                if a.is_single:
-                    lines.append(
-                        f'  diff: '
-                        f'{get_z3_simplified(a.single_value ^ x)}')
+                lines.extend(get_expected_lines())
         print('\n'.join(lines), file=sys.stderr, flush=True)
         raise TestFailure()
+
+    def check(x):
+        if n.startswith('instr'):
+            b, a = at_start[n], at_end[n]
+        else:
+            b, a = before[n], after[n]
+            x = is_active(n).ifelse(x, b)
+
+        # A state with several possible values fails its check:
+        # racing nodes state their outcome sets via check_set().
+        a = PossibleValues.cast(a)
+        if a.is_single and bools.is_equiv(a.single_value, x):
+            return CheckToken()
+
+        def get_expected_lines():
+            lines = [f'  expected: {get_z3_simplified(x)}']
+            if a.is_single:
+                lines.append(
+                    f'  diff: {get_z3_simplified(a.single_value ^ x)}')
+            return lines
+
+        fail(b, a, get_expected_lines)
+
+    def check_set(*xs):
+        # A racing node's spec is the exact set of its possible
+        # outcomes: every outcome must be one of these values,
+        # and every value must arise. Which orders yield which
+        # value is deliberately no part of the spec -- that
+        # would freeze incidental internals; the set is the
+        # hardware-facing promise.
+        b, a = before[n], after[n]
+        xs = [is_active(n).ifelse(x, b) for x in xs]
+        a = PossibleValues.cast(a)
+
+        matched = len(a.entries) == len(xs)
+        if matched:
+            remaining = list(xs)
+            for v, _ in a.entries:
+                for j, x in enumerate(remaining):
+                    if bools.is_equiv(v, x):
+                        del remaining[j]
+                        break
+                else:
+                    matched = False
+                    break
+        if matched:
+            return CheckToken()
+
+        def get_expected_lines():
+            lines = [f'  expected: exactly these {len(xs)} values']
+            for no, x in enumerate(xs):
+                lines.append(f'    {no}) {get_z3_simplified(x)}')
+            return lines
+
+        fail(b, a, get_expected_lines)
 
     phase = len(instrs)
     instr = instrs[-1]
@@ -2897,10 +2936,19 @@ def test_node(instrs, n, at_start, at_end, before, after):
         if instr == 'cpl':
             return check(~a)
         if instr == 'scf/ccf':
-            # See <https://github.com/kosarev/z80/issues/42>.
-            # TODO: Does this agree with the current known
-            # description of the behaviour?
             f = get_f()[i]
+
+            # Under all orders the outcome is the proven race
+            # set of issue #51: XF and YF each land on one of
+            # these four values, independently per bit, the
+            # choice hanging on genuine update races the netlist
+            # leaves undecided.
+            if all_orders:
+                return check_set(a, f, a | f, a & f)
+
+            # A single-order run lands on the one value its
+            # order yields; this describes the default order.
+            # See <https://github.com/kosarev/z80/issues/42>.
             op = Bits(at_start[f'instr{b}'] for b in range(8))
             x = Bits(op.bits[6:8])
             z = Bits(op.bits[0:3])
@@ -3452,7 +3500,8 @@ def process_instr(instrs, base_state, *, test=False, all_orders=False):
     after = get_effective_states(s, SAMPLED_NODES, all_orders=all_orders)
 
     for n in sorted(TESTED_NODES):
-        token = test_node(instrs, n, at_start, at_end, before, after)
+        token = test_node(instrs, n, at_start, at_end, before, after,
+                          all_orders)
         assert isinstance(token, CheckToken)
 
     return after_instr_state
