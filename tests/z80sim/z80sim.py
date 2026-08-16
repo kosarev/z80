@@ -3108,6 +3108,16 @@ def test_node(instrs, n, at_start, at_end, before, after,
             # it takes the address of the second opcode byte.
             wz = Bits.ifelse(get_bc() != 1, get_pc_plus(1), get_wz())
             return check(wz[i])
+        if instr in ('cpi/cpd', 'cpir/cpdr'):
+            wz = get_wz()
+            wz = Bits.ifelse(phased_bool('is_cpd'), wz - 1, wz + 1)
+            if instr == 'cpir/cpdr':
+                # A repeating instruction takes the address of
+                # the second opcode byte instead.
+                a, s = get_a(), Bits(phased('r'), width=8)
+                wz = Bits.ifelse((get_bc() != 1) & (a != s),
+                                 get_pc_plus(1), wz)
+            return check(wz[i])
         if instr == 'ld hl, (nn)/ld (nn), hl':
             wz = Bits.concat(Bits(phased('r2'), width=8),
                              Bits(phased('r1'), width=8)) + 1
@@ -3357,6 +3367,36 @@ def test_node(instrs, n, at_start, at_end, before, after,
                                  pc[11] if n in XFF else pc[13], x)
             return check(x)
 
+    if instr in ('cpi/cpd', 'cpir/cpdr'):
+        # One iteration's effect: a repeating cpir/cpdr re-runs
+        # itself through PC, so the per-instruction semantics
+        # are cpi/cpd's.
+        a, s = get_a(), Bits(phased('r'), width=8)
+        d = a - s
+        if n in NFF:
+            return check(TRUE)
+        if n in HFF:
+            return check(d[4] ^ a[4] ^ s[4])
+        if n in PFF:
+            return check((get_bc() - 1).truncated(16) != 0)
+        if n in ZFF:
+            return check(d.truncated(8) == 0x00)
+        if n in SFF:
+            return check(d[7])
+        if n in XFF + YFF:
+            # XF takes bit 3 and YF takes bit 1 -- not 5 -- of
+            # the comparison less its halfborrow.
+            t = d.truncated(8) - Bits.ifelse(d[4] ^ a[4] ^ s[4], 1, 0)
+            x = t[3] if n in XFF else t[1]
+            if instr == 'cpir/cpdr':
+                # A repeating iteration takes the two flags from
+                # the address it re-executes from instead: XF
+                # from bit 11 and YF from bit 13 of PC.
+                pc = get_pc_plus(0)
+                x = bools.ifelse((get_bc() != 1) & (a != s),
+                                 pc[11] if n in XFF else pc[13], x)
+            return check(x)
+
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
         cf = Bits.ifelse(get_active(CF), 1, 0)
@@ -3487,6 +3527,21 @@ def get_cond_as_expr(cond, phase, before):
                 Bits(before[f'reg_c{i}'] for i in range(8)),
                 Bits(before[f'reg_cc{i}'] for i in range(8)))
         return Bits.concat(b, c) != 1
+    if cond == 'bc != 1 && a != r':
+        b = Bits.ifelse(
+                before[EXX_FF],
+                Bits(before[f'reg_b{i}'] for i in range(8)),
+                Bits(before[f'reg_bb{i}'] for i in range(8)))
+        c = Bits.ifelse(
+                before[EXX_FF],
+                Bits(before[f'reg_c{i}'] for i in range(8)),
+                Bits(before[f'reg_cc{i}'] for i in range(8)))
+        a = Bits.ifelse(
+                before[EX_AF_FF],
+                Bits(before[f'reg_a{i}'] for i in range(8)),
+                Bits(before[f'reg_aa{i}'] for i in range(8)))
+        r = Bits(f'r_p{phase}', width=8)
+        return (Bits.concat(b, c) != 1) & (a != r)
     f = Bits.ifelse(
             before[EX_AF_FF],
             Bits(before[f'reg_f{i}'] for i in range(8)),
@@ -4011,8 +4066,8 @@ class TestedInstrs(object):
         def e4(p='e'):
             return phased(p), 4, None
 
-        def e5(*, cond=None):
-            return phased('e'), 5, cond
+        def e5(p='e', *, cond=None):
+            return phased(p), 5, cond
 
         def io4():
             return phased('io'), 4, None
@@ -4132,6 +4187,14 @@ class TestedInstrs(object):
         yield 'ldir/lddr', (
             f(0xed), f(ifelse('is_ldd', 0xb8, 0xb0)), r3(), w5(),
             e5(cond='bc != 1'))
+        yield 'cpi/cpd', (
+            f(0xed), f(ifelse('is_cpd', 0xa9, 0xa1)), r3(), e5())
+        # The repeat cycle runs only when the decremented BC is
+        # not zero and the comparison did not match -- one
+        # symbolic run covers both branches.
+        yield 'cpir/cpdr', (
+            f(0xed), f(ifelse('is_cpd', 0xb9, 0xb1)), r3(), e5(),
+            e5('e2', cond='bc != 1 && a != r'))
         yield 'in r, (c)', (
             f(0xed), f(xyz(1, 'y', 0)), io4())
         yield 'out (c), r', (
