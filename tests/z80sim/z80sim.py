@@ -3031,11 +3031,13 @@ def test_node(instrs, n, at_start, at_end, before, after,
             i += 8
         if instr in ('add hl, <rp>', 'rrd/rld', 'adc/sbc hl, <rp>'):
             return check((get_hl() + 1)[i])
-        if instr in ('call nn', 'ex (sp), hl'):
+        # jp cc and call cc load WZ with the target address
+        # whether or not they are taken.
+        if instr in ('call nn', 'call cc, nn', 'ex (sp), hl'):
             wz = Bits.concat(Bits(phased('r2'), width=8),
                              Bits(phased('r1'), width=8))
             return check(wz[i])
-        if instr in ('jp nn', 'ret'):
+        if instr in ('jp nn', 'jp cc, nn', 'ret'):
             wz = Bits.concat(Bits(phased('hi'), width=8),
                              Bits(phased('lo'), width=8))
             return check(wz[i])
@@ -3948,8 +3950,8 @@ class TestedInstrs(object):
         def r4(p='r'):
             return phased(p), 4, None
 
-        def w3(p='w'):
-            return phased(p), 3, None
+        def w3(p='w', cond=None):
+            return phased(p), 3, cond
 
         def w5(p='w'):
             return phased(p), 5, None
@@ -4060,6 +4062,15 @@ class TestedInstrs(object):
             r3(), e5(cond='cc2'))
         yield 'ret cc', (
             f5(xyz(3, 'cc', 0)), r3('r1', cond='cc'), r3('r2', cond='cc'))
+        yield 'jp cc, nn', (
+            f(xyz(3, 'cc', 2)), r3('lo'), r3('hi'))
+        # The high-operand read runs a fourth tick when the call
+        # is taken; it is modelled as a separate one-tick
+        # conditional cycle.
+        yield 'call cc, nn', (
+            f(xyz(3, 'cc', 4)), r3('r1'), r3('r2'),
+            (phased('e'), 1, 'cc'),
+            w3('w3', cond='cc'), w3('w4', cond='cc'))
 
         yield 'ld {i, r}, a/ld a, {i, r}', (
             f(0xed), f5(ifelse('is_i_reg',
