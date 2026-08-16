@@ -35,6 +35,13 @@ import traceback
 import z3
 
 
+# The simulator needs eqbool's equivalence sessions and
+# fingerprints, first released in eqbool 0.5. The check is by
+# feature so development installs pass regardless of their
+# stated version.
+assert hasattr(eqbool, 'EquivSession') and hasattr(eqbool.Bool, 'fp'), (
+    'z80sim requires eqbool 0.5 or later')
+
 _CACHE_ROOT = pathlib.Path('__z80sim_cache')
 assert _CACHE_ROOT.exists()
 
