@@ -2714,25 +2714,29 @@ def test_node(instrs, n, at_start, at_end, before, after,
         n_name = str(n)
         if n in NAMES:
             n_name = f'{n_name} ({NAMES[n]})'
-        lines = ['', 'FAILED: ' + '; '.join(instrs) + f' {n_name}']
+        def emit(line):
+            # Streamed as produced: verbalising a large outcome
+            # set takes time, and a partial report is still a
+            # report.
+            print(line, file=sys.stderr, flush=True)
+
+        emit('')
+        emit('FAILED: ' + '; '.join(instrs) + f' {n_name}')
         if '--no-before-after-expected' not in sys.argv:
             # Verbalised the way the reporting mode does it: a
             # racing node's outcome is a set, each value with
             # the order condition it arises under.
             with Status.do('verbalise'):
-                lines.append(f'  before: {get_z3_simplified(b)}')
+                emit(f'  before: {get_z3_simplified(b)}')
                 if a.is_single:
-                    lines.append(
-                        f'  after: {get_z3_simplified(a.single_value)}')
+                    emit(f'  after: {get_z3_simplified(a.single_value)}')
                 else:
-                    lines.append(
-                        f'  after: {len(a.entries)} possible values')
+                    emit(f'  after: {len(a.entries)} possible values')
                     for no, (v, os) in enumerate(a.entries):
-                        lines.append(f'    {no}) {get_z3_simplified(v)}')
-                        lines.append(
-                            f'       under {get_z3_simplified(os.e)}')
-                lines.extend(get_expected_lines())
-        print('\n'.join(lines), file=sys.stderr, flush=True)
+                        emit(f'    {no}) {get_z3_simplified(v)}')
+                        emit(f'       under {get_z3_simplified(os.e)}')
+                for line in get_expected_lines():
+                    emit(line)
         raise TestFailure()
 
     def check(x):
