@@ -2715,6 +2715,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         n_name = str(n)
         if n in NAMES:
             n_name = f'{n_name} ({NAMES[n]})'
+
         def emit(line):
             # Streamed as produced: verbalising a large outcome
             # set takes time, and a partial report is still a
