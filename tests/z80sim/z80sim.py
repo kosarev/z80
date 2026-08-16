@@ -564,11 +564,16 @@ class PartialOrders(object):
     @staticmethod
     def unite_all(orders):
         # The value arises whenever any of the conditions hold.
-        # A single n-ary union: uniting a long run of conditions
-        # pairwise would rebuild the growing expression on every
-        # step.
-        unique = {id(o): o for o in orders}.values()
-        return __class__.get(bools.get_or(*(o.e for o in unique)))
+        # United n-ary, in bounded chunks: uniting a long run of
+        # conditions pairwise would rebuild the growing
+        # expression on every step, and one union over the whole
+        # run stalls the underlying construction, whose
+        # per-argument reduction is quadratic.
+        es = [o.e for o in {id(o): o for o in orders}.values()]
+        while len(es) > 1:
+            es = [bools.get_or(*es[i:i + 256])
+                  for i in range(0, len(es), 256)]
+        return __class__.get(es[0])
 
     def combine(self, other):
         # The value arises whenever both conditions hold.
@@ -604,6 +609,51 @@ class PossibleValues(object):
         assert self.is_single
         return self.entries[0][0]
 
+    # The most distinct possible values a set is allowed to
+    # hold; sets going over the budget, never-arising values
+    # already pruned, get clipped down to a fresh unconstrained
+    # term. Deliberately below the genuine transient diversity
+    # observed (about four thousand values on the 'adc n' bus
+    # staging): populations under the budget still pay order
+    # queries on every merge, so we clip early and bet on the
+    # clipped transients being overwritten before any tested
+    # node reads them.
+    BUDGET = 1024
+
+    __num_clipped = 0
+
+    @staticmethod
+    def clip(num_values):
+        # The set is replaced with a fresh term: the node holds
+        # some value we no longer track, arising under orders we
+        # no longer track either.
+        #
+        # This is conservative. The term is opaque, so a tested
+        # node whose value still depends on it cannot check
+        # against its spec expression and fails its test -- a
+        # clipped value never certifies as correct, and being a
+        # sole possible value, never reports as a race either.
+        # Where the term drops out -- overwritten before it
+        # matters, or cancelling out of downstream expressions
+        # so the value provably does not depend on the lost
+        # set -- the verdicts are as good as with full tracking.
+        # What is genuinely given up is completeness, never
+        # soundness: an instruction whose transients exceed the
+        # budget may fail its checks where full tracking would
+        # have passed or shown the actual outcomes, but nothing
+        # incorrect is ever proven.
+        #
+        # Each clip gets its own term, so values lost to
+        # different clips never spuriously compare equal.
+        # TODO: The names count from process start, so images
+        # cached by different runs may reuse a name for a
+        # different clipped set; content-derived names would
+        # remove the caveat.
+        __class__.__num_clipped += 1
+        id = f'clipped{__class__.__num_clipped}'
+        Status.print(f'{id} <- {num_values} possible values')
+        return __class__.cast(bools.get(id))
+
     @staticmethod
     def get(entries):
         # Merges equivalent values by uniting their orders and
@@ -617,8 +667,15 @@ class PossibleValues(object):
         # over a shared structure, which the session tells apart
         # having seen it once. Every merged value's conditions
         # unite in a single n-ary union at the end.
+        # Whether distinct values that arise never would push
+        # the count back under the budget is deliberately not
+        # checked: confirming deadness means solving for every
+        # group, or even every condition -- work priced by the
+        # very population the budget is here to bound.
         session = None
         buckets = {}
+        num_groups = 0
+
         for v, orders in entries:
             if orders.obviously_never:
                 continue
@@ -633,6 +690,9 @@ class PossibleValues(object):
                         break
                 else:
                     bucket[v.id] = v, [orders]
+                    num_groups += 1
+                    if num_groups > __class__.BUDGET:
+                        return __class__.clip(num_groups)
                     continue
             e[1].append(orders)
 
