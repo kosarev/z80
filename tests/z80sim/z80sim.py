@@ -98,6 +98,10 @@ def get_opt(id, type):
 
 SEED = get_opt('--seed', int)
 
+# The number of concurrent test workers; the run is
+# single-threaded when not given.
+THREADS = get_opt('--threads', int)
+
 # The memory cap for concurrent test workers, in GiB.
 WORKER_MEMORY = get_opt('--worker-memory', float)
 
@@ -2604,7 +2608,7 @@ class State(object):
             # process resume from this very point, holding only
             # what the state actually references.
             if (WORKER_MEMORY is not None and
-                    '--single-thread' not in sys.argv and
+                    THREADS is not None and
                     get_rss() > WORKER_MEMORY * (1 << 30)):
                 raise MemoryCapReached()
 
@@ -3840,17 +3844,13 @@ def test_instr_seqs(seqs, all_orders=False):
 
     seqs = sorted(seqs, key=sort_key)
     ok = True
-    if '--single-thread' in sys.argv:
+    if THREADS is None:
         for i, seq in enumerate(seqs):
             ok &= process_results(i, seqs[i],
                                   test_instr_seq(seq, all_orders))
     else:
         seqs = tuple(seqs)
-        num_threads = get_opt('--threads', int)
-        if num_threads is None:
-            num_threads = multiprocessing.cpu_count()
-            if '--spare-thread' in sys.argv:
-                num_threads = max(1, num_threads - 1)
+        num_threads = THREADS
         # One instruction sequence per worker process: the
         # expression contexts only ever grow -- hash-consing
         # never frees -- so a worker serving several sequences
@@ -4112,13 +4112,13 @@ class TestedInstrs(object):
 
 
 def test_instructions():
-    # With --all-orders, the tested instructions' settlings
-    # simulate all orders of updates, so a pass means the
-    # expected values hold under every order. Nodes coming out
-    # with several possible values fail their checks: the
-    # expected values are yet to be extended to embrace
-    # order-dependent outcomes.
-    all_orders = '--all-orders' in sys.argv
+    # The tested instructions' settlings simulate all orders of
+    # updates by default, so a pass means the expected values
+    # hold under every order; racing nodes state their outcome
+    # sets via check_set(). With --single-order only the default
+    # order is simulated, against the expectations describing
+    # its deterministic outcomes.
+    all_orders = '--single-order' not in sys.argv
 
     seqs = []
 
