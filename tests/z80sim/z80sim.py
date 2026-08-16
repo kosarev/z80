@@ -941,6 +941,7 @@ class Bits(object):
         if isinstance(bits, int):
             assert suffix is None
             n = bits
+            assert n >= 0, n
             bits = []
             while n:
                 bits.append(n & 1)
