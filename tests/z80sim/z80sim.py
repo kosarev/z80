@@ -671,7 +671,9 @@ class PossibleValues(object):
         self.entries = entries
 
     def __repr__(self):
-        return ' / '.join(f'{v!r} [{os!r}]' for v, os in self.entries)
+        # str() of a value spells the expression; repr() only
+        # names its kind.
+        return ' / '.join(f'{v} [{os!r}]' for v, os in self.entries)
 
     @property
     def is_single(self):
@@ -2715,12 +2717,26 @@ def test_node(instrs, n, at_start, at_end, before, after):
             n_name = f'{n_name} ({NAMES[n]})'
         lines = ['', 'FAILED: ' + '; '.join(instrs) + f' {n_name}']
         if '--no-before-after-expected' not in sys.argv:
-            lines.extend((
-                f'  before: {b}',
-                f'  after: {a}',
-                f'  expected: {x}'))
-            if a.is_single:
-                lines.append(f'  diff: {a.single_value ^ x}')
+            # Verbalised the way the reporting mode does it: a
+            # racing node's outcome is a set, each value with
+            # the order condition it arises under.
+            with Status.do('verbalise'):
+                lines.append(f'  before: {get_z3_simplified(b)}')
+                if a.is_single:
+                    lines.append(
+                        f'  after: {get_z3_simplified(a.single_value)}')
+                else:
+                    lines.append(
+                        f'  after: {len(a.entries)} possible values')
+                    for no, (v, os) in enumerate(a.entries):
+                        lines.append(f'    {no}) {get_z3_simplified(v)}')
+                        lines.append(
+                            f'       under {get_z3_simplified(os.e)}')
+                lines.append(f'  expected: {get_z3_simplified(x)}')
+                if a.is_single:
+                    lines.append(
+                        f'  diff: '
+                        f'{get_z3_simplified(a.single_value ^ x)}')
         print('\n'.join(lines), file=sys.stderr, flush=True)
         raise TestFailure()
 
