@@ -1513,20 +1513,20 @@ class ObservedStates(object):
     # states and derive different conditions every trip, and the
     # settling never converges.
     def __init__(self, new_states, evaluated=None, all_orders=False,
-                 sweep_no=None, raced=None):
+                 update_no=None, raced=None):
         self.__new_states = new_states
         self.__evaluated = evaluated
         self.__all_orders = all_orders
-        self.__sweep_no = sweep_no
+        self.__update_no = update_no
         self.__raced = raced
         self.__observed = {}
 
     def __fact(self, before, after):
         # An update event is a node updating within a given
-        # settling of the circuit, so facts surviving a settling
-        # are never confused with facts about later updates of
-        # the same nodes.
-        s = self.__sweep_no
+        # group update, so facts surviving a group update are
+        # never confused with facts about later updates of the
+        # same nodes.
+        s = self.__update_no
         return PartialOrders.get_fact(f'u{s}.{before.index}',
                                       f'u{s}.{after.index}')
 
@@ -1776,7 +1776,7 @@ class Z80Simulator(object):
             new_states = {}
         observed = ObservedStates(new_states, evaluated=n,
                                   all_orders=all_orders,
-                                  sweep_no=self.sweep_no,
+                                  update_no=self.update_no,
                                   raced=self.__raced_pairs)
         gnd, pwr, pullup, pulldown = self.__get_node_preds(
             n, observed, budget=budget)
@@ -1836,7 +1836,7 @@ class Z80Simulator(object):
         # events for the facts partial orders are made of, and a
         # fresh chance for every competing pair to be asked its
         # order question.
-        self.sweep_no += 1
+        self.update_no += 1
         self.__raced_pairs = set()
         self.__clipped_nodes = {}
         self.__settle_start_states = {}
@@ -1870,7 +1870,7 @@ class Z80Simulator(object):
                 # stay: an unverified start value could certify
                 # falsely. The opaque terms take the nodes.
                 for n, pinned in self.__clipped_nodes.items():
-                    id = f'clipped.{self.sweep_no}.{n.index}'
+                    id = f'clipped.{self.update_no}.{n.index}'
                     state = PossibleValues.cast(bools.get(id))
                     if PossibleValues.is_same(state, pinned):
                         continue
@@ -1900,7 +1900,7 @@ class Z80Simulator(object):
                             state, self.__clipped_nodes[n])
                     if lost:
                         # The value is lost for good.
-                        id = f'clipped.{self.sweep_no}.{n.index}'
+                        id = f'clipped.{self.update_no}.{n.index}'
                         state = PossibleValues.cast(bools.get(id))
                         if PossibleValues.is_same(
                                 state, self.__clipped_nodes[n]):
@@ -2077,8 +2077,8 @@ class Z80Simulator(object):
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
-        # Counts settlings of the circuit; scopes update events.
-        self.sweep_no = 0
+        # Counts group updates; scopes their update events.
+        self.update_no = 0
 
         # The competing pairs whose order questions the current
         # settling has already asked.
