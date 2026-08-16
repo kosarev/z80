@@ -2919,7 +2919,10 @@ def test_node(instrs, n, at_start, at_end, before, after,
     def get_pc_plus(off):
         # On tick 3 of an instruction the value of pc has already
         # been advanced, so we in fact get (pc + 1).
-        return Bits.concat(bits('reg_pch'), bits('reg_pcl')) + (off - 1)
+        pc = Bits.concat(bits('reg_pch'), bits('reg_pcl'))
+        if off >= 1:
+            return pc + (off - 1)
+        return pc - (1 - off)
 
     CFF = CF, CF2
     NFF = NF, NF2
@@ -3098,6 +3101,11 @@ def test_node(instrs, n, at_start, at_end, before, after,
                                       out_wz[i]))
         if instr == 'rst n':
             wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
+            return check(wz[i])
+        if instr == 'ldir/lddr':
+            # WZ changes only when the instruction repeats: then
+            # it takes the address of the second opcode byte.
+            wz = Bits.ifelse(get_bc() != 1, get_pc_plus(1), get_wz())
             return check(wz[i])
         if instr == 'ld hl, (nn)/ld (nn), hl':
             wz = Bits.concat(Bits(phased('r2'), width=8),
@@ -3326,6 +3334,28 @@ def test_node(instrs, n, at_start, at_end, before, after,
             i = int(n[-1])
             return check(a[i])
 
+    if instr in ('ldi/ldd', 'ldir/lddr'):
+        # One iteration's effect: a repeating ldir/lddr re-runs
+        # itself through PC, so the per-instruction semantics
+        # are ldi/ldd's.
+        if n in NFF + HFF:
+            return check(FALSE)
+        if n in PFF:
+            return check((get_bc() - 1).truncated(16) != 0)
+        if n in XFF + YFF:
+            # XF takes bit 3 and YF takes bit 1 -- not 5 -- of
+            # the accumulator plus the transferred byte.
+            v = get_a() + Bits(phased('r'), width=8)
+            x = v[3] if n in XFF else v[1]
+            if instr == 'ldir/lddr':
+                # A repeating iteration takes the two flags from
+                # the address it re-executes from instead: XF
+                # from bit 11 and YF from bit 13 of PC.
+                pc = get_pc_plus(0)
+                x = bools.ifelse(get_bc() != 1,
+                                 pc[11] if n in XFF else pc[13], x)
+            return check(x)
+
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
         cf = Bits.ifelse(get_active(CF), 1, 0)
@@ -3446,6 +3476,16 @@ def get_cond_as_expr(cond, phase, before):
                 Bits(before[f'reg_b{i}'] for i in range(8)),
                 Bits(before[f'reg_bb{i}'] for i in range(8)))
         return b != 1
+    if cond == 'bc != 1':
+        b = Bits.ifelse(
+                before[EXX_FF],
+                Bits(before[f'reg_b{i}'] for i in range(8)),
+                Bits(before[f'reg_bb{i}'] for i in range(8)))
+        c = Bits.ifelse(
+                before[EXX_FF],
+                Bits(before[f'reg_c{i}'] for i in range(8)),
+                Bits(before[f'reg_cc{i}'] for i in range(8)))
+        return Bits.concat(b, c) != 1
     f = Bits.ifelse(
             before[EX_AF_FF],
             Bits(before[f'reg_f{i}'] for i in range(8)),
@@ -4083,6 +4123,14 @@ class TestedInstrs(object):
                                ifelse('is_store', 0x4f, 0x5f))))
         yield 'rrd/rld', (
             f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
+        yield 'ldi/ldd', (
+            f(0xed), f(ifelse('is_ldd', 0xa8, 0xa0)), r3(), w5())
+        # The repeat cycle runs only when the decremented BC is
+        # not zero, that is, when BC was not 1 -- one symbolic
+        # run covers both branches for all BC values.
+        yield 'ldir/lddr', (
+            f(0xed), f(ifelse('is_ldd', 0xb8, 0xb0)), r3(), w5(),
+            e5(cond='bc != 1'))
         yield 'in r, (c)', (
             f(0xed), f(xyz(1, 'y', 0)), io4())
         yield 'out (c), r', (
