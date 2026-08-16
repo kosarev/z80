@@ -3842,9 +3842,8 @@ def test_instr_seqs(seqs, all_orders=False):
     ok = True
     if '--single-thread' in sys.argv:
         for i, seq in enumerate(seqs):
-            if not process_results(i, seqs[i],
-                                   test_instr_seq(seq, all_orders)):
-                assert 0
+            ok &= process_results(i, seqs[i],
+                                  test_instr_seq(seq, all_orders))
     else:
         seqs = tuple(seqs)
         num_threads = get_opt('--threads', int)
