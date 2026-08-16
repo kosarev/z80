@@ -639,7 +639,16 @@ class PossibleValues(object):
     # node reads them.
     BUDGET = 1024
 
+    # An unpin evaluation runs once per pinned node per
+    # settling, so it affords a far larger budget than the
+    # per-pass merges the ordinary budget bounds.
+    UNPIN_BUDGET = BUDGET * 16
+
     __num_clipped = 0
+
+    @staticmethod
+    def get_num_clipped():
+        return __class__.__num_clipped
 
     @staticmethod
     def clip(num_values):
@@ -663,7 +672,12 @@ class PossibleValues(object):
         # incorrect is ever proven.
         #
         # Each clip gets its own term, so values lost to
-        # different clips never spuriously compare equal.
+        # different clips never spuriously compare equal. A
+        # clipped node's term feeds back into the very merge
+        # that overflowed, so re-evaluations keep clipping;
+        # __update_gate_state pins the node to one per-settling
+        # term, or its state would never compare same and the
+        # settling could not converge.
         # TODO: The names count from process start, so images
         # cached by different runs may reuse a name for a
         # different clipped set; content-derived names would
@@ -675,7 +689,7 @@ class PossibleValues(object):
         return __class__.cast(bools.get(id))
 
     @staticmethod
-    def get(entries):
+    def get(entries, budget=None):
         # Merges equivalent values by uniting their orders and
         # drops values that arise never. Entries are kept sorted
         # by their orders, so equal sets store their entries
@@ -692,6 +706,9 @@ class PossibleValues(object):
         # checked: confirming deadness means solving for every
         # group, or even every condition -- work priced by the
         # very population the budget is here to bound.
+        if budget is None:
+            budget = __class__.BUDGET
+
         session = None
         buckets = {}
         num_groups = 0
@@ -711,7 +728,7 @@ class PossibleValues(object):
                 else:
                     bucket[v.id] = v, [orders]
                     num_groups += 1
-                    if num_groups > __class__.BUDGET:
+                    if num_groups > budget:
                         return __class__.clip(num_groups)
                     continue
             e[1].append(orders)
@@ -777,7 +794,7 @@ class PossibleValues(object):
         return PossibleValues(((x, PartialOrders.ALWAYS),))
 
     @staticmethod
-    def apply(f, *args):
+    def apply(f, *args, budget=None):
         # Applies a function over plain values to every
         # combination of the possible values of the arguments,
         # dropping combinations whose orders are impossible and
@@ -807,7 +824,7 @@ class PossibleValues(object):
                     combos(i + 1, values + (v,), combined)
 
         combos(0, (), PartialOrders.ALWAYS)
-        return __class__.get(results)
+        return __class__.get(results, budget)
 
 
 def test_orders():
@@ -1592,7 +1609,7 @@ class Z80Simulator(object):
         assert pv.is_single, (n, pv)
         return pv.single_value
 
-    def __get_node_preds(self, n, observed):
+    def __get_node_preds(self, n, observed, budget=None):
         def is_const(pv, const):
             return pv.is_single and pv.entries[0][0] is const
 
@@ -1632,7 +1649,8 @@ class Z80Simulator(object):
                         cyclic |= cc
 
                         mp = PossibleValues.apply(
-                            lambda s, q: s & q, state, pp)
+                            lambda s, q: s & q, state, pp,
+                            budget=budget)
                         if is_const(mp, TRUE):
                             p = [PV_TRUE]
                             break
@@ -1643,7 +1661,8 @@ class Z80Simulator(object):
             r = None
             for x in p:
                 r = x if r is None else \
-                    PossibleValues.apply(bools.get_or, r, x)
+                    PossibleValues.apply(bools.get_or, r, x,
+                                         budget=budget)
             p = PossibleValues.apply(bools.get_or) if r is None else r
             assert stack.pop() == n
 
@@ -1679,7 +1698,8 @@ class Z80Simulator(object):
 
         return gnd, pwr, pullup, pulldown
 
-    def get_node_entries(self, n, new_states=None, all_orders=False):
+    def get_node_entries(self, n, new_states=None, all_orders=False,
+                         budget=None):
         # The full state of node n: the set of its possible
         # values, each with the partial orders of updates under
         # which the evaluation arrives at it -- a sole value
@@ -1692,7 +1712,8 @@ class Z80Simulator(object):
                                   all_orders=all_orders,
                                   sweep_no=self.sweep_no,
                                   raced=self.__raced_pairs)
-        gnd, pwr, pullup, pulldown = self.__get_node_preds(n, observed)
+        gnd, pwr, pullup, pulldown = self.__get_node_preds(
+            n, observed, budget=budget)
 
         if len(n.gate_of) == 0:
             floating = PossibleValues.cast(
@@ -1701,16 +1722,36 @@ class Z80Simulator(object):
             floating = observed.observe_floating(n)
         pull = PossibleValues.apply(
             lambda pd, pu, f: bools.ifelse(pd | pu, ~pd, f),
-            pulldown, pullup, floating)
+            pulldown, pullup, floating, budget=budget)
         return PossibleValues.apply(
             lambda g, p, pl: bools.ifelse(g | p, ~g, pl),
-            gnd, pwr, pull)
+            gnd, pwr, pull, budget=budget)
 
     def __update_gate_state(self, n, new_states, all_orders):
         assert not n.is_gnd_or_pwr
 
         old_state = new_states.get(n, n.gate_of[0].state)
-        new_state = self.get_node_entries(n, new_states, all_orders)
+
+        # A node whose evaluation clipped is pinned for the rest
+        # of the settling -- a changing stand-in would feed back
+        # into the very merge that overflowed and the settling
+        # could never converge. The stand-in is the node's
+        # settling-start state: it is exactly what the hold path
+        # of a feedback loop means, so loop members pinned this
+        # way evaluate to properly anchored values at the
+        # fixpoint, where every pin must then be verified -- a
+        # stand-in the settled evaluation does not confirm is
+        # replaced, an overflowing one by an opaque term.
+        new_state = self.__clipped_nodes.get(n)
+        if new_state is None:
+            num_clipped = PossibleValues.get_num_clipped()
+            new_state = self.get_node_entries(n, new_states, all_orders)
+            if PossibleValues.get_num_clipped() != num_clipped:
+                new_state = self.__settle_start_states.get(
+                    n, n.gate_of[0].state)
+                Status.print(f'{n} pinned to its settling-start state '
+                             f'at {Status.get_context()}')
+                self.__clipped_nodes[n] = new_state
 
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
@@ -1731,6 +1772,9 @@ class Z80Simulator(object):
         # order question.
         self.sweep_no += 1
         self.__raced_pairs = set()
+        self.__clipped_nodes = {}
+        self.__settle_start_states = {}
+        self.__num_unpin_waves = 0
 
         groups = []
         for n in nodes:
@@ -1739,8 +1783,77 @@ class Z80Simulator(object):
                 groups.append(n.group)
         del nodes
 
+        # A pin holds the node at its settling-start state while
+        # the settling converges, and the fixpoint must then
+        # verify every pin: the settled evaluation, run at a
+        # generous budget, either confirms the stand-in (the
+        # node genuinely held), or replaces it with the true
+        # settled value, or overflows even at that budget --
+        # then the value is genuinely lost, and an opaque term
+        # must take the node, since leaving the start value in
+        # place could certify falsely. Waves repeat at every
+        # fixpoint: a loop member evaluates properly only after
+        # its neighbours' pins resolve. The wave cap bounds the
+        # ping-pong of a loop that keeps resolving and
+        # re-pinning.
+        def try_unpinning():
+            self.__num_unpin_waves += 1
+            if self.__num_unpin_waves > 30:
+                # Past the cap the remaining stand-ins must not
+                # stay: an unverified start value could certify
+                # falsely. The opaque terms take the nodes.
+                for n, pinned in self.__clipped_nodes.items():
+                    id = f'clipped.{self.sweep_no}.{n.index}'
+                    state = PossibleValues.cast(bools.get(id))
+                    if PossibleValues.is_same(state, pinned):
+                        continue
+                    self.__clipped_nodes[n] = state
+                    Status.print(f'{id} <- the state of {n} '
+                                 f'at {Status.get_context()}')
+                    for t in n.gate_of:
+                        t.state = state
+                        if t.conns_group not in groups:
+                            groups.append(t.conns_group)
+                return bool(groups)
+            for n in list(self.__clipped_nodes):
+                with Status.do(f'verify pin {n}'):
+                    num_clipped = PossibleValues.get_num_clipped()
+                    state = self.get_node_entries(
+                        n, all_orders=all_orders,
+                        budget=PossibleValues.UNPIN_BUDGET)
+                    if PossibleValues.get_num_clipped() != num_clipped:
+                        # The value is lost for good.
+                        id = f'clipped.{self.sweep_no}.{n.index}'
+                        state = PossibleValues.cast(bools.get(id))
+                        if PossibleValues.is_same(
+                                state, self.__clipped_nodes[n]):
+                            continue
+                        self.__clipped_nodes[n] = state
+                        Status.print(f'{id} <- the state of {n} '
+                                     f'at {Status.get_context()}')
+                    elif PossibleValues.is_same(
+                            state, self.__clipped_nodes[n]):
+                        # The stand-in verified: the node held.
+                        del self.__clipped_nodes[n]
+                        Status.print(f'pin of {n} verified '
+                                     f'at {Status.get_context()}')
+                        continue
+                    else:
+                        del self.__clipped_nodes[n]
+                        values = '; '.join(
+                            str(v)[:60] for v, _ in state.entries[:2])
+                        Status.print(
+                            f'pin of {n} resolved '
+                            f'({len(state.entries)} values: {values}) '
+                            f'at {Status.get_context()}')
+                    for t in n.gate_of:
+                        t.state = state
+                        if t.conns_group not in groups:
+                            groups.append(t.conns_group)
+            return bool(groups)
+
         round = 0
-        while groups:
+        while groups or try_unpinning():
             round += 1
             assert round < 100, 'Loop encountered!'
             with Status.do(f'round {round}'):
@@ -1764,9 +1877,14 @@ class Z80Simulator(object):
                                 repeat |= self.__update_gate_state(
                                     n, new_states, all_orders)
 
-                # Apply new states.
+                # Apply new states, keeping each node's state
+                # from before the settling first touched it --
+                # the value the hold path of a feedback loop
+                # refers to, and so the stand-in for pinning.
                 groups = []
                 for n, state in new_states.items():
+                    if n not in self.__settle_start_states:
+                        self.__settle_start_states[n] = n.gate_of[0].state
                     for t in n.gate_of:
                         t.state = state
                         if t.conns_group not in groups:
@@ -1864,6 +1982,19 @@ class Z80Simulator(object):
         # The competing pairs whose order questions the current
         # settling has already asked.
         self.__raced_pairs = set()
+
+        # The nodes the current settling has clipped, each
+        # pinned to its stand-in for the settling.
+        self.__clipped_nodes = {}
+
+        # The state each node had before the current settling
+        # first touched it -- the pinning stand-in.
+        self.__settle_start_states = {}
+
+        # Pin-verification waves already run in the current
+        # settling; the cap bounds the resolve-and-re-pin
+        # ping-pong a feedback loop can sustain.
+        self.__num_unpin_waves = 0
 
         self.__restore_nodes_from_image(node_names, nodes, node_storage)
         self.__restore_transistors_from_image(trans_storage, trans)
@@ -2286,14 +2417,19 @@ class State(object):
     # settlings, present in the step only when tracking -- the
     # step list remains the complete description of the
     # computation, and cache keys, being hashes of step lists,
-    # come out mode-specific automatically. The parameter's
-    # value is the clipping budget: it bounds what the settled
-    # states hold, so states computed under different budgets
-    # must never share a cache entry.
+    # come out mode-specific automatically. The parameters'
+    # values are the clipping budget, which bounds what the
+    # settled states hold, and the all-orders simulation
+    # version, bumped whenever the simulation changes what a
+    # settled state contains -- states computed under different
+    # budgets or semantics must never share a cache entry.
+    # Plain images are unaffected by either.
+    ALL_ORDERS_VERSION = 7
+
     def update_pin(self, pin, all_orders=False):
         step = ('update_pin', pin)
         if all_orders:
-            step += PossibleValues.BUDGET,
+            step += PossibleValues.BUDGET, self.ALL_ORDERS_VERSION
         self.__add_step(step)
 
     def set_pin_and_update(self, pin, pull, all_orders=False):
@@ -2328,7 +2464,7 @@ class State(object):
         else:
             step = ('conditional_half_tick', cond)
         if all_orders:
-            step += PossibleValues.BUDGET,
+            step += PossibleValues.BUDGET, self.ALL_ORDERS_VERSION
         self.__add_step(step)
 
     def tick(self):
