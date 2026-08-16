@@ -183,6 +183,10 @@ class Status(object):
             __class__.__emit(line)
 
     @staticmethod
+    def get_context():
+        return ', '.join(p for p in __class__.__parts if p)
+
+    @staticmethod
     def enter(s):
         __class__.__parts.append(s)
         __class__.__update()
@@ -666,7 +670,8 @@ class PossibleValues(object):
         # remove the caveat.
         __class__.__num_clipped += 1
         id = f'clipped{__class__.__num_clipped}'
-        Status.print(f'{id} <- {num_values} possible values')
+        Status.print(f'{id} <- {num_values} possible values '
+                     f'at {Status.get_context()}')
         return __class__.cast(bools.get(id))
 
     @staticmethod
