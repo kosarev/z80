@@ -3118,6 +3118,21 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 wz = Bits.ifelse((get_bc() != 1) & (a != s),
                                  get_pc_plus(1), wz)
             return check(wz[i])
+        if instr in ('ini/ind', 'inir/indr', 'outi/outd', 'otir/otdr'):
+            if instr in ('ini/ind', 'inir/indr'):
+                # The in forms take BC before decrementing B;
+                # the out forms after.
+                bc = Bits.concat(get_b(), get_c())
+                is_dec = phased_bool('is_ind')
+            else:
+                bc = Bits.concat((get_b() - 1).truncated(8), get_c())
+                is_dec = phased_bool('is_outd')
+            wz = Bits.ifelse(is_dec, bc - 1, bc + 1)
+            if instr in ('inir/indr', 'otir/otdr'):
+                # A repeating instruction takes the address of
+                # the second opcode byte instead.
+                wz = Bits.ifelse(get_b() != 1, get_pc_plus(1), wz)
+            return check(wz[i])
         if instr == 'ld hl, (nn)/ld (nn), hl':
             wz = Bits.concat(Bits(phased('r2'), width=8),
                              Bits(phased('r1'), width=8)) + 1
@@ -3396,6 +3411,69 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 x = bools.ifelse((get_bc() != 1) & (a != s),
                                  pc[11] if n in XFF else pc[13], x)
             return check(x)
+
+    if instr in ('ini/ind', 'inir/indr', 'outi/outd', 'otir/otdr'):
+        # One iteration's effect: a repeating variant re-runs
+        # itself through PC, so the per-instruction semantics
+        # are the non-repeating form's, adjusted where noted.
+        is_in = instr in ('ini/ind', 'inir/indr')
+        repeats = instr in ('inir/indr', 'otir/otdr')
+        is_dec = phased_bool('is_ind' if is_in else 'is_outd')
+        data = Bits(phased('io' if is_in else 'r'), width=8)
+        b1 = (get_b() - 1).truncated(8)
+        # The in forms add the transferred byte to C stepped in
+        # the direction the address goes; the out forms add it
+        # to the updated L.
+        s = get_c() if is_in else get_l()
+        k = data + Bits.ifelse(is_dec, (s - 1).truncated(8),
+                               (s + 1).truncated(8))
+        if n in NFF:
+            return check(data[7])
+        if n in CFF:
+            return check(k[8])
+        if n in HFF:
+            x = k[8]
+            if repeats:
+                # A repeating iteration instead reports whether
+                # the carry propagates through the low nibble of
+                # the decremented B, stepped down or up by where
+                # bit 7 of the data byte points.
+                x = bools.ifelse(
+                    get_b() != 1,
+                    k[8] & (b1.truncated(4) ==
+                            Bits.ifelse(data[7], 0x0, 0xf)),
+                    x)
+            return check(x)
+        if n in PFF:
+            x = (k.truncated(3).zero_extended(8) ^ b1).parity()
+            if repeats:
+                # A repeating iteration flips PF by the odd
+                # parity of the low three bits of the
+                # decremented B, on carry stepped down or up by
+                # where bit 7 of the data byte points.
+                t = Bits.ifelse(
+                    k[8],
+                    Bits.ifelse(data[7],
+                                (b1 - 1).truncated(8),
+                                (b1 + 1).truncated(8)),
+                    b1)
+                x = bools.ifelse(get_b() != 1,
+                                 x ^ ~t.truncated(3).parity(), x)
+            return check(x)
+        if n in XFF + YFF:
+            x = b1[3] if n in XFF else b1[5]
+            if repeats:
+                # A repeating iteration takes the two flags from
+                # the address it re-executes from instead: XF
+                # from bit 11 and YF from bit 13 of PC.
+                pc = get_pc_plus(0)
+                x = bools.ifelse(get_b() != 1,
+                                 pc[11] if n in XFF else pc[13], x)
+            return check(x)
+        if n in ZFF:
+            return check(b1 == 0x00)
+        if n in SFF:
+            return check(b1[7])
 
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
@@ -4195,6 +4273,19 @@ class TestedInstrs(object):
         yield 'cpir/cpdr', (
             f(0xed), f(ifelse('is_cpd', 0xb9, 0xb1)), r3(), e5(),
             e5('e2', cond='bc != 1 && a != r'))
+        yield 'ini/ind', (
+            f(0xed), f5(ifelse('is_ind', 0xaa, 0xa2)), io4(), w3())
+        # The repeat cycle runs only when the decremented B is
+        # not zero, that is, when B was not 1 -- one symbolic
+        # run covers both branches for all B values.
+        yield 'inir/indr', (
+            f(0xed), f5(ifelse('is_ind', 0xba, 0xb2)), io4(), w3(),
+            e5(cond='b != 1'))
+        yield 'outi/outd', (
+            f(0xed), f5(ifelse('is_outd', 0xab, 0xa3)), r3(), io4())
+        yield 'otir/otdr', (
+            f(0xed), f5(ifelse('is_outd', 0xbb, 0xb3)), r3(), io4(),
+            e5(cond='b != 1'))
         yield 'in r, (c)', (
             f(0xed), f(xyz(1, 'y', 0)), io4())
         yield 'out (c), r', (
