@@ -561,6 +561,15 @@ class PartialOrders(object):
             return self
         return __class__.get(self.e | other.e)
 
+    @staticmethod
+    def unite_all(orders):
+        # The value arises whenever any of the conditions hold.
+        # A single n-ary union: uniting a long run of conditions
+        # pairwise would rebuild the growing expression on every
+        # step.
+        unique = {id(o): o for o in orders}.values()
+        return __class__.get(bools.get_or(*(o.e for o in unique)))
+
     def combine(self, other):
         # The value arises whenever both conditions hold.
         if self is other:
@@ -600,17 +609,49 @@ class PossibleValues(object):
         # Merges equivalent values by uniting their orders and
         # drops values that arise never. Entries are kept sorted
         # by their orders, so equal sets store their entries
-        # identically.
-        merged = []
+        # identically. Redundant combinations mostly produce
+        # literally the same hash-consed value, merged here by
+        # identity; only distinct values sharing a fingerprint
+        # digest need equivalence checks, and those go through
+        # one equivalence session -- the entries are variations
+        # over a shared structure, which the session tells apart
+        # having seen it once. Every merged value's conditions
+        # unite in a single n-ary union at the end.
+        session = None
+        buckets = {}
         for v, orders in entries:
             if orders.obviously_never:
                 continue
-            for i, (u, uorders) in enumerate(merged):
-                if bools.is_equiv(u, v):
-                    merged[i] = u, uorders.unite(orders)
-                    break
-            else:
-                merged.append((v, orders))
+            bucket = buckets.setdefault(v.fp, {})
+            e = bucket.get(v.id)
+            if e is None:
+                for u_e in bucket.values():
+                    if session is None:
+                        session = eqbool.EquivSession(bools)
+                    if session.is_equiv(u_e[0], v):
+                        e = bucket[v.id] = u_e
+                        break
+                else:
+                    bucket[v.id] = v, [orders]
+                    continue
+            e[1].append(orders)
+
+        groups = [e for bucket in buckets.values()
+                  for e in {id(entry): entry
+                            for entry in bucket.values()}.values()]
+
+        # A sole possible value holds under every possible
+        # execution and sheds its orders -- including the union
+        # of the ways of arriving at it, which for heavily
+        # redundant merges is the bulk of the work.
+        if len(groups) == 1:
+            return PossibleValues(((groups[0][0], PartialOrders.ALWAYS),))
+
+        merged = []
+        for v, orders_list in groups:
+            orders = (orders_list[0] if len(orders_list) == 1
+                      else PartialOrders.unite_all(orders_list))
+            merged.append((v, orders))
 
         # Values whose orders cannot hold once transitivity is
         # taken into account arise never.
@@ -639,8 +680,9 @@ class PossibleValues(object):
                 return False
             remaining = list(b.entries)
             for av, ao in a.entries:
+                fp = av.fp
                 for i, (bv, bo) in enumerate(remaining):
-                    if bools.is_equiv(av, bv) and ao.same(bo):
+                    if fp == bv.fp and bools.is_equiv(av, bv) and ao.same(bo):
                         del remaining[i]
                         break
                 else:
