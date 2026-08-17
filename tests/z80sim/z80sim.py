@@ -3608,7 +3608,11 @@ def verbalise_state_value(v):
     return lines
 
 
-def check_sampled_states(what, states, get_expected):
+def check_sampled_states(what, states, get_expected, under=None):
+    # With an under condition given, expected values need only
+    # hold where the condition does: the check is that no
+    # assignment satisfies the condition yet tells the values
+    # apart.
     def fail(n, lines):
         Status.clear()
         report = ['', f'FAILED: {what} {n}'] + lines
@@ -3626,7 +3630,11 @@ def check_sampled_states(what, states, get_expected):
     for n in sorted(states):
         expected = get_single(n, get_expected(n))
         actual = get_single(n, states[n])
-        if bools.is_equiv(actual, expected):
+        if under is None:
+            ok = bools.is_equiv(actual, expected)
+        else:
+            ok = bools.is_equiv(under & (actual ^ expected), FALSE)
+        if ok:
             continue
         with Status.do('verbalise'):
             fail(n, ['  expected:'] + verbalise_state_value(expected) +
@@ -3744,6 +3752,44 @@ def test_nmi_from_halt(base_state, all_orders=False):
         return s2[n]
 
     check_sampled_states('nmi from halt', after, get_expected)
+
+
+def test_masked_int_in_halt(base_state, all_orders=False):
+    # An active ~int must not end the halted state while
+    # interrupts are disabled. IFF1 in the halted state is the
+    # symbolised interrupt-enable choice, so the settled result
+    # covers both branches at once: where IFF1 is clear the
+    # steady state must persist exactly as without ~int,
+    # byte-independence included -- the checks are conditioned
+    # on that; where IFF1 is set the state proceeds into the
+    # acceptance, which its own test will cover.
+    s = State(base_state)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    with Status.do('halted M1 before ~int'):
+        s1 = run_halted_m1(s, 'mi1', all_orders)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    with Status.do('halted M1 with ~int 1'):
+        s2 = run_halted_m1(s, 'mi2', all_orders)
+    with Status.do('halted M1 with ~int 2'):
+        s3 = run_halted_m1(s, 'mi3', all_orders)
+
+    r_lo = (sampled_bits(s2, 'reg_r', width=7) + 1).truncated(7)
+    # The enable state as of before ~int went active: at the
+    # sample right after, the accepting branch has already
+    # cleared IFF1.
+    masked = ~PossibleValues.cast(s1[IFF1]).single_value
+
+    def get_expected(n):
+        if n == '~halt':
+            return FALSE
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return Bits('mi3', width=8)[int(n[-1])]
+        return s2[n]
+
+    check_sampled_states('masked ~int in halt', s3, get_expected,
+                         under=masked)
 
 
 def get_cond_as_expr(cond, phase, before):
@@ -4121,6 +4167,7 @@ def test_instr_seq(seq, all_orders=False):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
                 test_nmi_from_halt(halted, all_orders)
+                test_masked_int_in_halt(halted, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
