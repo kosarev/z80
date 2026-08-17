@@ -26,45 +26,6 @@ at once. A pass then means every node ends up as its expected
 value under every order — or, for the racing nodes, that the
 possible outcomes are exactly the expected set.
 
-## Findings
-
-- The XF and YF flags after `scf`/`ccf` are not merely
-  undocumented but not fully implemented: the circuit does not
-  produce a definite value for them. Each of the two bits,
-  independently, ends up as one of A, F, A | F or A & F — the
-  last not predicted by any known model of the flags — and
-  which one wins is a race. Which chip you have, how warm it is
-  and what instruction ran before merely shift the odds. See
-  <https://github.com/kosarev/z80/issues/51>.
-
-- The undocumented flag behaviour of the block instructions
-  (`ldi`/`ldd`, `cpi`/`cpd`, `ini`/`ind`, `outi`/`outd` and
-  their repeating forms) is deterministic: the circuit
-  produces the same values no matter which of its gates react
-  first — there is no race like the `scf`/`ccf` one above.
-  Testing real chips could not have settled this: a test
-  program can record the values its chip produces, but it
-  cannot show that no race exists behind them.
-
-- A halted Z80 is not stopped. That it keeps running fetch
-  cycles, so that memory refresh continues, is well known; the
-  simulation shows the fetches are complete ones: each byte
-  read from the bus is loaded into the internal instruction
-  register, early in the fetch cycle, just as in normal
-  execution — only the execution of what was fetched is
-  suppressed. Being invisible to programs, this was out of
-  reach of test programs on real chips. Also proven: whatever
-  byte those fetches return and however long the CPU stays
-  halted, nothing changes but the refresh register.
-
-- The fetch cycle that starts the acceptance of an interrupt —
-  non-maskable, or maskable in mode 1 — reads its byte from
-  the bus like any other fetch, and the byte lands in the
-  internal instruction register on the same schedule, where it
-  then sits untouched through the whole acceptance sequence.
-  It is only never executed. This, again, is invisible to
-  programs and so beyond what testing real chips could show.
-
 ## Dependencies
 
 - `eqbool` 0.5 or later — the library the symbolic expressions
@@ -89,8 +50,80 @@ has.
 ./z80sim.py --all-orders=<instr>   # report an instruction's
                                    # racing nodes and their
                                    # outcomes
+./z80sim.py --probe-acceptance-latch   # print the instruction
+                                       # register through halted
+                                       # fetches and the ~nmi
+                                       # acceptance, half-tick
+                                       # by half-tick
 ```
 
 When a check fails, the report lists the values the node can
 end up with and the order conditions under which each one
 arises.
+
+## Findings
+
+Each finding names the run it is derived from and covered by,
+so it can be reproduced and traced to the checks in the code.
+
+- The XF and YF flags after `scf`/`ccf` are not merely
+  undocumented but not fully implemented: the circuit does not
+  produce a definite value for them. Each of the two bits,
+  independently, ends up as one of A, F, A | F or A & F — the
+  last not predicted by any known model of the flags — and
+  which one wins is a race. Which chip you have, how warm it is
+  and what instruction ran before merely shift the odds. See
+  <https://github.com/kosarev/z80/issues/51>.
+
+  Covered by the `scf/ccf` sequence of a plain `./z80sim.py`
+  run, which asserts the exact outcome set via `check_set()`;
+  `./z80sim.py --all-orders=scf/ccf` reports the racing nodes,
+  their outcomes and the order conditions each arises under.
+
+- The undocumented flag behaviour of the block instructions
+  (`ldi`/`ldd`, `cpi`/`cpd`, `ini`/`ind`, `outi`/`outd` and
+  their repeating forms) is deterministic: the circuit
+  produces the same values no matter which of its gates react
+  first — there is no race like the `scf`/`ccf` one above.
+  Testing real chips could not have settled this: a test
+  program can record the values its chip produces, but it
+  cannot show that no race exists behind them.
+
+  Covered by the block instruction sequences (`ldi/ldd`,
+  `ldir/lddr`, `cpi/cpd`, `cpir/cpdr`, `ini/ind`, `inir/indr`,
+  `outi/outd`, `otir/otdr`) of a plain `./z80sim.py` run:
+  their flag expectations in `test_node()` are single values,
+  and a pass means no node has any other possible outcome
+  under any order of gate reactions.
+
+- A halted Z80 is not stopped. That it keeps running fetch
+  cycles, so that memory refresh continues, is well known; the
+  simulation shows the fetches are complete ones: each byte
+  read from the bus is loaded into the internal instruction
+  register, early in the fetch cycle, just as in normal
+  execution — only the execution of what was fetched is
+  suppressed. Being invisible to programs, this was out of
+  reach of test programs on real chips. Also proven: whatever
+  byte those fetches return and however long the CPU stays
+  halted, nothing changes but the refresh register.
+
+  Covered by the `halt` sequence of a plain `./z80sim.py` run:
+  `test_halted_dynamics()` feeds a halted fetch a symbolic
+  byte and compares the complete sampled state of consecutive
+  halted cycles. The load timing is shown by
+  `./z80sim.py --probe-acceptance-latch`.
+
+- The fetch cycle that starts the acceptance of an interrupt —
+  non-maskable, or maskable in mode 1 — reads its byte from
+  the bus like any other fetch, and the byte lands in the
+  internal instruction register on the same schedule, where it
+  then sits untouched through the whole acceptance sequence.
+  It is only never executed. This, again, is invisible to
+  programs and so beyond what testing real chips could show.
+
+  Derived with `./z80sim.py --probe-acceptance-latch`, which
+  follows the register half-tick by half-tick from a halted
+  fetch through the ~nmi acceptance and its pushes; the
+  acceptance tests of a plain `./z80sim.py` run
+  (`test_nmi_from_halt()`, `test_int_im1_from_halt()`) assert
+  the states the acceptance leaves behind.
