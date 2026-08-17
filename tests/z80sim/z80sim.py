@@ -80,7 +80,7 @@ IFF1 = 'n181'
 IFF2 = 'n206'
 
 TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
-                EX_DE_FF0, EX_DE_FF1, EX_DE_FF}
+                EX_DE_FF0, EX_DE_FF1, EX_DE_FF, '~halt'}
 for i in range(8):
     for r in 'af':
         TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
@@ -2819,7 +2819,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         return Bits(before[f'{id}{i}'] for i in range(8))
 
     def is_active(n):
-        if n in (IFF1, IFF2, EX_AF_FF, EXX_FF, EX_DE_FF):
+        if n in (IFF1, IFF2, EX_AF_FF, EXX_FF, EX_DE_FF, '~halt'):
             return TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
             exx = before[EXX_FF]
@@ -3561,6 +3561,10 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 bools.ifelse(op == ROT, rot_r[i],
                              bools.ifelse(op == RES, res_r[i], set_r[i]))))
 
+    if n == '~halt':
+        # The pin is active low; only halt asserts it.
+        return check(FALSE if instr == 'halt' else before[n])
+
     # Test instruction latch nodes.
     if n.startswith('instr'):
         i = int(n[-1])
@@ -4179,10 +4183,8 @@ class TestedInstrs(object):
         yield 'ld (hl), {b, c, d, e, h, l, a}', (
             f(xyz(1, AT_HL, get_non_at_hl_r('regs'))), w3())
 
-        ''' TODO
         yield 'halt', (
             f(xyz(1, AT_HL, AT_HL)),)
-        '''
 
         yield 'ld {b, c, d, e, h, l, a}, n', (
             f(xyz(0, get_non_at_hl_r(), 6)), r3())
