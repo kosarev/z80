@@ -4228,6 +4228,45 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def test_reset_from_halt(base_state, all_orders=False):
+    # ~reset ends the halted state. Afterwards the CPU fetches
+    # from address 0 with interrupts disabled and the refresh
+    # counter restarted -- and everything else survives: the
+    # register file, the flags, their shadows, the exchange
+    # flip-flops and WZ keep their symbolic values through the
+    # reset.
+    s = State(base_state)
+    with Status.do('halted M1'):
+        s2 = run_halted_m1(s, 'rh1', all_orders)
+    with Status.do('reset'):
+        s.reset(propagation_delay=31, waiting_for_m1_delay=5)
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    def get_expected(n):
+        if n == '~halt':
+            # The halted state ends.
+            return TRUE
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pc') or n.startswith('reg_i'):
+            # The settling nop fetches from address 0, and a
+            # sampled pc reads advanced by one; I restarts at
+            # zero.
+            return TRUE if n == 'reg_pcl0' else FALSE
+        if n.startswith('reg_r'):
+            # R restarts at zero; the sampling nop's increment
+            # lands within the sampled ticks.
+            return TRUE if n == 'reg_r0' else FALSE
+        if n.startswith('instr'):
+            # The settling nop's byte, loaded by the sample
+            # point.
+            return FALSE
+        return s2[n]
+
+    check_sampled_states('reset from halt', after, get_expected)
+
+
 def get_cond_as_expr(cond, phase, before):
     if cond is None:
         return None
@@ -4607,6 +4646,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_int_im1_from_halt(state, all_orders)
                 test_int_im2_from_halt(state, all_orders)
                 test_int_im0_from_halt(state, all_orders)
+                test_reset_from_halt(halted, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
