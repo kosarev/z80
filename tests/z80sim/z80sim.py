@@ -3597,6 +3597,56 @@ def get_effective_states(s, nodes=None, all_orders=False):
     return s.get_node_states(nodes)
 
 
+def verbalise_state_value(v):
+    v = PossibleValues.cast(v)
+    if v.is_single:
+        return [f'    {get_z3_simplified(v.single_value)}']
+    lines = [f'    {len(v.entries)} possible values']
+    for no, (val, os) in enumerate(v.entries):
+        lines.append(f'      {no}) {get_z3_simplified(val)}')
+        lines.append(f'         under {get_z3_simplified(os.e)}')
+    return lines
+
+
+def check_sampled_states(what, states, get_expected):
+    def fail(n, lines):
+        Status.clear()
+        report = ['', f'FAILED: {what} {n}'] + lines
+        print('\n'.join(report), file=sys.stderr, flush=True)
+        raise TestFailure()
+
+    def get_single(n, v):
+        pv = PossibleValues.cast(v)
+        if not pv.is_single:
+            with Status.do('verbalise'):
+                fail(n, ['  not a single value:'] +
+                     verbalise_state_value(v))
+        return pv.single_value
+
+    for n in sorted(states):
+        expected = get_single(n, get_expected(n))
+        actual = get_single(n, states[n])
+        if bools.is_equiv(actual, expected):
+            continue
+        with Status.do('verbalise'):
+            fail(n, ['  expected:'] + verbalise_state_value(expected) +
+                 ['  actual:'] + verbalise_state_value(actual))
+
+
+def sampled_bits(states, prefix, width=8):
+    return Bits(states[f'{prefix}{i}'] for i in range(width))
+
+
+def run_halted_m1(s, db, all_orders):
+    s.set_db(db, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            with s.status(f'halted tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    return s.get_node_states(SAMPLED_NODES)
+
+
 def test_halted_dynamics(base_state, all_orders=False):
     # The halted steady state: an M1 cycle with a symbolic byte
     # on the bus preserves the whole sampled state, certifying
@@ -3606,66 +3656,94 @@ def test_halted_dynamics(base_state, all_orders=False):
     # the entry transient; the second is compared against the
     # first, so the equality is the induction step for halted
     # runs of any length.
-    def fail(n, lines):
-        Status.clear()
-        report = ['', f'FAILED: halt dynamics {n}'] + lines
-        print('\n'.join(report), file=sys.stderr, flush=True)
-        raise TestFailure()
-
-    def verbalise_value(v):
-        v = PossibleValues.cast(v)
-        if v.is_single:
-            return [f'    {get_z3_simplified(v.single_value)}']
-        lines = [f'    {len(v.entries)} possible values']
-        for no, (val, os) in enumerate(v.entries):
-            lines.append(f'      {no}) {get_z3_simplified(val)}')
-            lines.append(f'         under {get_z3_simplified(os.e)}')
-        return lines
-
-    def get_single(n, v):
-        pv = PossibleValues.cast(v)
-        if not pv.is_single:
-            with Status.do('verbalise'):
-                fail(n, ['  not a single value:'] + verbalise_value(v))
-        return pv.single_value
-
-    def run_halted_m1(s, db):
-        s.set_db(db, all_orders)
-        for t in range(4):
-            for ht in (0, 1):
-                with s.status(f'halted tick {t}.{ht}'):
-                    s.half_tick(all_orders=all_orders)
-        s.cache()
-        return s.get_node_states(SAMPLED_NODES)
-
     s = State(base_state)
     with Status.do('halted M1 1'):
-        s1 = run_halted_m1(s, 'hf1')
+        s1 = run_halted_m1(s, 'hf1', all_orders)
     with Status.do('halted M1 2'):
-        s2 = run_halted_m1(s, 'hf2')
+        s2 = run_halted_m1(s, 'hf2', all_orders)
 
-    r_lo = Bits(get_single(f'reg_r{i}', s1[f'reg_r{i}'])
-                for i in range(7))
-    r_lo = (r_lo + 1).truncated(7)
+    r_lo = (sampled_bits(s1, 'reg_r', width=7) + 1).truncated(7)
 
-    for n in sorted(SAMPLED_NODES):
+    def get_expected(n):
         if n == '~halt':
-            expected = FALSE
-        elif n.startswith('reg_r') and n[-1] != '7':
-            expected = r_lo[int(n[-1])]
-        elif n.startswith('instr'):
+            return FALSE
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
             # The instruction latch keeps loading each fetched
             # byte while halted: fetching proceeds; only
             # execution is suppressed.
-            expected = Bits('hf2', width=8)[int(n[-1])]
-        else:
-            expected = get_single(n, s1[n])
-        actual = get_single(n, s2[n])
-        if bools.is_equiv(actual, expected):
-            continue
-        with Status.do('verbalise'):
-            fail(n, ['  expected:'] + verbalise_value(expected) +
-                    ['  actual:'] + verbalise_value(actual))
+            return Bits('hf2', width=8)[int(n[-1])]
+        return s1[n]
+
+    check_sampled_states('halt dynamics', s2, get_expected)
+
+
+def test_nmi_from_halt(base_state, all_orders=False):
+    # ~nmi ends the halted state. The pin first goes definitely
+    # high, then low at the start of a halted M1, well before
+    # the end-of-cycle sampling; the acceptance follows: a
+    # five-tick fetch cycle whose byte, fed symbolic, must be
+    # ignored, then two three-tick pushes of PC. The state is
+    # then sampled through the usual nop settling.
+    s = State(base_state)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    with Status.do('halted M1 before ~nmi'):
+        run_halted_m1(s, 'nh1', all_orders)
+    s.set_pin_and_update('~nmi', FALSE, all_orders)
+    with Status.do('halted M1 with ~nmi'):
+        s2 = run_halted_m1(s, 'nh2', all_orders)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    s.set_db('nf', all_orders)
+    for t in range(5 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'nmi acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(s2, 'reg_sph'),
+                     sampled_bits(s2, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # The acceptance fetch refreshes too, and the sampling
+    # nop's increment lands within the sampled ticks: two
+    # increments past the halted state.
+    r_lo = (sampled_bits(s2, 'reg_r', width=7) + 2).truncated(7)
+    pc = Bits.cast(0x0067, width=16)
+    wz = Bits.cast(0x0066, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            # The halted state ends.
+            return TRUE
+        if n == IFF1:
+            # Accepting ~nmi disables maskable interrupts.
+            return FALSE
+        if n.startswith('reg_pch'):
+            # The nop settling fetches from 0x0066, and a
+            # sampled pc reads advanced by one.
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            # Unlike the halted fetches, the acceptance fetch
+            # does not load its byte: the latch reads back as
+            # if a nop had been fetched.
+            return FALSE
+        return s2[n]
+
+    check_sampled_states('nmi from halt', after, get_expected)
 
 
 def get_cond_as_expr(cond, phase, before):
@@ -4042,6 +4120,7 @@ def test_instr_seq(seq, all_orders=False):
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
+                test_nmi_from_halt(halted, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
