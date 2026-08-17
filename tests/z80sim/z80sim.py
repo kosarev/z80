@@ -3929,6 +3929,97 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def test_int_im2_from_halt(symbolised_state, all_orders=False):
+    # ~int in mode 2 reads the handler address from the vector
+    # table: the acknowledge byte is the vector and the two
+    # table bytes are the address, so all three are symbolic
+    # exactly in the mode-2 branch -- the other branches see
+    # nops. Conditioned on interrupts enabled and mode 2, that
+    # is, on ED5E and its ED7E duplicate at once: the halted
+    # state ends, both interrupt flip-flops come out clear, PC
+    # is pushed, and execution resumes at the address the table
+    # supplied, with WZ loaded to match. The table address
+    # itself is not asserted: there are no address-bus
+    # expectations yet.
+    s = symbolised_state
+    prep = 'im/xim n', 'ei/di', 'nop', 'halt'
+    for i in range(len(prep)):
+        s = process_instr(prep[:i + 1], s, all_orders=all_orders)
+
+    y = Bits('y_p1', width=3)
+    is_im2 = y[1] & y[0]
+    accepts = bools.get('is_ei_p2') & is_im2
+
+    def in_mode_2(id):
+        return Bits.ifelse(is_im2, Bits(id, width=8),
+                           Bits.cast(0x00, width=8))
+
+    s = State(s)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    with Status.do('halted M1 before ~int'):
+        run_halted_m1(s, 'ia1', all_orders)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    with Status.do('halted M1 with ~int'):
+        s2 = run_halted_m1(s, 'ia2', all_orders)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+
+    def run_ticks(what, ticks, db):
+        s.set_db(db, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+
+    run_ticks('im2 acknowledge', 7 + 3 + 3, in_mode_2('iv'))
+    run_ticks('im2 read lo', 3, in_mode_2('ivl'))
+    run_ticks('im2 read hi', 3, in_mode_2('ivh'))
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    handler = Bits.concat(Bits('ivh', width=8),
+                          Bits('ivl', width=8))
+    pc = (handler + 1).truncated(16)
+    sp = Bits.concat(sampled_bits(s2, 'reg_sph'),
+                     sampled_bits(s2, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # The acknowledge cycle refreshes too, and the sampling
+    # nop's increment lands within the sampled ticks.
+    r_lo = (sampled_bits(s2, 'reg_r', width=7) + 2).truncated(7)
+
+    def get_expected(n):
+        if n == '~halt':
+            # The halted state ends.
+            return TRUE
+        if n in (IFF1, IFF2):
+            # A maskable acceptance disables both flip-flops.
+            return FALSE
+        if n.startswith('reg_pch'):
+            # The settling nop fetches from the handler
+            # address, and a sampled pc reads advanced by one.
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return handler[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return handler[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            # The settling nop's byte, loaded by the sample
+            # point.
+            return FALSE
+        return s2[n]
+
+    check_sampled_states('im 2 ~int from halt', after, get_expected,
+                         under=accepts)
+
+
 def get_cond_as_expr(cond, phase, before):
     if cond is None:
         return None
@@ -4306,6 +4397,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_nmi_from_halt(halted, all_orders)
                 test_masked_int_in_halt(halted, all_orders)
                 test_int_im1_from_halt(state, all_orders)
+                test_int_im2_from_halt(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
