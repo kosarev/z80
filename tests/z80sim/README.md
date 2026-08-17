@@ -132,10 +132,13 @@ internal nodes.
 - WZ — the internal pointer register often called MEMPTR —
   survives a `~reset` pulse: it keeps its value while PC, I, R
   and the interrupt flip-flops restart. Documentation commonly
-  assumes reset clears it, but observing WZ on a real chip
-  means executing instructions, and any instruction that could
-  make its bits visible loads it first — so the assumption was
-  never something a test program could check. Also proven
+  assumes reset clears it, but we are not aware of any
+  experimental data on this. An experiment is possible: `bit n, (hl)` copies two bits of W into the
+  XF and YF flags without changing WZ, so code placed at
+  address 0 that runs this right after a reset pulse — which
+  needs hardware control over the memory at the reset vector —
+  would show whether a preloaded value survived. This finding
+  predicts it does. Also proven
   along the way: both banks of the register file and of the
   flags, and the exchange flip-flops, keep their values
   through a reset taken from the halted state.
