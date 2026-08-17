@@ -3792,6 +3792,57 @@ def test_masked_int_in_halt(base_state, all_orders=False):
                          under=masked)
 
 
+def probe_acceptance_latch(all_orders=False):
+    # Reports the instruction latch through the ~nmi acceptance
+    # fetch, half-tick by half-tick: whether the symbolic bus
+    # byte ever reaches the latch before the zero that the
+    # acceptance leaves there -- the write being gated and the
+    # register cleared are different mechanisms with the same
+    # final state, and the sampling times the zeroing.
+    s = build_symbolised_state()
+    s = process_instr(('halt',), s, all_orders=all_orders)
+
+    s = State(s)
+
+    instr_nodes = tuple(f'instr{i}' for i in range(8))
+
+    def sample_ticks(what, ticks):
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+                s.cache()
+                latch = s.get_node_states(instr_nodes)
+                with Status.do('verbalise'):
+                    bits = ', '.join(
+                        '; '.join(verbalise_state_value(latch[n]))
+                        .strip() for n in instr_nodes)
+                Status.print(f'latch after {what} {t}.{ht}: ({bits})')
+
+    # The first halted M1 right after the halt instruction, on
+    # its own branch: the halt entry test sees the halt opcode
+    # still latched three ticks in, so this M1's load timing
+    # is suspect of differing from the steady state's.
+    steady = s
+    s = State(steady)
+    s.set_db('nh0', all_orders)
+    sample_ticks('first halted', 4)
+    s = steady
+
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    with Status.do('halted M1 before ~nmi'):
+        run_halted_m1(s, 'nh1', all_orders)
+    s.set_pin_and_update('~nmi', FALSE, all_orders)
+    s.set_db('nh2', all_orders)
+    sample_ticks('halted', 4)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    s.set_db('nf', all_orders)
+    sample_ticks('acceptance', 5)
+    sample_ticks('push', 3 + 3)
+    s.set_db(0x00, all_orders)
+    sample_ticks('nop', 3)
+
+
 def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ~int ends the halted state where interrupts are enabled
     # and the mode is 1. The preparation sets the mode and the
@@ -4794,6 +4845,12 @@ def main():
 
     if '--identify-state-nodes' in sys.argv:
         identify_state_nodes()
+        return
+
+    if '--probe-acceptance-latch' in sys.argv:
+        probe_acceptance_latch(
+            all_orders='--single-order' not in sys.argv)
+        Status.clear()
         return
 
     all_orders_instr = get_opt('--all-orders', str)
