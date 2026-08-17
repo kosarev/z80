@@ -37,6 +37,26 @@ possible outcomes are exactly the expected set.
   and what instruction ran before merely shift the odds. See
   <https://github.com/kosarev/z80/issues/51>.
 
+- The undocumented flag behaviour of the block instructions
+  (`ldi`/`ldd`, `cpi`/`cpd`, `ini`/`ind`, `outi`/`outd` and
+  their repeating forms) is deterministic: the circuit
+  produces the same values no matter which of its gates react
+  first — there is no race like the `scf`/`ccf` one above.
+  Testing real chips could not have settled this: a test
+  program can record the values its chip produces, but it
+  cannot show that no race exists behind them.
+
+- A halted Z80 is not stopped. That it keeps running fetch
+  cycles, so that memory refresh continues, is well known; the
+  simulation shows the fetches are complete ones: each byte
+  read from the bus is loaded into the internal instruction
+  register, late in the fetch cycle, just as in normal
+  execution — only the execution of what was fetched is
+  suppressed. Being invisible to programs, this was out of
+  reach of test programs on real chips. Also proven: whatever
+  byte those fetches return and however long the CPU stays
+  halted, nothing changes but the refresh register.
+
 ## Dependencies
 
 - `eqbool` 0.5 or later — the library the symbolic expressions
