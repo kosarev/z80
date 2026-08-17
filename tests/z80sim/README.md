@@ -57,10 +57,11 @@ possible outcomes are exactly the expected set.
   byte those fetches return and however long the CPU stays
   halted, nothing changes but the refresh register.
 
-- The fetch cycle that starts the acceptance of a non-maskable
-  interrupt behaves differently: it too reads a byte from the
-  bus, but the internal instruction register ends up holding 0
-  — as if a `nop` had been fetched — whatever that byte was.
+- The fetch cycle that starts the acceptance of an interrupt —
+  non-maskable, or maskable in mode 1 — behaves differently:
+  it too reads a byte from the bus, but the internal
+  instruction register ends up holding 0 — as if a `nop` had
+  been fetched — whatever that byte was.
   The old description of interrupt acceptance as the CPU
   "inserting a NOP" turns out to be literally true at the
   level of the instruction register. This, again, is invisible
