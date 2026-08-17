@@ -55,6 +55,12 @@ has.
                                        # fetches and the ~nmi
                                        # acceptance, half-tick
                                        # by half-tick
+./z80sim.py --probe-bus-templates --single-order
+                                   # print the address bus and
+                                   # the control pins through
+                                   # representative machine
+                                   # cycles, half-tick by
+                                   # half-tick
 ```
 
 When a check fails, the report lists the values the node can
@@ -67,11 +73,13 @@ Each finding names the run it is derived from and covered by,
 so it can be reproduced and traced to the checks in the code.
 
 Where a finding says that a state is preserved or that nothing
-else changes, the state in question is the sampled one: the
-whole register file including the shadow registers, PC, SP, I
-and R, the flags of both banks, the interrupt and exchange
-flip-flops, the internal instruction register and the `~halt`
-pin. Claims do not extend to the rest of the circuit's
+else changes, the state in question is the sampled one: both
+banks of the register file and of the flags (the alternate
+bank is what programmers know as BC', DE', HL' and AF'; on
+the die it is simply a second bank, with flip-flops selecting
+which one is in use), PC, SP, I and R, the interrupt and
+exchange flip-flops, the internal instruction register and
+the `~halt` pin. Claims do not extend to the rest of the circuit's
 internal nodes.
 
 - The XF and YF flags after `scf`/`ccf` are not merely
@@ -120,6 +128,20 @@ internal nodes.
   byte and compares the complete sampled state of consecutive
   halted cycles. The load timing is shown by
   `./z80sim.py --probe-acceptance-latch`.
+
+- WZ — the internal pointer register often called MEMPTR —
+  survives a `~reset` pulse: it keeps its value while PC, I, R
+  and the interrupt flip-flops restart. Documentation commonly
+  assumes reset clears it, but observing WZ on a real chip
+  means executing instructions, and any instruction that could
+  make its bits visible loads it first — so the assumption was
+  never something a test program could check. Also proven
+  along the way: both banks of the register file and of the
+  flags, and the exchange flip-flops, keep their values
+  through a reset taken from the halted state.
+
+  Covered by `test_reset_from_halt()` of a plain `./z80sim.py`
+  run.
 
 - The fetch cycle that starts the acceptance of an interrupt —
   non-maskable, or maskable in mode 1 — reads its byte from
