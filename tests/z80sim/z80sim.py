@@ -88,6 +88,13 @@ for i in range(8):
         TESTED_NODES.add(f'reg_{r}{i}')
     TESTED_NODES.add(f'instr{i}')
 
+SAMPLED_NODES = set(TESTED_NODES)
+for i in range(8):
+    for r in 'bcdehl':
+        SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
+    for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
+        SAMPLED_NODES.add(f'reg_{r}{i}')
+
 
 def get_opt(id, type):
     for a in sys.argv:
@@ -3590,6 +3597,77 @@ def get_effective_states(s, nodes=None, all_orders=False):
     return s.get_node_states(nodes)
 
 
+def test_halted_dynamics(base_state, all_orders=False):
+    # The halted steady state: an M1 cycle with a symbolic byte
+    # on the bus preserves the whole sampled state, certifying
+    # fetch-without-execute for every possible opcode at once;
+    # only the refresh register's low seven bits advance, as
+    # refresh continues while halted. The first cycle clears
+    # the entry transient; the second is compared against the
+    # first, so the equality is the induction step for halted
+    # runs of any length.
+    def fail(n, lines):
+        Status.clear()
+        report = ['', f'FAILED: halt dynamics {n}'] + lines
+        print('\n'.join(report), file=sys.stderr, flush=True)
+        raise TestFailure()
+
+    def verbalise_value(v):
+        v = PossibleValues.cast(v)
+        if v.is_single:
+            return [f'    {get_z3_simplified(v.single_value)}']
+        lines = [f'    {len(v.entries)} possible values']
+        for no, (val, os) in enumerate(v.entries):
+            lines.append(f'      {no}) {get_z3_simplified(val)}')
+            lines.append(f'         under {get_z3_simplified(os.e)}')
+        return lines
+
+    def get_single(n, v):
+        pv = PossibleValues.cast(v)
+        if not pv.is_single:
+            with Status.do('verbalise'):
+                fail(n, ['  not a single value:'] + verbalise_value(v))
+        return pv.single_value
+
+    def run_halted_m1(s, db):
+        s.set_db(db, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'halted tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache()
+        return s.get_node_states(SAMPLED_NODES)
+
+    s = State(base_state)
+    with Status.do('halted M1 1'):
+        s1 = run_halted_m1(s, 'hf1')
+    with Status.do('halted M1 2'):
+        s2 = run_halted_m1(s, 'hf2')
+
+    r_lo = Bits(get_single(f'reg_r{i}', s1[f'reg_r{i}'])
+                for i in range(7))
+    r_lo = (r_lo + 1).truncated(7)
+
+    for n in sorted(SAMPLED_NODES):
+        if n == '~halt':
+            expected = FALSE
+        elif n.startswith('reg_r') and n[-1] != '7':
+            expected = r_lo[int(n[-1])]
+        elif n.startswith('instr'):
+            # The instruction latch keeps loading each fetched
+            # byte while halted: fetching proceeds; only
+            # execution is suppressed.
+            expected = Bits('hf2', width=8)[int(n[-1])]
+        else:
+            expected = get_single(n, s1[n])
+        actual = get_single(n, s2[n])
+        if bools.is_equiv(actual, expected):
+            continue
+        with Status.do('verbalise'):
+            fail(n, ['  expected:'] + verbalise_value(expected) +
+                    ['  actual:'] + verbalise_value(actual))
+
+
 def get_cond_as_expr(cond, phase, before):
     if cond is None:
         return None
@@ -3665,13 +3743,6 @@ def execute_instr(s, id, phase, before, all_orders=False):
 
 
 def process_instr(instrs, base_state, *, test=False, all_orders=False):
-    SAMPLED_NODES = set(TESTED_NODES)
-    for i in range(8):
-        for r in 'bcdehl':
-            SAMPLED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
-        for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
-            SAMPLED_NODES.add(f'reg_{r}{i}')
-
     phase = len(instrs)
     id = instrs[-1]
 
@@ -3968,6 +4039,9 @@ def test_instr_seq(seq, all_orders=False):
             for i in range(len(seq) - 1):
                 state = process_instr(seq[:i + 1], state)
             process_instr(seq, state, test=True, all_orders=all_orders)
+            if seq == ('halt',):
+                halted = process_instr(seq, state, all_orders=all_orders)
+                test_halted_dynamics(halted, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
