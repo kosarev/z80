@@ -4228,6 +4228,120 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
+                     ack_db, all_orders):
+    # The shared shape of the two sharp edges: ei and halt
+    # execute with ~int active -- from before ei when the
+    # pending flag is set, otherwise from the start of the halt
+    # M1 itself. Either way the halted state is never entered:
+    # ~halt stays high throughout, the acceptance follows the
+    # halt M1 directly, and the pushed return address resumes
+    # past the halt. The interrupt mode stays symbolic; the
+    # acceptance is checked in its mode-1 branch.
+    s = process_instr(('im/xim n',), symbolised_state,
+                      all_orders=all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    s = State(s)
+
+    def run_m1(db, ticks=4, sample_halt=False):
+        s.set_db(db, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+                if sample_halt:
+                    s.cache()
+                    check_sampled_states(
+                        f'{what} ~halt at {t}.{ht}',
+                        s.get_node_states(('~halt',)),
+                        lambda n: TRUE)
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    if int_pending_over_ei:
+        run_m1(0x00)
+        s.set_pin_and_update('~int', FALSE, all_orders)
+        run_m1(0xfb)  # ei
+    else:
+        run_m1(0xfb)  # ei
+        run_m1(0x00)
+        s.set_pin_and_update('~int', FALSE, all_orders)
+    run_m1(0x76, sample_halt=True)  # halt
+    s.cache()
+
+    y = Bits('y_p1', width=1 + 2)
+    accepts = y[1] & ~y[0]
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    s.set_db(Bits.ifelse(accepts, Bits(ack_db, width=8),
+                         Bits.cast(0x00, width=8)), all_orders)
+    for t in range(7 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'{what} acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+            if t < 3:
+                s.cache()
+                check_sampled_states(
+                    f'{what} ~halt at ack {t}.{ht}',
+                    s.get_node_states(('~halt',)),
+                    lambda n: TRUE)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Five fetch cycles past the baseline refresh: the nop, ei
+    # and halt M1s, the acknowledge, and the sampling nop's
+    # increment landing within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 5).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return base[n]
+
+    check_sampled_states(what, after, get_expected, under=accepts)
+
+
+def test_ei_halt_atomicity(symbolised_state, all_orders=False):
+    # ~int is active from before ei executes: the EI shadow
+    # must carry the pending interrupt past the ei; halt then
+    # executes and the acceptance resumes past it -- the ei;
+    # halt idiom is atomic.
+    run_ei_halt_edge(symbolised_state, 'ei; halt atomicity',
+                     True, 'sf1', all_orders)
+
+
+def test_int_at_halt_m1(symbolised_state, all_orders=False):
+    # ~int arrives at the start of the halt M1 itself, inside
+    # the window where the previous instruction's writeback
+    # overlaps the fetch: the halted state is still entered and
+    # the acceptance resumes past the halt.
+    run_ei_halt_edge(symbolised_state, '~int at halt M1',
+                     False, 'sf2', all_orders)
+
+
 def test_reset_from_halt(base_state, all_orders=False):
     # ~reset ends the halted state. Afterwards the CPU fetches
     # from address 0 with interrupts disabled and the refresh
@@ -4647,6 +4761,8 @@ def test_instr_seq(seq, all_orders=False):
                 test_int_im2_from_halt(state, all_orders)
                 test_int_im0_from_halt(state, all_orders)
                 test_reset_from_halt(halted, all_orders)
+                test_ei_halt_atomicity(state, all_orders)
+                test_int_at_halt_m1(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
