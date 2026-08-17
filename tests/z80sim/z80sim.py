@@ -3792,6 +3792,90 @@ def test_masked_int_in_halt(base_state, all_orders=False):
                          under=masked)
 
 
+def test_int_im1_from_halt(symbolised_state, all_orders=False):
+    # ~int ends the halted state where interrupts are enabled
+    # and the mode is 1. The preparation sets the mode and the
+    # enable symbolically and runs a nop so the EI shadow is
+    # over before halt; the checks are then conditioned on the
+    # enable choice and on the mode-1 encodings -- ED56 and its
+    # ED76 duplicate at once. The acceptance is a seven-tick
+    # acknowledge cycle whose bus byte, fed symbolic, must be
+    # ignored in mode 1, and two three-tick pushes of PC.
+    s = symbolised_state
+    prep = 'im/xim n', 'ei/di', 'nop', 'halt'
+    for i in range(len(prep)):
+        s = process_instr(prep[:i + 1], s, all_orders=all_orders)
+
+    y = Bits('y_p1', width=3)
+    is_im1 = y[1] & ~y[0]
+    accepts = bools.get('is_ei_p2') & is_im1
+
+    s = State(s)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    with Status.do('halted M1 before ~int'):
+        run_halted_m1(s, 'ia1', all_orders)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    with Status.do('halted M1 with ~int'):
+        s2 = run_halted_m1(s, 'ia2', all_orders)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    # The acknowledge byte is symbolic exactly in the mode-1
+    # branch, where it is to be proven ignored; the other modes
+    # see a nop -- executing an arbitrary symbolic byte under
+    # mode 0 is no realistic setup and needlessly hard to
+    # settle.
+    s.set_db(Bits.ifelse(is_im1, Bits('if1', width=8),
+                         Bits.cast(0x00, width=8)), all_orders)
+    for t in range(7 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'im1 acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(s2, 'reg_sph'),
+                     sampled_bits(s2, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # The acknowledge cycle refreshes too, and the sampling
+    # nop's increment lands within the sampled ticks.
+    r_lo = (sampled_bits(s2, 'reg_r', width=7) + 2).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            # The halted state ends.
+            return TRUE
+        if n in (IFF1, IFF2):
+            # A maskable acceptance disables both flip-flops.
+            return FALSE
+        if n.startswith('reg_pch'):
+            # The nop settling fetches from 0x0038, and a
+            # sampled pc reads advanced by one.
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            # As with the ~nmi acceptance, the acknowledge
+            # fetch does not load its byte: the latch reads
+            # back as if a nop had been fetched.
+            return FALSE
+        return s2[n]
+
+    check_sampled_states('im 1 ~int from halt', after, get_expected,
+                         under=accepts)
+
+
 def get_cond_as_expr(cond, phase, before):
     if cond is None:
         return None
@@ -4168,6 +4252,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_halted_dynamics(halted, all_orders)
                 test_nmi_from_halt(halted, all_orders)
                 test_masked_int_in_halt(halted, all_orders)
+                test_int_im1_from_halt(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
