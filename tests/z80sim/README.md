@@ -146,6 +146,23 @@ internal nodes.
   Covered by `test_reset_from_halt()` of a plain `./z80sim.py`
   run.
 
+- A halt executed while an interrupt is already pending never
+  enters the halted state: the `~halt` pin stays high
+  throughout, and the acceptance follows the halt
+  instruction's fetch cycle directly, its return address
+  resuming past the halt. This holds both for `ei; halt` with
+  the interrupt active from before the `ei` — the classic
+  idiom is atomic — and for an interrupt arriving during the
+  halt instruction's own fetch cycle. On a machine like the ZX
+  Spectrum this is easy to hit: a halt reached while the frame
+  interrupt is still active simply never shows the halted
+  state.
+
+  Covered by `test_ei_halt_atomicity()` and
+  `test_int_at_halt_m1()` of a plain `./z80sim.py` run, which
+  assert `~halt` high at every sampled half-tick through the
+  halt fetch and into the acceptance.
+
 - The fetch cycle that starts the acceptance of an interrupt —
   non-maskable, or maskable in mode 1 — reads its byte from
   the bus like any other fetch, and the byte lands in the
