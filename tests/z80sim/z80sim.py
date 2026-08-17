@@ -3745,9 +3745,10 @@ def test_nmi_from_halt(base_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            # Unlike the halted fetches, the acceptance fetch
-            # does not load its byte: the latch reads back as
-            # if a nop had been fetched.
+            # The acceptance fetch loads its byte like any
+            # other fetch and it rides through the acceptance
+            # unexecuted; by this sample the settling nop has
+            # replaced it in the latch.
             return FALSE
         return s2[n]
 
@@ -3918,8 +3919,9 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             # As with the ~nmi acceptance, the acknowledge
-            # fetch does not load its byte: the latch reads
-            # back as if a nop had been fetched.
+            # byte rides through the acceptance unexecuted; by
+            # this sample the settling nop has replaced it in
+            # the latch.
             return FALSE
         return s2[n]
 

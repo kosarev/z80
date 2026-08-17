@@ -50,7 +50,7 @@ possible outcomes are exactly the expected set.
   cycles, so that memory refresh continues, is well known; the
   simulation shows the fetches are complete ones: each byte
   read from the bus is loaded into the internal instruction
-  register, late in the fetch cycle, just as in normal
+  register, early in the fetch cycle, just as in normal
   execution — only the execution of what was fetched is
   suppressed. Being invisible to programs, this was out of
   reach of test programs on real chips. Also proven: whatever
@@ -58,15 +58,12 @@ possible outcomes are exactly the expected set.
   halted, nothing changes but the refresh register.
 
 - The fetch cycle that starts the acceptance of an interrupt —
-  non-maskable, or maskable in mode 1 — behaves differently:
-  it too reads a byte from the bus, but the internal
-  instruction register ends up holding 0 — as if a `nop` had
-  been fetched — whatever that byte was.
-  The old description of interrupt acceptance as the CPU
-  "inserting a NOP" turns out to be literally true at the
-  level of the instruction register. This, again, is invisible
-  to programs and so beyond what testing real chips could
-  show.
+  non-maskable, or maskable in mode 1 — reads its byte from
+  the bus like any other fetch, and the byte lands in the
+  internal instruction register on the same schedule, where it
+  then sits untouched through the whole acceptance sequence.
+  It is only never executed. This, again, is invisible to
+  programs and so beyond what testing real chips could show.
 
 ## Dependencies
 
