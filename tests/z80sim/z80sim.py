@@ -4342,6 +4342,85 @@ def test_int_at_halt_m1(symbolised_state, all_orders=False):
                      False, 'sf2', all_orders)
 
 
+def test_int_at_boundary(symbolised_state, all_orders=False):
+    # ~int accepted at a normal instruction boundary, no halt
+    # involved: the pin is active from before ei completes, the
+    # EI shadow defers the acceptance past exactly one
+    # instruction -- the nop -- and the acceptance follows at
+    # the nop's boundary, pushing the address after it. The
+    # interrupt mode stays symbolic; the acceptance is checked
+    # in its mode-1 branch.
+    s = process_instr(('im/xim n',), symbolised_state,
+                      all_orders=all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    s = State(s)
+
+    def run_m1(db):
+        s.set_db(db, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'boundary int tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    run_m1(0x00)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    run_m1(0xfb)  # ei
+    run_m1(0x00)  # the shadow's one instruction
+    s.cache()
+
+    y = Bits('y_p1', width=3)
+    accepts = y[1] & ~y[0]
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    s.set_db(Bits.ifelse(accepts, Bits('bf1', width=8),
+                         Bits.cast(0x00, width=8)), all_orders)
+    for t in range(7 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'boundary int acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Five fetch cycles past the baseline refresh: the leading
+    # nop, ei, the shadowed nop, the acknowledge, and the
+    # sampling nop's increment landing within the sampled
+    # ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 5).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return base[n]
+
+    check_sampled_states('~int at a boundary', after, get_expected,
+                         under=accepts)
+
+
 def test_reset_from_halt(base_state, all_orders=False):
     # ~reset ends the halted state. Afterwards the CPU fetches
     # from address 0 with interrupts disabled and the refresh
@@ -4763,6 +4842,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_reset_from_halt(halted, all_orders)
                 test_ei_halt_atomicity(state, all_orders)
                 test_int_at_halt_m1(state, all_orders)
+                test_int_at_boundary(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
