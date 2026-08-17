@@ -3844,6 +3844,130 @@ def probe_acceptance_latch(all_orders=False):
     sample_ticks('nop', 3)
 
 
+def probe_bus_templates(all_orders=False):
+    # Reports the address bus and the control pins through
+    # representative machine cycles, half-tick by half-tick,
+    # naming each sampled address by the state expression it
+    # equals: the per-cycle-kind templates that address-bus
+    # certification builds on.
+    base = build_symbolised_state()
+
+    AB = tuple(f'ab{i}' for i in range(16))
+    CTL = '~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh'
+
+    def single(v):
+        return PossibleValues.cast(v).single_value
+
+    def ir_plus(st, k):
+        r = sampled_bits(st, 'reg_r')
+        lo = (Bits(r.bits[0:7]) + k).truncated(7)
+        return Bits.concat(sampled_bits(st, 'reg_i'),
+                           Bits(lo.bits + (r[7],)))
+
+    def get_candidates(st, eff):
+        # PC, IR and SP are stable at the boundary and come
+        # from the raw sample; the exchange-muxed registers
+        # read correctly only in the effective state.
+        pc = Bits.concat(sampled_bits(st, 'reg_pch'),
+                         sampled_bits(st, 'reg_pcl'))
+        sp = Bits.concat(sampled_bits(st, 'reg_sph'),
+                         sampled_bits(st, 'reg_spl'))
+        cands = {'float': Bits(bools.get(f'pull.{p}') for p in AB)}
+        for k in range(-1, 3):
+            cands[f'pc{k:+}' if k else 'pc'] = (
+                (pc + (0x10000 + k)).truncated(16))
+        for k in range(3):
+            cands[f'ir+{k}' if k else 'ir'] = ir_plus(st, k)
+        st = eff
+        # The bus sees the effective registers, resolved through
+        # the exchange flip-flops.
+
+        def bank(r):
+            return Bits.ifelse(single(st[EXX_FF]),
+                               sampled_bits(st, f'reg_{r}'),
+                               sampled_bits(st, f'reg_{r}{r}'))
+
+        ex_de = single(st[EX_DE_FF])
+        cands['hl'] = Bits.concat(
+            Bits.ifelse(ex_de, bank('d'), bank('h')),
+            Bits.ifelse(ex_de, bank('e'), bank('l')))
+        cands['de'] = Bits.concat(
+            Bits.ifelse(ex_de, bank('h'), bank('d')),
+            Bits.ifelse(ex_de, bank('l'), bank('e')))
+        for k in range(1, 3):
+            cands[f'sp-{k}'] = (sp - k).truncated(16)
+        cands['sp'] = sp
+        return cands
+
+    def match(bits, cands):
+        names = [name for name, c in cands.items()
+                 if all(bools.is_equiv(a, b)
+                        for a, b in zip(bits, c))]
+        if names:
+            return '/'.join(names)
+        with Status.do('verbalise'):
+            return ('(' +
+                    ', '.join(get_z3_simplified(b) for b in bits) +
+                    ')')
+
+    def render_pin(v):
+        if bools.is_equiv(v, TRUE):
+            return '1'
+        if bools.is_equiv(v, FALSE):
+            return '0'
+        with Status.do('verbalise'):
+            return get_z3_simplified(v)
+
+    def drive(s, what, db, ticks, cands):
+        s.set_db(db, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+                s.cache()
+                ab = s.get_node_states(AB)
+                ab = tuple(single(ab[p]) for p in AB)
+                ctl = s.get_node_states(CTL)
+                pins = ' '.join(
+                    f'{p}={render_pin(single(ctl[p]))}' for p in CTL)
+                Status.print(f'{what} {t}.{ht}: '
+                             f'ab={match(ab, cands)} {pins}')
+
+    effective = get_effective_states(base, SAMPLED_NODES,
+                                     all_orders=all_orders)
+    cands = get_candidates(base.get_node_states(SAMPLED_NODES),
+                           effective)
+
+    s = State(base)
+    drive(s, 'nop M1', 0x00, 4, cands)
+    drive(s, 'next M1', 0x00, 2, cands)
+
+    s = State(base)
+    drive(s, 'ld a, (hl) M1', 0x7e, 4, cands)
+    drive(s, 'ld a, (hl) read', 'rb', 3, cands)
+
+    s = State(base)
+    drive(s, 'ld (hl), a M1', 0x77, 4, cands)
+    drive(s, 'ld (hl), a write', 'wb', 3, cands)
+
+    s = State(base)
+    io_cands = dict(cands)
+    io_cands['a:n'] = Bits.concat(
+        Bits.ifelse(PossibleValues.cast(effective[EX_AF_FF])
+                    .single_value,
+                    sampled_bits(effective, 'reg_a'),
+                    sampled_bits(effective, 'reg_aa')),
+        Bits('pn', width=8))
+    drive(s, 'in a, (n) M1', 0xdb, 4, io_cands)
+    drive(s, 'in a, (n) imm', 'pn', 3, io_cands)
+    drive(s, 'in a, (n) io', 'pi', 4, io_cands)
+
+    s = State(base)
+    drive(s, 'push bc M1', 0xc5, 5, cands)
+    drive(s, 'push bc write 1', 'wp1', 3, cands)
+    drive(s, 'push bc write 2', 'wp2', 3, cands)
+
+
 def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ~int ends the halted state where interrupts are enabled
     # and the mode is 1. The preparation sets the mode and the
@@ -4943,6 +5067,12 @@ def main():
 
     if '--probe-acceptance-latch' in sys.argv:
         probe_acceptance_latch(
+            all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-bus-templates' in sys.argv:
+        probe_bus_templates(
             all_orders='--single-order' not in sys.argv)
         Status.clear()
         return
