@@ -66,6 +66,14 @@ arises.
 Each finding names the run it is derived from and covered by,
 so it can be reproduced and traced to the checks in the code.
 
+Where a finding says that a state is preserved or that nothing
+else changes, the state in question is the sampled one: the
+whole register file including the shadow registers, PC, SP, I
+and R, the flags of both banks, the interrupt and exchange
+flip-flops, the internal instruction register and the `~halt`
+pin. Claims do not extend to the rest of the circuit's
+internal nodes.
+
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
   produce a definite value for them. Each of the two bits,
