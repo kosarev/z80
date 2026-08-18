@@ -89,6 +89,8 @@ for i in range(8):
         TESTED_NODES.add(f'reg_{r}{i}')
     for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
         TESTED_NODES.add(f'reg_{r}{i}')
+    for r in 'bcdehl':
+        TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
     TESTED_NODES.add(f'instr{i}')
 
 SAMPLED_NODES = set(TESTED_NODES)
@@ -2839,6 +2841,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 return TRUE
             if n[4:6] in ('pc', 'sp') or n[4] in 'ir':
                 return TRUE
+            if n[4] in 'bcdehl':
+                return TRUE
             if n[4] in 'af':
                 ex_af = before[EX_AF_FF]
                 is_alt = (n[5] == n[4])
@@ -3363,6 +3367,151 @@ def test_node(instrs, n, at_start, at_end, before, after,
                    ~phased_bool('is_i_reg'))
             v = Bits.ifelse(sel, w, v)
         return check(v[i])
+
+    BANK_STORAGE = ('b', 'c', 'd', 'e', 'h', 'l',
+                    'bb', 'cc', 'dd', 'ee', 'hh', 'll')
+    if n.startswith('reg_') and n[4:-1] in BANK_STORAGE:
+        i = int(n[-1])
+        storage = n[4:-1]
+        letter, alt = storage[0], len(storage) == 2
+        exx = before[EXX_FF]
+        active = ~exx if alt else exx
+
+        R_CODES = {'b': 0, 'c': 1, 'd': 2, 'e': 3, 'h': 4, 'l': 5}
+
+        def arch_after(x):
+            # The architectural register's expected value; the
+            # families not listed leave it alone.
+            cur = {'b': get_b, 'c': get_c, 'd': get_d, 'e': get_e,
+                   'h': get_h, 'l': get_l}[x]()
+            code = R_CODES[x]
+            hi = x in 'bdh'
+            pair = {'b': get_bc, 'c': get_bc, 'd': get_de,
+                    'e': get_de, 'h': get_hl, 'l': get_hl}[x]()
+            rp_code = {'b': 0, 'c': 0, 'd': 1, 'e': 1,
+                       'h': 2, 'l': 2}[x]
+
+            def half(v16):
+                return Bits(v16.bits[8:16] if hi else
+                            v16.bits[0:8])
+
+            if instr == ('ld {b, c, d, e, h, l, a}, '
+                         '{b, c, d, e, h, l, a}'):
+                return Bits.ifelse(Bits(opcode[3:6]) == code,
+                                   get_r(Bits(opcode[0:3])), cur)
+            if instr in ('ld {b, c, d, e, h, l, a}, n',
+                         'ld {b, c, d, e, h, l, a}, (hl)'):
+                return Bits.ifelse(Bits(opcode[3:6]) == code,
+                                   Bits(phased('r'), width=8), cur)
+            if instr == 'inc/dec {b, c, d, e, h, l, a}':
+                stepped = Bits.ifelse(opcode[0], cur - 1, cur + 1)
+                return Bits.ifelse(Bits(opcode[3:6]) == code,
+                                   stepped.truncated(8), cur)
+            if instr == 'pop <rp2>':
+                v = Bits(phased('hi' if hi else 'lo'), width=8)
+                return Bits.ifelse(Bits(opcode.bits[4:6]) == rp_code,
+                                   v, cur)
+            if instr == 'ld <rp>, nn':
+                v = Bits(phased('r2' if hi else 'r1'), width=8)
+                return Bits.ifelse(
+                    Bits(phased('rp'), width=2) == rp_code, v, cur)
+            if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
+                v = Bits(phased('rw6' if hi else 'rw5'), width=8)
+                is_load = bools.get(phased('q') + '_b0')
+                sel = ((Bits(phased('p'), width=2) == rp_code) &
+                       is_load)
+                return Bits.ifelse(sel, v, cur)
+            if instr == 'inc/dec <rp>':
+                stepped = Bits.ifelse(phased_bool('is_inc'),
+                                      pair + 1, pair - 1)
+                return Bits.ifelse(
+                    Bits(phased('rp'), width=2) == rp_code,
+                    half(stepped.truncated(16)), cur)
+            if instr == 'add hl, <rp>' and x in 'hl':
+                s = (get_hl() + get_rp(opcode[4:6])).truncated(16)
+                return half(s)
+            if instr == 'adc/sbc hl, <rp>' and x in 'hl':
+                hlv, rpv = get_hl(), get_rp(opcode[4:6])
+                cfin = Bits.ifelse(get_active(CF), 1, 0)
+                is_adc = bools.get(phased('q') + '_b0')
+                s = Bits.ifelse(is_adc, hlv + rpv + cfin,
+                                ((hlv - rpv) ^ 0x10000) - cfin)
+                return half(s.truncated(16))
+            if instr == 'ex (sp), hl' and x in 'hl':
+                return Bits(phased('r2' if hi else 'r1'), width=8)
+            if instr == 'ld hl, (nn)/ld (nn), hl' and x in 'hl':
+                v = Bits(phased('rw4' if hi else 'rw3'), width=8)
+                return Bits.ifelse(phased_bool('is_store'), cur, v)
+            if instr == 'djnz d' and x == 'b':
+                return (cur - 1).truncated(8)
+            if instr == 'in r, (c)':
+                return Bits.ifelse(
+                    Bits(phased('y'), width=3) == code,
+                    Bits(phased('io'), width=8), cur)
+            if instr in ('rot {b, c, d, e, h, l, a}',
+                         'bit {b, c, d, e, h, l, a}',
+                         'res {b, c, d, e, h, l, a}',
+                         'set {b, c, d, e, h, l, a}'):
+                yb = Bits(phased('y'), width=3)
+                regf = Bits(opcode[0:3])
+                v = get_r(regf)
+                is_right = yb[0]
+                rot_cf = bools.ifelse(is_right, v[0], v[7])
+                fill = bools.ifelse(
+                    yb[2],
+                    bools.ifelse(yb[1], ~is_right,
+                                 is_right & v[7]),
+                    bools.ifelse(yb[1], get_active(CF), rot_cf))
+                rot_v = Bits.ifelse(is_right,
+                                    Bits(v.bits[1:8] + (fill,)),
+                                    Bits((fill,) + v.bits[0:7]))
+                m = Bits.get_mask(yb)
+                ROT, BIT, RES, SET = range(4)
+                op = Bits(opcode[6:8])
+                new = Bits.ifelse(
+                    op == ROT, rot_v,
+                    Bits.ifelse(op == RES, v & ~m, v | m))
+                return Bits.ifelse((op == BIT) | (regf != code),
+                                   cur, new)
+            if instr in ('ldi/ldd', 'ldir/lddr'):
+                if x in 'bc':
+                    return half((get_bc() - 1).truncated(16))
+                stepped = Bits.ifelse(phased_bool('is_ldd'),
+                                      pair - 1, pair + 1)
+                return half(stepped.truncated(16))
+            if instr in ('cpi/cpd', 'cpir/cpdr'):
+                if x in 'bc':
+                    return half((get_bc() - 1).truncated(16))
+                if x in 'hl':
+                    stepped = Bits.ifelse(phased_bool('is_cpd'),
+                                          pair - 1, pair + 1)
+                    return half(stepped.truncated(16))
+                return cur
+            if instr in ('ini/ind', 'inir/indr',
+                         'outi/outd', 'otir/otdr'):
+                if x == 'b':
+                    return (cur - 1).truncated(8)
+                if x in 'hl':
+                    dec = phased_bool(
+                        'is_ind' if instr in ('ini/ind',
+                                              'inir/indr')
+                        else 'is_outd')
+                    stepped = Bits.ifelse(dec, pair - 1, pair + 1)
+                    return half(stepped.truncated(16))
+                return cur
+            return cur
+
+        if letter in 'bc':
+            new = arch_after(letter)
+        else:
+            # Under the DE/HL exchange, the d/e storage holds
+            # HL and the h/l storage holds DE.
+            partner = {'d': 'h', 'h': 'd', 'e': 'l', 'l': 'e'}
+            new = Bits.ifelse(before[EX_DE_FF],
+                              arch_after(partner[letter]),
+                              arch_after(letter))
+        return check(Bits.ifelse(active, new,
+                                 bits(f'reg_{storage}'))[i])
 
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
