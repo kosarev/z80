@@ -87,6 +87,8 @@ for i in range(8):
         TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
     for r in 'wz':
         TESTED_NODES.add(f'reg_{r}{i}')
+    for r in ('pch', 'pcl', 'sph', 'spl', 'i', 'r'):
+        TESTED_NODES.add(f'reg_{r}{i}')
     TESTED_NODES.add(f'instr{i}')
 
 SAMPLED_NODES = set(TESTED_NODES)
@@ -2835,6 +2837,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if n.startswith('reg_'):
             if n[4] in 'wz':
                 return TRUE
+            if n[4:6] in ('pc', 'sp') or n[4] in 'ir':
+                return TRUE
             if n[4] in 'af':
                 ex_af = before[EX_AF_FF]
                 is_alt = (n[5] == n[4])
@@ -3167,6 +3171,198 @@ def test_node(instrs, n, at_start, at_end, before, after,
             hi = Bits(phased('r4'), width=8)
             wz = Bits.concat(hi, lo) + 1
             return check(wz[i])
+
+    def get_cc_taken():
+        sf, pf = get_active(SF), get_active(PF)
+        cf, zf = get_active(CF), get_active(ZF)
+        cc = Bits(phased('cc'), width=3)
+        return bools.ifelse(
+            cc[2],
+            bools.ifelse(
+                cc[1],
+                bools.ifelse(cc[0], sf, ~sf),
+                bools.ifelse(cc[0], pf, ~pf)),
+            bools.ifelse(
+                cc[1],
+                bools.ifelse(cc[0], cf, ~cf),
+                bools.ifelse(cc[0], zf, ~zf)))
+
+    if (n.startswith('reg_pch') or n.startswith('reg_pcl') or
+            n.startswith('reg_sph') or n.startswith('reg_spl')):
+        SEQ_LENGTHS = {
+            'nop': 1, "ex af, af'": 1, 'daa': 1, 'cpl': 1,
+            'scf/ccf': 1, 'exx': 1, 'ex de, hl': 1,
+            'ld sp, hl': 1, 'ei/di': 1,
+            'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}': 1,
+            'ld {b, c, d, e, h, l, a}, (hl)': 1,
+            'ld (hl), {b, c, d, e, h, l, a}': 1,
+            'rlca/rrca/rla/rra': 1,
+            'inc/dec {b, c, d, e, h, l, a}': 1,
+            'inc/dec (hl)': 1, 'ld <rp>, nn': 3, 'add hl, <rp>': 1,
+            'inc/dec <rp>': 1, 'pop <rp2>': 1, 'push <rp2>': 1,
+            'ld (<rp>), a/ld a, (<rp>)': 1, 'ex (sp), hl': 1,
+            'in a, (n)/out (n), a': 2,
+            'ld {b, c, d, e, h, l, a}, n': 2, 'ld (hl), n': 2,
+            'ld hl, (nn)/ld (nn), hl': 3,
+            'ld a, (nn)/ld (nn), a': 3,
+            'ld {i, r}, a/ld a, {i, r}': 2, 'rrd/rld': 2,
+            'in r, (c)': 2, 'out (c), r': 2, 'adc/sbc hl, <rp>': 2,
+            'ld <rp>, (nn)/ld (nn), <rp>': 4, 'neg/xneg': 2,
+            'im/xim n': 2, 'xnop': 2, 'ldi/ldd': 2, 'cpi/cpd': 2,
+            'ini/ind': 2, 'outi/outd': 2, 'bit (hl)': 2,
+        }
+        for m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or',
+                  'cp'):
+            SEQ_LENGTHS[f'{m} {{b, c, d, e, h, l, a}}'] = 1
+            SEQ_LENGTHS[f'{m} (hl)'] = 1
+            SEQ_LENGTHS[f'{m} n'] = 2
+        for m in ('rot', 'bit', 'res', 'set'):
+            SEQ_LENGTHS[f'{m} {{b, c, d, e, h, l, a}}'] = 2
+        for m in ('rot', 'res', 'set'):
+            SEQ_LENGTHS[f'{m} (hl)'] = 2
+
+        def get_pc_expected():
+            # In the sampled convention, pc reads advanced by
+            # one past the next instruction's address.
+            length = SEQ_LENGTHS.get(instr)
+            if length is not None:
+                return get_pc_plus(length + 1)
+            if instr == 'halt':
+                # PC freezes past the halt opcode.
+                return get_pc_plus(1)
+            if instr == 'jp hl':
+                return get_hl() + 1
+            if instr in ('jp nn', 'ret'):
+                t = Bits.concat(Bits(phased('hi'), width=8),
+                                Bits(phased('lo'), width=8))
+                return t + 1
+            if instr == 'reti/retn/xretn':
+                t = Bits.concat(Bits(phased('r4'), width=8),
+                                Bits(phased('r3'), width=8))
+                return t + 1
+            if instr == 'jp cc, nn':
+                t = Bits.concat(Bits(phased('hi'), width=8),
+                                Bits(phased('lo'), width=8))
+                return Bits.ifelse(get_cc_taken(), t,
+                                   get_pc_plus(3)) + 1
+            if instr == 'call nn':
+                t = Bits.concat(Bits(phased('r2'), width=8),
+                                Bits(phased('r1'), width=8))
+                return t + 1
+            if instr == 'call cc, nn':
+                t = Bits.concat(Bits(phased('r2'), width=8),
+                                Bits(phased('r1'), width=8))
+                return Bits.ifelse(get_cc_taken(), t,
+                                   get_pc_plus(3)) + 1
+            if instr == 'ret cc':
+                t = Bits.concat(Bits(phased('r2'), width=8),
+                                Bits(phased('r1'), width=8))
+                return Bits.ifelse(get_cc_taken(), t,
+                                   get_pc_plus(1)) + 1
+            if instr == 'jr d':
+                d = Bits(phased('r'), width=8)
+                return get_pc_plus(2) + d.sign_extended(16) + 1
+            if instr == 'jr cc, d':
+                cc2 = Bits(phased('cc2'), width=2)
+                cf, zf = get_active(CF), get_active(ZF)
+                taken = bools.ifelse(
+                    cc2[1],
+                    bools.ifelse(cc2[0], cf, ~cf),
+                    bools.ifelse(cc2[0], zf, ~zf))
+                d = Bits(phased('r'), width=8)
+                t = (get_pc_plus(2) +
+                     d.sign_extended(16)).truncated(16)
+                return Bits.ifelse(taken, t, get_pc_plus(2)) + 1
+            if instr == 'djnz d':
+                d = Bits(phased('r'), width=8)
+                t = (get_pc_plus(2) +
+                     d.sign_extended(16)).truncated(16)
+                return Bits.ifelse(get_b() != 1, t,
+                                   get_pc_plus(2)) + 1
+            if instr == 'rst n':
+                t = Bits(phased('y'), width=3) << 3
+                return t.zero_extended(16) + 1
+            if instr == 'ldir/lddr':
+                return Bits.ifelse(get_bc() != 1, get_pc_plus(1),
+                                   get_pc_plus(3))
+            if instr == 'cpir/cpdr':
+                rep = ((get_bc() != 1) &
+                       (get_a() != Bits(phased('r'), width=8)))
+                return Bits.ifelse(rep, get_pc_plus(1),
+                                   get_pc_plus(3))
+            if instr in ('inir/indr', 'otir/otdr'):
+                return Bits.ifelse(get_b() != 1, get_pc_plus(1),
+                                   get_pc_plus(3))
+            assert 0, instr
+
+        def get_sp_expected():
+            sp = get_sp()
+            if instr == 'ld sp, hl':
+                return get_hl()
+            if instr == 'inc/dec <rp>':
+                stepped = Bits.ifelse(phased_bool('is_inc'),
+                                      sp + 1, sp - 1)
+                return Bits.ifelse(
+                    Bits(phased('rp'), width=2) == 3,
+                    stepped.truncated(16), sp)
+            if instr == 'ld <rp>, nn':
+                v = Bits.concat(Bits(phased('r2'), width=8),
+                                Bits(phased('r1'), width=8))
+                return Bits.ifelse(
+                    Bits(phased('rp'), width=2) == 3, v, sp)
+            if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
+                v = Bits.concat(Bits(phased('rw6'), width=8),
+                                Bits(phased('rw5'), width=8))
+                is_load = bools.get(phased('q') + '_b0')
+                sel = (Bits(phased('p'), width=2) == 3) & is_load
+                return Bits.ifelse(sel, v, sp)
+            if instr in ('push <rp2>', 'call nn', 'rst n'):
+                return (sp - 2).truncated(16)
+            if instr in ('pop <rp2>', 'ret', 'reti/retn/xretn'):
+                return (sp + 2).truncated(16)
+            if instr == 'call cc, nn':
+                return Bits.ifelse(get_cc_taken(),
+                                   (sp - 2).truncated(16), sp)
+            if instr == 'ret cc':
+                return Bits.ifelse(get_cc_taken(),
+                                   (sp + 2).truncated(16), sp)
+            return sp
+
+        i = int(n[-1])
+        if n[4:6] == 'pc':
+            v = get_pc_expected()
+        else:
+            v = get_sp_expected()
+        if n[6] == 'h':
+            i += 8
+        return check(v[i])
+
+    if n.startswith('reg_i'):
+        i = int(n[-1])
+        v = bits('reg_i')
+        if instr == 'ld {i, r}, a/ld a, {i, r}':
+            sel = (phased_bool('is_store') &
+                   phased_bool('is_i_reg'))
+            v = Bits.ifelse(sel, get_a(), v)
+        return check(v[i])
+
+    if n.startswith('reg_r'):
+        # The refresh register advances once per fetch cycle;
+        # the sampling adds the settling nop's own.
+        i = int(n[-1])
+        cur = bits('reg_r')
+        num_m1 = sum(1 for d, t, c in cycles
+                     if isinstance(d, Bits))
+        lo = (Bits(cur.bits[0:7]) + num_m1).truncated(7)
+        v = Bits(lo.bits + (cur[7],))
+        if instr == 'ld {i, r}, a/ld a, {i, r}':
+            a = get_a()
+            wl = (Bits(a.bits[0:7]) + 1).truncated(7)
+            w = Bits(wl.bits + (a[7],))
+            sel = (phased_bool('is_store') &
+                   ~phased_bool('is_i_reg'))
+            v = Bits.ifelse(sel, w, v)
+        return check(v[i])
 
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
