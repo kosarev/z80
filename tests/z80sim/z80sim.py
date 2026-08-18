@@ -4421,6 +4421,139 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
+    # ~int lands between two iterations of a repeating ldir:
+    # the acceptance pushes the ldir's own address, so the
+    # handler returns to re-execute it, and the state the
+    # handler observes is one certified iteration's worth --
+    # BC down one, DE and HL up one in the active bank (ldir
+    # moves DE and HL alike, so the DE/HL exchange flip-flop
+    # cancels out), XF and YF from bits 11 and 13 of the
+    # re-execution address, PF set as BC has not run out, NF
+    # and HF clear, CF, SF, ZF and A untouched. The checks are
+    # conditioned on the repeat itself (BC was not 1) and on
+    # mode 1.
+    s = process_instr(('im/xim n',), symbolised_state,
+                      all_orders=all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    s = State(s)
+
+    def run_cycle(what, db, ticks):
+        s.set_db(db, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    run_cycle('ei', 0xfb, 4)
+    run_cycle('shadow nop', 0x00, 4)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    run_cycle('ldir ED', 0xed, 4)
+    run_cycle('ldir opcode', 0xb0, 4)
+    run_cycle('ldir read', 'br', 3)
+    run_cycle('ldir write', 'bw', 5)
+    run_cycle('ldir repeat', 0x00, 5)
+    s.cache()
+
+    y = Bits('y_p1', width=3)
+    exx = PossibleValues.cast(base[EXX_FF]).single_value
+    ex_af = PossibleValues.cast(base[EX_AF_FF]).single_value
+
+    def pair_bits(hi, lo):
+        return Bits.concat(sampled_bits(base, f'reg_{hi}'),
+                           sampled_bits(base, f'reg_{lo}'))
+
+    repeats = pair_bits('b', 'c') != 1
+    repeats = bools.ifelse(exx, repeats, pair_bits('bb', 'cc') != 1)
+    accepts = (y[1] & ~y[0]) & repeats
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    s.set_db(Bits.ifelse(accepts, Bits('bi1', width=8),
+                         Bits.cast(0x00, width=8)), all_orders)
+    for t in range(7 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'ldir acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    changed = {}
+
+    def step_pair(hi, lo, active, dec):
+        pair = pair_bits(hi, lo)
+        new = (pair - 1) if dec else (pair + 1)
+        new = new.truncated(16)
+        for i in range(8):
+            changed[f'reg_{hi}{i}'] = bools.ifelse(
+                active, new[i + 8], pair[i + 8])
+            changed[f'reg_{lo}{i}'] = bools.ifelse(
+                active, new[i], pair[i])
+
+    step_pair('b', 'c', exx, dec=True)
+    step_pair('bb', 'cc', ~exx, dec=True)
+    step_pair('d', 'e', exx, dec=False)
+    step_pair('dd', 'ee', ~exx, dec=False)
+    step_pair('h', 'l', exx, dec=False)
+    step_pair('hh', 'll', ~exx, dec=False)
+
+    # The raw boundary sample holds pc as the next fetch
+    # address itself -- the ei's; the ldir sits two
+    # instructions past it.
+    base_pc = Bits.concat(sampled_bits(base, 'reg_pch'),
+                          sampled_bits(base, 'reg_pcl'))
+    ldir_addr = (base_pc + 2).truncated(16)
+    new_flags = {NF_BIT: FALSE, PF_BIT: TRUE, XF_BIT: ldir_addr[11],
+                 HF_BIT: FALSE, YF_BIT: ldir_addr[13]}
+    for i, v in new_flags.items():
+        changed[f'reg_f{i}'] = bools.ifelse(
+            ex_af, v, PossibleValues.cast(base[f'reg_f{i}'])
+            .single_value)
+        changed[f'reg_ff{i}'] = bools.ifelse(
+            ex_af, PossibleValues.cast(base[f'reg_ff{i}'])
+            .single_value, v)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Six fetch cycles past the baseline refresh: ei, the
+    # shadow nop, the ldir's two opcode fetches, the
+    # acknowledge, and the sampling nop's increment landing
+    # within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 6).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n in changed:
+            return changed[n]
+        if n == '~halt':
+            return TRUE
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return base[n]
+
+    check_sampled_states('~int between ldir repeats', after,
+                         get_expected, under=accepts)
+
+
 def test_reset_from_halt(base_state, all_orders=False):
     # ~reset ends the halted state. Afterwards the CPU fetches
     # from address 0 with interrupts disabled and the refresh
@@ -4843,6 +4976,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_ei_halt_atomicity(state, all_orders)
                 test_int_at_halt_m1(state, all_orders)
                 test_int_at_boundary(state, all_orders)
+                test_int_between_ldir_repeats(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
