@@ -74,8 +74,9 @@ EX_DE_FF0 = 'ex_dehl0'
 EX_DE_FF1 = 'ex_dehl1'
 EX_DE_FF = 'ex_dehl_combined'
 
-# TODO: Can also be p1210, p1239 or p231.
-# These two are suggested by Tony Brewer.
+# These two are suggested by Tony Brewer; --probe-node-ids
+# confirms them and classifies the alternates: p1210 and p231
+# track IFF1, p1239 tracks IFF2.
 IFF1 = 'n181'
 IFF2 = 'n206'
 
@@ -3844,6 +3845,99 @@ def probe_acceptance_latch(all_orders=False):
     sample_ticks('nop', 3)
 
 
+def mentions_terms(v, prefix):
+    seen = set()
+    stack = [v]
+    while stack:
+        x = stack.pop()
+        kind = x.kind
+        if kind in ('false', 'true'):
+            continue
+        if x.id in seen:
+            continue
+        seen.add(x.id)
+        if kind == 'term':
+            if str(x.term).startswith(prefix):
+                return True
+            continue
+        if kind == 'not':
+            stack.append(~x)
+        else:
+            stack.extend(x.args)
+    return False
+
+
+def probe_node_ids(all_orders=False):
+    # Reports identification candidates for state nodes the
+    # tests do not yet name: nodes that flip to a new constant
+    # on entering the halted state and hold it across halted
+    # cycles -- the halted flip-flop and its cone -- nodes
+    # whose settled state depends on the interrupt mode choice
+    # -- the IM latch -- and the values of the suggested IFF
+    # nodes and their alternates in a state that tells the two
+    # flip-flops apart.
+    base = build_symbolised_state()
+
+    def full_after_m1(s, db):
+        s.set_db(db, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'probe tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache()
+        return s.get_node_states()
+
+    with Status.do('halted flip-flop'):
+        pre = base.get_node_states()
+        s = State(process_instr(('halt',), base,
+                                all_orders=all_orders))
+        h1 = full_after_m1(s, 'ni1')
+        h2 = full_after_m1(s, 'ni2')
+        for n in sorted(pre, key=str):
+            v0, v1, v2 = pre[n], h1[n], h2[n]
+            if any(isinstance(v, PossibleValues)
+                   for v in (v0, v1, v2)):
+                continue
+            if (v0.is_const and v1.is_const and
+                    v1.kind != v0.kind and v2.kind == v1.kind):
+                Status.print(f'flips on halt entry and holds: '
+                             f'{n} = {v1.kind}')
+
+    with Status.do('im latch'):
+        s = State(process_instr(('im/xim n',), base,
+                                all_orders=all_orders))
+        st = full_after_m1(s, 0x00)
+        for n in sorted(st, key=str):
+            v = st[n]
+            if (not isinstance(v, PossibleValues) and
+                    mentions_terms(v, 'y_p1')):
+                Status.print(f'mode-dependent node: {n}')
+
+    with Status.do('iff nodes'):
+        s = State(process_instr(('halt',), base,
+                                all_orders=all_orders))
+        s.set_pin_and_update('~nmi', TRUE, all_orders)
+        run_halted_m1(s, 'nh1', all_orders)
+        s.set_pin_and_update('~nmi', FALSE, all_orders)
+        run_halted_m1(s, 'nh2', all_orders)
+        s.set_pin_and_update('~nmi', TRUE, all_orders)
+        s.set_db('nf', all_orders)
+        for t in range(5 + 3 + 3):
+            for ht in (0, 1):
+                with s.status(f'nmi acceptance tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache()
+        for n in (IFF1, IFF2, 'p1210', 'p1239', 'p231'):
+            try:
+                v = s.get_node_states((n,))[n]
+            except KeyError:
+                Status.print(f'{n}: no such node')
+                continue
+            with Status.do('verbalise'):
+                r = '; '.join(verbalise_state_value(v)).strip()
+            Status.print(f'{n} after ~nmi acceptance: {r}')
+
+
 def probe_bus_templates(all_orders=False):
     # Reports the address bus and the control pins through
     # representative machine cycles, half-tick by half-tick,
@@ -4604,7 +4698,8 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
         for ht in (0, 1):
-            with s.status(f'ld a, i acceptance tick {t}.{ht}'):
+            with s.status(f'ld a, {{i, r}} acceptance '
+                          f'tick {t}.{ht}'):
                 s.half_tick(all_orders=all_orders)
     s.cache()
     after = get_effective_states(s, SAMPLED_NODES,
@@ -5736,6 +5831,12 @@ def main():
 
     if '--probe-bus-templates' in sys.argv:
         probe_bus_templates(
+            all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-node-ids' in sys.argv:
+        probe_node_ids(
             all_orders='--single-order' not in sys.argv)
         Status.clear()
         return
