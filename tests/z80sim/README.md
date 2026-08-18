@@ -163,6 +163,21 @@ internal nodes.
   assert `~halt` high at every sampled half-tick through the
   halt fetch and into the acceptance.
 
+- When an interrupt is accepted at the boundary of `ld a, i`
+  — the instruction that copies the interrupt flip-flop IFF2
+  into the PF flag — the flag reads 0: the acceptance's
+  clearing of the flip-flop wins over the copy. That much
+  matches what testing real NMOS chips established. What
+  testing could not establish: the outcome is deterministic —
+  the circuit produces the 0 no matter which of its gates
+  react first — so the famous unreliability of probing
+  interrupt state this way is entirely about whether an
+  interrupt lands on that boundary, never about which value
+  wins when it does.
+
+  Covered by `test_int_at_ld_a_i()` of a plain `./z80sim.py`
+  run.
+
 - The fetch cycle that starts the acceptance of an interrupt —
   non-maskable, or maskable in mode 1 — reads its byte from
   the bus like any other fetch, and the byte lands in the
