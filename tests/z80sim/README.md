@@ -85,6 +85,24 @@ exchange flip-flops, the internal instruction register and
 the `~halt` pin. Claims do not extend to the rest of the circuit's
 internal nodes.
 
+- During an instruction's internal cycles — the five ticks of
+  `add hl, <rp>`, for instance — the address bus carries the
+  refresh address I:R with all control lines idle, and it
+  keeps carrying it through the extra ticks of extended fetch
+  cycles. Together with the refresh phases of every fetch,
+  this means the value of the I register chooses the addresses
+  hardware sees on the bus for much of the time between
+  transfers — one more reason why moving I into a contended
+  page upsets a ZX Spectrum. Also proven along the way: at
+  every sampled half-tick, the address bus and the control
+  pins are free of internal races — no order of gate reactions
+  can change what they carry.
+
+  Derived with `./z80sim.py --probe-bus-templates` and covered
+  by `test_bus_timeline()` of a plain `./z80sim.py` run, which
+  checks the bus at every half-tick of 54 instruction
+  families' machine cycles.
+
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
   produce a definite value for them. Each of the two bits,
