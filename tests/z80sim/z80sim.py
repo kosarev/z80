@@ -5597,6 +5597,190 @@ def run_all_orders(instr):
     SEED = orig_seed
 
 
+# The measured per-cycle-kind bus templates, per half-tick:
+# the address role and the ~m1/~mreq/~rd/~wr/~iorq/~rfsh
+# levels. 'cur' is the cycle's own address, 'ir' the refresh
+# address, 'next' the following cycle's address appearing at
+# the last half-tick, where ~m1 asserts exactly when that
+# cycle is a fetch.
+_BUS_M1_4 = (
+    ('cur', 0, 0, 0, 1, 1, 1), ('cur', 0, 0, 0, 1, 1, 1),
+    ('cur', 0, 0, 0, 1, 1, 1),
+    ('ir', 1, 1, 1, 1, 1, 0), ('ir', 1, 0, 1, 1, 1, 0),
+    ('ir', 1, 0, 1, 1, 1, 0), ('ir', 1, 1, 1, 1, 1, 0),
+    ('next', None, 1, 1, 1, 1, 1))
+_BUS_M1_5 = _BUS_M1_4[:7] + (
+    ('ir', 1, 1, 1, 1, 1, 1), ('ir', 1, 1, 1, 1, 1, 1),
+    ('next', None, 1, 1, 1, 1, 1))
+_BUS_R3 = (
+    ('cur', 1, 0, 0, 1, 1, 1), ('cur', 1, 0, 0, 1, 1, 1),
+    ('cur', 1, 0, 0, 1, 1, 1), ('cur', 1, 0, 0, 1, 1, 1),
+    ('cur', 1, 1, 1, 1, 1, 1),
+    ('next', None, 1, 1, 1, 1, 1))
+_BUS_W3 = (
+    ('cur', 1, 0, 1, 1, 1, 1), ('cur', 1, 0, 1, 1, 1, 1),
+    ('cur', 1, 0, 1, 0, 1, 1), ('cur', 1, 0, 1, 0, 1, 1),
+    ('cur', 1, 1, 1, 1, 1, 1),
+    ('next', None, 1, 1, 1, 1, 1))
+_BUS_M1_6 = _BUS_M1_4[:7] + (
+    ('ir', 1, 1, 1, 1, 1, 1),) * 4 + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
+                  'm16': _BUS_M1_6, 'r': _BUS_R3, 'w': _BUS_W3}
+
+# Per-family cycle kinds and addresses; families with
+# variant-dependent bus behaviour or cycle kinds not yet
+# probed (r4, w5, the internal e cycles, the six-tick M1, the
+# conditional cycles) are not listed yet.
+BUS_SPECS = {
+    'nop': (('m1', 'pc'),),
+    "ex af, af'": (('m1', 'pc'),),
+    'daa': (('m1', 'pc'),),
+    'cpl': (('m1', 'pc'),),
+    'scf/ccf': (('m1', 'pc'),),
+    'exx': (('m1', 'pc'),),
+    'ex de, hl': (('m1', 'pc'),),
+    'ld sp, hl': (('m16', 'pc'),),
+    'ei/di': (('m1', 'pc'),),
+    'jp hl': (('m1', 'pc'),),
+    'halt': (('m1', 'pc'),),
+    'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
+        (('m1', 'pc'),),
+    'rlca/rrca/rla/rra': (('m1', 'pc'),),
+    'inc/dec {b, c, d, e, h, l, a}': (('m1', 'pc'),),
+    'ld {b, c, d, e, h, l, a}, n':
+        (('m1', 'pc'), ('r', 'pc+1')),
+    'ld {b, c, d, e, h, l, a}, (hl)':
+        (('m1', 'pc'), ('r', 'hl')),
+    'ld (hl), {b, c, d, e, h, l, a}':
+        (('m1', 'pc'), ('w', 'hl')),
+    'ld (hl), n': (('m1', 'pc'), ('r', 'pc+1'), ('w', 'hl')),
+    'ld <rp>, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
+    'pop <rp2>': (('m1', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
+    'push <rp2>': (('m15', 'pc'), ('w', 'sp-1'), ('w', 'sp-2')),
+    'jp nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
+    'ret': (('m1', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
+    'rst n': (('m15', 'pc'), ('w', 'sp-1'), ('w', 'sp-2')),
+}
+for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
+    BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1', 'pc'),)
+    BUS_SPECS[f'{_m} (hl)'] = (('m1', 'pc'), ('r', 'hl'))
+    BUS_SPECS[f'{_m} n'] = (('m1', 'pc'), ('r', 'pc+1'))
+
+
+def test_bus_timeline(instr, base_state, all_orders=False):
+    # Replays the instruction's settlings -- the steps are
+    # identical to the tested run's, so everything comes from
+    # the cache -- sampling the address bus and the control
+    # pins at every half-tick against the measured templates
+    # and the family's cycle addresses.
+    spec = BUS_SPECS[instr]
+    raw = base_state.get_node_states(SAMPLED_NODES)
+    eff = get_effective_states(base_state, SAMPLED_NODES,
+                               all_orders=all_orders)
+
+    pc = Bits.concat(sampled_bits(raw, 'reg_pch'),
+                     sampled_bits(raw, 'reg_pcl'))
+    sp = Bits.concat(sampled_bits(raw, 'reg_sph'),
+                     sampled_bits(raw, 'reg_spl'))
+    ir = Bits.concat(sampled_bits(raw, 'reg_i'),
+                     sampled_bits(raw, 'reg_r'))
+
+    def ir_plus(k):
+        lo = (Bits(ir.bits[0:7]) + k).truncated(7)
+        return Bits(lo.bits + (ir[7],) + ir.bits[8:16])
+
+    exx = PossibleValues.cast(eff[EXX_FF]).single_value
+    ex_de = PossibleValues.cast(eff[EX_DE_FF]).single_value
+
+    def bank(r):
+        return Bits.ifelse(exx, sampled_bits(eff, f'reg_{r}'),
+                           sampled_bits(eff, f'reg_{r}{r}'))
+
+    hl = Bits.concat(Bits.ifelse(ex_de, bank('d'), bank('h')),
+                     Bits.ifelse(ex_de, bank('e'), bank('l')))
+
+    def phased(id):
+        return f'{id}_p1'
+
+    def resolve(a):
+        if a.startswith('pc'):
+            off = int(a[2:]) if len(a) > 2 else 0
+            return (pc + off).truncated(16)
+        if a.startswith('sp'):
+            off = int(a[2:]) if len(a) > 2 else 0
+            return (sp + (0x10000 + off)).truncated(16)
+        if a == 'hl':
+            return hl
+        if a == 'jp-target':
+            return Bits.concat(Bits(phased('hi'), width=8),
+                               Bits(phased('lo'), width=8))
+        if a == 'ret-target':
+            return Bits.concat(Bits(phased('hi'), width=8),
+                               Bits(phased('lo'), width=8))
+        if a == 'rst-target':
+            t = Bits(phased('y'), width=3) << 3
+            return t.zero_extended(16)
+        assert 0, a
+
+    NEXT_SPECIAL = {'jp hl': 'hl', 'jp nn': 'jp-target',
+                    'ret': 'ret-target', 'rst n': 'rst-target',
+                    'halt': 'pc+1'}
+    if instr in NEXT_SPECIAL:
+        instr_next = resolve(NEXT_SPECIAL[instr])
+    else:
+        length = 1 + sum(1 for k, a in spec if a.startswith('pc+'))
+        instr_next = (pc + length).truncated(16)
+
+    cycles = TestedInstrs.get_cycles(instr, 1)
+    assert len(cycles) == len(spec), instr
+
+    AB = tuple(f'ab{i}' for i in range(16))
+    CTL = '~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh'
+
+    s = State(base_state)
+    num_m1 = 0
+    for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
+            zip(cycles, spec)):
+        assert cond is None, instr
+        template = _BUS_TEMPLATES[kind]
+        assert len(template) == ticks * 2, instr
+        cur = resolve(addr)
+        refresh = ir_plus(num_m1)
+        if kind in ('m1', 'm15'):
+            num_m1 += 1
+        if cyc + 1 < len(cycles):
+            nxt = resolve(spec[cyc + 1][1])
+            next_is_fetch = spec[cyc + 1][0] in ('m1', 'm15')
+        else:
+            nxt = instr_next
+            next_is_fetch = True
+        s.set_db(d, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'bus tick {cyc}:{t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+                s.cache()
+                role, m1, mreq, rd, wr, iorq, rfsh = (
+                    template[t * 2 + ht])
+                a = {'cur': cur, 'ir': refresh,
+                     'next': nxt}[role]
+                if m1 is None:
+                    m1 = FALSE if next_is_fetch else TRUE
+                pins = dict(zip(CTL, (m1, mreq, rd, wr, iorq,
+                                      rfsh)))
+                expected = {}
+                for j, p in enumerate(AB):
+                    expected[p] = a[j]
+                for p, v in pins.items():
+                    expected[p] = (TRUE if v == 1 else
+                                   FALSE if v == 0 else v)
+                states = s.get_node_states(AB + CTL)
+                check_sampled_states(
+                    f'{instr} bus {cyc}:{t}.{ht}', states,
+                    lambda x: expected[x])
+
+
 def test_instr_seq(seq, all_orders=False):
     # bools.clear()
     # gc.collect()
@@ -5610,6 +5794,8 @@ def test_instr_seq(seq, all_orders=False):
             for i in range(len(seq) - 1):
                 state = process_instr(seq[:i + 1], state)
             process_instr(seq, state, test=True, all_orders=all_orders)
+            if len(seq) == 1 and seq[0] in BUS_SPECS:
+                test_bus_timeline(seq[0], state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
