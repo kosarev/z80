@@ -4061,6 +4061,12 @@ def probe_bus_templates(all_orders=False):
     drive(s, 'push bc write 1', 'wp1', 3, cands)
     drive(s, 'push bc write 2', 'wp2', 3, cands)
 
+    # The halted fetches: which address they drive was an open
+    # question of the halt coverage.
+    s = State(process_instr(('halt',), base, all_orders=all_orders))
+    drive(s, 'halted M1 1', 'hb1', 4, cands)
+    drive(s, 'halted M1 2', 'hb2', 4, cands)
+
 
 def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ~int ends the halted state where interrupts are enabled
@@ -4145,12 +4151,6 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
 
     check_sampled_states('im 1 ~int from halt', after, get_expected,
                          under=accepts)
-
-    # The halted fetches: which address they drive was an open
-    # question of the halt coverage.
-    s = State(process_instr(('halt',), base, all_orders=all_orders))
-    drive(s, 'halted M1 1', 'hb1', 4, cands)
-    drive(s, 'halted M1 2', 'hb2', 4, cands)
 
 
 def test_int_im2_from_halt(symbolised_state, all_orders=False):
