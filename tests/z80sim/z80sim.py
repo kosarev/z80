@@ -4662,6 +4662,85 @@ def test_int_at_ld_a_i(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def test_nmi_over_int_priority(symbolised_state, all_orders=False):
+    # ~nmi and ~int are both active at the same instruction
+    # boundary with interrupts enabled: the non-maskable one
+    # must win. The proof that the maskable one never sneaked
+    # in is IFF2 surviving as set -- the ~nmi acceptance
+    # preserves it, where a maskable acceptance would have
+    # cleared it -- while IFF1 comes out clear, blocking the
+    # still-pending ~int until the handler re-enables.
+    s = process_instr(('im/xim n',), symbolised_state,
+                      all_orders=all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    s = State(s)
+
+    def run_cycle(what, db, ticks):
+        s.set_db(db, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'{what} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    run_cycle('ei', 0xfb, 4)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    s.set_pin_and_update('~nmi', FALSE, all_orders)
+    run_cycle('shadow nop', 0x00, 4)
+    s.cache()
+
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    s.set_db('pf1', all_orders)
+    for t in range(5 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'priority acceptance tick {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Four fetch cycles past the baseline refresh: ei, the
+    # shadow nop, the acceptance fetch, and the sampling nop's
+    # increment landing within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 4).truncated(7)
+    pc = Bits.cast(0x0067, width=16)
+    wz = Bits.cast(0x0066, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n == IFF1:
+            return FALSE
+        if n == IFF2:
+            # Still set: only ~nmi accepted; a maskable
+            # acceptance would have cleared it.
+            return TRUE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return base[n]
+
+    check_sampled_states('~nmi over ~int priority', after,
+                         get_expected)
+
+
 def test_reset_from_halt(base_state, all_orders=False):
     # ~reset ends the halted state. Afterwards the CPU fetches
     # from address 0 with interrupts disabled and the refresh
@@ -5086,6 +5165,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_int_at_boundary(state, all_orders)
                 test_int_between_ldir_repeats(state, all_orders)
                 test_int_at_ld_a_i(state, all_orders)
+                test_nmi_over_int_priority(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
