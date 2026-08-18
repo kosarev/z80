@@ -4554,15 +4554,18 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
                          get_expected, under=accepts)
 
 
-def test_int_at_ld_a_i(symbolised_state, all_orders=False):
-    # The famous quirk: ld a, i copies IFF2 into PF, and an
-    # interrupt accepted at the instruction's own boundary is
-    # said to leave PF clear on NMOS parts -- the acceptance's
-    # clearing of IFF2 winning over the copy. The pin goes
-    # active only once ld a, i has started, so the acceptance
-    # lands exactly at its boundary; the checks state the lore
-    # -- PF clear -- and a failure report would show the true
-    # value, or the outcome set if it is a race.
+def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
+    # The famous quirk: ld a, i and ld a, r copy IFF2 into PF,
+    # and an interrupt accepted at the instruction's own
+    # boundary is said to leave PF clear on NMOS parts -- the
+    # acceptance's clearing of IFF2 winning over the copy. The
+    # pin goes active only once the instruction has started, so
+    # the acceptance lands exactly at its boundary; the checks
+    # state the lore -- PF clear -- and a failure report would
+    # show the true value, or the outcome set if it is a race.
+    # The instruction choice is symbolic; for ld a, r the
+    # copied value has both of the instruction's own refresh
+    # increments already in.
     s = process_instr(('im/xim n',), symbolised_state,
                       all_orders=all_orders)
     base = s.get_node_states(SAMPLED_NODES)
@@ -4579,8 +4582,11 @@ def test_int_at_ld_a_i(symbolised_state, all_orders=False):
     run_cycle('ei', 0xfb, 4)
     run_cycle('shadow nop', 0x00, 4)
     s.set_pin_and_update('~int', FALSE, all_orders)
-    run_cycle('ld a, i ED', 0xed, 4)
-    run_cycle('ld a, i opcode', 0x57, 5)
+    is_lar = bools.get('is_lar')
+    run_cycle('ld a, {i, r} ED', 0xed, 4)
+    run_cycle('ld a, {i, r} opcode',
+              Bits.ifelse(is_lar, Bits.cast(0x5f, width=8),
+                          Bits.cast(0x57, width=8)), 5)
     s.cache()
 
     y = Bits('y_p1', width=3)
@@ -4599,21 +4605,28 @@ def test_int_at_ld_a_i(symbolised_state, all_orders=False):
                                  all_orders=all_orders)
 
     i_reg = sampled_bits(base, 'reg_i')
+    # R as of the copy: the base value plus the four fetches up
+    # to and including the instruction's own -- ei, the shadow
+    # nop and its two opcode fetches.
+    r_at_copy = (sampled_bits(base, 'reg_r', width=7) + 4)
+    r_at_copy = Bits(r_at_copy.truncated(7).bits +
+                     (sampled_bits(base, 'reg_r')[7],))
+    copied = Bits.ifelse(is_lar, r_at_copy, i_reg)
     changed = {}
     for j in range(8):
         changed[f'reg_a{j}'] = bools.ifelse(
-            ex_af, i_reg[j],
+            ex_af, copied[j],
             PossibleValues.cast(base[f'reg_a{j}']).single_value)
         changed[f'reg_aa{j}'] = bools.ifelse(
             ex_af,
             PossibleValues.cast(base[f'reg_aa{j}']).single_value,
-            i_reg[j])
+            copied[j])
     new_flags = {NF_BIT: FALSE, HF_BIT: FALSE,
                  # The lore under test: the acceptance's
                  # clearing of IFF2 wins over the copy to PF.
                  PF_BIT: FALSE,
-                 XF_BIT: i_reg[3], YF_BIT: i_reg[5],
-                 ZF_BIT: i_reg == 0, SF_BIT: i_reg[7]}
+                 XF_BIT: copied[3], YF_BIT: copied[5],
+                 ZF_BIT: copied == 0, SF_BIT: copied[7]}
     for j, v in new_flags.items():
         changed[f'reg_f{j}'] = bools.ifelse(
             ex_af, v,
@@ -4658,8 +4671,8 @@ def test_int_at_ld_a_i(symbolised_state, all_orders=False):
             return FALSE
         return base[n]
 
-    check_sampled_states('~int at ld a, i', after, get_expected,
-                         under=accepts)
+    check_sampled_states('~int at ld a, {i, r}', after,
+                         get_expected, under=accepts)
 
 
 def test_nmi_over_int_priority(symbolised_state, all_orders=False):
@@ -5164,7 +5177,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_int_at_halt_m1(state, all_orders)
                 test_int_at_boundary(state, all_orders)
                 test_int_between_ldir_repeats(state, all_orders)
-                test_int_at_ld_a_i(state, all_orders)
+                test_int_at_ld_a_ir(state, all_orders)
                 test_nmi_over_int_priority(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
