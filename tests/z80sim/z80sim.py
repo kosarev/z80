@@ -5654,8 +5654,38 @@ _BUS_W3 = (
 _BUS_M1_6 = _BUS_M1_4[:7] + (
     ('ir', 1, 1, 1, 1, 1, 1),) * 4 + (
     ('next', None, 1, 1, 1, 1, 1),)
+# An M1 followed by internal cycles parks the refresh address
+# through its handover half-tick; the internal cycles keep it,
+# all strobes idle, and the next real cycle's address appears
+# only at the last internal cycle's final half-tick.
+_BUS_M1_INT = _BUS_M1_4[:7] + (('ir', 1, 1, 1, 1, 1, 1),)
+_BUS_E4 = (('ir', 1, 1, 1, 1, 1, 1),) * 8
+_BUS_E3_END = (('ir', 1, 1, 1, 1, 1, 1),) * 5 + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_R4 = (
+    ('cur', 1, 0, 0, 1, 1, 1),) * 4 + (
+    ('cur', 1, 1, 1, 1, 1, 1),) * 3 + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_W5 = _BUS_W3[:5] + (
+    ('cur', 1, 1, 1, 1, 1, 1),) * 4 + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_IO_R = (
+    ('cur', 1, 1, 1, 1, 1, 1),) + (
+    ('cur', 1, 1, 0, 1, 0, 1),) * 5 + (
+    ('cur', 1, 1, 1, 1, 1, 1),) + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_IO_W = (
+    ('cur', 1, 1, 1, 1, 1, 1),) + (
+    ('cur', 1, 1, 1, 0, 0, 1),) * 5 + (
+    ('cur', 1, 1, 1, 1, 1, 1),) + (
+    ('next', None, 1, 1, 1, 1, 1),)
 _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
-                  'm16': _BUS_M1_6, 'r': _BUS_R3, 'w': _BUS_W3}
+                  'm16': _BUS_M1_6, 'm1i': _BUS_M1_INT,
+                  'e4': _BUS_E4, 'e3end': _BUS_E3_END,
+                  'r': _BUS_R3, 'r4': _BUS_R4,
+                  'w': _BUS_W3, 'w5': _BUS_W5,
+                  'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W}
+_BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i')
 
 # Per-family cycle kinds and addresses; families with
 # variant-dependent bus behaviour or cycle kinds not yet
@@ -5747,6 +5777,11 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     hl = Bits.concat(Bits.ifelse(ex_de, bank('d'), bank('h')),
                      Bits.ifelse(ex_de, bank('e'), bank('l')))
+    de = Bits.concat(Bits.ifelse(ex_de, bank('h'), bank('d')),
+                     Bits.ifelse(ex_de, bank('l'), bank('e')))
+    ex_af = PossibleValues.cast(eff[EX_AF_FF]).single_value
+    a_reg = Bits.ifelse(ex_af, sampled_bits(eff, 'reg_a'),
+                        sampled_bits(eff, 'reg_aa'))
 
     def phased(id):
         return f'{id}_p1'
@@ -5760,6 +5795,14 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             return (sp + (0x10000 + off)).truncated(16)
         if a == 'hl':
             return hl
+        if a == 'de':
+            return de
+        if a == 'bc':
+            return Bits.concat(bank('b'), bank('c'))
+        if a == 'a:n':
+            return Bits.concat(a_reg, Bits(phased('r'), width=8))
+        if a == '-':
+            return None
         if a == 'jp-target':
             return Bits.concat(Bits(phased('hi'), width=8),
                                Bits(phased('lo'), width=8))
@@ -5791,18 +5834,30 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
             zip(cycles, spec)):
         assert cond is None, instr
-        template = _BUS_TEMPLATES[kind]
+        if kind == 'io_v':
+            is_in = bools.get(phased('is_in'))
+            template = ((('cur', 1, 1, 1, 1, 1, 1),) +
+                        (('cur', 1, 1, ~is_in, is_in, 0, 1),) * 5 +
+                        (('cur', 1, 1, 1, 1, 1, 1),) +
+                        (('next', None, 1, 1, 1, 1, 1),))
+        else:
+            template = _BUS_TEMPLATES[kind]
         assert len(template) == ticks * 2, instr
         cur = resolve(addr)
-        refresh = ir_plus(num_m1)
-        if kind in ('m1', 'm15'):
+        if kind in _BUS_FETCH_KINDS:
+            refresh = ir_plus(num_m1)
             num_m1 += 1
+        else:
+            # The internal cycles keep the last fetch's parked
+            # refresh address.
+            refresh = ir_plus(num_m1 - 1)
+        nxt = None
         if cyc + 1 < len(cycles):
             nxt = resolve(spec[cyc + 1][1])
-            next_is_fetch = spec[cyc + 1][0] in ('m1', 'm15')
-        else:
+            next_is_fetch = spec[cyc + 1][0] in _BUS_FETCH_KINDS
+        if nxt is None:
             nxt = instr_next
-            next_is_fetch = True
+            next_is_fetch = cyc + 1 >= len(cycles)
         s.set_db(d, all_orders)
         for t in range(ticks):
             for ht in (0, 1):
@@ -5821,8 +5876,9 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 for j, p in enumerate(AB):
                     expected[p] = a[j]
                 for p, v in pins.items():
-                    expected[p] = (TRUE if v == 1 else
-                                   FALSE if v == 0 else v)
+                    if isinstance(v, int):
+                        v = TRUE if v else FALSE
+                    expected[p] = v
                 states = s.get_node_states(AB + CTL)
                 check_sampled_states(
                     f'{instr} bus {cyc}:{t}.{ht}', states,
