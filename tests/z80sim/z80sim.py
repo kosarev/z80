@@ -4412,6 +4412,35 @@ def probe_bus_templates(all_orders=False):
     drive(s, 'halted M1 1', 'hb1', 4, cands)
     drive(s, 'halted M1 2', 'hb2', 4, cands)
 
+    # The remaining cycle kinds.
+    s = State(base)
+    drive(s, 'inc (hl) M1', 0x34, 4, cands)
+    drive(s, 'inc (hl) r4', 'q1', 4, cands)
+    drive(s, 'inc (hl) w3', 'q2', 3, cands)
+
+    s = State(base)
+    drive(s, 'out (n) M1', 0xd3, 4, io_cands)
+    drive(s, 'out (n) imm', 'pn', 3, io_cands)
+    drive(s, 'out (n) io', 'po', 4, io_cands)
+
+    s = State(base)
+    drive(s, 'add hl M1', 0x09, 4, cands)
+    drive(s, 'add hl e4', 'q3', 4, cands)
+    drive(s, 'add hl e3', 'q4', 3, cands)
+
+    s = State(base)
+    drive(s, 'ex (sp) M1', 0xe3, 4, cands)
+    drive(s, 'ex (sp) r3', 'q5', 3, cands)
+    drive(s, 'ex (sp) r4', 'q6', 4, cands)
+    drive(s, 'ex (sp) w3', 'q7', 3, cands)
+    drive(s, 'ex (sp) w5', 'q8', 5, cands)
+
+    s = State(base)
+    drive(s, 'ldi ED M1', 0xed, 4, cands)
+    drive(s, 'ldi op M1', 0xa0, 4, cands)
+    drive(s, 'ldi read', 'q9', 3, cands)
+    drive(s, 'ldi write', 'qa', 5, cands)
+
 
 def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ~int ends the halted state where interrupts are enabled
@@ -5666,6 +5695,25 @@ for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
     BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1', 'pc'),)
     BUS_SPECS[f'{_m} (hl)'] = (('m1', 'pc'), ('r', 'hl'))
     BUS_SPECS[f'{_m} n'] = (('m1', 'pc'), ('r', 'pc+1'))
+BUS_SPECS.update({
+    'inc/dec (hl)': (('m1', 'pc'), ('r4', 'hl'), ('w', 'hl')),
+    'inc/dec <rp>': (('m16', 'pc'),),
+    'ex (sp), hl': (('m1', 'pc'), ('r', 'sp'), ('r4', 'sp+1'),
+                    ('w', 'sp+1'), ('w5', 'sp')),
+    'ldi/ldd': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
+                ('w5', 'de')),
+    'add hl, <rp>': (('m1i', 'pc'), ('e4', '-'), ('e3end', '-')),
+    'adc/sbc hl, <rp>': (('m1', 'pc'), ('m1i', 'pc+1'),
+                         ('e4', '-'), ('e3end', '-')),
+    'neg/xneg': (('m1', 'pc'), ('m1', 'pc+1')),
+    'im/xim n': (('m1', 'pc'), ('m1', 'pc+1')),
+    'xnop': (('m1', 'pc'), ('m1', 'pc+1')),
+    'ld {i, r}, a/ld a, {i, r}': (('m1', 'pc'), ('m15', 'pc+1')),
+    'in r, (c)': (('m1', 'pc'), ('m1', 'pc+1'), ('io_r', 'bc')),
+    'out (c), r': (('m1', 'pc'), ('m1', 'pc+1'), ('io_w', 'bc')),
+    'in a, (n)/out (n), a': (('m1', 'pc'), ('r', 'pc+1'),
+                             ('io_v', 'a:n')),
+})
 
 
 def test_bus_timeline(instr, base_state, all_orders=False):
