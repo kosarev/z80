@@ -123,11 +123,17 @@ internal nodes.
   byte those fetches return and however long the CPU stays
   halted, nothing changes but the refresh register.
 
+  The halted fetches all read the address right after the
+  halt instruction, with the refresh address advancing
+  normally in between — so from outside, a halted Z80 looks
+  exactly like a CPU reading that one byte over and over.
+
   Covered by the `halt` sequence of a plain `./z80sim.py` run:
   `test_halted_dynamics()` feeds a halted fetch a symbolic
   byte and compares the complete sampled state of consecutive
   halted cycles. The load timing is shown by
-  `./z80sim.py --probe-acceptance-latch`.
+  `./z80sim.py --probe-acceptance-latch` and the fetch
+  addresses by `./z80sim.py --probe-bus-templates`.
 
 - WZ — the internal pointer register often called MEMPTR —
   survives a `~reset` pulse: it keeps its value while PC, I, R
@@ -164,8 +170,8 @@ internal nodes.
   halt fetch and into the acceptance.
 
 - When an interrupt is accepted at the boundary of `ld a, i`
-  — the instruction that copies the interrupt flip-flop IFF2
-  into the PF flag — the flag reads 0: the acceptance's
+  or `ld a, r` — the instructions that copy the interrupt
+  flip-flop IFF2 into the PF flag — the flag reads 0: the acceptance's
   clearing of the flip-flop wins over the copy. That much
   matches what testing real NMOS chips established. What
   testing could not establish: the outcome is deterministic —
@@ -175,7 +181,7 @@ internal nodes.
   interrupt lands on that boundary, never about which value
   wins when it does.
 
-  Covered by `test_int_at_ld_a_i()` of a plain `./z80sim.py`
+  Covered by `test_int_at_ld_a_ir()` of a plain `./z80sim.py`
   run.
 
 - The fetch cycle that starts the acceptance of an interrupt —
