@@ -3876,7 +3876,7 @@ def probe_bus_templates(all_orders=False):
         for k in range(-1, 3):
             cands[f'pc{k:+}' if k else 'pc'] = (
                 (pc + (0x10000 + k)).truncated(16))
-        for k in range(3):
+        for k in range(6):
             cands[f'ir+{k}' if k else 'ir'] = ir_plus(st, k)
         st = eff
         # The bus sees the effective registers, resolved through
@@ -4051,6 +4051,12 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
 
     check_sampled_states('im 1 ~int from halt', after, get_expected,
                          under=accepts)
+
+    # The halted fetches: which address they drive was an open
+    # question of the halt coverage.
+    s = State(process_instr(('halt',), base, all_orders=all_orders))
+    drive(s, 'halted M1 1', 'hb1', 4, cands)
+    drive(s, 'halted M1 2', 'hb2', 4, cands)
 
 
 def test_int_im2_from_halt(symbolised_state, all_orders=False):
