@@ -14,7 +14,10 @@ So a single run proves how an instruction behaves for all
 register contents and operands at once, and whole families of
 instructions are tested together. The results are checked
 against expected expressions written independently of the
-simulation.
+simulation, and every check covers the complete architectural
+state — both register banks, PC, SP, I, R, WZ, the flags and
+the interrupt and exchange flip-flops — so an instruction
+with a side effect anywhere in that state cannot pass.
 
 There is one more source of freedom the simulator covers: the
 order in which the gates of the circuit react to a change. On
