@@ -4436,6 +4436,13 @@ def probe_bus_templates(all_orders=False):
     drive(s, 'ex (sp) w5', 'q8', 5, cands)
 
     s = State(base)
+    drive(s, 'rrd ED M1', 0xed, 4, cands)
+    drive(s, 'rrd op M1', 0x67, 4, cands)
+    drive(s, 'rrd read', 'qb', 3, cands)
+    drive(s, 'rrd e4', 'qc', 4, cands)
+    drive(s, 'rrd write', 'qd', 3, cands)
+
+    s = State(base)
     drive(s, 'ldi ED M1', 0xed, 4, cands)
     drive(s, 'ldi op M1', 0xa0, 4, cands)
     drive(s, 'ldi read', 'q9', 3, cands)
@@ -5654,13 +5661,19 @@ _BUS_W3 = (
 _BUS_M1_6 = _BUS_M1_4[:7] + (
     ('ir', 1, 1, 1, 1, 1, 1),) * 4 + (
     ('next', None, 1, 1, 1, 1, 1),)
-# An M1 followed by internal cycles parks the refresh address
-# through its handover half-tick; the internal cycles keep it,
-# all strobes idle, and the next real cycle's address appears
-# only at the last internal cycle's final half-tick.
+# The bus holds its last driven value: internal cycles drive
+# nothing, so they keep the previous cycle's final address --
+# the refresh address after a fetch, the transfer address
+# after a read -- with all strobes idle, and the next real
+# cycle's address appears only at the last internal cycle's
+# final half-tick. A cycle followed by an internal one
+# accordingly keeps its own address at its handover half-tick.
 _BUS_M1_INT = _BUS_M1_4[:7] + (('ir', 1, 1, 1, 1, 1, 1),)
-_BUS_E4 = (('ir', 1, 1, 1, 1, 1, 1),) * 8
-_BUS_E3_END = (('ir', 1, 1, 1, 1, 1, 1),) * 5 + (
+_BUS_R3_INT = _BUS_R3[:5] + (('cur', 1, 1, 1, 1, 1, 1),)
+_BUS_E4 = (('hold', 1, 1, 1, 1, 1, 1),) * 8
+_BUS_E3_END = (('hold', 1, 1, 1, 1, 1, 1),) * 5 + (
+    ('next', None, 1, 1, 1, 1, 1),)
+_BUS_E5_END = (('hold', 1, 1, 1, 1, 1, 1),) * 9 + (
     ('next', None, 1, 1, 1, 1, 1),)
 _BUS_R4 = (
     ('cur', 1, 0, 0, 1, 1, 1),) * 4 + (
@@ -5681,7 +5694,8 @@ _BUS_IO_W = (
     ('next', None, 1, 1, 1, 1, 1),)
 _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'm16': _BUS_M1_6, 'm1i': _BUS_M1_INT,
-                  'e4': _BUS_E4, 'e3end': _BUS_E3_END,
+                  'ri': _BUS_R3_INT, 'e4': _BUS_E4,
+                  'e3end': _BUS_E3_END, 'e5end': _BUS_E5_END,
                   'r': _BUS_R3, 'r4': _BUS_R4,
                   'w': _BUS_W3, 'w5': _BUS_W5,
                   'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W}
@@ -5743,7 +5757,32 @@ BUS_SPECS.update({
     'out (c), r': (('m1', 'pc'), ('m1', 'pc+1'), ('io_w', 'bc')),
     'in a, (n)/out (n), a': (('m1', 'pc'), ('r', 'pc+1'),
                              ('io_v', 'a:n')),
+    'rrd/rld': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
+                ('e4', '-'), ('w', 'hl')),
+    'jr d': (('m1', 'pc'), ('ri', 'pc+1'), ('e5end', '-')),
+    'call nn': (('m1', 'pc'), ('r', 'pc+1'), ('r4', 'pc+2'),
+                ('w', 'sp-1'), ('w', 'sp-2')),
+    'reti/retn/xretn': (('m1', 'pc'), ('m1', 'pc+1'),
+                        ('r', 'sp'), ('r', 'sp+1')),
+    'ld a, (nn)/ld (nn), a': (('m1', 'pc'), ('r', 'pc+1'),
+                              ('r', 'pc+2'), ('rw_v', 'nn')),
+    'ld hl, (nn)/ld (nn), hl': (('m1', 'pc'), ('r', 'pc+1'),
+                                ('r', 'pc+2'), ('rw_v', 'nn'),
+                                ('rw_v', 'nn+1')),
+    'ld <rp>, (nn)/ld (nn), <rp>': (
+        ('m1', 'pc'), ('m1', 'pc+1'), ('r', 'pc+2'),
+        ('r', 'pc+3'), ('rw_v', 'nn2'), ('rw_v', 'nn2+1')),
+    'ld (<rp>), a/ld a, (<rp>)': (('m1', 'pc'),
+                                  ('rw_v', 'bc/de')),
 })
+
+# The store condition of the rw_v families, per family.
+_BUS_RW_STORE = {
+    'ld a, (nn)/ld (nn), a': 'is_store',
+    'ld hl, (nn)/ld (nn), hl': 'is_store',
+    'ld (<rp>), a/ld a, (<rp>)': 'is_store',
+    'ld <rp>, (nn)/ld (nn), <rp>': '~q',
+}
 
 
 def test_bus_timeline(instr, base_state, all_orders=False):
@@ -5801,6 +5840,26 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             return Bits.concat(bank('b'), bank('c'))
         if a == 'a:n':
             return Bits.concat(a_reg, Bits(phased('r'), width=8))
+        if a.startswith('nn2'):
+            v = Bits.concat(Bits(phased('r4'), width=8),
+                            Bits(phased('r3'), width=8))
+            return (v + 1).truncated(16) if a.endswith('+1') else v
+        if a.startswith('nn'):
+            v = Bits.concat(Bits(phased('r2'), width=8),
+                            Bits(phased('r1'), width=8))
+            return (v + 1).truncated(16) if a.endswith('+1') else v
+        if a == 'bc/de':
+            return Bits.ifelse(cycles[0][0][4], de,
+                               Bits.concat(bank('b'), bank('c')))
+        if a == 'call-target':
+            return Bits.concat(Bits(phased('r2'), width=8),
+                               Bits(phased('r1'), width=8))
+        if a == 'reti-target':
+            return Bits.concat(Bits(phased('r4'), width=8),
+                               Bits(phased('r3'), width=8))
+        if a == 'jr-target':
+            d = Bits(phased('r'), width=8)
+            return (pc + 2 + d.sign_extended(16)).truncated(16)
         if a == '-':
             return None
         if a == 'jp-target':
@@ -5816,7 +5875,9 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     NEXT_SPECIAL = {'jp hl': 'hl', 'jp nn': 'jp-target',
                     'ret': 'ret-target', 'rst n': 'rst-target',
-                    'halt': 'pc+1'}
+                    'halt': 'pc+1', 'jr d': 'jr-target',
+                    'call nn': 'call-target',
+                    'reti/retn/xretn': 'reti-target'}
     if instr in NEXT_SPECIAL:
         instr_next = resolve(NEXT_SPECIAL[instr])
     else:
@@ -5831,6 +5892,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     s = State(base_state)
     num_m1 = 0
+    held = None
     for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
             zip(cycles, spec)):
         assert cond is None, instr
@@ -5838,6 +5900,16 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             is_in = bools.get(phased('is_in'))
             template = ((('cur', 1, 1, 1, 1, 1, 1),) +
                         (('cur', 1, 1, ~is_in, is_in, 0, 1),) * 5 +
+                        (('cur', 1, 1, 1, 1, 1, 1),) +
+                        (('next', None, 1, 1, 1, 1, 1),))
+        elif kind == 'rw_v':
+            t = _BUS_RW_STORE[instr]
+            if t.startswith('~'):
+                store = ~bools.get(phased(t[1:]) + '_b0')
+            else:
+                store = bools.get(phased(t))
+            template = ((('cur', 1, 0, store, 1, 1, 1),) * 2 +
+                        (('cur', 1, 0, store, ~store, 1, 1),) * 2 +
                         (('cur', 1, 1, 1, 1, 1, 1),) +
                         (('next', None, 1, 1, 1, 1, 1),))
         else:
@@ -5867,7 +5939,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 role, m1, mreq, rd, wr, iorq, rfsh = (
                     template[t * 2 + ht])
                 a = {'cur': cur, 'ir': refresh,
-                     'next': nxt}[role]
+                     'next': nxt, 'hold': held}[role]
                 if m1 is None:
                     m1 = FALSE if next_is_fetch else TRUE
                 pins = dict(zip(CTL, (m1, mreq, rd, wr, iorq,
@@ -5883,6 +5955,11 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 check_sampled_states(
                     f'{instr} bus {cyc}:{t}.{ht}', states,
                     lambda x: expected[x])
+        # What the bus keeps into a following internal cycle:
+        # the last role this cycle drove.
+        role = template[-1][0]
+        held = {'cur': cur, 'ir': refresh, 'next': nxt,
+                'hold': held}[role]
 
 
 def test_instr_seq(seq, all_orders=False):
