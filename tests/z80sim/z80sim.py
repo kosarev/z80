@@ -2811,10 +2811,16 @@ def test_node(instrs, n, at_start, at_end, before, after,
     phase = len(instrs)
     instr = instrs[-1]
     cycles = TestedInstrs.get_cycles(instr, phase)
-    opcode, ticks, cond = cycles[0]
+    # The main opcode: past a conditional prefix fetch and past
+    # a CB/ED prefix byte.
+    ci = 1 if cycles[0][2] == 'is_prefixed' else 0
+    opcode, ticks, cond = cycles[ci]
     if opcode.value in (0xcb, 0xed):
-        opcode, ticks, cond = cycles[1]
+        opcode, ticks, cond = cycles[ci + 1]
     opcode = opcode.zero_extended(8)
+    is_prefixed = (bools.get(f'is_prefixed_p{len(instrs)}')
+                   if ci else FALSE)
+    prefix_bit = Bits.ifelse(is_prefixed, 1, 0)
 
     AT_HL, A = 6, 7
 
@@ -3230,7 +3236,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
             # one past the next instruction's address.
             length = SEQ_LENGTHS.get(instr)
             if length is not None:
-                return get_pc_plus(length + 1)
+                # The prefix, where a family carries one, adds
+                # a byte.
+                return get_pc_plus(length + 1) + prefix_bit
             if instr == 'halt':
                 # PC freezes past the halt opcode.
                 return get_pc_plus(1)
@@ -3356,8 +3364,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
         i = int(n[-1])
         cur = bits('reg_r')
         num_m1 = sum(1 for d, t, c in cycles
-                     if isinstance(d, Bits))
-        lo = (Bits(cur.bits[0:7]) + num_m1).truncated(7)
+                     if isinstance(d, Bits) and c is None)
+        lo = (Bits(cur.bits[0:7]) + num_m1 +
+              prefix_bit).truncated(7)
         v = Bits(lo.bits + (cur[7],))
         if instr == 'ld {i, r}, a/ld a, {i, r}':
             a = get_a()
@@ -4249,8 +4258,7 @@ def probe_node_ids(all_orders=False):
                              f'{n} = {v1.kind}')
 
     with Status.do('im latch'):
-        s = State(process_instr(('im/xim n',), base,
-                                all_orders=all_orders))
+        s = run_im_ei_nop_halt_prep(base, 1, all_orders)
         st = full_after_m1(s, 0x00)
         for n in sorted(st, key=str):
             v = st[n]
@@ -4487,6 +4495,42 @@ def probe_bus_templates(all_orders=False):
     drive(s, 'ldi write', 'qa', 5, cands)
 
 
+def run_prep_instr(s, cycles, all_orders):
+    # Mirrors execute_instr()'s steps exactly. Preparations
+    # drive raw byte expressions instead of executing the
+    # instruction families: the families' cycle lists evolve --
+    # the prefix work adds conditional cycles to them -- and a
+    # preparation must keep its step list, and so its cached
+    # settlings, stable.
+    for d, ticks in cycles:
+        s.set_db(d, all_orders)
+        for t in range(ticks):
+            for ht in (0, 1):
+                with s.status(f'prep tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache(intermediate=True)
+    s.cache()
+
+
+def run_im_ei_nop_halt_prep(symbolised_state, upto, all_orders):
+    # The acceptance tests' preparation: im/xim with the mode
+    # symbolic, ei/di with the choice symbolic, a shadow nop
+    # and halt -- as many of these as asked, with the terms
+    # named as the family executions used to name them.
+    s = State(symbolised_state)
+    y = Bits('y_p1', width=3)
+    im_op = Bits((FALSE, TRUE, TRUE) + tuple(y.bits) +
+                 (TRUE, FALSE))
+    ei_op = Bits.ifelse(bools.get('is_ei_p2'),
+                        Bits.cast(0xfb, width=8),
+                        Bits.cast(0xf3, width=8))
+    prep = (((0xed, 4), (im_op, 4)), ((ei_op, 4),),
+            ((0x00, 4),), ((0x76, 4),))
+    for cycles in prep[:upto]:
+        run_prep_instr(s, cycles, all_orders)
+    return s
+
+
 def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ~int ends the halted state where interrupts are enabled
     # and the mode is 1. The preparation sets the mode and the
@@ -4496,10 +4540,7 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # ED76 duplicate at once. The acceptance is a seven-tick
     # acknowledge cycle whose bus byte, fed symbolic, must be
     # ignored in mode 1, and two three-tick pushes of PC.
-    s = symbolised_state
-    prep = 'im/xim n', 'ei/di', 'nop', 'halt'
-    for i in range(len(prep)):
-        s = process_instr(prep[:i + 1], s, all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 4, all_orders)
 
     y = Bits('y_p1', width=3)
     is_im1 = y[1] & ~y[0]
@@ -4584,10 +4625,7 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
     # supplied, with WZ loaded to match. The table address
     # itself is not asserted: there are no address-bus
     # expectations yet.
-    s = symbolised_state
-    prep = 'im/xim n', 'ei/di', 'nop', 'halt'
-    for i in range(len(prep)):
-        s = process_instr(prep[:i + 1], s, all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 4, all_orders)
 
     y = Bits('y_p1', width=3)
     is_im2 = y[1] & y[0]
@@ -4675,10 +4713,7 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
     # flip-flops come out clear, PC -- the halt address plus
     # one -- is pushed, and execution resumes at the RST
     # target, with WZ loaded to match.
-    s = symbolised_state
-    prep = 'im/xim n', 'ei/di', 'nop', 'halt'
-    for i in range(len(prep)):
-        s = process_instr(prep[:i + 1], s, all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 4, all_orders)
 
     y = Bits('y_p1', width=3)
     is_im0 = ~y[1]
@@ -4757,10 +4792,8 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
     # halt M1 directly, and the pushed return address resumes
     # past the halt. The interrupt mode stays symbolic; the
     # acceptance is checked in its mode-1 branch.
-    s = process_instr(('im/xim n',), symbolised_state,
-                      all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 1, all_orders)
     base = s.get_node_states(SAMPLED_NODES)
-    s = State(s)
 
     def run_m1(db, ticks=4, sample_halt=False):
         s.set_db(db, all_orders)
@@ -4869,10 +4902,8 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
     # the nop's boundary, pushing the address after it. The
     # interrupt mode stays symbolic; the acceptance is checked
     # in its mode-1 branch.
-    s = process_instr(('im/xim n',), symbolised_state,
-                      all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 1, all_orders)
     base = s.get_node_states(SAMPLED_NODES)
-    s = State(s)
 
     def run_m1(db):
         s.set_db(db, all_orders)
@@ -4952,10 +4983,8 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
     # and HF clear, CF, SF, ZF and A untouched. The checks are
     # conditioned on the repeat itself (BC was not 1) and on
     # mode 1.
-    s = process_instr(('im/xim n',), symbolised_state,
-                      all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 1, all_orders)
     base = s.get_node_states(SAMPLED_NODES)
-    s = State(s)
 
     def run_cycle(what, db, ticks):
         s.set_db(db, all_orders)
@@ -5085,10 +5114,8 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
     # The instruction choice is symbolic; for ld a, r the
     # copied value has both of the instruction's own refresh
     # increments already in.
-    s = process_instr(('im/xim n',), symbolised_state,
-                      all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 1, all_orders)
     base = s.get_node_states(SAMPLED_NODES)
-    s = State(s)
 
     def run_cycle(what, db, ticks):
         s.set_db(db, all_orders)
@@ -5203,10 +5230,8 @@ def test_nmi_over_int_priority(symbolised_state, all_orders=False):
     # preserves it, where a maskable acceptance would have
     # cleared it -- while IFF1 comes out clear, blocking the
     # still-pending ~int until the handler re-enables.
-    s = process_instr(('im/xim n',), symbolised_state,
-                      all_orders=all_orders)
+    s = run_im_ei_nop_halt_prep(symbolised_state, 1, all_orders)
     base = s.get_node_states(SAMPLED_NODES)
-    s = State(s)
 
     def run_cycle(what, db, ticks):
         s.set_db(db, all_orders)
@@ -5332,6 +5357,8 @@ def get_cond_as_expr(cond, phase, before):
                 Bits(before[f'reg_c{i}'] for i in range(8)),
                 Bits(before[f'reg_cc{i}'] for i in range(8)))
         return Bits.concat(b, c) != 1
+    if cond == 'is_prefixed':
+        return bools.get(f'is_prefixed_p{phase}')
     if cond == 'bc != 1 && a != r':
         b = Bits.ifelse(
                 before[EXX_FF],
@@ -5739,15 +5766,16 @@ _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'e1': _BUS_E1,
                   'r': _BUS_R3, 'r4': _BUS_R4,
                   'w': _BUS_W3, 'w5': _BUS_W5,
-                  'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W}
-_BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i')
+                  'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W,
+                  'm1p': _BUS_M1_4}
+_BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i', 'm1p')
 
 # Per-family cycle kinds and addresses; families with
 # variant-dependent bus behaviour or cycle kinds not yet
 # probed (r4, w5, the internal e cycles, the six-tick M1, the
 # conditional cycles) are not listed yet.
 BUS_SPECS = {
-    'nop': (('m1', 'pc'),),
+    'nop': (('m1p', 'pc'), ('m1', 'pc')),
     "ex af, af'": (('m1', 'pc'),),
     'daa': (('m1', 'pc'),),
     'cpl': (('m1', 'pc'),),
@@ -5886,6 +5914,24 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         lo = (Bits(ir.bits[0:7]) + k).truncated(7)
         return Bits(lo.bits + (ir[7],) + ir.bits[8:16])
 
+    def ir_plus_b(k):
+        lo = (Bits(ir.bits[0:7]) + k).truncated(7)
+        return Bits(lo.bits + (ir[7],) + ir.bits[8:16])
+
+    family_prefixed = spec[0][0] == 'm1p'
+    pref_b = Bits.ifelse(
+        bools.get('is_prefixed_p1') if family_prefixed else FALSE,
+        1, 0)
+
+    def resolve_at(cyc_index, a):
+        v = resolve(a)
+        if (v is not None and family_prefixed and cyc_index > 0
+                and a.startswith('pc')):
+            # The prefix byte shifts every later pc-relative
+            # address by one where it is there.
+            v = (v + pref_b).truncated(16)
+        return v
+
     exx = PossibleValues.cast(eff[EXX_FF]).single_value
     ex_de = PossibleValues.cast(eff[EX_DE_FF]).single_value
 
@@ -5971,6 +6017,8 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     else:
         length = 1 + sum(1 for k, a in spec if a.startswith('pc+'))
         instr_next = (pc + length).truncated(16)
+    if family_prefixed:
+        instr_next = (instr_next + pref_b).truncated(16)
     if instr in _BUS_COND_NEXTS:
         tk_spec, nt_spec = _BUS_COND_NEXTS[instr]
         taken_next = resolve(tk_spec)
@@ -5985,7 +6033,8 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     CTL = '~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh'
 
     s = State(base_state)
-    num_m1 = 0
+    m1_index = Bits.cast(0, width=3)
+    refresh = None
     held = None
     for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
             zip(cycles, spec)):
@@ -6010,16 +6059,16 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         else:
             template = _BUS_TEMPLATES[kind]
         assert len(template) == ticks * 2, instr
-        cur = resolve(addr)
+        cur = resolve_at(cyc, addr)
         if kind in _BUS_FETCH_KINDS:
-            refresh = ir_plus(num_m1)
-            num_m1 += 1
-        else:
-            # The internal cycles keep the last fetch's parked
-            # refresh address.
-            refresh = ir_plus(num_m1 - 1)
+            refresh = ir_plus_b(m1_index)
+            m1_index = (m1_index +
+                        (pref_b if kind == 'm1p' else
+                         1)).truncated(3)
+        # Internal cycles keep the last fetch's parked refresh
+        # address, so refresh persists across them.
         if cyc + 1 < len(cycles):
-            tk = resolve(spec[cyc + 1][1])
+            tk = resolve_at(cyc + 1, spec[cyc + 1][1])
             if tk is None:
                 tk = cur if cur is not None else held
             ncond = cycles[cyc + 1][2]
@@ -6248,10 +6297,19 @@ class TestedInstrs(object):
 
             return Bits(bits)
 
-        def f(p, *, ticks=4):
+        def f(p, *, ticks=4, cond=None):
             # Variable names must be phased, so don't allow them here.
             assert not isinstance(p, str)
-            return Bits.cast(p), ticks, None
+            return Bits.cast(p), ticks, cond
+
+        def fp():
+            # The conditional DD/FD prefix fetch: the prefix is
+            # a modifier on the instruction that follows, not an
+            # instruction of its own, so it joins a family's
+            # cycles guarded on whether it is there at all, with
+            # the IX/IY choice symbolic.
+            return f(ifelse('is_iy', 0xfd, 0xdd),
+                     cond='is_prefixed')
 
         def f5(p):
             return f(p, ticks=5)
@@ -6296,7 +6354,7 @@ class TestedInstrs(object):
                           ifelse(f'{id}_b1', ifelse(f'{id}_b0', e, d),
                                  ifelse(f'{id}_b0', c, b)))
 
-        yield 'nop', (f(0x00),)
+        yield 'nop', (fp(), f(0x00))
         yield "ex af, af'", (f(0x08),)
         yield 'jr d', (f(0x18), r3(), e5())
         yield 'daa', (f(0x27),)
