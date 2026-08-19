@@ -103,6 +103,18 @@ internal nodes.
   checks the bus at every half-tick of 54 instruction
   families' machine cycles.
 
+- In interrupt mode 2, the vector byte the interrupting
+  device supplies is used as-is: the two bytes of the handler
+  address are read from I:vector and I:vector + 1, with the
+  vector's bit 0 respected. Documentation disagrees on whether
+  the Z80 forces the vector even; on this netlist no forcing
+  exists, and an odd vector simply reads a pointer that
+  straddles two table entries.
+
+  Derived with `./z80sim.py --probe-bus-templates`, which
+  shows the table read addresses on the bus with the vector
+  fully symbolic.
+
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
   produce a definite value for them. Each of the two bits,
