@@ -5776,19 +5776,19 @@ _BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i', 'm1p')
 # conditional cycles) are not listed yet.
 BUS_SPECS = {
     'nop': (('m1p', 'pc'), ('m1', 'pc')),
-    "ex af, af'": (('m1', 'pc'),),
-    'daa': (('m1', 'pc'),),
-    'cpl': (('m1', 'pc'),),
-    'scf/ccf': (('m1', 'pc'),),
-    'exx': (('m1', 'pc'),),
+    "ex af, af'": (('m1p', 'pc'), ('m1', 'pc')),
+    'daa': (('m1p', 'pc'), ('m1', 'pc')),
+    'cpl': (('m1p', 'pc'), ('m1', 'pc')),
+    'scf/ccf': (('m1p', 'pc'), ('m1', 'pc')),
+    'exx': (('m1p', 'pc'), ('m1', 'pc')),
     'ex de, hl': (('m1', 'pc'),),
     'ld sp, hl': (('m16', 'pc'),),
-    'ei/di': (('m1', 'pc'),),
+    'ei/di': (('m1p', 'pc'), ('m1', 'pc')),
     'jp hl': (('m1', 'pc'),),
     'halt': (('m1', 'pc'),),
     'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
         (('m1', 'pc'),),
-    'rlca/rrca/rla/rra': (('m1', 'pc'),),
+    'rlca/rrca/rla/rra': (('m1p', 'pc'), ('m1', 'pc')),
     'inc/dec {b, c, d, e, h, l, a}': (('m1', 'pc'),),
     'ld {b, c, d, e, h, l, a}, n':
         (('m1', 'pc'), ('r', 'pc+1')),
@@ -5807,7 +5807,8 @@ BUS_SPECS = {
 for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
     BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1', 'pc'),)
     BUS_SPECS[f'{_m} (hl)'] = (('m1', 'pc'), ('r', 'hl'))
-    BUS_SPECS[f'{_m} n'] = (('m1', 'pc'), ('r', 'pc+1'))
+    BUS_SPECS[f'{_m} n'] = (('m1p', 'pc'), ('m1', 'pc'),
+                            ('r', 'pc+1'))
 BUS_SPECS.update({
     'inc/dec (hl)': (('m1', 'pc'), ('r4', 'hl'), ('w', 'hl')),
     'inc/dec <rp>': (('m16', 'pc'),),
@@ -5824,8 +5825,8 @@ BUS_SPECS.update({
     'ld {i, r}, a/ld a, {i, r}': (('m1', 'pc'), ('m15', 'pc+1')),
     'in r, (c)': (('m1', 'pc'), ('m1', 'pc+1'), ('io_r', 'bc')),
     'out (c), r': (('m1', 'pc'), ('m1', 'pc+1'), ('io_w', 'bc')),
-    'in a, (n)/out (n), a': (('m1', 'pc'), ('r', 'pc+1'),
-                             ('io_v', 'a:n')),
+    'in a, (n)/out (n), a': (('m1p', 'pc'), ('m1', 'pc'),
+                             ('r', 'pc+1'), ('io_v', 'a:n')),
     'rrd/rld': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
                 ('e4', '-'), ('w', 'hl')),
     'jr d': (('m1', 'pc'), ('ri', 'pc+1'), ('e5end', '-')),
@@ -5833,15 +5834,16 @@ BUS_SPECS.update({
                 ('w', 'sp-1'), ('w', 'sp-2')),
     'reti/retn/xretn': (('m1', 'pc'), ('m1', 'pc+1'),
                         ('r', 'sp'), ('r', 'sp+1')),
-    'ld a, (nn)/ld (nn), a': (('m1', 'pc'), ('r', 'pc+1'),
-                              ('r', 'pc+2'), ('rw_v', 'nn')),
+    'ld a, (nn)/ld (nn), a': (('m1p', 'pc'), ('m1', 'pc'),
+                              ('r', 'pc+1'), ('r', 'pc+2'),
+                              ('rw_v', 'nn')),
     'ld hl, (nn)/ld (nn), hl': (('m1', 'pc'), ('r', 'pc+1'),
                                 ('r', 'pc+2'), ('rw_v', 'nn'),
                                 ('rw_v', 'nn+1')),
     'ld <rp>, (nn)/ld (nn), <rp>': (
         ('m1', 'pc'), ('m1', 'pc+1'), ('r', 'pc+2'),
         ('r', 'pc+3'), ('rw_v', 'nn2'), ('rw_v', 'nn2+1')),
-    'ld (<rp>), a/ld a, (<rp>)': (('m1', 'pc'),
+    'ld (<rp>), a/ld a, (<rp>)': (('m1p', 'pc'), ('m1', 'pc'),
                                   ('rw_v', 'bc/de')),
 })
 
@@ -5977,7 +5979,8 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                             Bits(phased('r1'), width=8))
             return (v + 1).truncated(16) if a.endswith('+1') else v
         if a == 'bc/de':
-            return Bits.ifelse(cycles[0][0][4], de,
+            main = cycles[1 if family_prefixed else 0][0]
+            return Bits.ifelse(main[4], de,
                                Bits.concat(bank('b'), bank('c')))
         if a in ('call-target', 'retcc-target'):
             return Bits.concat(Bits(phased('r2'), width=8),
@@ -6355,16 +6358,16 @@ class TestedInstrs(object):
                                  ifelse(f'{id}_b0', c, b)))
 
         yield 'nop', (fp(), f(0x00))
-        yield "ex af, af'", (f(0x08),)
+        yield "ex af, af'", (fp(), f(0x08))
         yield 'jr d', (f(0x18), r3(), e5())
-        yield 'daa', (f(0x27),)
-        yield 'cpl', (f(0x2f),)
-        yield 'scf/ccf', (f(ifelse('is_scf', 0x37, 0x3f)),)
-        yield 'exx', (f(0xd9),)
+        yield 'daa', (fp(), f(0x27))
+        yield 'cpl', (fp(), f(0x2f))
+        yield 'scf/ccf', (fp(), f(ifelse('is_scf', 0x37, 0x3f)))
+        yield 'exx', (fp(), f(0xd9))
         yield 'jp hl', (f(0xe9),)
         yield 'ex de, hl', (f(0xeb),)
         yield 'ld sp, hl', (f6(0xf9),)
-        yield 'ei/di', (f(ifelse('is_ei', 0xfb, 0xf3)),)
+        yield 'ei/di', (fp(), f(ifelse('is_ei', 0xfb, 0xf3)))
 
         yield 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}', (
             f(xyz(1, get_non_at_hl_r('regd'), get_non_at_hl_r('regs'))),)
@@ -6388,20 +6391,21 @@ class TestedInstrs(object):
             yield f'{m} {{b, c, d, e, h, l, a}}', (
                 f(xyz(2, op, get_non_at_hl_r())),)
             yield f'{m} (hl)', (f(xyz(2, op, AT_HL)), r3())
-            yield f'{m} n', (f(xyz(3, op, 6)), r3())
+            yield f'{m} n', (fp(), f(xyz(3, op, 6)), r3())
 
         yield 'ld hl, (nn)/ld (nn), hl', (
             f(ifelse('is_store', 0x22, 0x2a)),
             r3('r1'), r3('r2'), rw3('rw3'), rw3('rw4'))
         yield 'ld a, (nn)/ld (nn), a', (
-            f(ifelse('is_store', 0x32, 0x3a)),
+            fp(), f(ifelse('is_store', 0x32, 0x3a)),
             r3('r1'), r3('r2'), rw3('rw3'))
 
         yield 'rst n', (f5(xyz(3, 'y', 7)), w3('w1'), w3('w2'))
 
-        yield 'rlca/rrca/rla/rra', (f(ifelse('is_rlca_rrca',
-                                             ifelse('is_rl', 0x07, 0x0f),
-                                             ifelse('is_rl', 0x17, 0x1f))),)
+        yield 'rlca/rrca/rla/rra', (
+            fp(), f(ifelse('is_rlca_rrca',
+                           ifelse('is_rl', 0x07, 0x0f),
+                           ifelse('is_rl', 0x17, 0x1f))))
 
         yield 'inc/dec {b, c, d, e, h, l, a}', (
             f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))),)
@@ -6416,7 +6420,9 @@ class TestedInstrs(object):
 
         pp = Bits.concat(Bits(0, width=1), Bits('p', width=1))
         yield 'ld (<rp>), a/ld a, (<rp>)', (
-            f(xpqz(0, pp, Bits((~bools.get(phased('is_store')),)), 2)), rw3())
+            fp(),
+            f(xpqz(0, pp, Bits((~bools.get(phased('is_store')),)), 2)),
+            rw3())
 
         yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
         yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
@@ -6424,7 +6430,7 @@ class TestedInstrs(object):
         yield 'ex (sp), hl', (f(0xe3), r3('r1'), r4('r2'), w3('w3'), w5('w4'))
 
         yield 'in a, (n)/out (n), a', (
-            f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
+            fp(), f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
 
         yield 'djnz d', (
             f5(0x10), r3(), e5(cond='b != 1'))
