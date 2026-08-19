@@ -6491,6 +6491,14 @@ def test_instructions():
         return True
 
     instrs = TestedInstrs.get_instrs()
+
+    # For iterating on a single family: --only=<instr> tests
+    # just that sequence, pass records untouched aside.
+    only = get_opt('--only', str)
+    if only is not None:
+        assert only in instrs, only
+        instrs = (only,)
+
     ok = True
     ok &= add((i,) for i in instrs)
     if '--two-instr-seqs' in sys.argv:
