@@ -4312,7 +4312,7 @@ def probe_bus_templates(all_orders=False):
         sp = Bits.concat(sampled_bits(st, 'reg_sph'),
                          sampled_bits(st, 'reg_spl'))
         cands = {'float': Bits(bools.get(f'pull.{p}') for p in AB)}
-        for k in range(-1, 3):
+        for k in range(-1, 6):
             cands[f'pc{k:+}' if k else 'pc'] = (
                 (pc + (0x10000 + k)).truncated(16))
         for k in range(6):
@@ -4434,6 +4434,44 @@ def probe_bus_templates(all_orders=False):
     drive(s, 'ex (sp) r4', 'q6', 4, cands)
     drive(s, 'ex (sp) w3', 'q7', 3, cands)
     drive(s, 'ex (sp) w5', 'q8', 5, cands)
+
+    # The acceptance timelines: the ~nmi acknowledge fetch and
+    # the im 2 acceptance with its vector-table reads -- the
+    # table address, vector bit 0 included, is the open
+    # question.
+    s = State(process_instr(('halt',), base, all_orders=all_orders))
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    drive(s, 'pre-nmi halted M1', 'ha1', 4, cands)
+    s.set_pin_and_update('~nmi', FALSE, all_orders)
+    drive(s, 'nmi-edge halted M1', 'ha2', 4, cands)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    drive(s, 'nmi ack M1', 'ha3', 5, cands)
+    drive(s, 'nmi push 1', 'ha4', 3, cands)
+    drive(s, 'nmi push 2', 'ha5', 3, cands)
+
+    s = State(base)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    for byte, name in ((0xed, 'im 2 ED'), (0x5e, 'im 2 op'),
+                       (0xfb, 'ei'), (0x00, 'shadow nop')):
+        s.set_db(byte, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'{name} tick {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    io_cands2 = dict(cands)
+    iv = Bits('pv', width=8)
+    i_reg = sampled_bits(base.get_node_states(SAMPLED_NODES),
+                         'reg_i')
+    io_cands2['i:v'] = Bits.concat(i_reg, iv)
+    io_cands2['i:v+1'] = (Bits.concat(i_reg, iv) + 1).truncated(16)
+    drive(s, 'im2 last nop', 0x00, 4, io_cands2)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    drive(s, 'im2 ack M1', 'pv', 7, io_cands2)
+    drive(s, 'im2 push 1', 'pw1', 3, io_cands2)
+    drive(s, 'im2 push 2', 'pw2', 3, io_cands2)
+    drive(s, 'im2 table lo', 'pt1', 3, io_cands2)
+    drive(s, 'im2 table hi', 'pt2', 3, io_cands2)
 
     s = State(base)
     drive(s, 'rrd ED M1', 0xed, 4, cands)
