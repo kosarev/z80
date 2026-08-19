@@ -3585,7 +3585,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
     if instr == 'ld {i, r}, a/ld a, {i, r}':
         ri, rr = bits('reg_i'), bits('reg_r')
-        rr = Bits((rr + 1).bits[:7] + (rr[7],))
+        # The prefix fetch, where there is one, adds a refresh
+        # before the copy.
+        rr = Bits((rr + 1 + prefix_bit).bits[:7] + (rr[7],))
         r = Bits.ifelse(phased('is_i_reg'), ri, rr)
         v = Bits.ifelse(phased('is_store'), get_a(), r)
         if n in NFF + HFF:
@@ -5834,24 +5836,29 @@ BUS_SPECS.update({
     'ldi/ldd': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
                 ('w5', 'de')),
     'add hl, <rp>': (('m1i', 'pc'), ('e4', '-'), ('e3end', '-')),
-    'adc/sbc hl, <rp>': (('m1', 'pc'), ('m1i', 'pc+1'),
-                         ('e4', '-'), ('e3end', '-')),
-    'neg/xneg': (('m1', 'pc'), ('m1', 'pc+1')),
-    'im/xim n': (('m1', 'pc'), ('m1', 'pc+1')),
-    'xnop': (('m1', 'pc'), ('m1', 'pc+1')),
-    'ld {i, r}, a/ld a, {i, r}': (('m1', 'pc'), ('m15', 'pc+1')),
-    'in r, (c)': (('m1', 'pc'), ('m1', 'pc+1'), ('io_r', 'bc')),
-    'out (c), r': (('m1', 'pc'), ('m1', 'pc+1'), ('io_w', 'bc')),
+    'adc/sbc hl, <rp>': (('m1p', 'pc'), ('m1', 'pc'),
+                         ('m1i', 'pc+1'), ('e4', '-'),
+                         ('e3end', '-')),
+    'neg/xneg': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1')),
+    'im/xim n': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1')),
+    'xnop': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1')),
+    'ld {i, r}, a/ld a, {i, r}': (('m1p', 'pc'), ('m1', 'pc'),
+                                  ('m15', 'pc+1')),
+    'in r, (c)': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'),
+                  ('io_r', 'bc')),
+    'out (c), r': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'),
+                   ('io_w', 'bc')),
     'in a, (n)/out (n), a': (('m1p', 'pc'), ('m1', 'pc'),
                              ('r', 'pc+1'), ('io_v', 'a:n')),
-    'rrd/rld': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
-                ('e4', '-'), ('w', 'hl')),
+    'rrd/rld': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'),
+                ('ri', 'hl'), ('e4', '-'), ('w', 'hl')),
     'jr d': (('m1p', 'pc'), ('m1', 'pc'), ('ri', 'pc+1'),
              ('e5end', '-')),
     'call nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
                 ('r4', 'pc+2'), ('w', 'sp-1'), ('w', 'sp-2')),
-    'reti/retn/xretn': (('m1', 'pc'), ('m1', 'pc+1'),
-                        ('r', 'sp'), ('r', 'sp+1')),
+    'reti/retn/xretn': (('m1p', 'pc'), ('m1', 'pc'),
+                        ('m1', 'pc+1'), ('r', 'sp'),
+                        ('r', 'sp+1')),
     'ld a, (nn)/ld (nn), a': (('m1p', 'pc'), ('m1', 'pc'),
                               ('r', 'pc+1'), ('r', 'pc+2'),
                               ('rw_v', 'nn')),
@@ -5859,8 +5866,9 @@ BUS_SPECS.update({
                                 ('r', 'pc+2'), ('rw_v', 'nn'),
                                 ('rw_v', 'nn+1')),
     'ld <rp>, (nn)/ld (nn), <rp>': (
-        ('m1', 'pc'), ('m1', 'pc+1'), ('r', 'pc+2'),
-        ('r', 'pc+3'), ('rw_v', 'nn2'), ('rw_v', 'nn2+1')),
+        ('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'),
+        ('r', 'pc+2'), ('r', 'pc+3'), ('rw_v', 'nn2'),
+        ('rw_v', 'nn2+1')),
     'ld (<rp>), a/ld a, (<rp>)': (('m1p', 'pc'), ('m1', 'pc'),
                                   ('rw_v', 'bc/de')),
 })
@@ -6479,11 +6487,13 @@ class TestedInstrs(object):
             w3('w3', cond='cc'), w3('w4', cond='cc'))
 
         yield 'ld {i, r}, a/ld a, {i, r}', (
-            f(0xed), f5(ifelse('is_i_reg',
-                               ifelse('is_store', 0x47, 0x57),
-                               ifelse('is_store', 0x4f, 0x5f))))
+            fp(), f(0xed),
+            f5(ifelse('is_i_reg',
+                      ifelse('is_store', 0x47, 0x57),
+                      ifelse('is_store', 0x4f, 0x5f))))
         yield 'rrd/rld', (
-            f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(), e4(), w3())
+            fp(), f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(),
+            e4(), w3())
         yield 'ldi/ldd', (
             f(0xed), f(ifelse('is_ldd', 0xa8, 0xa0)), r3(), w5())
         # The repeat cycle runs only when the decremented BC is
@@ -6514,18 +6524,18 @@ class TestedInstrs(object):
             f(0xed), f5(ifelse('is_outd', 0xbb, 0xb3)), r3(), io4(),
             e5(cond='b != 1'))
         yield 'in r, (c)', (
-            f(0xed), f(xyz(1, 'y', 0)), io4())
+            fp(), f(0xed), f(xyz(1, 'y', 0)), io4())
         yield 'out (c), r', (
-            f(0xed), f(xyz(1, 'y', 1)), io4())
+            fp(), f(0xed), f(xyz(1, 'y', 1)), io4())
         yield 'adc/sbc hl, <rp>', (
-            f(0xed), f(xpqz(1, 'p', 'q', 2)), e4(), e3())
+            fp(), f(0xed), f(xpqz(1, 'p', 'q', 2)), e4(), e3())
         yield 'ld <rp>, (nn)/ld (nn), <rp>', (
-            f(0xed), f(xpqz(1, 'p', 'q', 3)),
+            fp(), f(0xed), f(xpqz(1, 'p', 'q', 3)),
             r3('r3'), r3('r4'), rw3('rw5'), rw3('rw6'))
-        yield 'neg/xneg', (f(0xed), f(xyz(1, 'y', 4)))
+        yield 'neg/xneg', (fp(), f(0xed), f(xyz(1, 'y', 4)))
         yield 'reti/retn/xretn', (
-            f(0xed), f(xyz(1, 'y', 5)), r3('r3'), r3('r4'))
-        yield 'im/xim n', (f(0xed), f(xyz(1, 'y', 6)))
+            fp(), f(0xed), f(xyz(1, 'y', 5)), r3('r3'), r3('r4'))
+        yield 'im/xim n', (fp(), f(0xed), f(xyz(1, 'y', 6)))
 
         xnop_00 = pattern('00 xxx xxx')
         xnop_01 = pattern('01 11x 111')
@@ -6535,7 +6545,7 @@ class TestedInstrs(object):
         xnop = ifelse('is_0',
                       ifelse('is_00', xnop_00, xnop_01),
                       ifelse('is_10', xnop_10, xnop_11))
-        yield 'xnop', (f(0xed), f(xnop))
+        yield 'xnop', (fp(), f(0xed), f(xnop))
 
         ROT, BIT, RES, SET = range(4)
         for x, m in (
