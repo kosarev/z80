@@ -5675,6 +5675,8 @@ _BUS_E3_END = (('hold', 1, 1, 1, 1, 1, 1),) * 5 + (
     ('next', None, 1, 1, 1, 1, 1),)
 _BUS_E5_END = (('hold', 1, 1, 1, 1, 1, 1),) * 9 + (
     ('next', None, 1, 1, 1, 1, 1),)
+_BUS_E1 = (('hold', 1, 1, 1, 1, 1, 1),
+           ('next', None, 1, 1, 1, 1, 1))
 _BUS_R4 = (
     ('cur', 1, 0, 0, 1, 1, 1),) * 4 + (
     ('cur', 1, 1, 1, 1, 1, 1),) * 3 + (
@@ -5696,6 +5698,7 @@ _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'm16': _BUS_M1_6, 'm1i': _BUS_M1_INT,
                   'ri': _BUS_R3_INT, 'e4': _BUS_E4,
                   'e3end': _BUS_E3_END, 'e5end': _BUS_E5_END,
+                  'e1': _BUS_E1,
                   'r': _BUS_R3, 'r4': _BUS_R4,
                   'w': _BUS_W3, 'w5': _BUS_W5,
                   'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W}
@@ -5784,6 +5787,44 @@ _BUS_RW_STORE = {
     'ld <rp>, (nn)/ld (nn), <rp>': '~q',
 }
 
+BUS_SPECS.update({
+    'jp cc, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
+    'djnz d': (('m15', 'pc'), ('r', 'pc+1'), ('e5end', '-')),
+    'jr cc, d': (('m1', 'pc'), ('r', 'pc+1'), ('e5end', '-')),
+    'ret cc': (('m15', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
+    'call cc, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2'),
+                    ('e1', '-'), ('w', 'sp-1'), ('w', 'sp-2')),
+    'cpi/cpd': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
+                ('e5end', '-')),
+    'cpir/cpdr': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
+                  ('e5end', '-'), ('e5end', '-')),
+    'ldir/lddr': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
+                  ('w5', 'de'), ('e5end', '-')),
+    'ini/ind': (('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
+                ('w', 'hl')),
+    'inir/indr': (('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
+                  ('w', 'hl'), ('e5end', '-')),
+    # The out group decrements B before the port write, so
+    # its port address carries the decremented value.
+    'outi/outd': (('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
+                  ('io_w', 'b-1:c')),
+    'otir/otdr': (('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
+                  ('io_w', 'b-1:c'), ('e5end', '-')),
+})
+
+# The conditional families' two next-fetch addresses: the
+# taken branch's and the fall-through one's.
+_BUS_COND_NEXTS = {
+    'djnz d': ('jr-target', 'pc+2'),
+    'jr cc, d': ('jr-target', 'pc+2'),
+    'ret cc': ('retcc-target', 'pc+1'),
+    'call cc, nn': ('call-target', 'pc+3'),
+    'ldir/lddr': ('pc', 'pc+2'),
+    'cpir/cpdr': ('pc', 'pc+2'),
+    'inir/indr': ('pc', 'pc+2'),
+    'otir/otdr': ('pc', 'pc+2'),
+}
+
 
 def test_bus_timeline(instr, base_state, all_orders=False):
     # Replays the instruction's settlings -- the steps are
@@ -5838,6 +5879,9 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             return de
         if a == 'bc':
             return Bits.concat(bank('b'), bank('c'))
+        if a == 'b-1:c':
+            return Bits.concat((bank('b') - 1).truncated(8),
+                               bank('c'))
         if a == 'a:n':
             return Bits.concat(a_reg, Bits(phased('r'), width=8))
         if a.startswith('nn2'):
@@ -5851,9 +5895,14 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         if a == 'bc/de':
             return Bits.ifelse(cycles[0][0][4], de,
                                Bits.concat(bank('b'), bank('c')))
-        if a == 'call-target':
+        if a in ('call-target', 'retcc-target'):
             return Bits.concat(Bits(phased('r2'), width=8),
                                Bits(phased('r1'), width=8))
+        if a == 'jpcc-next':
+            t = Bits.concat(Bits(phased('hi'), width=8),
+                            Bits(phased('lo'), width=8))
+            cc = get_cond_as_expr('cc', 1, eff)
+            return Bits.ifelse(cc, t, (pc + 3).truncated(16))
         if a == 'reti-target':
             return Bits.concat(Bits(phased('r4'), width=8),
                                Bits(phased('r3'), width=8))
@@ -5877,12 +5926,19 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                     'ret': 'ret-target', 'rst n': 'rst-target',
                     'halt': 'pc+1', 'jr d': 'jr-target',
                     'call nn': 'call-target',
-                    'reti/retn/xretn': 'reti-target'}
+                    'reti/retn/xretn': 'reti-target',
+                    'jp cc, nn': 'jpcc-next'}
     if instr in NEXT_SPECIAL:
         instr_next = resolve(NEXT_SPECIAL[instr])
     else:
         length = 1 + sum(1 for k, a in spec if a.startswith('pc+'))
         instr_next = (pc + length).truncated(16)
+    if instr in _BUS_COND_NEXTS:
+        tk_spec, nt_spec = _BUS_COND_NEXTS[instr]
+        taken_next = resolve(tk_spec)
+        nottaken_next = resolve(nt_spec)
+    else:
+        taken_next = nottaken_next = instr_next
 
     cycles = TestedInstrs.get_cycles(instr, 1)
     assert len(cycles) == len(spec), instr
@@ -5895,7 +5951,8 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     held = None
     for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
             zip(cycles, spec)):
-        assert cond is None, instr
+        under = (get_cond_as_expr(cond, 1, eff)
+                 if cond is not None else None)
         if kind == 'io_v':
             is_in = bools.get(phased('is_in'))
             template = ((('cur', 1, 1, 1, 1, 1, 1),) +
@@ -5923,25 +5980,38 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             # The internal cycles keep the last fetch's parked
             # refresh address.
             refresh = ir_plus(num_m1 - 1)
-        nxt = None
         if cyc + 1 < len(cycles):
-            nxt = resolve(spec[cyc + 1][1])
-            next_is_fetch = spec[cyc + 1][0] in _BUS_FETCH_KINDS
-        if nxt is None:
-            nxt = instr_next
-            next_is_fetch = cyc + 1 >= len(cycles)
+            tk = resolve(spec[cyc + 1][1])
+            if tk is None:
+                tk = cur if cur is not None else held
+            ncond = cycles[cyc + 1][2]
+            if ncond is not None:
+                # The boundary into a conditional cycle: the
+                # taken branch enters it; the fall-through one
+                # fetches the next instruction.
+                nc = get_cond_as_expr(ncond, 1, eff)
+                nxt = Bits.ifelse(nc, tk, nottaken_next)
+                next_m1 = nc
+            else:
+                nxt = tk
+                next_m1 = (FALSE if spec[cyc + 1][0] in
+                           _BUS_FETCH_KINDS else TRUE)
+        else:
+            nxt = taken_next
+            next_m1 = FALSE
         s.set_db(d, all_orders)
         for t in range(ticks):
             for ht in (0, 1):
                 with s.status(f'bus tick {cyc}:{t}.{ht}'):
-                    s.half_tick(all_orders=all_orders)
+                    s.half_tick(cond=under,
+                                all_orders=all_orders)
                 s.cache()
                 role, m1, mreq, rd, wr, iorq, rfsh = (
                     template[t * 2 + ht])
                 a = {'cur': cur, 'ir': refresh,
                      'next': nxt, 'hold': held}[role]
                 if m1 is None:
-                    m1 = FALSE if next_is_fetch else TRUE
+                    m1 = next_m1
                 pins = dict(zip(CTL, (m1, mreq, rd, wr, iorq,
                                       rfsh)))
                 expected = {}
@@ -5954,7 +6024,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 states = s.get_node_states(AB + CTL)
                 check_sampled_states(
                     f'{instr} bus {cyc}:{t}.{ht}', states,
-                    lambda x: expected[x])
+                    lambda x: expected[x], under=under)
         # What the bus keeps into a following internal cycle:
         # the last role this cycle drove.
         role = template[-1][0]
