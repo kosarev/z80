@@ -3096,12 +3096,13 @@ def test_node(instrs, n, at_start, at_end, before, after,
             return check(wz[i])
         if instr == 'jr d':
             d = Bits(phased('r'), width=8)
-            wz = get_pc_plus(2) + d.sign_extended(16)
+            wz = get_pc_plus(2) + prefix_bit + d.sign_extended(16)
             return check(wz[i])
         if instr == 'djnz d':
             b = get_b()
             d = Bits(phased('r'), width=8)
-            target = get_pc_plus(2) + d.sign_extended(16)
+            target = (get_pc_plus(2) + prefix_bit +
+                      d.sign_extended(16))
             wz = Bits.ifelse(b != 1, target, get_wz())
             return check(wz[i])
         if instr == 'jr cc, d':
@@ -3112,7 +3113,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 bools.ifelse(cc2[0], cf, ~cf),
                 bools.ifelse(cc2[0], zf, ~zf))
             d = Bits(phased('r'), width=8)
-            target = get_pc_plus(2) + d.sign_extended(16)
+            target = (get_pc_plus(2) + prefix_bit +
+                      d.sign_extended(16))
             wz = Bits.ifelse(cc2, target, get_wz())
             return check(wz[i])
         if instr == 'in a, (n)/out (n), a':
@@ -3255,8 +3257,10 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == 'jp cc, nn':
                 t = Bits.concat(Bits(phased('hi'), width=8),
                                 Bits(phased('lo'), width=8))
-                return Bits.ifelse(get_cc_taken(), t,
-                                   get_pc_plus(3)) + 1
+                return Bits.ifelse(
+                    get_cc_taken(), t,
+                    (get_pc_plus(3) +
+                     prefix_bit).truncated(16)) + 1
             if instr == 'call nn':
                 t = Bits.concat(Bits(phased('r2'), width=8),
                                 Bits(phased('r1'), width=8))
@@ -3264,16 +3268,21 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == 'call cc, nn':
                 t = Bits.concat(Bits(phased('r2'), width=8),
                                 Bits(phased('r1'), width=8))
-                return Bits.ifelse(get_cc_taken(), t,
-                                   get_pc_plus(3)) + 1
+                return Bits.ifelse(
+                    get_cc_taken(), t,
+                    (get_pc_plus(3) +
+                     prefix_bit).truncated(16)) + 1
             if instr == 'ret cc':
                 t = Bits.concat(Bits(phased('r2'), width=8),
                                 Bits(phased('r1'), width=8))
-                return Bits.ifelse(get_cc_taken(), t,
-                                   get_pc_plus(1)) + 1
+                return Bits.ifelse(
+                    get_cc_taken(), t,
+                    (get_pc_plus(1) +
+                     prefix_bit).truncated(16)) + 1
             if instr == 'jr d':
                 d = Bits(phased('r'), width=8)
-                return get_pc_plus(2) + d.sign_extended(16) + 1
+                return (get_pc_plus(2) + prefix_bit +
+                        d.sign_extended(16) + 1)
             if instr == 'jr cc, d':
                 cc2 = Bits(phased('cc2'), width=2)
                 cf, zf = get_active(CF), get_active(ZF)
@@ -3282,15 +3291,20 @@ def test_node(instrs, n, at_start, at_end, before, after,
                     bools.ifelse(cc2[0], cf, ~cf),
                     bools.ifelse(cc2[0], zf, ~zf))
                 d = Bits(phased('r'), width=8)
-                t = (get_pc_plus(2) +
+                t = (get_pc_plus(2) + prefix_bit +
                      d.sign_extended(16)).truncated(16)
-                return Bits.ifelse(taken, t, get_pc_plus(2)) + 1
+                return Bits.ifelse(
+                    taken, t,
+                    (get_pc_plus(2) +
+                     prefix_bit).truncated(16)) + 1
             if instr == 'djnz d':
                 d = Bits(phased('r'), width=8)
-                t = (get_pc_plus(2) +
+                t = (get_pc_plus(2) + prefix_bit +
                      d.sign_extended(16)).truncated(16)
-                return Bits.ifelse(get_b() != 1, t,
-                                   get_pc_plus(2)) + 1
+                return Bits.ifelse(
+                    get_b() != 1, t,
+                    (get_pc_plus(2) +
+                     prefix_bit).truncated(16)) + 1
             if instr == 'rst n':
                 t = Bits(phased('y'), width=3) << 3
                 return t.zero_extended(16) + 1
@@ -5800,9 +5814,12 @@ BUS_SPECS = {
     'ld <rp>, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
     'pop <rp2>': (('m1', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
     'push <rp2>': (('m15', 'pc'), ('w', 'sp-1'), ('w', 'sp-2')),
-    'jp nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
-    'ret': (('m1', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
-    'rst n': (('m15', 'pc'), ('w', 'sp-1'), ('w', 'sp-2')),
+    'jp nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+              ('r', 'pc+2')),
+    'ret': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
+            ('r', 'sp+1')),
+    'rst n': (('m1p', 'pc'), ('m15', 'pc'), ('w', 'sp-1'),
+              ('w', 'sp-2')),
 }
 for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
     BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1', 'pc'),)
@@ -5829,9 +5846,10 @@ BUS_SPECS.update({
                              ('r', 'pc+1'), ('io_v', 'a:n')),
     'rrd/rld': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
                 ('e4', '-'), ('w', 'hl')),
-    'jr d': (('m1', 'pc'), ('ri', 'pc+1'), ('e5end', '-')),
-    'call nn': (('m1', 'pc'), ('r', 'pc+1'), ('r4', 'pc+2'),
-                ('w', 'sp-1'), ('w', 'sp-2')),
+    'jr d': (('m1p', 'pc'), ('m1', 'pc'), ('ri', 'pc+1'),
+             ('e5end', '-')),
+    'call nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+                ('r4', 'pc+2'), ('w', 'sp-1'), ('w', 'sp-2')),
     'reti/retn/xretn': (('m1', 'pc'), ('m1', 'pc+1'),
                         ('r', 'sp'), ('r', 'sp+1')),
     'ld a, (nn)/ld (nn), a': (('m1p', 'pc'), ('m1', 'pc'),
@@ -5856,12 +5874,17 @@ _BUS_RW_STORE = {
 }
 
 BUS_SPECS.update({
-    'jp cc, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
-    'djnz d': (('m15', 'pc'), ('r', 'pc+1'), ('e5end', '-')),
-    'jr cc, d': (('m1', 'pc'), ('r', 'pc+1'), ('e5end', '-')),
-    'ret cc': (('m15', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
-    'call cc, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2'),
-                    ('e1', '-'), ('w', 'sp-1'), ('w', 'sp-2')),
+    'jp cc, nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+                  ('r', 'pc+2')),
+    'djnz d': (('m1p', 'pc'), ('m15', 'pc'), ('r', 'pc+1'),
+               ('e5end', '-')),
+    'jr cc, d': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+                 ('e5end', '-')),
+    'ret cc': (('m1p', 'pc'), ('m15', 'pc'), ('r', 'sp'),
+               ('r', 'sp+1')),
+    'call cc, nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+                    ('r', 'pc+2'), ('e1', '-'), ('w', 'sp-1'),
+                    ('w', 'sp-2')),
     'cpi/cpd': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
                 ('e5end', '-')),
     'cpir/cpdr': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
@@ -5989,13 +6012,15 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             t = Bits.concat(Bits(phased('hi'), width=8),
                             Bits(phased('lo'), width=8))
             cc = get_cond_as_expr('cc', 1, eff)
-            return Bits.ifelse(cc, t, (pc + 3).truncated(16))
+            return Bits.ifelse(cc, t,
+                               (pc + 3 + pref_b).truncated(16))
         if a == 'reti-target':
             return Bits.concat(Bits(phased('r4'), width=8),
                                Bits(phased('r3'), width=8))
         if a == 'jr-target':
             d = Bits(phased('r'), width=8)
-            return (pc + 2 + d.sign_extended(16)).truncated(16)
+            return (pc + 2 + pref_b +
+                    d.sign_extended(16)).truncated(16)
         if a == '-':
             return None
         if a == 'jp-target':
@@ -6016,16 +6041,17 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                     'reti/retn/xretn': 'reti-target',
                     'jp cc, nn': 'jpcc-next'}
     if instr in NEXT_SPECIAL:
+        # The special resolvers shift themselves where their
+        # targets are pc-relative; absolute targets do not
+        # shift.
         instr_next = resolve(NEXT_SPECIAL[instr])
     else:
         length = 1 + sum(1 for k, a in spec if a.startswith('pc+'))
-        instr_next = (pc + length).truncated(16)
-    if family_prefixed:
-        instr_next = (instr_next + pref_b).truncated(16)
+        instr_next = (pc + length + pref_b).truncated(16)
     if instr in _BUS_COND_NEXTS:
         tk_spec, nt_spec = _BUS_COND_NEXTS[instr]
-        taken_next = resolve(tk_spec)
-        nottaken_next = resolve(nt_spec)
+        taken_next = resolve_at(1, tk_spec)
+        nottaken_next = resolve_at(1, nt_spec)
     else:
         taken_next = nottaken_next = instr_next
 
@@ -6359,7 +6385,7 @@ class TestedInstrs(object):
 
         yield 'nop', (fp(), f(0x00))
         yield "ex af, af'", (fp(), f(0x08))
-        yield 'jr d', (f(0x18), r3(), e5())
+        yield 'jr d', (fp(), f(0x18), r3(), e5())
         yield 'daa', (fp(), f(0x27))
         yield 'cpl', (fp(), f(0x2f))
         yield 'scf/ccf', (fp(), f(ifelse('is_scf', 0x37, 0x3f)))
@@ -6400,7 +6426,8 @@ class TestedInstrs(object):
             fp(), f(ifelse('is_store', 0x32, 0x3a)),
             r3('r1'), r3('r2'), rw3('rw3'))
 
-        yield 'rst n', (f5(xyz(3, 'y', 7)), w3('w1'), w3('w2'))
+        yield 'rst n', (fp(), f5(xyz(3, 'y', 7)), w3('w1'),
+                        w3('w2'))
 
         yield 'rlca/rrca/rla/rra', (
             fp(), f(ifelse('is_rlca_rrca',
@@ -6424,28 +6451,30 @@ class TestedInstrs(object):
             f(xpqz(0, pp, Bits((~bools.get(phased('is_store')),)), 2)),
             rw3())
 
-        yield 'jp nn', (f(0xc3), r3('lo'), r3('hi'))
-        yield 'ret', (f(0xc9), r3('lo'), r3('hi'))
-        yield 'call nn', (f(0xcd), r3('r1'), r4('r2'), w3('w3'), w3('w4'))
+        yield 'jp nn', (fp(), f(0xc3), r3('lo'), r3('hi'))
+        yield 'ret', (fp(), f(0xc9), r3('lo'), r3('hi'))
+        yield 'call nn', (fp(), f(0xcd), r3('r1'), r4('r2'),
+                          w3('w3'), w3('w4'))
         yield 'ex (sp), hl', (f(0xe3), r3('r1'), r4('r2'), w3('w3'), w5('w4'))
 
         yield 'in a, (n)/out (n), a', (
             fp(), f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
 
         yield 'djnz d', (
-            f5(0x10), r3(), e5(cond='b != 1'))
+            fp(), f5(0x10), r3(), e5(cond='b != 1'))
         yield 'jr cc, d', (
-            f(xyz(0, Bits(phased('cc2'), width=2) | 0b100, 0)),
+            fp(), f(xyz(0, Bits(phased('cc2'), width=2) | 0b100, 0)),
             r3(), e5(cond='cc2'))
         yield 'ret cc', (
-            f5(xyz(3, 'cc', 0)), r3('r1', cond='cc'), r3('r2', cond='cc'))
+            fp(), f5(xyz(3, 'cc', 0)), r3('r1', cond='cc'),
+            r3('r2', cond='cc'))
         yield 'jp cc, nn', (
-            f(xyz(3, 'cc', 2)), r3('lo'), r3('hi'))
+            fp(), f(xyz(3, 'cc', 2)), r3('lo'), r3('hi'))
         # The high-operand read runs a fourth tick when the call
         # is taken; it is modelled as a separate one-tick
         # conditional cycle.
         yield 'call cc, nn', (
-            f(xyz(3, 'cc', 4)), r3('r1'), r3('r2'),
+            fp(), f(xyz(3, 'cc', 4)), r3('r1'), r3('r2'),
             (phased('e'), 1, 'cc'),
             w3('w3', cond='cc'), w3('w4', cond='cc'))
 
