@@ -91,6 +91,8 @@ for i in range(8):
         TESTED_NODES.add(f'reg_{r}{i}')
     for r in 'bcdehl':
         TESTED_NODES.update((f'reg_{r}{i}', f'reg_{r}{r}{i}'))
+    for r in ('ixh', 'ixl', 'iyh', 'iyl'):
+        TESTED_NODES.add(f'reg_{r}{i}')
     TESTED_NODES.add(f'instr{i}')
 
 SAMPLED_NODES = set(TESTED_NODES)
@@ -2706,6 +2708,15 @@ class State(object):
         sys.exit()
 
 
+# The families where the prefix redirects the HL role; the
+# ED families are deliberately absent -- there the prefix
+# is proven ignored.
+PREFIX_HL_REDIRECT = (
+    'jp hl', 'ld sp, hl', 'ex (sp), hl', 'add hl, <rp>',
+    'inc/dec <rp>', 'ld <rp>, nn', 'pop <rp2>',
+    'push <rp2>')
+
+
 class CheckToken(object):
     pass
 
@@ -2847,6 +2858,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 return TRUE
             if n[4:6] in ('pc', 'sp') or n[4] in 'ir':
                 return TRUE
+            if n[4:6] in ('ix', 'iy'):
+                return TRUE
             if n[4] in 'bcdehl':
                 return TRUE
             if n[4] in 'af':
@@ -2938,6 +2951,21 @@ def test_node(instrs, n, at_start, at_end, before, after,
             rp[1],
             Bits.ifelse(rp[0], get_sp(), get_hl()),
             Bits.ifelse(rp[0], get_de(), get_bc()))
+
+    def get_ix():
+        return Bits.concat(bits('reg_ixh'), bits('reg_ixl'))
+
+    def get_iy():
+        return Bits.concat(bits('reg_iyh'), bits('reg_iyl'))
+
+    def get_ixy():
+        return Bits.ifelse(phased_bool('is_iy'), get_iy(),
+                           get_ix())
+
+    def get_hl_eff():
+        # The prefix redirects the HL role to IX/IY in the
+        # families where it acts.
+        return Bits.ifelse(is_prefixed, get_ixy(), get_hl())
 
     def get_pc_plus(off):
         # On tick 3 of an instruction the value of pc has already
@@ -3060,7 +3088,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
-        if instr in ('add hl, <rp>', 'rrd/rld', 'adc/sbc hl, <rp>'):
+        if instr == 'add hl, <rp>':
+            return check((get_hl_eff() + 1)[i])
+        if instr in ('rrd/rld', 'adc/sbc hl, <rp>'):
             return check((get_hl() + 1)[i])
         # jp cc and call cc load WZ with the target address
         # whether or not they are taken.
@@ -3245,7 +3275,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # PC freezes past the halt opcode.
                 return get_pc_plus(1)
             if instr == 'jp hl':
-                return get_hl() + 1
+                return get_hl_eff() + 1
             if instr in ('jp nn', 'ret'):
                 t = Bits.concat(Bits(phased('hi'), width=8),
                                 Bits(phased('lo'), width=8))
@@ -3324,7 +3354,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         def get_sp_expected():
             sp = get_sp()
             if instr == 'ld sp, hl':
-                return get_hl()
+                return get_hl_eff()
             if instr == 'inc/dec <rp>':
                 stepped = Bits.ifelse(phased_bool('is_inc'),
                                       sp + 1, sp - 1)
@@ -3363,7 +3393,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             i += 8
         return check(v[i])
 
-    if n.startswith('reg_i'):
+    if n.startswith('reg_i') and n[4:-1] == 'i':
         i = int(n[-1])
         v = bits('reg_i')
         if instr == 'ld {i, r}, a/ld a, {i, r}':
@@ -3524,17 +3554,66 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 return cur
             return cur
 
+        def arch_after_routed(x):
+            v = arch_after(x)
+            if x in 'hl' and instr in PREFIX_HL_REDIRECT:
+                # The prefixed variant writes IX/IY instead of
+                # the h/l storage.
+                v = Bits.ifelse(is_prefixed,
+                                {'h': get_h, 'l': get_l}[x](), v)
+            return v
+
         if letter in 'bc':
-            new = arch_after(letter)
+            new = arch_after_routed(letter)
         else:
             # Under the DE/HL exchange, the d/e storage holds
             # HL and the h/l storage holds DE.
             partner = {'d': 'h', 'h': 'd', 'e': 'l', 'l': 'e'}
             new = Bits.ifelse(before[EX_DE_FF],
-                              arch_after(partner[letter]),
-                              arch_after(letter))
+                              arch_after_routed(partner[letter]),
+                              arch_after_routed(letter))
         return check(Bits.ifelse(active, new,
                                  bits(f'reg_{storage}'))[i])
+
+    IXY_STORAGE = ('ixh', 'ixl', 'iyh', 'iyl')
+    if n.startswith('reg_i') and n[4:-1] in IXY_STORAGE:
+        i = int(n[-1])
+        st = n[4:-1]
+        hi = st[2] == 'h'
+        cur = bits(f'reg_{st}')
+        if instr not in PREFIX_HL_REDIRECT:
+            return check(cur[i])
+        mine = phased_bool('is_iy')
+        if st[1] == 'x':
+            mine = ~mine
+        sel = is_prefixed & mine
+
+        def ixy_half(v16):
+            return Bits(v16.bits[8:16] if hi else v16.bits[0:8])
+
+        eff = get_ixy()
+        new = None
+        if instr == 'ld <rp>, nn':
+            new = Bits(phased('r2' if hi else 'r1'), width=8)
+            sel = sel & (Bits(phased('rp'), width=2) == 2)
+        elif instr == 'inc/dec <rp>':
+            stepped = Bits.ifelse(phased_bool('is_inc'),
+                                  eff + 1, eff - 1)
+            new = ixy_half(stepped.truncated(16))
+            sel = sel & (Bits(phased('rp'), width=2) == 2)
+        elif instr == 'add hl, <rp>':
+            rp_val = get_rp(opcode[4:6])
+            rp_val = Bits.ifelse(Bits(opcode[4:6]) == 2, eff,
+                                 rp_val)
+            new = ixy_half((eff + rp_val).truncated(16))
+        elif instr == 'ex (sp), hl':
+            new = Bits(phased('r2' if hi else 'r1'), width=8)
+        elif instr == 'pop <rp2>':
+            new = Bits(phased('hi' if hi else 'lo'), width=8)
+            sel = sel & (Bits(opcode.bits[4:6]) == 2)
+        if new is None:
+            return check(cur[i])
+        return check(Bits.ifelse(sel, new, cur)[i])
 
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
@@ -3572,8 +3651,12 @@ def test_node(instrs, n, at_start, at_end, before, after,
             return check(r[7])
 
     if instr == 'add hl, <rp>':
-        hl = get_hl()
+        hl = get_hl_eff()
         rp = get_rp(opcode[4:6])
+        # Under the prefix the HL-role operand is IX/IY on both
+        # sides: add ix, ix and add iy, iy included.
+        rp = Bits.ifelse(is_prefixed & (Bits(opcode[4:6]) == 2),
+                         get_ixy(), rp)
         r = hl + rp
         if n in CFF:
             return check(r[16])
@@ -5336,7 +5419,7 @@ def test_reset_from_halt(base_state, all_orders=False):
             return TRUE
         if n in (IFF1, IFF2):
             return FALSE
-        if n.startswith('reg_pc') or n.startswith('reg_i'):
+        if n.startswith('reg_pc') or n[4:-1] == 'i':
             # The settling nop fetches from address 0, and a
             # sampled pc reads advanced by one; I restarts at
             # zero.
@@ -5798,9 +5881,9 @@ BUS_SPECS = {
     'scf/ccf': (('m1p', 'pc'), ('m1', 'pc')),
     'exx': (('m1p', 'pc'), ('m1', 'pc')),
     'ex de, hl': (('m1', 'pc'),),
-    'ld sp, hl': (('m16', 'pc'),),
+    'ld sp, hl': (('m1p', 'pc'), ('m16', 'pc')),
     'ei/di': (('m1p', 'pc'), ('m1', 'pc')),
-    'jp hl': (('m1', 'pc'),),
+    'jp hl': (('m1p', 'pc'), ('m1', 'pc')),
     'halt': (('m1', 'pc'),),
     'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
         (('m1', 'pc'),),
@@ -5813,9 +5896,12 @@ BUS_SPECS = {
     'ld (hl), {b, c, d, e, h, l, a}':
         (('m1', 'pc'), ('w', 'hl')),
     'ld (hl), n': (('m1', 'pc'), ('r', 'pc+1'), ('w', 'hl')),
-    'ld <rp>, nn': (('m1', 'pc'), ('r', 'pc+1'), ('r', 'pc+2')),
-    'pop <rp2>': (('m1', 'pc'), ('r', 'sp'), ('r', 'sp+1')),
-    'push <rp2>': (('m15', 'pc'), ('w', 'sp-1'), ('w', 'sp-2')),
+    'ld <rp>, nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
+                    ('r', 'pc+2')),
+    'pop <rp2>': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
+                  ('r', 'sp+1')),
+    'push <rp2>': (('m1p', 'pc'), ('m15', 'pc'), ('w', 'sp-1'),
+                   ('w', 'sp-2')),
     'jp nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
               ('r', 'pc+2')),
     'ret': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
@@ -5830,12 +5916,13 @@ for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
                             ('r', 'pc+1'))
 BUS_SPECS.update({
     'inc/dec (hl)': (('m1', 'pc'), ('r4', 'hl'), ('w', 'hl')),
-    'inc/dec <rp>': (('m16', 'pc'),),
-    'ex (sp), hl': (('m1', 'pc'), ('r', 'sp'), ('r4', 'sp+1'),
-                    ('w', 'sp+1'), ('w5', 'sp')),
+    'inc/dec <rp>': (('m1p', 'pc'), ('m16', 'pc')),
+    'ex (sp), hl': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
+                    ('r4', 'sp+1'), ('w', 'sp+1'), ('w5', 'sp')),
     'ldi/ldd': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
                 ('w5', 'de')),
-    'add hl, <rp>': (('m1i', 'pc'), ('e4', '-'), ('e3end', '-')),
+    'add hl, <rp>': (('m1p', 'pc'), ('m1i', 'pc'), ('e4', '-'),
+                     ('e3end', '-')),
     'adc/sbc hl, <rp>': (('m1p', 'pc'), ('m1', 'pc'),
                          ('m1i', 'pc+1'), ('e4', '-'),
                          ('e3end', '-')),
@@ -5991,6 +6078,15 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             off = int(a[2:]) if len(a) > 2 else 0
             return (sp + (0x10000 + off)).truncated(16)
         if a == 'hl':
+            if instr in PREFIX_HL_REDIRECT:
+                ix = Bits.concat(sampled_bits(eff, 'reg_ixh'),
+                                 sampled_bits(eff, 'reg_ixl'))
+                iy = Bits.concat(sampled_bits(eff, 'reg_iyh'),
+                                 sampled_bits(eff, 'reg_iyl'))
+                return Bits.ifelse(
+                    bools.get('is_prefixed_p1'),
+                    Bits.ifelse(bools.get('is_iy_p1'), iy, ix),
+                    hl)
             return hl
         if a == 'de':
             return de
@@ -6398,9 +6494,9 @@ class TestedInstrs(object):
         yield 'cpl', (fp(), f(0x2f))
         yield 'scf/ccf', (fp(), f(ifelse('is_scf', 0x37, 0x3f)))
         yield 'exx', (fp(), f(0xd9))
-        yield 'jp hl', (f(0xe9),)
+        yield 'jp hl', (fp(), f(0xe9))
         yield 'ex de, hl', (f(0xeb),)
-        yield 'ld sp, hl', (f6(0xf9),)
+        yield 'ld sp, hl', (fp(), f6(0xf9))
         yield 'ei/di', (fp(), f(ifelse('is_ei', 0xfb, 0xf3)))
 
         yield 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}', (
@@ -6447,11 +6543,16 @@ class TestedInstrs(object):
         yield 'inc/dec (hl)', (
             f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))), r4(), w3())
 
-        yield 'ld <rp>, nn', (f(xpqz(0, 'rp', 0, 1)), r3('r1'), r3('r2'))
-        yield 'add hl, <rp>', (f(xpqz(0, 'rp', 1, 1)), e4('e1'), e3('e2'))
-        yield 'inc/dec <rp>', (f6(xpqz(0, 'rp', ifelse('is_inc', 0, 1), 3)),)
-        yield 'pop <rp2>', (f(xpqz(3, 'rp2', 0, 1)), r3('lo'), r3('hi'))
-        yield 'push <rp2>', (f5(xpqz(3, 'rp2', 0, 5)), w3('lo'), w3('hi'))
+        yield 'ld <rp>, nn', (fp(), f(xpqz(0, 'rp', 0, 1)),
+                              r3('r1'), r3('r2'))
+        yield 'add hl, <rp>', (fp(), f(xpqz(0, 'rp', 1, 1)),
+                               e4('e1'), e3('e2'))
+        yield 'inc/dec <rp>', (
+            fp(), f6(xpqz(0, 'rp', ifelse('is_inc', 0, 1), 3)))
+        yield 'pop <rp2>', (fp(), f(xpqz(3, 'rp2', 0, 1)),
+                            r3('lo'), r3('hi'))
+        yield 'push <rp2>', (fp(), f5(xpqz(3, 'rp2', 0, 5)),
+                             w3('lo'), w3('hi'))
 
         pp = Bits.concat(Bits(0, width=1), Bits('p', width=1))
         yield 'ld (<rp>), a/ld a, (<rp>)', (
@@ -6463,7 +6564,8 @@ class TestedInstrs(object):
         yield 'ret', (fp(), f(0xc9), r3('lo'), r3('hi'))
         yield 'call nn', (fp(), f(0xcd), r3('r1'), r4('r2'),
                           w3('w3'), w3('w4'))
-        yield 'ex (sp), hl', (f(0xe3), r3('r1'), r4('r2'), w3('w3'), w5('w4'))
+        yield 'ex (sp), hl', (
+            fp(), f(0xe3), r3('r1'), r4('r2'), w3('w3'), w5('w4'))
 
         yield 'in a, (n)/out (n), a', (
             fp(), f(ifelse('is_in', 0xdb, 0xd3)), r3(), io4())
