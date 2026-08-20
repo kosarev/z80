@@ -2714,7 +2714,7 @@ class State(object):
 PREFIX_HL_REDIRECT = (
     'jp hl', 'ld sp, hl', 'ex (sp), hl', 'add hl, <rp>',
     'inc/dec <rp>', 'ld <rp>, nn', 'pop <rp2>',
-    'push <rp2>')
+    'push <rp2>', 'ld hl, (nn)/ld (nn), hl')
 
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
@@ -3650,6 +3650,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
         elif instr == 'pop <rp2>':
             new = Bits(phased('hi' if hi else 'lo'), width=8)
             sel = sel & (Bits(opcode.bits[4:6]) == 2)
+        elif instr == 'ld hl, (nn)/ld (nn), hl':
+            new = Bits(phased('rw4' if hi else 'rw3'), width=8)
+            sel = sel & ~phased_bool('is_store')
         elif instr == ('ld {b, c, d, e, h, l, a}, '
                        '{b, c, d, e, h, l, a}'):
             new = get_r_eff(Bits(opcode[0:3]))
@@ -5931,7 +5934,7 @@ BUS_SPECS = {
     'cpl': (('m1p', 'pc'), ('m1', 'pc')),
     'scf/ccf': (('m1p', 'pc'), ('m1', 'pc')),
     'exx': (('m1p', 'pc'), ('m1', 'pc')),
-    'ex de, hl': (('m1', 'pc'),),
+    'ex de, hl': (('m1p', 'pc'), ('m1', 'pc')),
     'ld sp, hl': (('m1p', 'pc'), ('m16', 'pc')),
     'ei/di': (('m1p', 'pc'), ('m1', 'pc')),
     'jp hl': (('m1p', 'pc'), ('m1', 'pc')),
@@ -6002,9 +6005,9 @@ BUS_SPECS.update({
     'ld a, (nn)/ld (nn), a': (('m1p', 'pc'), ('m1', 'pc'),
                               ('r', 'pc+1'), ('r', 'pc+2'),
                               ('rw_v', 'nn')),
-    'ld hl, (nn)/ld (nn), hl': (('m1', 'pc'), ('r', 'pc+1'),
-                                ('r', 'pc+2'), ('rw_v', 'nn'),
-                                ('rw_v', 'nn+1')),
+    'ld hl, (nn)/ld (nn), hl': (('m1p', 'pc'), ('m1', 'pc'),
+                                ('r', 'pc+1'), ('r', 'pc+2'),
+                                ('rw_v', 'nn'), ('rw_v', 'nn+1')),
     'ld <rp>, (nn)/ld (nn), <rp>': (
         ('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'),
         ('r', 'pc+2'), ('r', 'pc+3'), ('rw_v', 'nn2'),
@@ -6548,7 +6551,7 @@ class TestedInstrs(object):
         yield 'scf/ccf', (fp(), f(ifelse('is_scf', 0x37, 0x3f)))
         yield 'exx', (fp(), f(0xd9))
         yield 'jp hl', (fp(), f(0xe9))
-        yield 'ex de, hl', (f(0xeb),)
+        yield 'ex de, hl', (fp(), f(0xeb))
         yield 'ld sp, hl', (fp(), f6(0xf9))
         yield 'ei/di', (fp(), f(ifelse('is_ei', 0xfb, 0xf3)))
 
@@ -6578,7 +6581,7 @@ class TestedInstrs(object):
             yield f'{m} n', (fp(), f(xyz(3, op, 6)), r3())
 
         yield 'ld hl, (nn)/ld (nn), hl', (
-            f(ifelse('is_store', 0x22, 0x2a)),
+            fp(), f(ifelse('is_store', 0x22, 0x2a)),
             r3('r1'), r3('r2'), rw3('rw3'), rw3('rw4'))
         yield 'ld a, (nn)/ld (nn), a', (
             fp(), f(ifelse('is_store', 0x32, 0x3a)),
