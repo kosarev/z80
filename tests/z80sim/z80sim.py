@@ -2716,6 +2716,18 @@ PREFIX_HL_REDIRECT = (
     'inc/dec <rp>', 'ld <rp>, nn', 'pop <rp2>',
     'push <rp2>')
 
+# The families where the prefix redirects the 8-bit H and L
+# roles to the undocumented IX/IY halves; a and the other
+# registers are unaffected.
+PREFIX_HALVES_REDIRECT = (
+    'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}',
+    'ld {b, c, d, e, h, l, a}, n',
+    'inc/dec {b, c, d, e, h, l, a}',
+    'add {b, c, d, e, h, l, a}', 'adc {b, c, d, e, h, l, a}',
+    'sub {b, c, d, e, h, l, a}', 'sbc {b, c, d, e, h, l, a}',
+    'and {b, c, d, e, h, l, a}', 'xor {b, c, d, e, h, l, a}',
+    'or {b, c, d, e, h, l, a}', 'cp {b, c, d, e, h, l, a}')
+
 
 class CheckToken(object):
     pass
@@ -2967,6 +2979,31 @@ def test_node(instrs, n, at_start, at_end, before, after,
         # families where it acts.
         return Bits.ifelse(is_prefixed, get_ixy(), get_hl())
 
+    def get_h_eff():
+        return Bits.ifelse(is_prefixed,
+                           Bits(get_ixy().bits[8:16]), get_h())
+
+    def get_l_eff():
+        return Bits.ifelse(is_prefixed,
+                           Bits(get_ixy().bits[0:8]), get_l())
+
+    def get_r_eff(r):
+        # Reads of the 8-bit H and L roles go to the IX/IY
+        # halves in the families where the prefix redirects
+        # them.
+        if instr not in PREFIX_HALVES_REDIRECT:
+            return get_r(r)
+        return Bits.ifelse(
+            r[2],
+            Bits.ifelse(
+                r[1],
+                Bits.ifelse(r[0], get_a(), get_at_hl()),
+                Bits.ifelse(r[0], get_l_eff(), get_h_eff())),
+            Bits.ifelse(
+                r[1],
+                Bits.ifelse(r[0], get_e(), get_d()),
+                Bits.ifelse(r[0], get_c(), get_b())))
+
     def get_pc_plus(off):
         # On tick 3 of an instruction the value of pc has already
         # been advanced, so we in fact get (pc + 1).
@@ -3060,7 +3097,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             a = Bits.ifelse(Bits(opcode[3:6]) == A, v, get_a())
             return check(a[i])
         if instr == 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
-            s = get_r(opcode[0:3])
+            s = get_r_eff(opcode[0:3])
             d = Bits(opcode[3:6])
             a = Bits.ifelse(d == A, s, get_a())
             return check(a[i])
@@ -3451,7 +3488,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == ('ld {b, c, d, e, h, l, a}, '
                          '{b, c, d, e, h, l, a}'):
                 return Bits.ifelse(Bits(opcode[3:6]) == code,
-                                   get_r(Bits(opcode[0:3])), cur)
+                                   get_r_eff(Bits(opcode[0:3])),
+                                   cur)
             if instr in ('ld {b, c, d, e, h, l, a}, n',
                          'ld {b, c, d, e, h, l, a}, (hl)'):
                 return Bits.ifelse(Bits(opcode[3:6]) == code,
@@ -3556,7 +3594,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
         def arch_after_routed(x):
             v = arch_after(x)
-            if x in 'hl' and instr in PREFIX_HL_REDIRECT:
+            if x in 'hl' and instr in (PREFIX_HL_REDIRECT +
+                                       PREFIX_HALVES_REDIRECT):
                 # The prefixed variant writes IX/IY instead of
                 # the h/l storage.
                 v = Bits.ifelse(is_prefixed,
@@ -3581,7 +3620,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         st = n[4:-1]
         hi = st[2] == 'h'
         cur = bits(f'reg_{st}')
-        if instr not in PREFIX_HL_REDIRECT:
+        if instr not in PREFIX_HL_REDIRECT + PREFIX_HALVES_REDIRECT:
             return check(cur[i])
         mine = phased_bool('is_iy')
         if st[1] == 'x':
@@ -3611,6 +3650,18 @@ def test_node(instrs, n, at_start, at_end, before, after,
         elif instr == 'pop <rp2>':
             new = Bits(phased('hi' if hi else 'lo'), width=8)
             sel = sel & (Bits(opcode.bits[4:6]) == 2)
+        elif instr == ('ld {b, c, d, e, h, l, a}, '
+                       '{b, c, d, e, h, l, a}'):
+            new = get_r_eff(Bits(opcode[0:3]))
+            sel = sel & (Bits(opcode[3:6]) == (4 if hi else 5))
+        elif instr == 'ld {b, c, d, e, h, l, a}, n':
+            new = Bits(phased('r'), width=8)
+            sel = sel & (Bits(opcode[3:6]) == (4 if hi else 5))
+        elif instr == 'inc/dec {b, c, d, e, h, l, a}':
+            half = ixy_half(eff)
+            new = Bits.ifelse(opcode[0], half - 1,
+                              half + 1).truncated(8)
+            sel = sel & (Bits(opcode[3:6]) == (4 if hi else 5))
         if new is None:
             return check(cur[i])
         return check(Bits.ifelse(sel, new, cur)[i])
@@ -3633,7 +3684,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         return check(~ex_de)
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
-        r = get_r(opcode[3:6])
+        r = get_r_eff(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
         if n in PFF:
             return check(bools.ifelse(phased_bool('is_inc'),
@@ -3747,7 +3798,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             op = Bits(SUB)
         else:
             a = get_a()
-            s = get_r(opcode[0:3])
+            s = get_r_eff(opcode[0:3])
             op = Bits(opcode[3:6])
 
         is_add_adc = op.is_any(ADD, ADC)
@@ -5886,11 +5937,12 @@ BUS_SPECS = {
     'jp hl': (('m1p', 'pc'), ('m1', 'pc')),
     'halt': (('m1', 'pc'),),
     'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
-        (('m1', 'pc'),),
+        (('m1p', 'pc'), ('m1', 'pc')),
     'rlca/rrca/rla/rra': (('m1p', 'pc'), ('m1', 'pc')),
-    'inc/dec {b, c, d, e, h, l, a}': (('m1', 'pc'),),
+    'inc/dec {b, c, d, e, h, l, a}': (('m1p', 'pc'),
+                                      ('m1', 'pc')),
     'ld {b, c, d, e, h, l, a}, n':
-        (('m1', 'pc'), ('r', 'pc+1')),
+        (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1')),
     'ld {b, c, d, e, h, l, a}, (hl)':
         (('m1', 'pc'), ('r', 'hl')),
     'ld (hl), {b, c, d, e, h, l, a}':
@@ -5910,7 +5962,8 @@ BUS_SPECS = {
               ('w', 'sp-2')),
 }
 for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
-    BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1', 'pc'),)
+    BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1p', 'pc'),
+                                                  ('m1', 'pc'))
     BUS_SPECS[f'{_m} (hl)'] = (('m1', 'pc'), ('r', 'hl'))
     BUS_SPECS[f'{_m} n'] = (('m1p', 'pc'), ('m1', 'pc'),
                             ('r', 'pc+1'))
@@ -6500,7 +6553,8 @@ class TestedInstrs(object):
         yield 'ei/di', (fp(), f(ifelse('is_ei', 0xfb, 0xf3)))
 
         yield 'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}', (
-            f(xyz(1, get_non_at_hl_r('regd'), get_non_at_hl_r('regs'))),)
+            fp(),
+            f(xyz(1, get_non_at_hl_r('regd'), get_non_at_hl_r('regs'))))
         yield 'ld {b, c, d, e, h, l, a}, (hl)', (
             f(xyz(1, get_non_at_hl_r('regd'), AT_HL)), r3())
         yield 'ld (hl), {b, c, d, e, h, l, a}', (
@@ -6510,7 +6564,7 @@ class TestedInstrs(object):
             f(xyz(1, AT_HL, AT_HL)),)
 
         yield 'ld {b, c, d, e, h, l, a}, n', (
-            f(xyz(0, get_non_at_hl_r(), 6)), r3())
+            fp(), f(xyz(0, get_non_at_hl_r(), 6)), r3())
         yield 'ld (hl), n', (
             f(xyz(0, AT_HL, 6)), r3(), w3())
 
@@ -6519,7 +6573,7 @@ class TestedInstrs(object):
                 (ADD, 'add'), (ADC, 'adc'), (SUB, 'sub'), (SBC, 'sbc'),
                 (AND, 'and'), (XOR, 'xor'), (OR, 'or'), (CP, 'cp')):
             yield f'{m} {{b, c, d, e, h, l, a}}', (
-                f(xyz(2, op, get_non_at_hl_r())),)
+                fp(), f(xyz(2, op, get_non_at_hl_r())))
             yield f'{m} (hl)', (f(xyz(2, op, AT_HL)), r3())
             yield f'{m} n', (fp(), f(xyz(3, op, 6)), r3())
 
@@ -6539,7 +6593,8 @@ class TestedInstrs(object):
                            ifelse('is_rl', 0x17, 0x1f))))
 
         yield 'inc/dec {b, c, d, e, h, l, a}', (
-            f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))),)
+            fp(),
+            f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))))
         yield 'inc/dec (hl)', (
             f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))), r4(), w3())
 
