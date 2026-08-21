@@ -15,9 +15,10 @@ register contents and operands at once, and whole families of
 instructions are tested together. The results are checked
 against expected expressions written independently of the
 simulation, and every check covers the complete architectural
-state — both register banks, PC, SP, I, R, WZ, the flags and
-the interrupt and exchange flip-flops — so an instruction
-with a side effect anywhere in that state cannot pass.
+state — both register banks, IX, IY, PC, SP, I, R, WZ, the
+flags and the interrupt and exchange flip-flops — so an
+instruction with a side effect anywhere in that state cannot
+pass.
 
 There is one more source of freedom the simulator covers: the
 order in which the gates of the circuit react to a change. On
@@ -80,10 +81,10 @@ else changes, the state in question is the sampled one: both
 banks of the register file and of the flags (the alternate
 bank is what programmers know as BC', DE', HL' and AF'; on
 the die it is simply a second bank, with flip-flops selecting
-which one is in use), PC, SP, I and R, the interrupt and
-exchange flip-flops, the internal instruction register and
-the `~halt` pin. Claims do not extend to the rest of the circuit's
-internal nodes.
+which one is in use), IX and IY, PC, SP, I and R, the
+interrupt and exchange flip-flops, the internal instruction
+register and the `~halt` pin. Claims do not extend to the
+rest of the circuit's internal nodes.
 
 - During an instruction's internal cycles — the five ticks of
   `add hl, <rp>`, for instance — the address bus carries the
@@ -100,7 +101,7 @@ internal nodes.
 
   Derived with `./z80sim.py --probe-bus-templates` and covered
   by `test_bus_timeline()` of a plain `./z80sim.py` run, which
-  checks the bus at every half-tick of 54 instruction
+  checks the bus at every half-tick of 81 instruction
   families' machine cycles.
 
 - In interrupt mode 2, the vector byte the interrupting
@@ -179,8 +180,8 @@ internal nodes.
   would show whether a preloaded value survived. This finding
   predicts it does. Also proven
   along the way: both banks of the register file and of the
-  flags, and the exchange flip-flops, keep their values
-  through a reset taken from the halted state.
+  flags, IX and IY, and the exchange flip-flops, keep their
+  values through a reset taken from the halted state.
 
   Covered by `test_reset_from_halt()` of a plain `./z80sim.py`
   run.
