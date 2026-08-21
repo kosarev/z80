@@ -101,8 +101,8 @@ rest of the circuit's internal nodes.
 
   Derived with `./z80sim.py --probe-bus-templates` and covered
   by `test_bus_timeline()` of a plain `./z80sim.py` run, which
-  checks the bus at every half-tick of 81 instruction
-  families' machine cycles.
+  checks the bus at every half-tick of the covered
+  instructions' machine cycles.
 
 - In interrupt mode 2, the vector byte the interrupting
   device supplies is used as-is: the two bytes of the handler
