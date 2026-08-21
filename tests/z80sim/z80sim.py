@@ -4699,6 +4699,87 @@ def test_bus_grant(base_state, all_orders=False):
                          lambda n: plain[n])
 
 
+def test_special_reset(base_state, all_orders=False):
+    # The 'special reset', mapped by --probe-special-reset:
+    # ~reset is sampled at the odd half-ticks, and the sample
+    # in the second half of a fetch's T1 is unlike the others
+    # -- a pulse caught there and nowhere else forces PC to
+    # zero and changes nothing else, the refresh counter
+    # running on uninterrupted. A catch at any later sampling
+    # instant -- even a lone half-tick pulse -- is a full
+    # reset. The three regimes are certified over the complete
+    # sampled state: a one-clock pulse from the fetch's start
+    # (the classic special-reset recipe), a half-tick pulse at
+    # T2 (full), and a half-tick pulse at a non-sampling
+    # instant (ignored).
+    s0 = State(base_state)
+    for db in (0xfb, 0x00):  # ei; nop -- the shadow passes
+        s0.set_db(db, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s0.status('special reset prep'):
+                    s0.half_tick(all_orders=all_orders)
+    s0.cache()
+    st0 = s0.get_node_states(SAMPLED_NODES)
+    pc0 = Bits.concat(sampled_bits(st0, 'reg_pch'),
+                      sampled_bits(st0, 'reg_pcl'))
+    r0 = sampled_bits(st0, 'reg_r')
+
+    def run(offset, width):
+        s = State(s0)
+        s.set_db(0x00, all_orders)
+        for k in range(offset):
+            with s.status('pre'):
+                s.half_tick(all_orders=all_orders)
+        s.set_pin_and_update('~reset', FALSE, all_orders)
+        for k in range(width):
+            with s.status('pulse'):
+                s.half_tick(all_orders=all_orders)
+        s.set_pin_and_update('~reset', TRUE, all_orders)
+        for k in range(24):
+            with s.status('after'):
+                s.half_tick(all_orders=all_orders)
+        s.cache()
+        return s.get_node_states(SAMPLED_NODES)
+
+    def r_plus(k):
+        lo = (Bits(r0.bits[0:7]) + k).truncated(7)
+        return Bits(lo.bits + (r0[7],))
+
+    def check(what, st, pc, i_cleared, r, iffs_cleared):
+        def get_expected(n):
+            if n.startswith('reg_pch'):
+                return pc[int(n[-1]) + 8]
+            if n.startswith('reg_pcl'):
+                return pc[int(n[-1])]
+            if n[4:-1] == 'i' and n.startswith('reg_i'):
+                return FALSE if i_cleared else st0[n]
+            if n.startswith('reg_r'):
+                return r[int(n[-1])]
+            if n in (IFF1, IFF2):
+                return FALSE if iffs_cleared else TRUE
+            if n in (IM_LATCH0, IM_LATCH1):
+                return FALSE if iffs_cleared else st0[n]
+            if n.startswith('instr'):
+                # Nops throughout.
+                return FALSE
+            return st0[n]
+
+        check_sampled_states(what, st, get_expected)
+
+    with Status.do('special reset: one clock from T1'):
+        check('special reset', run(0, 2),
+              Bits.cast(2, width=16), False, r_plus(3), False)
+    with Status.do('special reset: half a tick at T2'):
+        check('half-tick full reset', run(3, 1),
+              Bits.cast(3, width=16), True,
+              Bits.cast(2, width=8), True)
+    with Status.do('special reset: unsampled instant'):
+        check('ignored reset pulse', run(0, 1),
+              (pc0 + 4).truncated(16), False, r_plus(3),
+              False)
+
+
 def test_prefix_chains(base_state, all_orders=False):
     # Chained prefixes act as one modifier: the last prefix
     # before the opcode wins. Certified on doubly prefixed
@@ -5072,6 +5153,113 @@ def probe_writeback(all_orders=False):
                 names = names[:12] + [f'... {len(by_k[k])} in all']
             Status.print(f'{instr}: retired by half-tick '
                          f'{k}: ' + ' '.join(names))
+
+
+def probe_special_reset(all_orders=False):
+    # The 'special reset' question: what a ~reset pulse
+    # shorter than the documented three clocks does, swept
+    # over pulse widths and phase offsets within a fetch. The
+    # preparation sets the IFFs so their survival is
+    # observable; I, R, the mode latch and the registers are
+    # symbolic already.
+    base = build_symbolised_state()
+    s0 = State(base)
+    for db in (0xfb, 0x00):  # ei; nop -- the shadow passes
+        s0.set_db(db, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s0.status('special reset prep'):
+                    s0.half_tick(all_orders=all_orders)
+    s0.cache()
+    st0 = s0.get_node_states(SAMPLED_NODES)
+    pc0 = Bits.concat(sampled_bits(st0, 'reg_pch'),
+                      sampled_bits(st0, 'reg_pcl'))
+    r0lo = sampled_bits(st0, 'reg_r', width=7)
+
+    def desc16(v, base16):
+        for k in range(8):
+            if all(bools.is_equiv(a, b) for a, b in zip(
+                    v.bits, Bits.cast(k, width=16).bits)):
+                return f'={k}'
+        for k in range(8):
+            if all(bools.is_equiv(a, b) for a, b in zip(
+                    v.bits,
+                    ((base16 + k).truncated(16)).bits)):
+                return f'base+{k}'
+        return '?'
+
+    def desc_bits(v, kept):
+        if all(bools.is_equiv(b, FALSE) for b in v.bits):
+            return 'cleared'
+        if all(bools.is_equiv(a, b)
+               for a, b in zip(v.bits, kept.bits)):
+            return 'kept'
+        return '?'
+
+    def desc_bool(v, kept):
+        if bools.is_equiv(v, FALSE):
+            return 'cleared'
+        if bools.is_equiv(v, kept):
+            return 'kept'
+        return '?'
+
+    for w in (1, 2, 3, 4, 6, 8, 12):
+        for o in ((0, 1, 2, 3, 4, 5, 6, 7) if w <= 2 else
+                  (0, 1, 2, 3)):
+            with Status.do(f'pulse w={w} o={o}'):
+                s = State(s0)
+                s.set_db(0x00, all_orders)
+                for k in range(o):
+                    with s.status('pre'):
+                        s.half_tick(all_orders=all_orders)
+                s.set_pin_and_update('~reset', FALSE,
+                                     all_orders)
+                for k in range(w):
+                    with s.status('pulse'):
+                        s.half_tick(all_orders=all_orders)
+                s.set_pin_and_update('~reset', TRUE,
+                                     all_orders)
+                for k in range(24):
+                    with s.status('after'):
+                        s.half_tick(all_orders=all_orders)
+                s.cache()
+                st = s.get_node_states(SAMPLED_NODES)
+            pc = Bits.concat(sampled_bits(st, 'reg_pch'),
+                             sampled_bits(st, 'reg_pcl'))
+            rlo = sampled_bits(st, 'reg_r', width=7)
+            rk = '?'
+            for k in range(8):
+                if all(bools.is_equiv(a, b) for a, b in zip(
+                        rlo.bits,
+                        Bits.cast(k, width=7).bits)):
+                    rk = f'={k}'
+                    break
+                if all(bools.is_equiv(a, b) for a, b in zip(
+                        rlo.bits,
+                        ((r0lo + k).truncated(7)).bits)):
+                    rk = f'base+{k}'
+                    break
+
+            def single(states, n):
+                return PossibleValues.cast(
+                    states[n]).single_value
+
+            iv = desc_bits(sampled_bits(st, 'reg_i'),
+                           sampled_bits(st0, 'reg_i'))
+            f1 = desc_bool(single(st, IFF1), TRUE)
+            f2 = desc_bool(single(st, IFF2), TRUE)
+            imv = desc_bool(single(st, IM_LATCH0),
+                            single(st0, IM_LATCH0))
+            wzv = desc_bits(
+                Bits.concat(sampled_bits(st, 'reg_w'),
+                            sampled_bits(st, 'reg_z')),
+                Bits.concat(sampled_bits(st0, 'reg_w'),
+                            sampled_bits(st0, 'reg_z')))
+            av = desc_bits(sampled_bits(st, 'reg_a'),
+                           sampled_bits(st0, 'reg_a'))
+            Status.print(f'w={w} o={o}: pc{desc16(pc, pc0)} '
+                         f'i={iv} r{rk} iff1={f1} iff2={f2} '
+                         f'im0={imv} wz={wzv} a={av}')
 
 
 def probe_bus_templates(all_orders=False):
@@ -7173,6 +7361,7 @@ def test_instr_seq(seq, all_orders=False):
             if seq == ('nop',):
                 test_wait_states(state, all_orders)
                 test_bus_grant(state, all_orders)
+                test_special_reset(state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
@@ -7828,6 +8017,12 @@ def main():
 
     if '--probe-writeback' in sys.argv:
         probe_writeback(
+            all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-special-reset' in sys.argv:
+        probe_special_reset(
             all_orders='--single-order' not in sys.argv)
         Status.clear()
         return

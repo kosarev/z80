@@ -116,6 +116,27 @@ rest of the circuit's internal nodes.
   shows the table read addresses on the bus with the vector
   fully symbolic.
 
+- The Z80's obscure 'special reset' is real, and the netlist
+  gives it an exact shape. The `~reset` pin is sampled in the
+  second half of every clock cycle, but the sampling instant
+  in the first clock of an instruction fetch is unlike the
+  others: a reset pulse caught at that instant and no other
+  forces PC to zero and changes nothing else — the interrupt
+  flip-flops, the interrupt mode, I, WZ and all the registers
+  keep their values, and the refresh counter R keeps counting
+  without a break, showing that no general reset took place.
+  This is the behaviour debug hardware exploited to seize a
+  running CPU without wiping its context, researched on real
+  chips by Tony Brewer; the netlist confirms it and sharpens
+  it: a pulse caught at any later sampling instant — even a
+  pulse only half a clock wide — performs the full reset, and
+  a pulse that covers no sampling instant does nothing at
+  all. All three outcomes are deterministic: no order of gate
+  reactions changes them.
+
+  Mapped by `./z80sim.py --probe-special-reset` and certified
+  by `test_special_reset()` of a plain `./z80sim.py` run.
+
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
   produce a definite value for them. Each of the two bits,
