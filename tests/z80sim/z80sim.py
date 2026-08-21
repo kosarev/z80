@@ -4870,6 +4870,69 @@ def probe_node_ids(all_orders=False):
                              f'(prefix held past the opcode)')
 
 
+def probe_latch_cells():
+    # A static netlist analysis: the storage structure behind
+    # the identified state nodes. Almost every state cell on
+    # this die is a dynamic latch -- the state node drives two
+    # inverters in series and the refreshed value returns
+    # through a pass transistor gated by clk -- so the state
+    # is charge, refreshed every clock: the reason a Z80 has a
+    # minimum clock frequency. The halted cell is the one
+    # exception: a genuine static cross-coupled pair.
+    import re as _re
+    trans = []
+    with open('transdefs.js') as f:
+        for line in f:
+            m = _re.match(r"^\['t(\d+)',(\d+),(\d+),(\d+),",
+                          line)
+            if m:
+                trans.append(tuple(int(x)
+                                   for x in m.groups()[1:]))
+    GND, PWR, CLK = 1, 2, 3
+
+    out = {}
+    for g, c1, c2 in trans:
+        for m in (c1, c2):
+            if m not in (GND, PWR):
+                out.setdefault(g, []).append((m, f'inv'))
+        if c1 not in (GND, PWR) and c2 not in (GND, PWR):
+            out.setdefault(c1, []).append((c2, f'pass[{g}]'))
+            out.setdefault(c2, []).append((c1, f'pass[{g}]'))
+
+    gnd_gates = {}
+    for g, c1, c2 in trans:
+        for a, b in ((c1, c2), (c2, c1)):
+            if b == GND:
+                gnd_gates.setdefault(a, set()).add(g)
+
+    KEY = (('IFF1', 181), ('IFF2', 206),
+           ('IM_LATCH0', 205), ('IM_LATCH1', 179),
+           ('prefix held', 1242), ('IX/IY choice', 1616),
+           ('halted', 1126))
+    for name, n in KEY:
+        for b in sorted(gnd_gates.get(n, ())):
+            if n in gnd_gates.get(b, ()):
+                Status.print(f'{name} ({n}): static '
+                             f'cross-coupled pair with {b}')
+        # Shortest refresh loops back to the state node.
+        stack = [(n, [n], [])]
+        seen = []
+        while stack and len(seen) < 3:
+            v, path, labels = stack.pop()
+            if len(path) > 4:
+                continue
+            for m, lab in out.get(v, ()):
+                if m == n and len(path) > 1:
+                    seen.append(' -> '.join(
+                        f'{p}[{la}]' for p, la in
+                        zip(path[1:] + [n], labels + [lab])))
+                elif m not in path:
+                    stack.append((m, path + [m],
+                                  labels + [lab]))
+        for s in seen:
+            Status.print(f'{name} ({n}): loop {n} -> {s}')
+
+
 def probe_bus_templates(all_orders=False):
     # Reports the address bus and the control pins through
     # representative machine cycles, half-tick by half-tick,
@@ -7499,6 +7562,11 @@ def main():
     if '--probe-node-ids' in sys.argv:
         probe_node_ids(
             all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-latch-cells' in sys.argv:
+        probe_latch_cells()
         Status.clear()
         return
 
