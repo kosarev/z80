@@ -2716,6 +2716,19 @@ PREFIX_HL_REDIRECT = (
     'inc/dec <rp>', 'ld <rp>, nn', 'pop <rp2>',
     'push <rp2>', 'ld hl, (nn)/ld (nn), hl')
 
+# The families where the prefix turns the (hl) operand into
+# (ix+d)/(iy+d): a conditional displacement read and the
+# address computation join the cycles, and the memory operand
+# address becomes the indexed one. The register operands, h
+# and l included, stay the true registers -- the halves
+# redirection below does not apply to the displaced forms.
+PREFIX_DISP = (
+    'ld {b, c, d, e, h, l, a}, (hl)',
+    'ld (hl), {b, c, d, e, h, l, a}', 'ld (hl), n',
+    'inc/dec (hl)',
+    'add (hl)', 'adc (hl)', 'sub (hl)', 'sbc (hl)',
+    'and (hl)', 'xor (hl)', 'or (hl)', 'cp (hl)')
+
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
 # registers are unaffected.
@@ -3125,6 +3138,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
         i = int(n[-1])
         if n.startswith('reg_w'):
             i += 8
+        if instr in PREFIX_DISP:
+            # The displaced forms load WZ with the computed
+            # operand address; the plain (hl) forms leave it
+            # alone.
+            d = Bits(phased('d'), width=8)
+            t = (get_ixy() + d.sign_extended(16)).truncated(16)
+            return check(Bits.ifelse(is_prefixed, t,
+                                     get_wz())[i])
         if instr == 'add hl, <rp>':
             return check((get_hl_eff() + 1)[i])
         if instr in ('rrd/rld', 'adc/sbc hl, <rp>'):
@@ -3306,8 +3327,12 @@ def test_node(instrs, n, at_start, at_end, before, after,
             length = SEQ_LENGTHS.get(instr)
             if length is not None:
                 # The prefix, where a family carries one, adds
-                # a byte.
-                return get_pc_plus(length + 1) + prefix_bit
+                # a byte; the displaced forms add the
+                # displacement byte too.
+                v = get_pc_plus(length + 1) + prefix_bit
+                if instr in PREFIX_DISP:
+                    v = v + prefix_bit
+                return v
             if instr == 'halt':
                 # PC freezes past the halt opcode.
                 return get_pc_plus(1)
@@ -5912,6 +5937,8 @@ _BUS_IO_W = (
     ('cur', 1, 1, 1, 0, 0, 1),) * 5 + (
     ('cur', 1, 1, 1, 1, 1, 1),) + (
     ('next', None, 1, 1, 1, 1, 1),)
+_BUS_E2_END = (('hold', 1, 1, 1, 1, 1, 1),) * 3 + (
+    ('next', None, 1, 1, 1, 1, 1),)
 _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'm16': _BUS_M1_6, 'm1i': _BUS_M1_INT,
                   'ri': _BUS_R3_INT, 'e4': _BUS_E4,
@@ -5920,8 +5947,14 @@ _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'r': _BUS_R3, 'r4': _BUS_R4,
                   'w': _BUS_W3, 'w5': _BUS_W5,
                   'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W,
-                  'm1p': _BUS_M1_4}
+                  'm1p': _BUS_M1_4,
+                  'rp': _BUS_R3, 'rip': _BUS_R3_INT,
+                  'e5p': _BUS_E5_END, 'e2p': _BUS_E2_END}
 _BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i', 'm1p')
+# The kinds carrying a conditionally present instruction byte:
+# each shifts later pc-relative addresses by one where it is
+# there.
+_BUS_SHIFT_KINDS = ('m1p', 'rp', 'rip')
 
 # Per-family cycle kinds and addresses; families with
 # variant-dependent bus behaviour or cycle kinds not yet
@@ -5947,10 +5980,13 @@ BUS_SPECS = {
     'ld {b, c, d, e, h, l, a}, n':
         (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1')),
     'ld {b, c, d, e, h, l, a}, (hl)':
-        (('m1', 'pc'), ('r', 'hl')),
+        (('m1p', 'pc'), ('m1', 'pc'), ('rip', 'pc+1'),
+         ('e5p', '-'), ('r', 'hl')),
     'ld (hl), {b, c, d, e, h, l, a}':
-        (('m1', 'pc'), ('w', 'hl')),
-    'ld (hl), n': (('m1', 'pc'), ('r', 'pc+1'), ('w', 'hl')),
+        (('m1p', 'pc'), ('m1', 'pc'), ('rip', 'pc+1'),
+         ('e5p', '-'), ('w', 'hl')),
+    'ld (hl), n': (('m1p', 'pc'), ('m1', 'pc'), ('rp', 'pc+1'),
+                   ('r', 'pc+1'), ('e2p', '-'), ('w', 'hl')),
     'ld <rp>, nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
                     ('r', 'pc+2')),
     'pop <rp2>': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
@@ -5967,11 +6003,15 @@ BUS_SPECS = {
 for _m in ('add', 'adc', 'sub', 'sbc', 'and', 'xor', 'or', 'cp'):
     BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (('m1p', 'pc'),
                                                   ('m1', 'pc'))
-    BUS_SPECS[f'{_m} (hl)'] = (('m1', 'pc'), ('r', 'hl'))
+    BUS_SPECS[f'{_m} (hl)'] = (('m1p', 'pc'), ('m1', 'pc'),
+                               ('rip', 'pc+1'), ('e5p', '-'),
+                               ('r', 'hl'))
     BUS_SPECS[f'{_m} n'] = (('m1p', 'pc'), ('m1', 'pc'),
                             ('r', 'pc+1'))
 BUS_SPECS.update({
-    'inc/dec (hl)': (('m1', 'pc'), ('r4', 'hl'), ('w', 'hl')),
+    'inc/dec (hl)': (('m1p', 'pc'), ('m1', 'pc'),
+                     ('rip', 'pc+1'), ('e5p', '-'),
+                     ('r4', 'hl'), ('w', 'hl')),
     'inc/dec <rp>': (('m1p', 'pc'), ('m16', 'pc')),
     'ex (sp), hl': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
                     ('r4', 'sp+1'), ('w', 'sp+1'), ('w5', 'sp')),
@@ -6101,11 +6141,13 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     def resolve_at(cyc_index, a):
         v = resolve(a)
-        if (v is not None and family_prefixed and cyc_index > 0
-                and a.startswith('pc')):
-            # The prefix byte shifts every later pc-relative
-            # address by one where it is there.
-            v = (v + pref_b).truncated(16)
+        if v is not None and a.startswith('pc'):
+            # Every conditionally present byte before this
+            # cycle -- the prefix, the displacement -- shifts a
+            # pc-relative address by one where it is there.
+            for k, _ in spec[:cyc_index]:
+                if k in _BUS_SHIFT_KINDS:
+                    v = (v + pref_b).truncated(16)
         return v
 
     exx = PossibleValues.cast(eff[EXX_FF]).single_value
@@ -6134,15 +6176,18 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             off = int(a[2:]) if len(a) > 2 else 0
             return (sp + (0x10000 + off)).truncated(16)
         if a == 'hl':
-            if instr in PREFIX_HL_REDIRECT:
+            if instr in PREFIX_HL_REDIRECT + PREFIX_DISP:
                 ix = Bits.concat(sampled_bits(eff, 'reg_ixh'),
                                  sampled_bits(eff, 'reg_ixl'))
                 iy = Bits.concat(sampled_bits(eff, 'reg_iyh'),
                                  sampled_bits(eff, 'reg_iyl'))
-                return Bits.ifelse(
-                    bools.get('is_prefixed_p1'),
-                    Bits.ifelse(bools.get('is_iy_p1'), iy, ix),
-                    hl)
+                ixy = Bits.ifelse(bools.get('is_iy_p1'), iy, ix)
+                if instr in PREFIX_DISP:
+                    d8 = Bits(phased('d'), width=8)
+                    ixy = (ixy +
+                           d8.sign_extended(16)).truncated(16)
+                return Bits.ifelse(bools.get('is_prefixed_p1'),
+                                   ixy, hl)
             return hl
         if a == 'de':
             return de
@@ -6206,8 +6251,13 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         # shift.
         instr_next = resolve(NEXT_SPECIAL[instr])
     else:
-        length = 1 + sum(1 for k, a in spec if a.startswith('pc+'))
-        instr_next = (pc + length + pref_b).truncated(16)
+        length = 1 + sum(1 for k, a in spec
+                         if a.startswith('pc+') and
+                         k not in _BUS_SHIFT_KINDS)
+        instr_next = (pc + length).truncated(16)
+        for k, a in spec:
+            if k in _BUS_SHIFT_KINDS:
+                instr_next = (instr_next + pref_b).truncated(16)
     if instr in _BUS_COND_NEXTS:
         tk_spec, nt_spec = _BUS_COND_NEXTS[instr]
         taken_next = resolve_at(1, tk_spec)
@@ -6264,10 +6314,27 @@ def test_bus_timeline(instr, base_state, all_orders=False):
             if ncond is not None:
                 # The boundary into a conditional cycle: the
                 # taken branch enters it; the fall-through one
-                # fetches the next instruction.
+                # continues at the first cycle past the
+                # conditional run -- the next instruction's
+                # fetch where the run is a tail.
                 nc = get_cond_as_expr(ncond, 1, eff)
-                nxt = Bits.ifelse(nc, tk, nottaken_next)
-                next_m1 = nc
+                j = cyc + 2
+                while (j < len(cycles) and
+                       cycles[j][2] is not None):
+                    j += 1
+                if j < len(cycles):
+                    fall = resolve_at(j, spec[j][1])
+                    if fall is None:
+                        fall = cur if cur is not None else held
+                    fall_m1 = (FALSE if spec[j][0] in
+                               _BUS_FETCH_KINDS else TRUE)
+                else:
+                    fall = nottaken_next
+                    fall_m1 = FALSE
+                tk_m1 = (FALSE if spec[cyc + 1][0] in
+                         _BUS_FETCH_KINDS else TRUE)
+                nxt = Bits.ifelse(nc, tk, fall)
+                next_m1 = bools.ifelse(nc, tk_m1, fall_m1)
             else:
                 nxt = tk
                 next_m1 = (FALSE if spec[cyc + 1][0] in
@@ -6521,6 +6588,9 @@ class TestedInstrs(object):
         def rw3(p='rw'):
             return phased(p), 3, None
 
+        def e2(p='e', *, cond=None):
+            return phased(p), 2, cond
+
         def e3(p='e'):
             return phased(p), 3, None
 
@@ -6559,9 +6629,13 @@ class TestedInstrs(object):
             fp(),
             f(xyz(1, get_non_at_hl_r('regd'), get_non_at_hl_r('regs'))))
         yield 'ld {b, c, d, e, h, l, a}, (hl)', (
-            f(xyz(1, get_non_at_hl_r('regd'), AT_HL)), r3())
+            fp(), f(xyz(1, get_non_at_hl_r('regd'), AT_HL)),
+            r3('d', cond='is_prefixed'), e5(cond='is_prefixed'),
+            r3())
         yield 'ld (hl), {b, c, d, e, h, l, a}', (
-            f(xyz(1, AT_HL, get_non_at_hl_r('regs'))), w3())
+            fp(), f(xyz(1, AT_HL, get_non_at_hl_r('regs'))),
+            r3('d', cond='is_prefixed'), e5(cond='is_prefixed'),
+            w3())
 
         yield 'halt', (
             f(xyz(1, AT_HL, AT_HL)),)
@@ -6569,7 +6643,9 @@ class TestedInstrs(object):
         yield 'ld {b, c, d, e, h, l, a}, n', (
             fp(), f(xyz(0, get_non_at_hl_r(), 6)), r3())
         yield 'ld (hl), n', (
-            f(xyz(0, AT_HL, 6)), r3(), w3())
+            fp(), f(xyz(0, AT_HL, 6)),
+            r3('d', cond='is_prefixed'), r3(),
+            e2(cond='is_prefixed'), w3())
 
         ADD, ADC, SUB, SBC, AND, XOR, OR, CP = range(8)
         for op, m in (
@@ -6577,7 +6653,10 @@ class TestedInstrs(object):
                 (AND, 'and'), (XOR, 'xor'), (OR, 'or'), (CP, 'cp')):
             yield f'{m} {{b, c, d, e, h, l, a}}', (
                 fp(), f(xyz(2, op, get_non_at_hl_r())))
-            yield f'{m} (hl)', (f(xyz(2, op, AT_HL)), r3())
+            yield f'{m} (hl)', (
+                fp(), f(xyz(2, op, AT_HL)),
+                r3('d', cond='is_prefixed'),
+                e5(cond='is_prefixed'), r3())
             yield f'{m} n', (fp(), f(xyz(3, op, 6)), r3())
 
         yield 'ld hl, (nn)/ld (nn), hl', (
@@ -6599,7 +6678,9 @@ class TestedInstrs(object):
             fp(),
             f(xyz(0, get_non_at_hl_r(), ifelse('is_inc', 4, 5))))
         yield 'inc/dec (hl)', (
-            f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))), r4(), w3())
+            fp(), f(xyz(0, AT_HL, ifelse('is_inc', 4, 5))),
+            r3('d', cond='is_prefixed'), e5(cond='is_prefixed'),
+            r4(), w3())
 
         yield 'ld <rp>, nn', (fp(), f(xpqz(0, 'rp', 0, 1)),
                               r3('r1'), r3('r2'))
