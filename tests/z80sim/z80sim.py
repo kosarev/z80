@@ -4566,6 +4566,73 @@ def probe_node_ids(all_orders=False):
                 r = '; '.join(verbalise_state_value(v)).strip()
             Status.print(f'{n} after ~nmi acceptance: {r}')
 
+    with Status.do('prefix flip-flops'):
+        # The DD/FD modifier pair: nodes that leave the nop
+        # baseline after a prefix fetch and hold through a
+        # second one -- the chains keep the modifier pending.
+        # Nodes where DD and FD agree carry the
+        # prefix-pending state; nodes where they part carry
+        # the IX-or-IY choice.
+        def held_after_two(db):
+            s = State(base)
+            a = full_after_m1(s, db)
+            b = full_after_m1(s, db)
+            return a, b
+
+        n0, n0b = held_after_two(0x00)
+        nd, ndb = held_after_two(0xdd)
+        nf, nfb = held_after_two(0xfd)
+        for n in sorted(n0, key=str):
+            vs = n0[n], n0b[n], nd[n], ndb[n], nf[n], nfb[n]
+            if any(isinstance(v, PossibleValues) for v in vs):
+                continue
+            if not all(v.is_const for v in vs):
+                continue
+            v0, v0b, vd, vdb, vf, vfb = (v.kind for v in vs)
+            if v0 != v0b or vd != vdb or vf != vfb:
+                # Not held: transient state, not the modifier.
+                continue
+            if vd == v0 and vf == v0:
+                continue
+            if vd == vf:
+                tag = 'dd and fd alike -- prefix pending'
+            elif vd != v0 and vf != v0:
+                tag = 'dd and fd apart -- the IX/IY choice'
+            else:
+                tag = 'dd only' if vd != v0 else 'fd only'
+            Status.print(f'{n}: nop {v0}, dd {vd}, fd {vf} '
+                         f'({tag})')
+
+        # While a prefix is pending, the last fetched byte is
+        # the prefix itself, so the data path's bit-5 cone
+        # mimics the IX-or-IY choice. Fetching the main opcode
+        # separates them: the data paths then agree, and a node
+        # still telling dd from fd carries the held choice.
+        def after_prefix_and_op(db):
+            s = State(base)
+            full_after_m1(s, db)
+            return full_after_m1(s, 0x21)
+
+        m0 = after_prefix_and_op(0x00)
+        md = after_prefix_and_op(0xdd)
+        mf = after_prefix_and_op(0xfd)
+        for n in sorted(m0, key=str):
+            vs = m0[n], md[n], mf[n]
+            if any(isinstance(v, PossibleValues) for v in vs):
+                continue
+            if not all(v.is_const for v in vs):
+                continue
+            v0, vd, vf = (v.kind for v in vs)
+            if vd != vf:
+                Status.print(f'{n}: nop {v0}, dd {vd}, fd {vf} '
+                             f'(tells dd from fd past the '
+                             f'opcode -- the IX/IY choice)')
+            elif vd != v0:
+                # The byte paths agree here, so this is held
+                # modifier state, not data.
+                Status.print(f'{n}: nop {v0}, prefixed {vd} '
+                             f'(prefix held past the opcode)')
+
 
 def probe_bus_templates(all_orders=False):
     # Reports the address bus and the control pins through
