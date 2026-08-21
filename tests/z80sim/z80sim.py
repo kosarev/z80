@@ -4606,6 +4606,80 @@ def test_wait_states(base_state, all_orders=False):
                          lambda n: plain[n])
 
 
+def test_bus_grant(base_state, all_orders=False):
+    # ~busrq: the fetch in flight completes, then the CPU
+    # grants the bus -- ~busak asserts, the address bus and
+    # the four transfer strobes genuinely float (their pull
+    # terms are the expected values), while ~m1 and ~rfsh stay
+    # driven high -- and no refresh runs through the grant.
+    # Release costs one tick, and the granted run ends in
+    # exactly the plain fetch's state, node for node.
+    s0 = State(base_state)
+    s0.set_db(0x00, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            with s0.status(f'plain fetch {t}.{ht}'):
+                s0.half_tick(all_orders=all_orders)
+    s0.cache()
+    plain = get_effective_states(s0, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    st = base_state.get_node_states(SAMPLED_NODES)
+    pcv = Bits.concat(sampled_bits(st, 'reg_pch'),
+                      sampled_bits(st, 'reg_pcl'))
+    refresh = Bits.concat(sampled_bits(st, 'reg_i'),
+                          sampled_bits(st, 'reg_r'))
+    float_ab = Bits(bools.get(f'pull.{p}') for p in _BUS_AB)
+    TRI = tuple(bools.get(f'pull.{p}')
+                for p in ('~mreq', '~rd', '~wr', '~iorq'))
+
+    def granted(busak):
+        # ab and the transfer strobes floating; ~m1 and ~rfsh
+        # driven high; ~busak as given.
+        return (float_ab, TRUE) + TRI + (TRUE, busak)
+
+    def driven(a, m1, mreq, rd, wr, iorq, rfsh):
+        return ((a, TRUE if m1 else FALSE)
+                + tuple(TRUE if v else FALSE
+                        for v in (mreq, rd, wr, iorq))
+                + (TRUE if rfsh else FALSE, TRUE))
+
+    rows = (
+        driven(pcv, 0, 0, 0, 1, 1, 1),) * 3 + (
+        driven(refresh, 1, 1, 1, 1, 1, 0),
+        driven(refresh, 1, 0, 1, 1, 1, 0),
+        driven(refresh, 1, 0, 1, 1, 1, 0),
+        driven(refresh, 1, 1, 1, 1, 1, 0)) + (
+        granted(FALSE),) * 7 + (
+        granted(TRUE),
+        driven((pcv + 1).truncated(16), 0, 1, 1, 1, 1, 1))
+
+    CTL = ('~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh',
+           '~busak')
+    s = State(base_state)
+    s.set_pin_and_update('~busrq', FALSE, all_orders)
+    s.set_db(0x00, all_orders)
+    for no, (a, *pins) in enumerate(rows):
+        t, ht = no // 2, no % 2
+        if (t, ht) == (6, 0):
+            s.set_pin_and_update('~busrq', TRUE, all_orders)
+        with s.status(f'bus grant {t}.{ht}'):
+            s.half_tick(all_orders=all_orders)
+        s.cache()
+        expected = {}
+        for j, p in enumerate(_BUS_AB):
+            expected[p] = a[j]
+        for p, v in zip(CTL, pins):
+            expected[p] = v
+        states = s.get_node_states(_BUS_AB + CTL)
+        check_sampled_states(f'bus grant {t}.{ht}', states,
+                             lambda n: expected[n])
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+    check_sampled_states('bus grant', after,
+                         lambda n: plain[n])
+
+
 def test_prefix_chains(base_state, all_orders=False):
     # Chained prefixes act as one modifier: the last prefix
     # before the opcode wins. Certified on doubly prefixed
@@ -6785,6 +6859,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_prefix_chains(state, all_orders)
             if seq == ('nop',):
                 test_wait_states(state, all_orders)
+                test_bus_grant(state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
