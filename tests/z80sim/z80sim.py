@@ -85,7 +85,14 @@ IFF2 = 'n206'
 IM_LATCH0 = 'n205'
 IM_LATCH1 = 'n179'
 
+# The halted flip-flop: the die's one static cross-coupled
+# pair among the identified state cells (--probe-latch-cells),
+# HALTED_FF the side that goes low on halt entry.
+HALTED_FF = 'p1126'
+HALTED_FF_B = 'p143'
+
 TESTED_NODES = {IFF1, IFF2, IM_LATCH0, IM_LATCH1,
+                HALTED_FF, HALTED_FF_B,
                 EX_AF_FF, EXX_FF,
                 EX_DE_FF0, EX_DE_FF1, EX_DE_FF, '~halt'}
 for i in range(8):
@@ -2884,6 +2891,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
     def is_active(n):
         if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1,
+                 HALTED_FF, HALTED_FF_B,
                  EX_AF_FF, EXX_FF, EX_DE_FF, '~halt'):
             return TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
@@ -3735,6 +3743,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if instr == 'ei/di':
             return check(phased_bool('is_ei'))
 
+    if n in (HALTED_FF, HALTED_FF_B):
+        # The halted flip-flop flips on halt -- HALTED_FF is
+        # the side that goes low -- and nothing else touches
+        # it.
+        if instr == 'halt':
+            return check(FALSE if n == HALTED_FF else TRUE)
+        return check(before[n])
+
     if n in (IM_LATCH0, IM_LATCH1):
         # The mode latch takes the im instruction's mode field
         # verbatim -- the field's top bit unused, so the
@@ -4410,6 +4426,9 @@ def test_nmi_from_halt(base_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
+        if n in (HALTED_FF, HALTED_FF_B):
+            # Leaving the halted state flips the pair back.
+            return TRUE if n == HALTED_FF else FALSE
         if n == IFF1:
             # Accepting ~nmi disables maskable interrupts.
             return FALSE
@@ -4933,6 +4952,81 @@ def probe_latch_cells():
             Status.print(f'{name} ({n}): loop {n} -> {s}')
 
 
+def get_structural_state_ids():
+    # The netlist's state cells, by structure: nodes with a
+    # clk-gated two-inverter refresh loop (dynamic latches) or
+    # a static cross-coupled partner. This is the closed-world
+    # candidate set -- everything on the die that can remember.
+    import re as _re
+    trans = []
+    with open('transdefs.js') as f:
+        for line in f:
+            m = _re.match(r"^\['t(\d+)',(\d+),(\d+),(\d+),",
+                          line)
+            if m:
+                trans.append(tuple(int(x)
+                                   for x in m.groups()[1:]))
+    GND, PWR, CLK = 1, 2, 3
+    gnd_gates = {}
+    passes = {}
+    for g, c1, c2 in trans:
+        for a, b in ((c1, c2), (c2, c1)):
+            if b == GND:
+                gnd_gates.setdefault(a, set()).add(g)
+        if c1 not in (GND, PWR) and c2 not in (GND, PWR):
+            passes.setdefault(c1, []).append((c2, g))
+            passes.setdefault(c2, []).append((c1, g))
+    state = set()
+    for a, gs in gnd_gates.items():
+        for b in gs:
+            if a in gnd_gates.get(b, ()):
+                state.add(a)
+                state.add(b)
+    for n, ps in passes.items():
+        for y, g in ps:
+            if g != CLK:
+                continue
+            for x in gnd_gates.get(y, ()):
+                if n in gnd_gates.get(x, ()):
+                    state.add(n)
+    return state
+
+
+def probe_closed_world(all_orders=False):
+    # The closed-world triage: sample every structural state
+    # node not already in the tested set across a few covered
+    # instructions, and report which of them change between
+    # the boundaries -- the input for expectations and
+    # documented exclusions.
+    base = build_symbolised_state()
+    all_states = base.get_node_states()
+    nums = get_structural_state_ids()
+    ext = tuple(sorted(
+        n for n in all_states
+        if n not in SAMPLED_NODES and
+        n.lstrip('~npmx').isdigit() and
+        int(n.lstrip('~npmx')) in nums))
+    Status.print(f'{len(ext)} untested state nodes')
+
+    before = base.get_node_states(ext)
+    for instr in ('nop', 'ld {b, c, d, e, h, l, a}, n',
+                  'add hl, <rp>', 'ldi/ldd', 'ei/di',
+                  'scf/ccf'):
+        with Status.do(instr):
+            s = process_instr((instr,), base,
+                              all_orders=all_orders)
+            after = s.get_node_states(ext)
+        changed = []
+        for n in ext:
+            b, a = before[n], after[n]
+            if isinstance(a, PossibleValues) or b is not a:
+                if (isinstance(a, PossibleValues) or
+                        not bools.is_equiv(b, a)):
+                    changed.append(n)
+        Status.print(f'{instr}: {len(changed)} changed: ' +
+                     ' '.join(changed))
+
+
 def probe_bus_templates(all_orders=False):
     # Reports the address bus and the control pins through
     # representative machine cycles, half-tick by half-tick,
@@ -5231,6 +5325,9 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
+        if n in (HALTED_FF, HALTED_FF_B):
+            # Leaving the halted state flips the pair back.
+            return TRUE if n == HALTED_FF else FALSE
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
             return FALSE
@@ -5338,6 +5435,9 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
+        if n in (HALTED_FF, HALTED_FF_B):
+            # Leaving the halted state flips the pair back.
+            return TRUE if n == HALTED_FF else FALSE
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
             return FALSE
@@ -5419,6 +5519,9 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
+        if n in (HALTED_FF, HALTED_FF_B):
+            # Leaving the halted state flips the pair back.
+            return TRUE if n == HALTED_FF else FALSE
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
             return FALSE
@@ -5996,6 +6099,9 @@ def test_reset_from_halt(base_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
+        if n in (HALTED_FF, HALTED_FF_B):
+            # Leaving the halted state flips the pair back.
+            return TRUE if n == HALTED_FF else FALSE
         if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1):
             # Reset also restarts the interrupt mode at 0.
             return FALSE
@@ -6095,6 +6201,78 @@ def execute_instr(s, id, phase, before, all_orders=False):
         s.cache(intermediate=True)
 
 
+# The per-instruction microstate among the structural state
+# nodes, flagged by --probe-closed-world across diverse
+# families: instruction and prefix decode cells and the
+# byte-wide data-path latch blocks. Documented exclusions from
+# the closed-world unchanged checks, pending expectations of
+# their own.
+_CLOSED_WORLD_EXCLUDED = frozenset((
+    'n1242', 'n1245', 'n1616', 'n1683', 'n701',
+    'n1243', 'n696', 'n729', 'p1844', 'p1853', 'p1854', 'p1880',
+    'p1881', 'p1957', 'p1958', 'p1985', 'p1986', 'p2057',
+    'p2058', 'p2081', 'p2082', 'p2154', 'p2155', 'p2167',
+    'p2178', 'p2179', 'p2259', 'p2270', 'p2271', 'p2284',
+    'p2295', 'p2296', 'p2372', 'p2383', 'p2384', 'p2404',
+    'p2415', 'p2416', 'p2477', 'p2488', 'p2489', 'p2515',
+    'p2526', 'p2527', 'p2598', 'p2609', 'p2610', 'p2621',
+    'p2632', 'p2633',
+    'p1871', 'p1948', 'p1976', 'p2048', 'p2072', 'p2145',
+    'p2169', 'p2261', 'p2286', 'p2374', 'p2406', 'p2479',
+    'p2517', 'p2600', 'p2623', 'n1830', 'n1909',
+    'n1931', 'n2013', 'n2034', 'n2114', 'n2134', 'n2222',
+    'n2248', 'n2329', 'n2361', 'n2448', 'n2465', 'n2562',
+    'n2588', 'n2674', 'n647', 'n697', 'n726', 'p1077', 'p1773',
+    'p1783', 'p1841', 'p1842', 'p1843', 'p1845', 'p1846',
+    'p1847', 'p1848', 'p1849', 'p1850', 'p1851', 'p1852',
+    'p1868', 'p1869', 'p1870', 'p1872', 'p1873', 'p1874',
+    'p1875', 'p1876', 'p1877', 'p1878', 'p1879', 'p1945',
+    'p1946', 'p1947', 'p1949', 'p1950', 'p1951', 'p1952',
+    'p1953', 'p1954', 'p1955', 'p1956', 'p1973', 'p1974',
+    'p1975', 'p1977', 'p1978', 'p1979', 'p1980', 'p1981',
+    'p1982', 'p1983', 'p1984', 'p2045', 'p2046', 'p2047',
+    'p2049', 'p2050', 'p2051', 'p2052', 'p2053', 'p2054',
+    'p2055', 'p2056', 'p2069', 'p2070', 'p2071', 'p2073',
+    'p2074', 'p2075', 'p2076', 'p2077', 'p2078', 'p2079',
+    'p2080', 'p2142', 'p2143', 'p2144', 'p2146', 'p2147',
+    'p2148', 'p2149', 'p2150', 'p2151', 'p2152', 'p2153',
+    'p2166', 'p2168', 'p2170', 'p2171', 'p2172', 'p2173',
+    'p2174', 'p2175', 'p2176', 'p2177', 'p2258', 'p2260',
+    'p2262', 'p2263', 'p2264', 'p2265', 'p2266', 'p2267',
+    'p2268', 'p2269', 'p2283', 'p2285', 'p2287', 'p2288',
+    'p2289', 'p2290', 'p2291', 'p2292', 'p2293', 'p2294',
+    'p2371', 'p2373', 'p2375', 'p2376', 'p2377', 'p2378',
+    'p2379', 'p2380', 'p2381', 'p2382', 'p2403', 'p2405',
+    'p2407', 'p2408', 'p2409', 'p2410', 'p2411', 'p2412',
+    'p2413', 'p2414', 'p2476', 'p2478', 'p2480', 'p2481',
+    'p2482', 'p2483', 'p2484', 'p2485', 'p2486', 'p2487',
+    'p2514', 'p2516', 'p2518', 'p2519', 'p2520', 'p2521',
+    'p2522', 'p2523', 'p2524', 'p2525', 'p2597', 'p2599',
+    'p2601', 'p2602', 'p2603', 'p2604', 'p2605', 'p2606',
+    'p2607', 'p2608', 'p2620', 'p2622', 'p2624', 'p2625',
+    'p2626', 'p2627', 'p2628', 'p2629', 'p2630', 'p2631', 'p687',
+    'p98'))
+
+_closed_world_nodes = None
+
+
+def get_closed_world_nodes(s):
+    # The structurally identified state nodes -- everything on
+    # the die that can remember -- not already in the tested
+    # set nor among the documented microstate exclusions:
+    # checked as unchanged across every covered instruction.
+    global _closed_world_nodes
+    if _closed_world_nodes is None:
+        nums = get_structural_state_ids()
+        _closed_world_nodes = tuple(sorted(
+            n for n in s.get_node_states()
+            if n not in SAMPLED_NODES and
+            n not in _CLOSED_WORLD_EXCLUDED and
+            n.lstrip('~npmx').isdigit() and
+            int(n.lstrip('~npmx')) in nums))
+    return _closed_world_nodes
+
+
 def process_instr(instrs, base_state, *, test=False, all_orders=False):
     phase = len(instrs)
     id = instrs[-1]
@@ -6102,6 +6280,9 @@ def process_instr(instrs, base_state, *, test=False, all_orders=False):
     s = State(base_state)
     at_start = s.get_node_states(SAMPLED_NODES)
     before = get_effective_states(s, SAMPLED_NODES)
+    if test:
+        cw_nodes = get_closed_world_nodes(s)
+        cw_start = s.get_node_states(cw_nodes)
 
     # The tested instruction and the extra ticks following it
     # simulate all orders of updates when so asked; the
@@ -6123,6 +6304,28 @@ def process_instr(instrs, base_state, *, test=False, all_orders=False):
         token = test_node(instrs, n, at_start, at_end, before, after,
                           all_orders)
         assert isinstance(token, CheckToken)
+
+    # The closed world: every other state cell on the die must
+    # come out of the instruction as it went in. All offenders
+    # are gathered before failing, to keep the triage loop
+    # short.
+    cw_end = s.get_node_states(cw_nodes)
+    cw_bad = []
+    for n in cw_nodes:
+        b, a = cw_start[n], cw_end[n]
+        if b is a:
+            continue
+        av = PossibleValues.cast(a)
+        bv = PossibleValues.cast(b)
+        if (av.is_single and bv.is_single and
+                bools.is_equiv(av.single_value,
+                               bv.single_value)):
+            continue
+        cw_bad.append(n)
+    if cw_bad:
+        Status.clear()
+        print('FAILED: closed world: ' + ' '.join(cw_bad))
+        raise TestFailure()
 
     return after_instr_state
 
@@ -7567,6 +7770,12 @@ def main():
 
     if '--probe-latch-cells' in sys.argv:
         probe_latch_cells()
+        Status.clear()
+        return
+
+    if '--probe-closed-world' in sys.argv:
+        probe_closed_world(
+            all_orders='--single-order' not in sys.argv)
         Status.clear()
         return
 
