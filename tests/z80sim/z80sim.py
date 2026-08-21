@@ -80,7 +80,13 @@ EX_DE_FF = 'ex_dehl_combined'
 IFF1 = 'n181'
 IFF2 = 'n206'
 
-TESTED_NODES = {IFF1, IFF2, EX_AF_FF, EXX_FF,
+# The interrupt mode latch, identified by --probe-node-ids:
+# the pair stores the im instruction's mode field verbatim.
+IM_LATCH0 = 'n205'
+IM_LATCH1 = 'n179'
+
+TESTED_NODES = {IFF1, IFF2, IM_LATCH0, IM_LATCH1,
+                EX_AF_FF, EXX_FF,
                 EX_DE_FF0, EX_DE_FF1, EX_DE_FF, '~halt'}
 for i in range(8):
     for r in 'af':
@@ -2877,7 +2883,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
         return Bits(before[f'{id}{i}'] for i in range(8))
 
     def is_active(n):
-        if n in (IFF1, IFF2, EX_AF_FF, EXX_FF, EX_DE_FF, '~halt'):
+        if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1,
+                 EX_AF_FF, EXX_FF, EX_DE_FF, '~halt'):
             return TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
             exx = before[EXX_FF]
@@ -3727,6 +3734,16 @@ def test_node(instrs, n, at_start, at_end, before, after,
     if n in (IFF1, IFF2):
         if instr == 'ei/di':
             return check(phased_bool('is_ei'))
+
+    if n in (IM_LATCH0, IM_LATCH1):
+        # The mode latch takes the im instruction's mode field
+        # verbatim -- the field's top bit unused, so the
+        # duplicate encodings land alike; nothing else touches
+        # the latch.
+        if instr == 'im/xim n':
+            y = Bits(phased('y'), width=3)
+            return check(y[0 if n == IM_LATCH0 else 1])
+        return check(before[n])
 
     if n == EX_AF_FF and instr == "ex af, af'":
         return check(~before[n])
@@ -5239,6 +5256,18 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def prepped_base_expected(base, n):
+    # The im preparation's mode lands in the latch only after
+    # the raw boundary sample -- the usual writeback overlap --
+    # so 'unchanged' relative to such a baseline means the
+    # prepared mode for the latch, not the sampled value.
+    if n == IM_LATCH0:
+        return bools.get('y_p1_b0')
+    if n == IM_LATCH1:
+        return bools.get('y_p1_b1')
+    return base[n]
+
+
 def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
                      ack_db, all_orders):
     # The shared shape of the two sharp edges: ei and halt
@@ -5328,7 +5357,7 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             return FALSE
-        return base[n]
+        return prepped_base_expected(base, n)
 
     check_sampled_states(what, after, get_expected, under=accepts)
 
@@ -5422,7 +5451,7 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             return FALSE
-        return base[n]
+        return prepped_base_expected(base, n)
 
     check_sampled_states('~int at a boundary', after, get_expected,
                          under=accepts)
@@ -5553,7 +5582,7 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             return FALSE
-        return base[n]
+        return prepped_base_expected(base, n)
 
     check_sampled_states('~int between ldir repeats', after,
                          get_expected, under=accepts)
@@ -5673,7 +5702,7 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             return FALSE
-        return base[n]
+        return prepped_base_expected(base, n)
 
     check_sampled_states('~int at ld a, {i, r}', after,
                          get_expected, under=accepts)
@@ -5750,7 +5779,7 @@ def test_nmi_over_int_priority(symbolised_state, all_orders=False):
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
             return FALSE
-        return base[n]
+        return prepped_base_expected(base, n)
 
     check_sampled_states('~nmi over ~int priority', after,
                          get_expected)
@@ -5775,7 +5804,8 @@ def test_reset_from_halt(base_state, all_orders=False):
         if n == '~halt':
             # The halted state ends.
             return TRUE
-        if n in (IFF1, IFF2):
+        if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1):
+            # Reset also restarts the interrupt mode at 0.
             return FALSE
         if n.startswith('reg_pc') or n[4:-1] == 'i':
             # The settling nop fetches from address 0, and a
