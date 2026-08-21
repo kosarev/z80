@@ -2727,7 +2727,11 @@ PREFIX_DISP = (
     'ld (hl), {b, c, d, e, h, l, a}', 'ld (hl), n',
     'inc/dec (hl)',
     'add (hl)', 'adc (hl)', 'sub (hl)', 'sbc (hl)',
-    'and (hl)', 'xor (hl)', 'or (hl)', 'cp (hl)')
+    'and (hl)', 'xor (hl)', 'or (hl)', 'cp (hl)',
+    'rot {b, c, d, e, h, l, a}', 'rot (hl)',
+    'bit {b, c, d, e, h, l, a}', 'bit (hl)',
+    'res {b, c, d, e, h, l, a}', 'res (hl)',
+    'set {b, c, d, e, h, l, a}', 'set (hl)')
 
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
@@ -3471,13 +3475,29 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
     if n.startswith('reg_r'):
         # The refresh register advances once per fetch cycle;
-        # the sampling adds the settling nop's own.
+        # the sampling adds the settling nop's own. A
+        # conditional fetch -- the prefix byte, or a byte
+        # fetched only unprefixed -- counts under its
+        # condition.
         i = int(n[-1])
         cur = bits('reg_r')
-        num_m1 = sum(1 for d, t, c in cycles
-                     if isinstance(d, Bits) and c is None)
-        lo = (Bits(cur.bits[0:7]) + num_m1 +
-              prefix_bit).truncated(7)
+        lo = Bits(cur.bits[0:7])
+        for cd, ct, cc in cycles:
+            if not isinstance(cd, Bits) or ct < 4:
+                # Byte-term cycles are reads; so is the 3-tick
+                # conditional cycle re-feeding a CB family's
+                # opcode byte in the prefixed order -- the die
+                # does not refresh on it.
+                continue
+            if cc is None:
+                lo = lo + 1
+            elif cc == 'is_prefixed':
+                lo = lo + prefix_bit
+            elif cc == 'not_prefixed':
+                lo = lo + Bits.ifelse(is_prefixed, 0, 1)
+            else:
+                assert 0, cc
+        lo = lo.truncated(7)
         v = Bits(lo.bits + (cur[7],))
         if instr == 'ld {i, r}, a/ld a, {i, r}':
             a = get_a()
@@ -3575,7 +3595,11 @@ def test_node(instrs, n, at_start, at_end, before, after,
                          'set {b, c, d, e, h, l, a}'):
                 yb = Bits(phased('y'), width=3)
                 regf = Bits(opcode[0:3])
-                v = get_r(regf)
+                # Under the prefix the operand is the memory
+                # byte, whatever the register field says; the
+                # field only names the copy destination.
+                v = Bits.ifelse(is_prefixed, get_at_hl(),
+                                get_r(regf))
                 is_right = yb[0]
                 rot_cf = bools.ifelse(is_right, v[0], v[7])
                 fill = bools.ifelse(
@@ -4050,7 +4074,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
         y = Bits(phased('y'), width=3)
 
         reg = Bits(opcode[0:3])
-        v = get_r(reg)
+        # Under the prefix the operand is the memory byte,
+        # whatever the register field says.
+        v = Bits.ifelse(is_prefixed, get_at_hl(), get_r(reg))
 
         # RLC, RRC, RL, RR, SLA, SRA, SLL, SRL
         is_right = y[0]
@@ -4090,9 +4116,19 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 bools.ifelse(op == ROT, rot_r.parity(), before[n])))
         if n in XFF + YFF:
             i = int(n[-1])
+            # bit takes the two flags from the high byte of the
+            # operand pointer: WZ for (hl), the computed ix+d
+            # for the prefixed forms, the operand itself for a
+            # plain register.
+            ixd = (get_ixy() +
+                   Bits(phased('d'),
+                        width=8).sign_extended(16)).truncated(16)
+            ptr_xy = bools.ifelse(
+                is_prefixed, ixd[8 + i],
+                bools.ifelse(reg == AT_HL,
+                             before[f'reg_w{i}'], v[i]))
             return check(bools.ifelse(
-                op == BIT,
-                bools.ifelse(reg == AT_HL, before[f'reg_w{i}'], v[i]),
+                op == BIT, ptr_xy,
                 bools.ifelse(op == ROT, rot_r[i], before[n])))
         if n in ZFF:
             return check(bools.ifelse(
@@ -5545,6 +5581,8 @@ def get_cond_as_expr(cond, phase, before):
         return Bits.concat(b, c) != 1
     if cond == 'is_prefixed':
         return bools.get(f'is_prefixed_p{phase}')
+    if cond == 'not_prefixed':
+        return ~bools.get(f'is_prefixed_p{phase}')
     if cond == 'bc != 1 && a != r':
         b = Bits.ifelse(
                 before[EXX_FF],
@@ -5955,13 +5993,15 @@ _BUS_TEMPLATES = {'m1': _BUS_M1_4, 'm15': _BUS_M1_5,
                   'r': _BUS_R3, 'r4': _BUS_R4,
                   'w': _BUS_W3, 'w5': _BUS_W5,
                   'io_r': _BUS_IO_R, 'io_w': _BUS_IO_W,
-                  'm1p': _BUS_M1_4,
+                  'm1p': _BUS_M1_4, 'm1n': _BUS_M1_4,
                   'rp': _BUS_R3, 'rip': _BUS_R3_INT,
+                  'ron': _BUS_R3_INT,
                   'e5p': _BUS_E5_END, 'e2p': _BUS_E2_END}
-_BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i', 'm1p')
+_BUS_FETCH_KINDS = ('m1', 'm15', 'm16', 'm1i', 'm1p', 'm1n')
 # The kinds carrying a conditionally present instruction byte:
 # each shifts later pc-relative addresses by one where it is
-# there.
+# there. 'ron' is deliberately absent: it re-reads, under the
+# prefix, the byte the conditional 'm1n' fetch already counts.
 _BUS_SHIFT_KINDS = ('m1p', 'rp', 'rip')
 
 # Per-family cycle kinds and addresses; families with
@@ -6309,44 +6349,40 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         cur = resolve_at(cyc, addr)
         if kind in _BUS_FETCH_KINDS:
             refresh = ir_plus_b(m1_index)
-            m1_index = (m1_index +
-                        (pref_b if kind == 'm1p' else
-                         1)).truncated(3)
+            if kind == 'm1p':
+                w = pref_b
+            elif kind == 'm1n':
+                w = Bits.ifelse(
+                    bools.get('is_prefixed_p1'), 0, 1)
+            else:
+                w = 1
+            m1_index = (m1_index + w).truncated(3)
         # Internal cycles keep the last fetch's parked refresh
         # address, so refresh persists across them.
         if cyc + 1 < len(cycles):
-            tk = resolve_at(cyc + 1, spec[cyc + 1][1])
-            if tk is None:
-                tk = cur if cur is not None else held
-            ncond = cycles[cyc + 1][2]
-            if ncond is not None:
-                # The boundary into a conditional cycle: the
-                # taken branch enters it; the fall-through one
-                # continues at the first cycle past the
-                # conditional run -- the next instruction's
-                # fetch where the run is a tail.
-                nc = get_cond_as_expr(ncond, 1, eff)
-                j = cyc + 2
-                while (j < len(cycles) and
-                       cycles[j][2] is not None):
-                    j += 1
-                if j < len(cycles):
-                    fall = resolve_at(j, spec[j][1])
-                    if fall is None:
-                        fall = cur if cur is not None else held
-                    fall_m1 = (FALSE if spec[j][0] in
-                               _BUS_FETCH_KINDS else TRUE)
+            # The handover target: fold over the following
+            # cycles -- a conditional cycle is entered only
+            # where its condition holds, the first applicable
+            # one wins, and falling past the end reaches the
+            # next instruction's fetch.
+            arms = []
+            for j in range(cyc + 1, len(cycles)):
+                tk = resolve_at(j, spec[j][1])
+                if tk is None:
+                    tk = cur if cur is not None else held
+                m1v = (FALSE if spec[j][0] in _BUS_FETCH_KINDS
+                       else TRUE)
+                arms.append((cycles[j][2], tk, m1v))
+                if cycles[j][2] is None:
+                    break
+            nxt, next_m1 = nottaken_next, FALSE
+            for jcond, tk, m1v in reversed(arms):
+                if jcond is None:
+                    nxt, next_m1 = tk, m1v
                 else:
-                    fall = nottaken_next
-                    fall_m1 = FALSE
-                tk_m1 = (FALSE if spec[cyc + 1][0] in
-                         _BUS_FETCH_KINDS else TRUE)
-                nxt = Bits.ifelse(nc, tk, fall)
-                next_m1 = bools.ifelse(nc, tk_m1, fall_m1)
-            else:
-                nxt = tk
-                next_m1 = (FALSE if spec[cyc + 1][0] in
-                           _BUS_FETCH_KINDS else TRUE)
+                    c = get_cond_as_expr(jcond, 1, eff)
+                    nxt = Bits.ifelse(c, tk, nxt)
+                    next_m1 = bools.ifelse(c, m1v, next_m1)
         else:
             nxt = taken_next
             next_m1 = FALSE
@@ -6584,8 +6620,8 @@ class TestedInstrs(object):
         def r3(p='r', cond=None):
             return phased(p), 3, cond
 
-        def r4(p='r'):
-            return phased(p), 4, None
+        def r4(p='r', cond=None):
+            return phased(p), 4, cond
 
         def w3(p='w', cond=None):
             return phased(p), 3, cond
@@ -6796,24 +6832,43 @@ class TestedInstrs(object):
                       ifelse('is_10', xnop_10, xnop_11))
         yield 'xnop', (fp(), f(0xed), f(xnop))
 
+        # Under the DD/FD prefix a CB family's opcode byte is a
+        # plain read, not a fetch, and follows the displacement:
+        # the conditional fetch carries the unprefixed byte, the
+        # conditional read re-feeds the same expression in the
+        # prefixed order. The register field then selects the
+        # copy destination of the memory result -- the
+        # undocumented ld r, rlc (ix+d) forms -- with no copy
+        # for bit or field 6.
         ROT, BIT, RES, SET = range(4)
+
+        def cb_cycles(op_b):
+            return (fp(), f(0xcb), f(op_b, cond='not_prefixed'),
+                    r3('d', cond='is_prefixed'),
+                    f(op_b, ticks=3, cond='is_prefixed'),
+                    e2(cond='is_prefixed'))
+
         for x, m in (
                 (ROT, 'rot'),
                 (BIT, 'bit'),
                 (RES, 'res'),
                 (SET, 'set')):
+            op_b = xyz(x, 'y', get_non_at_hl_r())
+            mem = (r4(cond='is_prefixed'),)
+            if x != BIT:
+                mem += w3(cond='is_prefixed'),
             yield f'{m} {{b, c, d, e, h, l, a}}', (
-                f(0xcb), f(xyz(x, 'y', get_non_at_hl_r())))
+                cb_cycles(op_b) + mem)
 
         yield 'bit (hl)', (
-            f(0xcb), f(xyz(BIT, 'y', AT_HL)), r4())
+            cb_cycles(xyz(BIT, 'y', AT_HL)) + (r4(),))
 
         for x, m in (
                 (ROT, 'rot'),
                 (RES, 'res'),
                 (SET, 'set')):
             yield f'{m} (hl)', (
-                f(0xcb), f(xyz(x, 'y', AT_HL)), r4(), w3())
+                cb_cycles(xyz(x, 'y', AT_HL)) + (r4(), w3()))
 
 
 def test_instructions():
