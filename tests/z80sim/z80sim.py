@@ -3343,8 +3343,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
                     v = v + prefix_bit
                 return v
             if instr == 'halt':
-                # PC freezes past the halt opcode.
-                return get_pc_plus(1)
+                # PC freezes past the halt opcode -- and past
+                # its prefix where it carries one.
+                return get_pc_plus(1) + prefix_bit
             if instr == 'jp hl':
                 return get_hl_eff() + 1
             if instr in ('jp nn', 'ret'):
@@ -6019,7 +6020,7 @@ BUS_SPECS = {
     'ld sp, hl': (('m1p', 'pc'), ('m16', 'pc')),
     'ei/di': (('m1p', 'pc'), ('m1', 'pc')),
     'jp hl': (('m1p', 'pc'), ('m1', 'pc')),
-    'halt': (('m1', 'pc'),),
+    'halt': (('m1p', 'pc'), ('m1', 'pc')),
     'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}':
         (('m1p', 'pc'), ('m1', 'pc')),
     'rlca/rrca/rla/rra': (('m1p', 'pc'), ('m1', 'pc')),
@@ -6297,7 +6298,11 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         # The special resolvers shift themselves where their
         # targets are pc-relative; absolute targets do not
         # shift.
-        instr_next = resolve(NEXT_SPECIAL[instr])
+        # Resolving at the instruction's end shifts a
+        # pc-relative special next -- halt's frozen fetch
+        # address -- past the conditional bytes; the other
+        # special resolvers shift themselves where needed.
+        instr_next = resolve_at(len(spec), NEXT_SPECIAL[instr])
     else:
         length = 1 + sum(1 for k, a in spec
                          if a.startswith('pc+') and
@@ -6682,7 +6687,7 @@ class TestedInstrs(object):
             w3())
 
         yield 'halt', (
-            f(xyz(1, AT_HL, AT_HL)),)
+            fp(), f(xyz(1, AT_HL, AT_HL)))
 
         yield 'ld {b, c, d, e, h, l, a}, n', (
             fp(), f(xyz(0, get_non_at_hl_r(), 6)), r3())
