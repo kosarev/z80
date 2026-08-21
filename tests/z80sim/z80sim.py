@@ -4444,6 +4444,59 @@ def mentions_terms(v, prefix):
     return False
 
 
+def test_prefix_chains(base_state, all_orders=False):
+    # Chained prefixes act as one modifier: the last prefix
+    # before the opcode wins. Certified on doubly prefixed
+    # ld <rp>, nn encodings with rp = 2: dd dd loads IX, dd fd
+    # loads IY, and the complete sampled state shows nothing
+    # else changes beyond PC, R and the instruction latch.
+    before = get_effective_states(base_state, SAMPLED_NODES)
+
+    def run(chain, lo, hi):
+        s = State(base_state)
+        cycles = tuple((b, 4) for b in chain) + ((lo, 3),
+                                                 (hi, 3))
+        run_prep_instr(s, cycles, all_orders)
+        return get_effective_states(s, SAMPLED_NODES,
+                                    all_orders=all_orders)
+
+    def check(what, after, reg, lo, hi):
+        def get_expected(n):
+            if (n.startswith('reg_i') and
+                    n[4:-1] in (f'{reg}h', f'{reg}l')):
+                v = Bits(hi if n[4:-1].endswith('h') else lo,
+                         width=8)
+                return v[int(n[-1])]
+            if n.startswith('reg_pc'):
+                pc = Bits.concat(
+                    sampled_bits(before, 'reg_pch'),
+                    sampled_bits(before, 'reg_pcl'))
+                i = int(n[-1])
+                if n.startswith('reg_pch'):
+                    i += 8
+                return (pc + 5).truncated(16)[i]
+            if n.startswith('reg_r'):
+                r = sampled_bits(before, 'reg_r')
+                lo7 = (Bits(r.bits[0:7]) + 3).truncated(7)
+                return Bits(lo7.bits + (r[7],))[int(n[-1])]
+            if n.startswith('instr'):
+                # The settling nop's byte, loaded by the
+                # sample point.
+                return FALSE
+            return before[n]
+
+        check_sampled_states(what, after, get_expected)
+
+    with Status.do('dd dd chain'):
+        check('dd dd chain',
+              run((0xdd, 0xdd, 0x21), 'k1', 'k2'),
+              'ix', 'k1', 'k2')
+    with Status.do('dd fd chain'):
+        check('dd fd chain',
+              run((0xdd, 0xfd, 0x21), 'k3', 'k4'),
+              'iy', 'k3', 'k4')
+
+
 def probe_node_ids(all_orders=False):
     # Reports identification candidates for state nodes the
     # tests do not yet name: nodes that flip to a new constant
@@ -6439,6 +6492,8 @@ def test_instr_seq(seq, all_orders=False):
             process_instr(seq, state, test=True, all_orders=all_orders)
             if len(seq) == 1 and seq[0] in BUS_SPECS:
                 test_bus_timeline(seq[0], state, all_orders)
+            if seq == ('ld <rp>, nn',):
+                test_prefix_chains(state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
