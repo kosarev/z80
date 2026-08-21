@@ -4551,6 +4551,61 @@ def mentions_terms(v, prefix):
     return False
 
 
+def test_wait_states(base_state, all_orders=False):
+    # ~wait stretches a machine cycle's active phase without
+    # touching the architecture. A fetch with two wait ticks
+    # inserted holds its address and strobes through the
+    # inserted ticks, runs its refresh phase after them -- the
+    # refresh address pre-increment, as always -- and ends in
+    # exactly the state of the plain fetch: the complete
+    # sampled state, R included, compared node for node.
+    s0 = State(base_state)
+    s0.set_db(0x00, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            with s0.status(f'plain fetch {t}.{ht}'):
+                s0.half_tick(all_orders=all_orders)
+    s0.cache()
+    plain = get_effective_states(s0, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    st = base_state.get_node_states(SAMPLED_NODES)
+    pcv = Bits.concat(sampled_bits(st, 'reg_pch'),
+                      sampled_bits(st, 'reg_pcl'))
+    refresh = Bits.concat(sampled_bits(st, 'reg_i'),
+                          sampled_bits(st, 'reg_r'))
+    rows = ((pcv, 0, 0, 0, 1, 1, 1),) * 7 + (
+        (refresh, 1, 1, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 1, 1, 1, 1, 0),
+        ((pcv + 1).truncated(16), 0, 1, 1, 1, 1, 1))
+
+    s = State(base_state)
+    s.set_db(0x00, all_orders)
+    for no, (a, *pins) in enumerate(rows):
+        t, ht = no // 2, no % 2
+        if (t, ht) == (1, 0):
+            s.set_pin_and_update('~wait', FALSE, all_orders)
+        if (t, ht) == (3, 0):
+            s.set_pin_and_update('~wait', TRUE, all_orders)
+        with s.status(f'waited fetch {t}.{ht}'):
+            s.half_tick(all_orders=all_orders)
+        s.cache()
+        expected = {}
+        for j, p in enumerate(_BUS_AB):
+            expected[p] = a[j]
+        for p, v in zip(_BUS_CTL, pins):
+            expected[p] = TRUE if v else FALSE
+        states = s.get_node_states(_BUS_AB + _BUS_CTL)
+        check_sampled_states(f'waited fetch bus {t}.{ht}',
+                             states, lambda n: expected[n])
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+    check_sampled_states('wait states', after,
+                         lambda n: plain[n])
+
+
 def test_prefix_chains(base_state, all_orders=False):
     # Chained prefixes act as one modifier: the last prefix
     # before the opcode wins. Certified on doubly prefixed
@@ -6728,6 +6783,8 @@ def test_instr_seq(seq, all_orders=False):
                 test_bus_timeline(seq[0], state, all_orders)
             if seq == ('ld <rp>, nn',):
                 test_prefix_chains(state, all_orders)
+            if seq == ('nop',):
+                test_wait_states(state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
