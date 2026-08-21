@@ -3218,7 +3218,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if instr == 'ldir/lddr':
             # WZ changes only when the instruction repeats: then
             # it takes the address of the second opcode byte.
-            wz = Bits.ifelse(get_bc() != 1, get_pc_plus(1), get_wz())
+            wz = Bits.ifelse(get_bc() != 1,
+                             get_pc_plus(1) + prefix_bit,
+                             get_wz())
             return check(wz[i])
         if instr in ('cpi/cpd', 'cpir/cpdr'):
             wz = get_wz()
@@ -3228,7 +3230,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # the second opcode byte instead.
                 a, s = get_a(), Bits(phased('r'), width=8)
                 wz = Bits.ifelse((get_bc() != 1) & (a != s),
-                                 get_pc_plus(1), wz)
+                                 get_pc_plus(1) + prefix_bit,
+                                 wz)
             return check(wz[i])
         if instr in ('ini/ind', 'inir/indr', 'outi/outd', 'otir/otdr'):
             if instr in ('ini/ind', 'inir/indr'):
@@ -3243,7 +3246,9 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr in ('inir/indr', 'otir/otdr'):
                 # A repeating instruction takes the address of
                 # the second opcode byte instead.
-                wz = Bits.ifelse(get_b() != 1, get_pc_plus(1), wz)
+                wz = Bits.ifelse(get_b() != 1,
+                                 get_pc_plus(1) + prefix_bit,
+                                 wz)
             return check(wz[i])
         if instr == 'ld hl, (nn)/ld (nn), hl':
             wz = Bits.concat(Bits(phased('r2'), width=8),
@@ -3402,15 +3407,15 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 return t.zero_extended(16) + 1
             if instr == 'ldir/lddr':
                 return Bits.ifelse(get_bc() != 1, get_pc_plus(1),
-                                   get_pc_plus(3))
+                                   get_pc_plus(3)) + prefix_bit
             if instr == 'cpir/cpdr':
                 rep = ((get_bc() != 1) &
                        (get_a() != Bits(phased('r'), width=8)))
                 return Bits.ifelse(rep, get_pc_plus(1),
-                                   get_pc_plus(3))
+                                   get_pc_plus(3)) + prefix_bit
             if instr in ('inir/indr', 'otir/otdr'):
                 return Bits.ifelse(get_b() != 1, get_pc_plus(1),
-                                   get_pc_plus(3))
+                                   get_pc_plus(3)) + prefix_bit
             assert 0, instr
 
         def get_sp_expected():
@@ -3917,7 +3922,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # A repeating iteration takes the two flags from
                 # the address it re-executes from instead: XF
                 # from bit 11 and YF from bit 13 of PC.
-                pc = get_pc_plus(0)
+                pc = (get_pc_plus(0) +
+                      prefix_bit).truncated(16)
                 x = bools.ifelse(get_bc() != 1,
                                  pc[11] if n in XFF else pc[13], x)
             return check(x)
@@ -3947,7 +3953,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # A repeating iteration takes the two flags from
                 # the address it re-executes from instead: XF
                 # from bit 11 and YF from bit 13 of PC.
-                pc = get_pc_plus(0)
+                pc = (get_pc_plus(0) +
+                      prefix_bit).truncated(16)
                 x = bools.ifelse((get_bc() != 1) & (a != s),
                                  pc[11] if n in XFF else pc[13], x)
             return check(x)
@@ -4006,7 +4013,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # A repeating iteration takes the two flags from
                 # the address it re-executes from instead: XF
                 # from bit 11 and YF from bit 13 of PC.
-                pc = get_pc_plus(0)
+                pc = (get_pc_plus(0) +
+                      prefix_bit).truncated(16)
                 x = bools.ifelse(get_b() != 1,
                                  pc[11] if n in XFF else pc[13], x)
             return check(x)
@@ -6015,7 +6023,7 @@ BUS_SPECS.update({
     'inc/dec <rp>': (('m1p', 'pc'), ('m16', 'pc')),
     'ex (sp), hl': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'sp'),
                     ('r4', 'sp+1'), ('w', 'sp+1'), ('w5', 'sp')),
-    'ldi/ldd': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
+    'ldi/ldd': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
                 ('w5', 'de')),
     'add hl, <rp>': (('m1p', 'pc'), ('m1i', 'pc'), ('e4', '-'),
                      ('e3end', '-')),
@@ -6076,21 +6084,21 @@ BUS_SPECS.update({
     'call cc, nn': (('m1p', 'pc'), ('m1', 'pc'), ('r', 'pc+1'),
                     ('r', 'pc+2'), ('e1', '-'), ('w', 'sp-1'),
                     ('w', 'sp-2')),
-    'cpi/cpd': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
+    'cpi/cpd': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
                 ('e5end', '-')),
-    'cpir/cpdr': (('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
+    'cpir/cpdr': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'), ('ri', 'hl'),
                   ('e5end', '-'), ('e5end', '-')),
-    'ldir/lddr': (('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
+    'ldir/lddr': (('m1p', 'pc'), ('m1', 'pc'), ('m1', 'pc+1'), ('r', 'hl'),
                   ('w5', 'de'), ('e5end', '-')),
-    'ini/ind': (('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
+    'ini/ind': (('m1p', 'pc'), ('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
                 ('w', 'hl')),
-    'inir/indr': (('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
+    'inir/indr': (('m1p', 'pc'), ('m1', 'pc'), ('m15', 'pc+1'), ('io_r', 'bc'),
                   ('w', 'hl'), ('e5end', '-')),
     # The out group decrements B before the port write, so
     # its port address carries the decremented value.
-    'outi/outd': (('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
+    'outi/outd': (('m1p', 'pc'), ('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
                   ('io_w', 'b-1:c')),
-    'otir/otdr': (('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
+    'otir/otdr': (('m1p', 'pc'), ('m1', 'pc'), ('m15', 'pc+1'), ('r', 'hl'),
                   ('io_w', 'b-1:c'), ('e5end', '-')),
 })
 
@@ -6736,33 +6744,33 @@ class TestedInstrs(object):
             fp(), f(0xed), f(ifelse('is_rrd', 0x67, 0x6f)), r3(),
             e4(), w3())
         yield 'ldi/ldd', (
-            f(0xed), f(ifelse('is_ldd', 0xa8, 0xa0)), r3(), w5())
+            fp(), f(0xed), f(ifelse('is_ldd', 0xa8, 0xa0)), r3(), w5())
         # The repeat cycle runs only when the decremented BC is
         # not zero, that is, when BC was not 1 -- one symbolic
         # run covers both branches for all BC values.
         yield 'ldir/lddr', (
-            f(0xed), f(ifelse('is_ldd', 0xb8, 0xb0)), r3(), w5(),
+            fp(), f(0xed), f(ifelse('is_ldd', 0xb8, 0xb0)), r3(), w5(),
             e5(cond='bc != 1'))
         yield 'cpi/cpd', (
-            f(0xed), f(ifelse('is_cpd', 0xa9, 0xa1)), r3(), e5())
+            fp(), f(0xed), f(ifelse('is_cpd', 0xa9, 0xa1)), r3(), e5())
         # The repeat cycle runs only when the decremented BC is
         # not zero and the comparison did not match -- one
         # symbolic run covers both branches.
         yield 'cpir/cpdr', (
-            f(0xed), f(ifelse('is_cpd', 0xb9, 0xb1)), r3(), e5(),
+            fp(), f(0xed), f(ifelse('is_cpd', 0xb9, 0xb1)), r3(), e5(),
             e5('e2', cond='bc != 1 && a != r'))
         yield 'ini/ind', (
-            f(0xed), f5(ifelse('is_ind', 0xaa, 0xa2)), io4(), w3())
+            fp(), f(0xed), f5(ifelse('is_ind', 0xaa, 0xa2)), io4(), w3())
         # The repeat cycle runs only when the decremented B is
         # not zero, that is, when B was not 1 -- one symbolic
         # run covers both branches for all B values.
         yield 'inir/indr', (
-            f(0xed), f5(ifelse('is_ind', 0xba, 0xb2)), io4(), w3(),
+            fp(), f(0xed), f5(ifelse('is_ind', 0xba, 0xb2)), io4(), w3(),
             e5(cond='b != 1'))
         yield 'outi/outd', (
-            f(0xed), f5(ifelse('is_outd', 0xab, 0xa3)), r3(), io4())
+            fp(), f(0xed), f5(ifelse('is_outd', 0xab, 0xa3)), r3(), io4())
         yield 'otir/otdr', (
-            f(0xed), f5(ifelse('is_outd', 0xbb, 0xb3)), r3(), io4(),
+            fp(), f(0xed), f5(ifelse('is_outd', 0xbb, 0xb3)), r3(), io4(),
             e5(cond='b != 1'))
         yield 'in r, (c)', (
             fp(), f(0xed), f(xyz(1, 'y', 0)), io4())
