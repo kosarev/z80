@@ -6196,6 +6196,24 @@ BUS_SPECS.update({
                   ('io_w', 'b-1:c'), ('e5end', '-')),
 })
 
+# The CB families: under the prefix the opcode byte follows
+# the displacement as a plain read -- ~m1 stays high through
+# it -- and the memory operand cycles go to the indexed
+# address. The register forms' memory cycles exist only under
+# the prefix; their conditions come from the cycle lists.
+_BUS_CB_COMMON = (('m1p', 'pc'), ('m1', 'pc'), ('m1n', 'pc+1'),
+                  ('rp', 'pc+1'), ('ron', 'pc+1'), ('e2p', '-'))
+for _m in ('rot', 'bit', 'res', 'set'):
+    _tail = (('r4', 'hl'),)
+    if _m != 'bit':
+        _tail += ('w', 'hl'),
+    BUS_SPECS[f'{_m} {{b, c, d, e, h, l, a}}'] = (
+        _BUS_CB_COMMON + _tail)
+BUS_SPECS['bit (hl)'] = _BUS_CB_COMMON + (('r4', 'hl'),)
+for _m in ('rot', 'res', 'set'):
+    BUS_SPECS[f'{_m} (hl)'] = _BUS_CB_COMMON + (('r4', 'hl'),
+                                                ('w', 'hl'))
+
 # The conditional families' two next-fetch addresses: the
 # taken branch's and the fall-through one's.
 _BUS_COND_NEXTS = {
@@ -6357,9 +6375,14 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         # special resolvers shift themselves where needed.
         instr_next = resolve_at(len(spec), NEXT_SPECIAL[instr])
     else:
+        # Count the unprefixed encoding's bytes: the shift
+        # kinds are the prefix-only extras added below, and
+        # 'ron' re-reads a byte its 'm1n' sibling already
+        # counts.
         length = 1 + sum(1 for k, a in spec
                          if a.startswith('pc+') and
-                         k not in _BUS_SHIFT_KINDS)
+                         k not in _BUS_SHIFT_KINDS and
+                         k != 'ron')
         instr_next = (pc + length).truncated(16)
         for k, a in spec:
             if k in _BUS_SHIFT_KINDS:
