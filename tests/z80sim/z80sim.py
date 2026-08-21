@@ -5027,6 +5027,53 @@ def probe_closed_world(all_orders=False):
                      ' '.join(changed))
 
 
+def probe_writeback(all_orders=False):
+    # The writeback schedule: per tested node, the first
+    # half-tick past an instruction's nominal end at which the
+    # node holds its certified final value and keeps it -- the
+    # per-node retirement timetable behind the sufficient
+    # EXTRA_TICKS = 3 sampling margin.
+    base = build_symbolised_state()
+    for instr in ('ld {b, c, d, e, h, l, a}, n',
+                  'inc/dec {b, c, d, e, h, l, a}',
+                  'add hl, <rp>', 'pop <rp2>', 'ex de, hl',
+                  'scf/ccf', 'ei/di'):
+        with Status.do(instr):
+            s = State(process_instr((instr,), base,
+                                    all_orders=all_orders))
+            final = get_effective_states(
+                s, SAMPLED_NODES, all_orders=all_orders)
+            samples = [s.get_node_states(SAMPLED_NODES)]
+            s.set_db(0x00, all_orders)
+            for k in range(6):
+                with s.status(f'writeback half-tick {k}'):
+                    s.half_tick(all_orders=all_orders)
+                s.cache()
+                samples.append(
+                    s.get_node_states(SAMPLED_NODES))
+
+            def matches(v, f):
+                v = PossibleValues.cast(v)
+                f = PossibleValues.cast(f)
+                return (v.is_single and f.is_single and
+                        bools.is_equiv(v.single_value,
+                                       f.single_value))
+
+            by_k = {}
+            for n in sorted(SAMPLED_NODES):
+                k = len(samples) - 1
+                while (k > 0 and
+                       matches(samples[k - 1][n], final[n])):
+                    k -= 1
+                by_k.setdefault(k, []).append(n)
+        for k in sorted(by_k):
+            names = by_k[k]
+            if len(names) > 12:
+                names = names[:12] + [f'... {len(by_k[k])} in all']
+            Status.print(f'{instr}: retired by half-tick '
+                         f'{k}: ' + ' '.join(names))
+
+
 def probe_bus_templates(all_orders=False):
     # Reports the address bus and the control pins through
     # representative machine cycles, half-tick by half-tick,
@@ -7775,6 +7822,12 @@ def main():
 
     if '--probe-closed-world' in sys.argv:
         probe_closed_world(
+            all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-writeback' in sys.argv:
+        probe_writeback(
             all_orders='--single-order' not in sys.argv)
         Status.clear()
         return
