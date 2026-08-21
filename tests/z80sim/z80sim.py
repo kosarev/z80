@@ -4265,6 +4265,89 @@ def test_halted_dynamics(base_state, all_orders=False):
     check_sampled_states('halt dynamics', s2, get_expected)
 
 
+_BUS_AB = tuple(f'ab{i}' for i in range(16))
+_BUS_CTL = '~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh'
+
+
+def run_bus_checked_ticks(s, what, rows, all_orders, under=None):
+    # Executes one half-tick per row, checking the address bus
+    # and the control pins against it: the acceptance
+    # sequences' measured timelines, asserted where the
+    # families' spec machinery does not reach. Sampling adds
+    # no steps, so the settlings replay from the cache.
+    for no, (a, *pins) in enumerate(rows):
+        with s.status(f'{what} {no // 2}.{no % 2}'):
+            s.half_tick(all_orders=all_orders)
+        s.cache()
+        expected = {}
+        for j, p in enumerate(_BUS_AB):
+            expected[p] = a[j]
+        for p, v in zip(_BUS_CTL, pins):
+            expected[p] = TRUE if v else FALSE
+        states = s.get_node_states(_BUS_AB + _BUS_CTL)
+        check_sampled_states(f'{what} {no // 2}.{no % 2}',
+                             states, lambda n: expected[n],
+                             under=under)
+
+
+def bus_ack_fetch_rows(addr, refresh, nxt):
+    # The ~nmi acknowledge: a five-tick fetch, discarded.
+    return ((addr, 0, 0, 0, 1, 1, 1),) * 3 + (
+        (refresh, 1, 1, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 1, 1, 1, 1, 0),
+        (refresh, 1, 1, 1, 1, 1, 1),
+        (refresh, 1, 1, 1, 1, 1, 1),
+        (nxt, 1, 1, 1, 1, 1, 1))
+
+
+def bus_int_ack_rows(addr, refresh, nxt):
+    # The maskable acknowledge: ~m1 low with ~mreq silent and
+    # the would-be fetch address on the bus, ~iorq from two
+    # ticks in; then the refresh phase as in any fetch, over
+    # seven ticks in all.
+    return ((addr, 0, 1, 1, 1, 1, 1),) * 4 + (
+        (addr, 0, 1, 1, 1, 0, 1),) * 3 + (
+        (refresh, 1, 1, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 0, 1, 1, 1, 0),
+        (refresh, 1, 1, 1, 1, 1, 0),
+        (refresh, 1, 1, 1, 1, 1, 1),
+        (refresh, 1, 1, 1, 1, 1, 1),
+        (nxt, 1, 1, 1, 1, 1, 1))
+
+
+def bus_write_rows(addr, nxt, nxt_m1):
+    return ((addr, 1, 0, 1, 1, 1, 1), (addr, 1, 0, 1, 1, 1, 1),
+            (addr, 1, 0, 1, 0, 1, 1), (addr, 1, 0, 1, 0, 1, 1),
+            (addr, 1, 1, 1, 1, 1, 1),
+            (nxt, nxt_m1, 1, 1, 1, 1, 1))
+
+
+def bus_read_rows(addr, nxt, nxt_m1):
+    return ((addr, 1, 0, 0, 1, 1, 1),) * 4 + (
+        (addr, 1, 1, 1, 1, 1, 1),
+        (nxt, nxt_m1, 1, 1, 1, 1, 1))
+
+
+def get_ack_bus_addrs(s2):
+    # The addresses an acceptance from the halted state drives:
+    # the halted fetch address (the raw pc holds the next fetch
+    # address itself), the acknowledge cycle's refresh address
+    # -- the sampled R as it stands: a fetch drives its refresh
+    # before its own increment lands, the same overlap
+    # convention as pc -- and the push addresses.
+    fetch = Bits.concat(sampled_bits(s2, 'reg_pch'),
+                        sampled_bits(s2, 'reg_pcl'))
+    refresh = Bits.concat(sampled_bits(s2, 'reg_i'),
+                          sampled_bits(s2, 'reg_r'))
+    sp = Bits.concat(sampled_bits(s2, 'reg_sph'),
+                     sampled_bits(s2, 'reg_spl'))
+    return (fetch, refresh, (sp - 1).truncated(16),
+            (sp - 2).truncated(16))
+
+
 def test_nmi_from_halt(base_state, all_orders=False):
     # ~nmi ends the halted state. The pin first goes definitely
     # high, then low at the start of a halted M1, well before
@@ -4281,10 +4364,17 @@ def test_nmi_from_halt(base_state, all_orders=False):
         s2 = run_halted_m1(s, 'nh2', all_orders)
     s.set_pin_and_update('~nmi', TRUE, all_orders)
     s.set_db('nf', all_orders)
-    for t in range(5 + 3 + 3):
-        for ht in (0, 1):
-            with s.status(f'nmi acceptance tick {t}.{ht}'):
-                s.half_tick(all_orders=all_orders)
+    fetch, refresh, sp1, sp2a = get_ack_bus_addrs(s2)
+    run_bus_checked_ticks(
+        s, 'nmi ack', bus_ack_fetch_rows(fetch, refresh, sp1),
+        all_orders)
+    run_bus_checked_ticks(
+        s, 'nmi push 1', bus_write_rows(sp1, sp2a, 1),
+        all_orders)
+    run_bus_checked_ticks(
+        s, 'nmi push 2',
+        bus_write_rows(sp2a, Bits.cast(0x0066, width=16), 0),
+        all_orders)
     s.cache()
     after = get_effective_states(s, SAMPLED_NODES,
                                  all_orders=all_orders)
@@ -4904,10 +4994,17 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
     # settle.
     s.set_db(Bits.ifelse(is_im1, Bits('if1', width=8),
                          Bits.cast(0x00, width=8)), all_orders)
-    for t in range(7 + 3 + 3):
-        for ht in (0, 1):
-            with s.status(f'im1 acceptance tick {t}.{ht}'):
-                s.half_tick(all_orders=all_orders)
+    fetch, refresh, sp1, sp2a = get_ack_bus_addrs(s2)
+    run_bus_checked_ticks(
+        s, 'im1 ack', bus_int_ack_rows(fetch, refresh, sp1),
+        all_orders, under=accepts)
+    run_bus_checked_ticks(
+        s, 'im1 push 1', bus_write_rows(sp1, sp2a, 1),
+        all_orders, under=accepts)
+    run_bus_checked_ticks(
+        s, 'im1 push 2',
+        bus_write_rows(sp2a, Bits.cast(0x0038, width=16), 0),
+        all_orders, under=accepts)
     s.cache()
     after = get_effective_states(s, SAMPLED_NODES,
                                  all_orders=all_orders)
@@ -4965,9 +5062,9 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
     # is, on ED5E and its ED7E duplicate at once: the halted
     # state ends, both interrupt flip-flops come out clear, PC
     # is pushed, and execution resumes at the address the table
-    # supplied, with WZ loaded to match. The table address
-    # itself is not asserted: there are no address-bus
-    # expectations yet.
+    # supplied, with WZ loaded to match. The bus is checked at
+    # every half-tick: the acknowledge, the pushes and the
+    # table reads at I:vector with bit 0 respected.
     s = run_im_ei_nop_halt_prep(symbolised_state, 4, all_orders)
 
     y = Bits('y_p1', width=3)
@@ -4987,16 +5084,33 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
         s2 = run_halted_m1(s, 'ia2', all_orders)
     s.set_pin_and_update('~int', TRUE, all_orders)
 
-    def run_ticks(what, ticks, db):
-        s.set_db(db, all_orders)
-        for t in range(ticks):
-            for ht in (0, 1):
-                with s.status(f'{what} tick {t}.{ht}'):
-                    s.half_tick(all_orders=all_orders)
+    fetch, refresh, sp1, sp2a = get_ack_bus_addrs(s2)
+    # The table address: I paired with the vector as supplied,
+    # bit 0 respected.
+    table = Bits.concat(sampled_bits(s2, 'reg_i'),
+                        Bits('iv', width=8))
+    table1 = (table + 1).truncated(16)
+    target = Bits.concat(Bits('ivh', width=8),
+                         Bits('ivl', width=8))
 
-    run_ticks('im2 acknowledge', 7 + 3 + 3, in_mode_2('iv'))
-    run_ticks('im2 read lo', 3, in_mode_2('ivl'))
-    run_ticks('im2 read hi', 3, in_mode_2('ivh'))
+    s.set_db(in_mode_2('iv'), all_orders)
+    run_bus_checked_ticks(
+        s, 'im2 ack', bus_int_ack_rows(fetch, refresh, sp1),
+        all_orders, under=accepts)
+    run_bus_checked_ticks(
+        s, 'im2 push 1', bus_write_rows(sp1, sp2a, 1),
+        all_orders, under=accepts)
+    run_bus_checked_ticks(
+        s, 'im2 push 2', bus_write_rows(sp2a, table, 1),
+        all_orders, under=accepts)
+    s.set_db(in_mode_2('ivl'), all_orders)
+    run_bus_checked_ticks(
+        s, 'im2 table lo', bus_read_rows(table, table1, 1),
+        all_orders, under=accepts)
+    s.set_db(in_mode_2('ivh'), all_orders)
+    run_bus_checked_ticks(
+        s, 'im2 table hi', bus_read_rows(table1, target, 0),
+        all_orders, under=accepts)
     s.cache()
     after = get_effective_states(s, SAMPLED_NODES,
                                  all_orders=all_orders)
