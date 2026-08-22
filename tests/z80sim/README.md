@@ -41,31 +41,21 @@ possible outcomes are exactly the expected set.
 
 ## Running
 
-Run from inside this directory. Computed states are cached in
-`__z80sim_cache/`, so a rerun only computes what no earlier run
-has.
+The netlist itself is not part of this repository. It comes
+from the Visual 6502 and Z80 Explorer projects — the exact
+repositories and commits are pinned at the top of
+`z80sim.py` — as three files, `nodenames.js`, `segdefs.js`
+and `transdefs.js`, to be placed in this directory.
+
+Then, from inside this directory:
 
 ```shell
-./z80sim.py                  # test everything, in all orders
-./z80sim.py --new-only       # only what has no recorded pass
-./z80sim.py --single-order   # one fixed update order only
-./z80sim.py --threads=8      # run tests in parallel
-./z80sim.py --seed=568       # shuffle the update order
-./z80sim.py --all-orders=<instr>   # report an instruction's
-                                   # racing nodes and their
-                                   # outcomes
-./z80sim.py --probe-acceptance-latch   # print the instruction
-                                       # register through halted
-                                       # fetches and the ~nmi
-                                       # acceptance, half-tick
-                                       # by half-tick
-./z80sim.py --probe-bus-templates --single-order
-                                   # print the address bus and
-                                   # the control pins through
-                                   # representative machine
-                                   # cycles, half-tick by
-                                   # half-tick
+./z80sim.py
 ```
+
+This tests everything, in all orders. Computed states are
+cached in `__z80sim_cache/`, so a rerun only computes what no
+earlier run has.
 
 When a check fails, the report lists the values the node can
 end up with and the order conditions under which each one
