@@ -155,8 +155,16 @@ rest of the circuit's internal nodes.
   happen on this netlist. Both behaviours are deterministic:
   no order of gate reactions changes them.
 
-  Covered by `test_int_at_prefix_gap()` and
-  `test_nmi_at_prefix_gap()` of a plain `./z80sim.py` run.
+  The deferral compounds: each prefix postpones the
+  acceptance by one more instruction, so an `~nmi` caught
+  during the first of three chained prefixes is accepted only
+  after the first non-prefix instruction completes, and an
+  unbroken stream of prefix bytes holds the non-maskable
+  interrupt off indefinitely — its one loophole.
+
+  Covered by `test_int_at_prefix_gap()`,
+  `test_nmi_at_prefix_gap()` and `test_nmi_at_prefix_chain()`
+  of a plain `./z80sim.py` run.
 
 - The undocumented `out (c), 0` instruction (ED 71) drives
   zero onto the data bus on this netlist, as expected of an

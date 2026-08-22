@@ -6176,6 +6176,98 @@ def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
                          get_expected)
 
 
+def test_nmi_at_prefix_chain(symbolised_state, all_orders=False):
+    # Each prefix defers the acceptance by one more
+    # instruction: an ~nmi edge caught during the first of
+    # three chained prefixes is accepted only after the first
+    # non-prefix instruction completes, the pushed return
+    # address -- asserted on the data bus during the push
+    # writes -- pointing past all four bytes. An unbroken
+    # stream of prefix bytes therefore holds ~nmi off
+    # indefinitely: the non-maskable interrupt's one loophole.
+    s = run_im_ei_nop_halt_prep(symbolised_state, 3, all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    pc0 = Bits.concat(sampled_bits(base, 'reg_pch'),
+                      sampled_bits(base, 'reg_pcl'))
+    ret = (pc0 + 4).truncated(16)
+
+    s.set_db(0xdd, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            if (t, ht) == (2, 0):
+                s.set_pin_and_update('~nmi', FALSE, all_orders)
+            with s.status(f'nmi chain dd1 {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    for no, byte in ((2, 0xdd), (3, 0xdd)):
+        s.set_db(byte, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'nmi chain dd{no} {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+    s.set_db(0x00, all_orders)  # the prefixed instruction
+    for t in range(4):
+        for ht in (0, 1):
+            with s.status(f'nmi chain opcode {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    for t in range(5 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'nmi chain acceptance {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+            if t in (6, 9):
+                # The push writes' active half-ticks: the
+                # return address, high byte first.
+                s.cache()
+                v = ret.bits[8:16] if t == 6 else ret.bits[0:8]
+                v = Bits(v)
+                check_sampled_states(
+                    f'nmi chain push data {t}.{ht}',
+                    s.get_node_states(
+                        tuple(f'db{i}' for i in range(8))),
+                    lambda n: v[int(n[2:])])
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Six fetches past the baseline: the three prefixes, the
+    # opcode, the acknowledge, and the sampling nop's
+    # increment landing within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 6).truncated(7)
+    pc = Bits.cast(0x0067, width=16)
+    wz = Bits.cast(0x0066, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n == IFF1:
+            return FALSE
+        if n == IFF2:
+            return bools.get('is_ei_p2')
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return prepped_base_expected(base, n)
+
+    check_sampled_states('~nmi across a prefix chain', after,
+                         get_expected)
+
+
 def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
     # ~int lands between two iterations of a repeating ldir:
     # the acceptance pushes the ldir's own address, so the
@@ -7608,6 +7700,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_nmi_over_int_priority(state, all_orders)
                 test_int_at_prefix_gap(state, all_orders)
                 test_nmi_at_prefix_gap(state, all_orders)
+                test_nmi_at_prefix_chain(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
