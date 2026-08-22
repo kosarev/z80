@@ -137,6 +137,42 @@ rest of the circuit's internal nodes.
   Mapped by `./z80sim.py --probe-special-reset` and certified
   by `test_special_reset()` of a plain `./z80sim.py` run.
 
+- A DD/FD prefix makes the prefixed instruction atomic
+  against both kinds of interrupt. A pending maskable
+  interrupt is not accepted between the prefix and its opcode
+  — the fetch after the prefix is an ordinary opcode fetch,
+  proven down to the acknowledge strobe staying quiet — and,
+  contrary to a widely repeated story, a non-maskable
+  interrupt is not accepted there either: an `~nmi` edge
+  caught during the prefix fetch waits until the whole
+  prefixed instruction has completed, and the return address
+  pushed — verified byte by byte on the data bus during the
+  push writes — points past both bytes. Nothing is lost: the
+  handler returns to the instruction after the prefixed one,
+  which executed exactly as prefixed. The folklore that an
+  NMI striking between prefix and opcode abandons the prefix,
+  so the return executes the opcode unprefixed, does not
+  happen on this netlist. Both behaviours are deterministic:
+  no order of gate reactions changes them.
+
+  Covered by `test_int_at_prefix_gap()` and
+  `test_nmi_at_prefix_gap()` of a plain `./z80sim.py` run.
+
+- The undocumented `out (c), 0` instruction (ED 71) drives
+  zero onto the data bus on this netlist, as expected of an
+  NMOS Z80 — the CMOS parts are known to drive 0xFF instead,
+  making this one of the few points where the chip families
+  genuinely differ. The byte driven during the port write is
+  checked for every register field, including the exchange
+  flip-flops' routing for the named registers; the sibling
+  ED 70, `in (c)`, sets the flags and stores nowhere, which
+  the complete-state checks establish without any special
+  arrangement.
+
+  Covered by the `out (c), r` and `in r, (c)` sequences of a
+  plain `./z80sim.py` run, whose register fields are fully
+  symbolic and include field 6.
+
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
   produce a definite value for them. Each of the two bits,

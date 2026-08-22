@@ -5987,6 +5987,195 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
                          under=accepts)
 
 
+def test_int_at_prefix_gap(symbolised_state, all_orders=False):
+    # A pending maskable interrupt does not split a prefixed
+    # instruction: with ~int active from before a DD prefix
+    # fetch -- the EI shadow long past -- the M1 after the
+    # prefix is a plain opcode fetch, ~iorq staying high at
+    # the instants an acknowledge would drive it low, and the
+    # acceptance follows at the whole instruction's boundary,
+    # pushing the address after the prefixed instruction. The
+    # pushed bytes are asserted on the data bus during the
+    # push writes.
+    s = run_im_ei_nop_halt_prep(symbolised_state, 3, all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    pc0 = Bits.concat(sampled_bits(base, 'reg_pch'),
+                      sampled_bits(base, 'reg_pcl'))
+    ret = (pc0 + 2).truncated(16)
+
+    y = Bits('y_p1', width=3)
+    accepts = bools.get('is_ei_p2') & y[1] & ~y[0]
+
+    s.set_pin_and_update('~int', FALSE, all_orders)
+    s.set_db(0xdd, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            with s.status(f'gap dd {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.set_db(0x00, all_orders)  # the prefixed nop
+    for t in range(4):
+        for ht in (0, 1):
+            with s.status(f'gap opcode {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+            s.cache()
+            check_sampled_states(
+                f'prefix gap ~iorq {t}.{ht}',
+                s.get_node_states(('~iorq',)),
+                lambda n: TRUE, under=accepts)
+    s.set_pin_and_update('~int', TRUE, all_orders)
+    s.set_db(Bits.ifelse(accepts, Bits('gi1', width=8),
+                         Bits.cast(0x00, width=8)), all_orders)
+    for t in range(7 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'gap acceptance {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+            if t in (8, 11):
+                # The push writes' active half-ticks: the
+                # return address, high byte first.
+                s.cache()
+                v = ret.bits[8:16] if t == 8 else ret.bits[0:8]
+                v = Bits(v)
+                check_sampled_states(
+                    f'gap push data {t}.{ht}',
+                    s.get_node_states(
+                        tuple(f'db{i}' for i in range(8))),
+                    lambda n: v[int(n[2:])], under=accepts)
+    s.cache()
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Four fetches past the baseline: the prefix, the opcode,
+    # the acknowledge, and the sampling nop's increment
+    # landing within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 4).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return prepped_base_expected(base, n)
+
+    check_sampled_states('~int at a prefix gap', after,
+                         get_expected, under=accepts)
+
+
+def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
+    # Folklore says ~nmi, unlike ~int, splits the pair -- the
+    # acceptance following the prefix directly and the prefix
+    # getting lost. On this netlist it does not: an ~nmi edge
+    # latched during the prefix fetch defers past the complete
+    # prefixed instruction, exactly as ~int does. The opcode
+    # fetch and execution follow the prefix normally, the
+    # acceptance comes after, and the return address pushed --
+    # asserted on the data bus during the push writes -- is
+    # the address past both bytes: nothing is lost. The prefix
+    # cell n1242 reads back at its idle level after the
+    # acceptance.
+    s = run_im_ei_nop_halt_prep(symbolised_state, 3, all_orders)
+    base = s.get_node_states(SAMPLED_NODES)
+    pc0 = Bits.concat(sampled_bits(base, 'reg_pch'),
+                      sampled_bits(base, 'reg_pcl'))
+    ret = (pc0 + 2).truncated(16)
+
+    s.set_db(0xdd, all_orders)
+    for t in range(4):
+        for ht in (0, 1):
+            if (t, ht) == (2, 0):
+                s.set_pin_and_update('~nmi', FALSE, all_orders)
+            with s.status(f'nmi gap dd {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    s.set_pin_and_update('~nmi', TRUE, all_orders)
+    s.set_db(0x00, all_orders)  # the prefixed instruction
+    for t in range(4):
+        for ht in (0, 1):
+            with s.status(f'nmi gap opcode {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+    for t in range(5 + 3 + 3):
+        for ht in (0, 1):
+            with s.status(f'nmi gap acceptance {t}.{ht}'):
+                s.half_tick(all_orders=all_orders)
+            if t in (6, 9):
+                # The push writes' active half-ticks: the
+                # return address, high byte first.
+                s.cache()
+                v = ret.bits[8:16] if t == 6 else ret.bits[0:8]
+                v = Bits(v)
+                check_sampled_states(
+                    f'nmi gap push data {t}.{ht}',
+                    s.get_node_states(
+                        tuple(f'db{i}' for i in range(8))),
+                    lambda n: v[int(n[2:])])
+    s.cache()
+    with Status.do('prefix cell after acceptance'):
+        check_sampled_states(
+            'nmi gap prefix cell',
+            s.get_node_states(('n1242',)), lambda n: TRUE)
+    after = get_effective_states(s, SAMPLED_NODES,
+                                 all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(base, 'reg_sph'),
+                     sampled_bits(base, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Four fetches past the baseline: the prefix, the opcode,
+    # the acknowledge, and the sampling nop's increment
+    # landing within the sampled ticks.
+    r_lo = (sampled_bits(base, 'reg_r', width=7) + 4).truncated(7)
+    pc = Bits.cast(0x0067, width=16)
+    wz = Bits.cast(0x0066, width=16)
+
+    def get_expected(n):
+        if n == '~halt':
+            return TRUE
+        if n == IFF1:
+            return FALSE
+        if n == IFF2:
+            # Surviving as the witness that the acceptance was
+            # the non-maskable one.
+            return bools.get('is_ei_p2')
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return prepped_base_expected(base, n)
+
+    check_sampled_states('~nmi at a prefix gap', after,
+                         get_expected)
+
+
 def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
     # ~int lands between two iterations of a repeating ldir:
     # the acceptance pushes the ldir's own address, so the
@@ -7334,6 +7523,46 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 check_sampled_states(
                     f'{instr} bus {cyc}:{t}.{ht}', states,
                     lambda x: expected[x], under=under)
+                if (instr == 'out (c), r' and kind == 'io_w'
+                        and isinstance(wr, int) and not wr):
+                    # The byte the die drives during the port
+                    # write: the named register, a for field 7
+                    # -- and zero for field 6, the NMOS answer
+                    # to the out (c), 0 question.
+                    y = Bits(phased('y'), width=3)
+
+                    def arch(letter):
+                        # The architectural register, routed
+                        # through the DE/HL exchange.
+                        partner = {'d': 'h', 'h': 'd',
+                                   'e': 'l', 'l': 'e'}
+                        if letter in partner:
+                            return Bits.ifelse(
+                                ex_de,
+                                bank(partner[letter]),
+                                bank(letter))
+                        return bank(letter)
+
+                    v = Bits.ifelse(
+                        y[2],
+                        Bits.ifelse(
+                            y[1],
+                            Bits.ifelse(y[0], a_reg,
+                                        Bits.cast(0, width=8)),
+                            Bits.ifelse(y[0], arch('l'),
+                                        arch('h'))),
+                        Bits.ifelse(
+                            y[1],
+                            Bits.ifelse(y[0], arch('e'),
+                                        arch('d')),
+                            Bits.ifelse(y[0], arch('c'),
+                                        arch('b'))))
+                    DB = tuple(f'db{i}' for i in range(8))
+                    dstates = s.get_node_states(DB)
+                    check_sampled_states(
+                        f'{instr} data {cyc}:{t}.{ht}',
+                        dstates, lambda x: v[int(x[2:])],
+                        under=under)
         # What the bus keeps into a following internal cycle:
         # the last role this cycle drove.
         role = template[-1][0]
@@ -7377,6 +7606,8 @@ def test_instr_seq(seq, all_orders=False):
                 test_int_between_ldir_repeats(state, all_orders)
                 test_int_at_ld_a_ir(state, all_orders)
                 test_nmi_over_int_priority(state, all_orders)
+                test_int_at_prefix_gap(state, all_orders)
+                test_nmi_at_prefix_gap(state, all_orders)
         return True, '; '.join(seq)
     except TestFailure:
         return False, traceback.format_exc()
