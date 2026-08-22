@@ -218,11 +218,24 @@ rest of the circuit's internal nodes.
 
   What the instruction before the `scf`/`ccf` does is not a
   matter of odds, however: it decides whether the race exists
-  at all. When the preceding instruction writes the flags
-  through the ALU — measured so far for `adc` in all its
-  operand forms and `or n`, with the full map in progress —
-  the race disappears entirely: XF and YF copy A's bits, and
-  no order of gate reactions can produce anything else.
+  at all. For the pairings covered so far:
+
+  - After an instruction that writes the accumulator together
+    with the flags — `adc` and `add` with any operand, `and`
+    with a register operand, `or` with an immediate one — the
+    race disappears entirely: XF and YF copy A's bits, and no
+    order of gate reactions can produce anything else.
+
+  - After `call cc, nn` or `ld r, n`, which write neither,
+    the four-value race stands exactly as described above.
+
+  - `cp n`, which writes the flags but leaves the
+    accumulator, produces a different set again, involving
+    the compare operand's bits.
+
+  So the deciding factor is not flag writing as such but what
+  the last pass through the ALU left behind: where it wrote
+  the accumulator, that fresh value forces the outcome.
   Community research by Patrik Rak established the rule that
   the previous instruction's flag writing selects the
   behaviour, modelled since as a hidden 'Q register'; the die
@@ -235,10 +248,11 @@ rest of the circuit's internal nodes.
   forced; where there is none, the circuit's indecision shows
   and the chip families are free to differ.
 
-  Covered by the context sequences — `adc n; scf/ccf` and
+  Covered by the paired sequences — `adc n; scf/ccf` and
   kin — of a plain `./z80sim.py` run, each asserting the
-  context's exact outcome: the single forced value after a
-  measured flag writer, the four-value set otherwise.
+  exact outcome its preceding instruction produces: the
+  single forced value where the accumulator was freshly
+  written, the four-value set otherwise.
 
   Covered by the `scf/ccf` sequence of a plain `./z80sim.py`
   run, which asserts the exact outcome set via `check_set()`;
