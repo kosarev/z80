@@ -224,14 +224,20 @@ rest of the circuit's internal nodes.
     with the flags — `adc` and `add` with any operand, `and`
     with a register operand, `or` with an immediate one — the
     race disappears entirely: XF and YF copy A's bits, and no
-    order of gate reactions can produce anything else.
+    order of gate reactions can produce anything else. A DD
+    or FD prefix on the `scf`/`ccf` makes no difference here:
+    the bits copy A either way.
 
   - After `call cc, nn` or `ld r, n`, which write neither,
     the four-value race stands exactly as described above.
 
   - `cp n`, which writes the flags but leaves the
-    accumulator, produces a different set again, involving
-    the compare operand's bits.
+    accumulator, gives the same result as the first group —
+    XF and YF come out as A's bits, nothing else possible —
+    but only when the `scf`/`ccf` follows immediately. If the
+    `scf`/`ccf` carries a DD or FD prefix, so that the prefix
+    fetch sits between the two instructions, the four-value
+    race is back in full.
 
   So the deciding factor is not flag writing as such but what
   the last pass through the ALU left behind: where it wrote

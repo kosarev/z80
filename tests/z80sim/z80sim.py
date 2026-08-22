@@ -2766,7 +2766,14 @@ SCF_RACE_SUPPRESSORS = (
 SCF_RACE_KEEPERS = (
     'call cc, nn', 'ld {b, c, d, e, h, l, a}, n')
 
-SCF_CONTEXTS = SCF_RACE_SUPPRESSORS + SCF_RACE_KEEPERS
+# The families whose flag write forces a directly following
+# scf/ccf to the old accumulator, the forcing not surviving
+# an interposed DD/FD prefix byte: under the prefixed
+# variant, the full four-value race returns.
+SCF_FRAGILE_SUPPRESSORS = ('cp n',)
+
+SCF_CONTEXTS = (SCF_RACE_SUPPRESSORS + SCF_RACE_KEEPERS +
+                SCF_FRAGILE_SUPPRESSORS)
 
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
@@ -3111,6 +3118,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 if (len(instrs) > 1 and
                         instrs[-2] in SCF_RACE_SUPPRESSORS):
                     return check(a)
+                if (len(instrs) > 1 and
+                        instrs[-2] in SCF_FRAGILE_SUPPRESSORS):
+                    p = bools.get(f'is_prefixed_p{phase}')
+                    return check_set(
+                        a,
+                        bools.ifelse(p, f, a),
+                        bools.ifelse(p, a | f, a),
+                        bools.ifelse(p, a & f, a))
                 return check_set(a, f, a | f, a & f)
 
             # A single-order run lands on the one value its
