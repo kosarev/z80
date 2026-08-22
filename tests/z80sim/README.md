@@ -357,3 +357,21 @@ rest of the circuit's internal nodes.
   acceptance tests of a plain `./z80sim.py` run
   (`test_nmi_from_halt()`, `test_int_im1_from_halt()`) assert
   the states the acceptance leaves behind.
+
+## Related tickets
+
+- [#42](https://github.com/kosarev/z80/issues/42) —
+  supporting the `scf`/`ccf` flag behaviour in the emulator;
+  the pairing results above give the rules the emulator is to
+  follow.
+- [#43](https://github.com/kosarev/z80/issues/43) — passing
+  Patrik Rak's test suite, which exercises that same
+  behaviour on real chips.
+- [#50](https://github.com/kosarev/z80/issues/50) — the
+  symbolic simulation work this tool implements.
+- [#51](https://github.com/kosarev/z80/issues/51) — the
+  `scf`/`ccf` race itself, including the open hardware
+  experiment for the A & F outcome.
+- [#54](https://github.com/kosarev/z80/issues/54) — a
+  planned simulator change: transistors holding their states
+  rather than nodes.
