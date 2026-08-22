@@ -2750,13 +2750,23 @@ PREFIX_DISP = (
 # an scf/ccf decides whether its XF/YF race. These families
 # are measured to suppress the race entirely -- the following
 # scf/ccf copies A's bits deterministically under every order
-# of updates. The tuple grows as the context map is measured;
-# the paired sequences below certify each entry in the plain
-# run.
+# of updates. Every confirmed member writes A as well as F;
+# cp n, which writes F but leaves A, is measured to yield a
+# different set of its own (operand bits and the interposed
+# prefix byte involved) and awaits its exact expectation. The
+# tuples grow as the context map is measured; the paired
+# sequences below certify each entry in the plain run.
 SCF_RACE_SUPPRESSORS = (
     'adc (hl)', 'adc n', 'adc {b, c, d, e, h, l, a}',
-    'or n')
-SCF_CONTEXTS = SCF_RACE_SUPPRESSORS
+    'or n', 'add (hl)', 'add {b, c, d, e, h, l, a}',
+    'and {b, c, d, e, h, l, a}')
+
+# The measured contexts that leave the four-value race set
+# intact.
+SCF_RACE_KEEPERS = (
+    'call cc, nn', 'ld {b, c, d, e, h, l, a}, n')
+
+SCF_CONTEXTS = SCF_RACE_SUPPRESSORS + SCF_RACE_KEEPERS
 
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
