@@ -8012,11 +8012,13 @@ def get_instr_seq_time_stamp(domain, seq, all_orders):
 
 
 def test_instr_seqs(seqs, all_orders=False):
+    # A longer sequence depends on its shorter prefix for the
+    # cached states it starts from, so sequences run in order
+    # of length, and a threaded run completes each length
+    # before starting the next. Records of previous passes and
+    # failures never affect the order.
     def sort_key(seq):
-        last_passed_at = get_instr_seq_time_stamp('passed', seq, all_orders)
-        last_failed_at = get_instr_seq_time_stamp('failed', seq, all_orders)
-        seq_id = get_instr_seq_id(seq)
-        return -last_failed_at, -last_passed_at, len(seq), seq_id
+        return len(seq), get_instr_seq_id(seq)
 
     def mark(ok, seq):
         domain = 'passed' if ok else 'failed'
@@ -8051,24 +8053,29 @@ def test_instr_seqs(seqs, all_orders=False):
         # times one sequence's worth. Sequences whose workers
         # hit the memory cap get requeued and resume from their
         # cached states.
-        pending = tuple(enumerate(seqs))
-        while pending:
-            retries = []
-            with multiprocessing.Pool(num_threads,
-                                      maxtasksperchild=1) as p:
-                queue = p.imap_unordered(test_instr_seq_concurrently,
-                                         ((i, seq, all_orders)
-                                          for i, seq in pending))
-                for i, res in queue:
-                    if res is None:
-                        Status.print(
-                            f'{i + 1}/{len(seqs)} '
-                            f'{get_instr_seq_id(seqs[i])} '
-                            f'to resume after hitting the memory cap')
-                        retries.append((i, seqs[i]))
-                        continue
-                    ok &= process_results(i, seqs[i], res)
-            pending = tuple(retries)
+        for length in sorted({len(s) for s in seqs}):
+            pending = tuple((i, seq)
+                            for i, seq in enumerate(seqs)
+                            if len(seq) == length)
+            while pending:
+                retries = []
+                with multiprocessing.Pool(num_threads,
+                                          maxtasksperchild=1) as p:
+                    queue = p.imap_unordered(
+                        test_instr_seq_concurrently,
+                        ((i, seq, all_orders)
+                         for i, seq in pending))
+                    for i, res in queue:
+                        if res is None:
+                            Status.print(
+                                f'{i + 1}/{len(seqs)} '
+                                f'{get_instr_seq_id(seqs[i])} '
+                                f'to resume after hitting the '
+                                f'memory cap')
+                            retries.append((i, seqs[i]))
+                            continue
+                        ok &= process_results(i, seqs[i], res)
+                pending = tuple(retries)
 
     return ok
 
@@ -8405,23 +8412,6 @@ def test_instructions():
     # its deterministic outcomes.
     all_orders = '--single-order' not in sys.argv
 
-    seqs = []
-
-    def add(ss):
-        # Make sure short sequences that work as prefixes for
-        # longer sequences are generated and tested first.
-        ss = {s: get_instr_seq_time_stamp('passed', s, all_orders)
-              for s in ss}
-
-        if '--new-only' in sys.argv:
-            ss = {s: t for s, t in ss.items() if t == 0}
-
-        if 0 in ss.values():
-            return test_instr_seqs(ss.keys(), all_orders)
-
-        seqs.extend(ss.keys())
-        return True
-
     instrs = TestedInstrs.get_instrs()
 
     # For iterating on a single family: --only=<instr> tests
@@ -8431,15 +8421,22 @@ def test_instructions():
         assert only in instrs, only
         instrs = (only,)
 
-    ok = True
-    ok &= add((i,) for i in instrs)
+    seqs = [(i,) for i in instrs]
     if only is None:
         # The scf/ccf context pairs: the context map's
         # certified sequences.
-        ok &= add((i, 'scf/ccf') for i in SCF_CONTEXTS)
+        seqs += [(i, 'scf/ccf') for i in SCF_CONTEXTS]
     if '--two-instr-seqs' in sys.argv:
-        ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
-    ok &= test_instr_seqs(seqs, all_orders)
+        seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
+
+    # Options only filter what runs; they never affect the
+    # order, which is test_instr_seqs()'s own.
+    if '--new-only' in sys.argv:
+        seqs = [s for s in seqs
+                if get_instr_seq_time_stamp('passed', s,
+                                            all_orders) == 0]
+
+    ok = test_instr_seqs(seqs, all_orders)
 
     Status.clear()
     print('OK' if ok else 'FAILED')
