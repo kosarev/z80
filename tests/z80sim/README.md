@@ -235,8 +235,10 @@ rest of the circuit's internal nodes.
   Community research by Patrik Rak established the rule that
   the previous instruction's flag writing selects the
   behaviour, modelled since as a hidden 'Q register'; the die
-  has no such register — the closed-world sweep finds no
-  state cell holding it — and the mechanism is timing: the
+  has no such register — every transistor structure on the
+  chip capable of remembering a bit has been identified, and
+  none of them stores whether the previous instruction wrote
+  the flags — and the mechanism is timing: the
   flags of the preceding instruction retire later than its
   other results, and whether their write is still in flight
   when `scf`/`ccf` samples is what the 'Q' rule was
