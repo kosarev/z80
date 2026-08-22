@@ -212,9 +212,33 @@ rest of the circuit's internal nodes.
   produce a definite value for them. Each of the two bits,
   independently, ends up as one of A, F, A | F or A & F — the
   last not predicted by any known model of the flags — and
-  which one wins is a race. Which chip you have, how warm it is
-  and what instruction ran before merely shift the odds. See
+  which one wins is a race. Which chip you have and how warm
+  it is shift the odds. See
   <https://github.com/kosarev/z80/issues/51>.
+
+  What the instruction before the `scf`/`ccf` does is not a
+  matter of odds, however: it decides whether the race exists
+  at all. When the preceding instruction writes the flags
+  through the ALU — measured so far for `adc` in all its
+  operand forms and `or n`, with the full map in progress —
+  the race disappears entirely: XF and YF copy A's bits, and
+  no order of gate reactions can produce anything else.
+  Community research by Patrik Rak established the rule that
+  the previous instruction's flag writing selects the
+  behaviour, modelled since as a hidden 'Q register'; the die
+  has no such register — the closed-world sweep finds no
+  state cell holding it — and the mechanism is timing: the
+  flags of the preceding instruction retire later than its
+  other results, and whether their write is still in flight
+  when `scf`/`ccf` samples is what the 'Q' rule was
+  describing. Where the write is fresh, the outcome is
+  forced; where there is none, the circuit's indecision shows
+  and the chip families are free to differ.
+
+  Covered by the context sequences — `adc n; scf/ccf` and
+  kin — of a plain `./z80sim.py` run, each asserting the
+  context's exact outcome: the single forced value after a
+  measured flag writer, the four-value set otherwise.
 
   Covered by the `scf/ccf` sequence of a plain `./z80sim.py`
   run, which asserts the exact outcome set via `check_set()`;

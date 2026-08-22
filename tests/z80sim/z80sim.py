@@ -2746,6 +2746,18 @@ PREFIX_DISP = (
     'res {b, c, d, e, h, l, a}', 'res (hl)',
     'set {b, c, d, e, h, l, a}', 'set (hl)')
 
+# The scf/ccf context map: the instruction immediately before
+# an scf/ccf decides whether its XF/YF race. These families
+# are measured to suppress the race entirely -- the following
+# scf/ccf copies A's bits deterministically under every order
+# of updates. The tuple grows as the context map is measured;
+# the paired sequences below certify each entry in the plain
+# run.
+SCF_RACE_SUPPRESSORS = (
+    'adc (hl)', 'adc n', 'adc {b, c, d, e, h, l, a}',
+    'or n')
+SCF_CONTEXTS = SCF_RACE_SUPPRESSORS
+
 # The families where the prefix redirects the 8-bit H and L
 # roles to the undocumented IX/IY halves; a and the other
 # registers are unaffected.
@@ -3077,12 +3089,18 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if instr == 'scf/ccf':
             f = get_f()[i]
 
-            # Under all orders the outcome is the proven race
-            # set of issue #51: XF and YF each land on one of
-            # these four values, independently per bit, the
-            # choice hanging on genuine update races the netlist
+            # Under all orders the outcome hangs on the
+            # preceding instruction: a predecessor whose flag
+            # write is measured to suppress the race leaves XF
+            # and YF copying A's bits, deterministically;
+            # otherwise each bit lands on one of the proven
+            # race set of issue #51, independently, the choice
+            # hanging on genuine update races the netlist
             # leaves undecided.
             if all_orders:
+                if (len(instrs) > 1 and
+                        instrs[-2] in SCF_RACE_SUPPRESSORS):
+                    return check(a)
                 return check_set(a, f, a | f, a & f)
 
             # A single-order run lands on the one value its
@@ -5358,6 +5376,28 @@ def probe_special_reset(all_orders=False):
             Status.print(f'w={w} o={o}: pc{desc16(pc, pc0)} '
                          f'i={iv} r{rk} iff1={f1} iff2={f2} '
                          f'im0={imv} wz={wzv} a={av}')
+
+
+def probe_scf_contexts():
+    # The scf/ccf context map: scf/ccf simulated on top of
+    # every covered family, reusing the families' cached
+    # settlings as the preceding context. A pass means the
+    # context leaves the certified outcome set unchanged; a
+    # failure prints the context's actual set -- the
+    # measurement behind the previous-instruction dependence
+    # of XF and YF (the 'Q register' of emulator models,
+    # which has no latch on this die).
+    for instr in TestedInstrs.get_instrs():
+        if instr == 'halt':
+            # No instruction follows a halt.
+            continue
+        with Status.do(f'{instr}; scf/ccf'):
+            ok, message = test_instr_seq((instr, 'scf/ccf'),
+                                         all_orders=True)
+        Status.print(f'{instr}: ' +
+                     ('set unchanged' if ok else 'DIFFERS'))
+        if not ok:
+            Status.print(message)
 
 
 def probe_bus_templates(all_orders=False):
@@ -8259,6 +8299,10 @@ def test_instructions():
 
     ok = True
     ok &= add((i,) for i in instrs)
+    if only is None:
+        # The scf/ccf context pairs: the context map's
+        # certified sequences.
+        ok &= add((i, 'scf/ccf') for i in SCF_CONTEXTS)
     if '--two-instr-seqs' in sys.argv:
         ok &= add((i1, i2) for i1 in instrs for i2 in instrs)
     ok &= test_instr_seqs(seqs, all_orders)
@@ -8447,6 +8491,11 @@ def main():
     if '--probe-special-reset' in sys.argv:
         probe_special_reset(
             all_orders='--single-order' not in sys.argv)
+        Status.clear()
+        return
+
+    if '--probe-scf-contexts' in sys.argv:
+        probe_scf_contexts()
         Status.clear()
         return
 
