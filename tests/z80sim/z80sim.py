@@ -5378,6 +5378,115 @@ def probe_special_reset(all_orders=False):
                          f'im0={imv} wz={wzv} a={av}')
 
 
+# The flag-consuming families checked against representative
+# predecessor classes -- a full ALU flag writer, the partial
+# writers, a non-writer. A passing pair proves the family's
+# certified expectations hold in that context too; pairs
+# graduate into the plain run's sequences once measured.
+CONTEXT_SUSPECT_PAIRS = (
+    ('or n', 'jr cc, d'),
+    ('or n', 'jp cc, nn'),
+    ('or n', 'ret cc'),
+    ('or n', 'call cc, nn'),
+    ('or n', 'adc n'),
+    ('or n', 'sbc n'),
+    ('or n', 'rlca/rrca/rla/rra'),
+    ('or n', 'daa'),
+    ('cpl', 'jr cc, d'),
+    ('cpl', 'adc n'),
+    ('cpl', 'daa'),
+    ('cpl', 'rlca/rrca/rla/rra'),
+    ('inc/dec {b, c, d, e, h, l, a}', 'jr cc, d'),
+    ('inc/dec {b, c, d, e, h, l, a}', 'adc n'),
+    ('inc/dec {b, c, d, e, h, l, a}', 'daa'),
+    ('ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}',
+     'jr cc, d'),
+    ('ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}',
+     'adc n'),
+    ('ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}',
+     'daa'),
+)
+
+
+def probe_context_suspects():
+    # Runs the suspect pairs, reporting per pair whether the
+    # certified expectations hold in the context.
+    for pred, fam in CONTEXT_SUSPECT_PAIRS:
+        with Status.do(f'{pred}; {fam}'):
+            ok, message = test_instr_seq((pred, fam),
+                                         all_orders=True)
+        Status.print(f'{pred}; {fam}: ' +
+                     ('PASS' if ok else 'DIFFERS'))
+        if not ok:
+            Status.print(message)
+
+
+def probe_context_carriers():
+    # The context-leak census over the cached boundary states:
+    # nodes identical after every covered predecessor carry no
+    # context into the next instruction; the rest are the
+    # possible carriers. The second half measures each
+    # family's retirement surface -- the nodes still changing
+    # across its boundary beyond the settling nop's own
+    # activity: the trajectory the next instruction can
+    # observe even though the settled values are correct.
+    base = build_symbolised_state()
+    fams = [f for f in TestedInstrs.get_instrs()
+            if f != 'halt']
+
+    ref = None
+    diff = set()
+    finals = {}
+    for fam in fams:
+        st = process_instr((fam,), base, all_orders=True)
+        finals[fam] = st
+        states = st.get_node_states()
+        if ref is None:
+            ref = states
+            continue
+        for n, v in states.items():
+            if n in diff:
+                continue
+            r = ref.get(n)
+            if (r is None or isinstance(v, PossibleValues) or
+                    isinstance(r, PossibleValues) or
+                    (r is not v and not bools.is_equiv(r, v))):
+                diff.add(n)
+    Status.print(f'{len(ref)} nodes; {len(diff)} differ '
+                 f'across contexts, {len(ref) - len(diff)} '
+                 f'provably context-free')
+
+    def inflight(state):
+        raw = state.get_node_states()
+        eff = get_effective_states(state)
+        out = set()
+        for n, v in raw.items():
+            e = eff.get(n)
+            if (e is None or isinstance(v, PossibleValues) or
+                    isinstance(e, PossibleValues) or
+                    (e is not v and not bools.is_equiv(v, e))):
+                out.add(n)
+        return out
+
+    s = State(base)
+    for _ in range(2):
+        s.set_db(0x00, False)
+        for t in range(4):
+            for ht in (0, 1):
+                s.half_tick()
+    s.cache()
+    nop_activity = inflight(s)
+    Status.print(f'nop baseline activity: '
+                 f'{len(nop_activity)} nodes')
+    union = set()
+    for fam in fams:
+        extra = inflight(finals[fam]) - nop_activity
+        union |= extra
+        Status.print(f'{fam}: retirement surface '
+                     f'{len(extra)}')
+    Status.print(f'retirement surface union: {len(union)}')
+
+
 def probe_scf_contexts():
     # The scf/ccf context map: scf/ccf simulated on top of
     # every covered family, reusing the families' cached
@@ -8496,6 +8605,16 @@ def main():
 
     if '--probe-scf-contexts' in sys.argv:
         probe_scf_contexts()
+        Status.clear()
+        return
+
+    if '--probe-context-suspects' in sys.argv:
+        probe_context_suspects()
+        Status.clear()
+        return
+
+    if '--probe-context-carriers' in sys.argv:
+        probe_context_carriers()
         Status.clear()
         return
 
