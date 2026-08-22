@@ -118,10 +118,10 @@ rest of the circuit's internal nodes.
 
 - The Z80's obscure 'special reset' is real, and the netlist
   gives it an exact shape. The `~reset` pin is sampled in the
-  second half of every clock cycle, but the sampling instant
-  in the first clock of an instruction fetch is unlike the
-  others: a reset pulse caught at that instant and no other
-  forces PC to zero and changes nothing else — the interrupt
+  second half of every tick, but the sampling instant in a
+  fetch's tick 0 is unlike the others: a reset pulse caught
+  at that instant and no other forces PC to zero and changes
+  nothing else — the interrupt
   flip-flops, the interrupt mode, I, WZ and all the registers
   keep their values, and the refresh counter R keeps counting
   without a break, showing that no general reset took place.
@@ -129,7 +129,7 @@ rest of the circuit's internal nodes.
   running CPU without wiping its context, researched on real
   chips by Tony Brewer; the netlist confirms it and sharpens
   it: a pulse caught at any later sampling instant — even a
-  pulse only half a clock wide — performs the full reset, and
+  pulse only one half-tick wide — performs the full reset, and
   a pulse that covers no sampling instant does nothing at
   all. All three outcomes are deterministic: no order of gate
   reactions changes them.
@@ -180,6 +180,32 @@ rest of the circuit's internal nodes.
   Covered by the `out (c), r` and `in r, (c)` sequences of a
   plain `./z80sim.py` run, whose register fields are fully
   symbolic and include field 6.
+
+- The maskable interrupt pin is sampled at exactly one
+  instant per instruction — the second half of tick 2 of a
+  four-tick fetch — and a pulse one half-tick wide
+  landing on that instant is accepted, while an equal pulse
+  anywhere else in the instruction is ignored entirely, the
+  machine running on as if nothing had happened. The
+  time-honoured rule that `~int` must be held active until
+  acknowledged is board-level prudence about not knowing the
+  chip's phase; the chip itself needs the level at one
+  half-tick and nothing more.
+
+  Mapped by the pulse sweep and certified by
+  `test_int_sampling_instant()` of a plain `./z80sim.py` run.
+
+- The undocumented interrupt mode written by `im` encodings
+  ED 4E and ED 6E — often called 'IM 0/1' — is a real,
+  distinct state of the mode latch: the latch stores the
+  instruction's mode field verbatim, so this state is not the
+  same latch contents as plain IM 0. In acceptance it behaves
+  exactly as mode 0: the acceptance tests condition on the
+  latch's high bit alone, so their passing certifies the two
+  states accept identically.
+
+  Covered by the `im/xim n` sequence and
+  `test_int_im0_from_halt()` of a plain `./z80sim.py` run.
 
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not

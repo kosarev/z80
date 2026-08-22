@@ -4780,6 +4780,104 @@ def test_special_reset(base_state, all_orders=False):
               False)
 
 
+def test_int_sampling_instant(base_state, all_orders=False):
+    # ~int is sampled at exactly one instant per instruction:
+    # half-tick 5 of a four-tick fetch. A pulse one half-tick
+    # wide there is accepted, with the acknowledge following
+    # at the instruction's end; an equal pulse two half-ticks
+    # earlier is ignored entirely, the machine running on as
+    # if nothing happened -- compared node for node against a
+    # run with no pulse at all. Concretely prepared
+    # (im 1; ei; nop), so both regimes certify without branch
+    # conditions.
+    s0 = State(base_state)
+    run_prep_instr(s0, ((0xed, 4), (0x56, 4)), all_orders)
+    run_prep_instr(s0, ((0xfb, 4),), all_orders)
+    run_prep_instr(s0, ((0x00, 4),), all_orders)
+    st0 = s0.get_node_states(SAMPLED_NODES)
+
+    def run_pulse(offset):
+        s = State(s0)
+        s.set_db(0x00, all_orders)
+        for k in range(8):
+            if k == offset:
+                s.set_pin_and_update('~int', FALSE, all_orders)
+            if k == offset + 1:
+                s.set_pin_and_update('~int', TRUE, all_orders)
+            with s.status(f'int pulse half-tick {k}'):
+                s.half_tick(all_orders=all_orders)
+        s.set_pin_and_update('~int', TRUE, all_orders)
+        return s
+
+    with Status.do('accepted at half-tick 5'):
+        s = run_pulse(5)
+        s.set_db(0x00, all_orders)
+        for t in range(7 + 3 + 3):
+            for ht in (0, 1):
+                with s.status(f'int instant ack {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache()
+        after = get_effective_states(s, SAMPLED_NODES,
+                                     all_orders=all_orders)
+
+    sp = Bits.concat(sampled_bits(st0, 'reg_sph'),
+                     sampled_bits(st0, 'reg_spl'))
+    sp = (sp - 2).truncated(16)
+    # Three fetches past the baseline: the pulse's nop, the
+    # acknowledge, and the sampling nop's increment landing
+    # within the sampled ticks.
+    r_lo = (sampled_bits(st0, 'reg_r', width=7) +
+            3).truncated(7)
+    pc = Bits.cast(0x0039, width=16)
+    wz = Bits.cast(0x0038, width=16)
+
+    def get_expected(n):
+        if n in (IFF1, IFF2):
+            return FALSE
+        if n.startswith('reg_pch'):
+            return pc[int(n[-1]) + 8]
+        if n.startswith('reg_pcl'):
+            return pc[int(n[-1])]
+        if n.startswith('reg_sph'):
+            return sp[int(n[-1]) + 8]
+        if n.startswith('reg_spl'):
+            return sp[int(n[-1])]
+        if n.startswith('reg_w'):
+            return wz[int(n[-1]) + 8]
+        if n.startswith('reg_z'):
+            return wz[int(n[-1])]
+        if n.startswith('reg_r') and n[-1] != '7':
+            return r_lo[int(n[-1])]
+        if n.startswith('instr'):
+            return FALSE
+        return st0[n]
+
+    check_sampled_states('~int at the sampling instant',
+                         after, get_expected)
+
+    with Status.do('ignored at half-tick 3'):
+        s = run_pulse(3)
+        s.set_db(0x00, all_orders)
+        for t in range(4):
+            for ht in (0, 1):
+                with s.status(f'int instant follow {t}.{ht}'):
+                    s.half_tick(all_orders=all_orders)
+        s.cache()
+        pulsed = get_effective_states(s, SAMPLED_NODES,
+                                      all_orders=all_orders)
+        sp0 = State(s0)
+        sp0.set_db(0x00, all_orders)
+        for t in range(8):
+            for ht in (0, 1):
+                with sp0.status(f'int instant plain {t}.{ht}'):
+                    sp0.half_tick(all_orders=all_orders)
+        sp0.cache()
+        plain = get_effective_states(sp0, SAMPLED_NODES,
+                                     all_orders=all_orders)
+    check_sampled_states('~int off the sampling instant',
+                         pulsed, lambda n: plain[n])
+
+
 def test_prefix_chains(base_state, all_orders=False):
     # Chained prefixes act as one modifier: the last prefix
     # before the opcode wins. Certified on doubly prefixed
@@ -7683,6 +7781,7 @@ def test_instr_seq(seq, all_orders=False):
                 test_wait_states(state, all_orders)
                 test_bus_grant(state, all_orders)
                 test_special_reset(state, all_orders)
+                test_int_sampling_instant(state, all_orders)
             if seq == ('halt',):
                 halted = process_instr(seq, state, all_orders=all_orders)
                 test_halted_dynamics(halted, all_orders)
