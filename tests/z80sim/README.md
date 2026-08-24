@@ -214,11 +214,16 @@ rest of the circuit's internal nodes.
   - After an instruction that writes the accumulator through
     the ALU — the eight arithmetic and logical operations in
     all their operand forms, `cpl`, `daa`, `neg`, the
-    accumulator rotates and `rrd`/`rld` — the race
-    disappears entirely: XF and YF copy A's bits, and no
-    order of gate reactions can produce anything else. A DD
-    or FD prefix on the `scf`/`ccf` makes no difference
-    here: the bits copy A either way.
+    accumulator rotates and `rrd`/`rld` — XF and YF come out
+    as A's bits, and no order of gate reactions can produce
+    anything else. This is not the race being suppressed but
+    its outcomes coinciding: these instructions also copy
+    A's bits 3 and 5 into F, so all four values the race can
+    pick are the same value. That is also why a DD or FD
+    prefix on the `scf`/`ccf` makes no difference here, and
+    why hardware tests and models never had to distinguish
+    'copied from A' from 'OR-combined with A' in this case —
+    after these instructions the two readings agree.
 
   - After an instruction that writes the flags but not the
     accumulator — `cp` and `bit` in all forms, `inc`/`dec`
