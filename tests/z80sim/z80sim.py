@@ -220,7 +220,9 @@ class Status(object):
         __class__.__emit('')
 
     @staticmethod
-    def print(*args):
+    def print(*args, option=None):
+        if option is not None and option not in sys.argv:
+            return
         if __class__.__suppression_count != 0:
             return
 
@@ -804,7 +806,8 @@ class PossibleValues(object):
         __class__.__num_clipped += 1
         id = f'clipped{__class__.__num_clipped}'
         Status.print(f'{id} <- {num_values} possible values '
-                     f'at {Status.get_context()}')
+                     f'at {Status.get_context()}',
+                     option='--show-clips')
         return __class__.cast(bools.get(id))
 
     @staticmethod
@@ -1870,7 +1873,8 @@ class Z80Simulator(object):
                 new_state = self.__settle_start_states.get(
                     n, n.gate_of[0].state)
                 Status.print(f'{n} pinned to its settling-start state '
-                             f'at {Status.get_context()}')
+                             f'at {Status.get_context()}',
+                             option='--show-clips')
                 self.__clipped_nodes[n] = new_state
 
         # No further propagation is necessary if the state of
@@ -1961,13 +1965,15 @@ class Z80Simulator(object):
                             continue
                         self.__clipped_nodes[n] = state
                         Status.print(f'{id} <- the state of {n} '
-                                     f'at {Status.get_context()}')
+                                     f'at {Status.get_context()}',
+                                     option='--show-clips')
                     elif PossibleValues.is_same(
                             state, self.__clipped_nodes[n]):
                         # The stand-in verified: the node held.
                         del self.__clipped_nodes[n]
                         Status.print(f'pin of {n} verified '
-                                     f'at {Status.get_context()}')
+                                     f'at {Status.get_context()}',
+                                     option='--show-clips')
                         continue
                     else:
                         del self.__clipped_nodes[n]
@@ -1976,7 +1982,8 @@ class Z80Simulator(object):
                         Status.print(
                             f'pin of {n} resolved '
                             f'({len(state.entries)} values: {values}) '
-                            f'at {Status.get_context()}')
+                            f'at {Status.get_context()}',
+                            option='--show-clips')
                     for t in n.gate_of:
                         t.state = state
                         if t.conns_group not in groups:
@@ -2030,7 +2037,8 @@ class Z80Simulator(object):
                                     new_states[n] = stand_in
                                     Status.print(
                                         f'{n} pinned as oscillating '
-                                        f'at {Status.get_context()}')
+                                        f'at {Status.get_context()}',
+                                        option='--show-clips')
 
                 # Apply new states, keeping each node's state
                 # from before the settling first touched it --
