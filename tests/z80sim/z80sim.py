@@ -5512,6 +5512,86 @@ def probe_context_carriers():
     Status.print(f'retirement surface union: {len(union)}')
 
 
+def probe_scf_classes():
+    # Classifies each covered scf/ccf predecessor by the
+    # actual XF and YF outcome sets of the pair's cached
+    # settling, tested for equivalence against the candidate
+    # patterns; 'novel' means none fits and the raw set sizes
+    # are printed instead.
+    base = build_symbolised_state()
+    for pred in TestedInstrs.get_instrs():
+        if pred == 'halt':
+            continue
+        with Status.do(f'{pred}; scf/ccf'):
+            try:
+                s1 = process_instr((pred,), base,
+                                   all_orders=True)
+                s2 = process_instr((pred, 'scf/ccf'), s1,
+                                   all_orders=True)
+            except Exception as e:
+                Status.print(f'{pred}: skipped '
+                             f'({type(e).__name__})')
+                continue
+            before = get_effective_states(
+                s1, SAMPLED_NODES, all_orders=True)
+            after = get_effective_states(
+                s2, SAMPLED_NODES, all_orders=True)
+        p = bools.get('is_prefixed_p2')
+        verdicts = []
+        for i in (3, 5):
+            ex = PossibleValues.cast(
+                before[EX_AF_FF]).single_value
+            a = bools.ifelse(
+                ex,
+                PossibleValues.cast(
+                    before[f'reg_a{i}']).single_value,
+                PossibleValues.cast(
+                    before[f'reg_aa{i}']).single_value)
+            f = bools.ifelse(
+                ex,
+                PossibleValues.cast(
+                    before[f'reg_f{i}']).single_value,
+                PossibleValues.cast(
+                    before[f'reg_ff{i}']).single_value)
+            cands = {
+                'A': (a,),
+                'four-set': (a, f, a | f, a & f),
+                'A-unless-prefixed': (
+                    a, bools.ifelse(p, f, a),
+                    bools.ifelse(p, a | f, a),
+                    bools.ifelse(p, a & f, a)),
+                'F': (f,),
+                'A|F': (a | f,),
+            }
+            actual = PossibleValues.cast(after[f'reg_f{i}'])
+            if actual.is_single:
+                vals = (actual.single_value,)
+            else:
+                vals = tuple(v for v, _ in actual.entries)
+
+            def matches(cand):
+                if len(cand) != len(vals):
+                    return False
+                left = list(cand)
+                for v in vals:
+                    for j, c in enumerate(left):
+                        if bools.is_equiv(v, c):
+                            del left[j]
+                            break
+                    else:
+                        return False
+                return True
+
+            for name, cand in cands.items():
+                if matches(cand):
+                    verdicts.append(name)
+                    break
+            else:
+                verdicts.append(f'novel({len(vals)})')
+        Status.print(f'{pred}: xf {verdicts[0]}, '
+                     f'yf {verdicts[1]}')
+
+
 def probe_scf_contexts():
     # The scf/ccf context map: scf/ccf simulated on top of
     # every covered family, reusing the families' cached
@@ -8426,6 +8506,9 @@ def test_instructions():
         # The scf/ccf context pairs: the context map's
         # certified sequences.
         seqs += [(i, 'scf/ccf') for i in SCF_CONTEXTS]
+        # The flag consumers, proven blind to their
+        # predecessor in every context class.
+        seqs += list(CONTEXT_SUSPECT_PAIRS)
     if '--two-instr-seqs' in sys.argv:
         seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
 
@@ -8627,6 +8710,11 @@ def main():
 
     if '--probe-scf-contexts' in sys.argv:
         probe_scf_contexts()
+        Status.clear()
+        return
+
+    if '--probe-scf-classes' in sys.argv:
+        probe_scf_classes()
         Status.clear()
         return
 

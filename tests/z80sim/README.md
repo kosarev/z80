@@ -232,6 +232,7 @@ rest of the circuit's internal nodes.
   So the deciding factor is not flag writing as such but what
   the last pass through the ALU left behind: where it wrote
   the accumulator, that fresh value forces the outcome.
+
   Community research by Patrik Rak established the rule that
   the previous instruction's flag writing selects the
   behaviour, modelled since as a hidden 'Q register'; the die
@@ -245,6 +246,15 @@ rest of the circuit's internal nodes.
   describing. Where the write is fresh, the outcome is
   forced; where there is none, the circuit's indecision shows
   and the chip families are free to differ.
+
+  No such dependence on the previous instruction appears
+  anywhere else we have looked. The instructions that read
+  the flags soonest after they change — the conditional
+  jumps, calls and returns, `adc`, `sbc`, the accumulator
+  rotates, `daa` — each produce their certified results,
+  over the complete architectural state, whether the
+  instruction before them wrote all the flags, some of them
+  (`cpl`, `inc/dec r`) or none (`ld r, r'`).
 
   Covered by the paired sequences — `adc n; scf/ccf` and
   kin — of a plain `./z80sim.py` run, each asserting the
