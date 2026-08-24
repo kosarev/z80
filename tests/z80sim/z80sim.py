@@ -161,6 +161,8 @@ class Status(object):
     __suppression_count = 0
     __parts = []
     __line = ''
+    __tty = sys.stderr.isatty()
+    __last_log_time = None
 
     __profile = '--profile' in sys.argv
     if __profile:
@@ -171,11 +173,29 @@ class Status(object):
         if __class__.__suppression_count != 0:
             return
 
-        line_with_spaces = line
-        if len(line) < len(__class__.__line):
-            line_with_spaces += ' ' * (len(__class__.__line) - len(line))
+        if not __class__.__tty:
+            # With no line to rewrite, leave a plain trace at a
+            # low rate so redirected runs still show progress.
+            now = datetime.datetime.now()
+            last = __class__.__last_log_time
+            if line and (last is None or
+                         (now - last).total_seconds() >= 60):
+                print(line, file=sys.stderr, flush=True)
+                __class__.__last_log_time = now
+            __class__.__line = line
+            return
 
-        print(f'\r{line_with_spaces}', end='', file=sys.stderr)
+        # The status line lives on the line above the cursor,
+        # which always rests at the start of a fresh line, so
+        # output from outside this class -- tracebacks included
+        # -- never splices into the status text.
+        s = ''
+        if __class__.__line:
+            # Cursor to the start of the previous line; erase.
+            s += '\x1b[F\x1b[K'
+        if line:
+            s += line + '\n'
+        print(s, end='', file=sys.stderr, flush=True)
         __class__.__line = line
 
     @staticmethod
@@ -198,7 +218,6 @@ class Status(object):
         if __class__.__suppression_count != 0:
             return
         __class__.__emit('')
-        print('\r', end='', file=sys.stderr)
 
     @staticmethod
     def print(*args):
@@ -230,9 +249,10 @@ class Status(object):
         __class__.__update()
 
     @staticmethod
-    def exit():
+    def exit(redraw=True):
         __class__.__parts.pop()
-        __class__.__update()
+        if redraw:
+            __class__.__update()
 
     @staticmethod
     def do(p, option=None):
@@ -244,7 +264,9 @@ class Status(object):
 
             def __exit__(self, exc_type, exc_val, exc_tb):
                 if self.__show:
-                    Status.exit()
+                    # On an exception, leave the full status on
+                    # display for the report to print under.
+                    Status.exit(redraw=exc_type is None)
 
         return S()
 
