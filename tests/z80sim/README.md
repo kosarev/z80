@@ -76,35 +76,7 @@ interrupt and exchange flip-flops, the internal instruction
 register and the `~halt` pin. Claims do not extend to the
 rest of the circuit's internal nodes.
 
-- During an instruction's internal cycles — the five ticks of
-  `add hl, <rp>`, for instance — the address bus carries the
-  refresh address I:R with all control lines idle, and it
-  keeps carrying it through the extra ticks of extended fetch
-  cycles. Together with the refresh phases of every fetch,
-  this means the value of the I register chooses the addresses
-  hardware sees on the bus for much of the time between
-  transfers — one more reason why moving I into a contended
-  page upsets a ZX Spectrum. Also proven along the way: at
-  every sampled half-tick, the address bus and the control
-  pins are free of internal races — no order of gate reactions
-  can change what they carry.
-
-  Derived with `./z80sim.py --probe-bus-templates` and covered
-  by `test_bus_timeline()` of a plain `./z80sim.py` run, which
-  checks the bus at every half-tick of the covered
-  instructions' machine cycles.
-
-- In interrupt mode 2, the vector byte the interrupting
-  device supplies is used as-is: the two bytes of the handler
-  address are read from I:vector and I:vector + 1, with the
-  vector's bit 0 respected. Documentation disagrees on whether
-  the Z80 forces the vector even; on this netlist no forcing
-  exists, and an odd vector simply reads a pointer that
-  straddles two table entries.
-
-  Derived with `./z80sim.py --probe-bus-templates`, which
-  shows the table read addresses on the bus with the vector
-  fully symbolic.
+### Reset
 
 - The Z80's obscure 'special reset' is real, and the netlist
   gives it an exact shape. The `~reset` pin is sampled in the
@@ -126,6 +98,63 @@ rest of the circuit's internal nodes.
 
   Mapped by `./z80sim.py --probe-special-reset` and certified
   by `test_special_reset()` of a plain `./z80sim.py` run.
+
+- WZ — the internal pointer register often called MEMPTR —
+  survives a `~reset` pulse: it keeps its value while PC, I, R
+  and the interrupt flip-flops restart. Documentation commonly
+  assumes reset clears it, but we are not aware of any
+  experimental data on this. An experiment is possible: `bit n, (hl)` copies two bits of W into the
+  XF and YF flags without changing WZ, so code placed at
+  address 0 that runs this right after a reset pulse — which
+  needs hardware control over the memory at the reset vector —
+  would show whether a preloaded value survived. This finding
+  predicts it does. Also proven
+  along the way: both banks of the register file and of the
+  flags, IX and IY, and the exchange flip-flops, keep their
+  values through a reset taken from the halted state.
+
+  Covered by `test_reset_from_halt()` of a plain `./z80sim.py`
+  run.
+
+### Interrupts
+
+- The maskable interrupt pin is sampled at exactly one
+  instant per instruction — the second half of tick 2 of a
+  four-tick fetch — and a pulse one half-tick wide
+  landing on that instant is accepted, while an equal pulse
+  anywhere else in the instruction is ignored entirely, the
+  machine running on as if nothing had happened. The
+  time-honoured rule that `~int` must be held active until
+  acknowledged is board-level prudence about not knowing the
+  chip's phase; the chip itself needs the level at one
+  half-tick and nothing more.
+
+  Mapped by the pulse sweep and certified by
+  `test_int_sampling_instant()` of a plain `./z80sim.py` run.
+
+- In interrupt mode 2, the vector byte the interrupting
+  device supplies is used as-is: the two bytes of the handler
+  address are read from I:vector and I:vector + 1, with the
+  vector's bit 0 respected. Documentation disagrees on whether
+  the Z80 forces the vector even; on this netlist no forcing
+  exists, and an odd vector simply reads a pointer that
+  straddles two table entries.
+
+  Derived with `./z80sim.py --probe-bus-templates`, which
+  shows the table read addresses on the bus with the vector
+  fully symbolic.
+
+- The undocumented interrupt mode written by `im` encodings
+  ED 4E and ED 6E — often called 'IM 0/1' — is a real,
+  distinct state of the mode latch: the latch stores the
+  instruction's mode field verbatim, so this state is not the
+  same latch contents as plain IM 0. In acceptance it behaves
+  exactly as mode 0: the acceptance tests condition on the
+  latch's high bit alone, so their passing certifies the two
+  states accept identically.
+
+  Covered by the `im/xim n` sequence and
+  `test_int_im0_from_halt()` of a plain `./z80sim.py` run.
 
 - A DD/FD prefix makes the prefixed instruction atomic
   against both kinds of interrupt. A pending maskable
@@ -156,46 +185,37 @@ rest of the circuit's internal nodes.
   `test_nmi_at_prefix_gap()` and `test_nmi_at_prefix_chain()`
   of a plain `./z80sim.py` run.
 
-- The undocumented `out (c), 0` instruction (ED 71) drives
-  zero onto the data bus on this netlist, as expected of an
-  NMOS Z80 — the CMOS parts are known to drive 0xFF instead,
-  making this one of the few points where the chip families
-  genuinely differ. The byte driven during the port write is
-  checked for every register field, including the exchange
-  flip-flops' routing for the named registers; the sibling
-  ED 70, `in (c)`, sets the flags and stores nowhere, which
-  the complete-state checks establish without any special
-  arrangement.
+- When an interrupt is accepted at the boundary of `ld a, i`
+  or `ld a, r` — the instructions that copy the interrupt
+  flip-flop IFF2 into the PF flag — the flag reads 0: the acceptance's
+  clearing of the flip-flop wins over the copy. That much
+  matches what testing real NMOS chips established. What
+  testing could not establish: the outcome is deterministic —
+  the circuit produces the 0 no matter which of its gates
+  react first — so the famous unreliability of probing
+  interrupt state this way is entirely about whether an
+  interrupt lands on that boundary, never about which value
+  wins when it does.
 
-  Covered by the `out (c), r` and `in r, (c)` sequences of a
-  plain `./z80sim.py` run, whose register fields are fully
-  symbolic and include field 6.
+  Covered by `test_int_at_ld_a_ir()` of a plain `./z80sim.py`
+  run.
 
-- The maskable interrupt pin is sampled at exactly one
-  instant per instruction — the second half of tick 2 of a
-  four-tick fetch — and a pulse one half-tick wide
-  landing on that instant is accepted, while an equal pulse
-  anywhere else in the instruction is ignored entirely, the
-  machine running on as if nothing had happened. The
-  time-honoured rule that `~int` must be held active until
-  acknowledged is board-level prudence about not knowing the
-  chip's phase; the chip itself needs the level at one
-  half-tick and nothing more.
+- The fetch cycle that starts the acceptance of an interrupt —
+  non-maskable, or maskable in mode 1 — reads its byte from
+  the bus like any other fetch, and the byte lands in the
+  internal instruction register on the same schedule, where it
+  then sits untouched through the whole acceptance sequence.
+  It is only never executed. This, again, is invisible to
+  programs and so beyond what testing real chips could show.
 
-  Mapped by the pulse sweep and certified by
-  `test_int_sampling_instant()` of a plain `./z80sim.py` run.
+  Derived with `./z80sim.py --probe-acceptance-latch`, which
+  follows the register half-tick by half-tick from a halted
+  fetch through the ~nmi acceptance and its pushes; the
+  acceptance tests of a plain `./z80sim.py` run
+  (`test_nmi_from_halt()`, `test_int_im1_from_halt()`) assert
+  the states the acceptance leaves behind.
 
-- The undocumented interrupt mode written by `im` encodings
-  ED 4E and ED 6E — often called 'IM 0/1' — is a real,
-  distinct state of the mode latch: the latch stores the
-  instruction's mode field verbatim, so this state is not the
-  same latch contents as plain IM 0. In acceptance it behaves
-  exactly as mode 0: the acceptance tests condition on the
-  latch's high bit alone, so their passing certifies the two
-  states accept identically.
-
-  Covered by the `im/xim n` sequence and
-  `test_int_im0_from_halt()` of a plain `./z80sim.py` run.
+### Flags
 
 - The XF and YF flags after `scf`/`ccf` are not merely
   undocumented but not fully implemented: the circuit does not
@@ -297,6 +317,8 @@ rest of the circuit's internal nodes.
   and a pass means no node has any other possible outcome
   under any order of gate reactions.
 
+### Halt
+
 - A halted Z80 is not stopped. That it keeps running fetch
   cycles, so that memory refresh continues, is well known; the
   simulation shows the fetches are complete ones: each byte
@@ -320,23 +342,6 @@ rest of the circuit's internal nodes.
   `./z80sim.py --probe-acceptance-latch` and the fetch
   addresses by `./z80sim.py --probe-bus-templates`.
 
-- WZ — the internal pointer register often called MEMPTR —
-  survives a `~reset` pulse: it keeps its value while PC, I, R
-  and the interrupt flip-flops restart. Documentation commonly
-  assumes reset clears it, but we are not aware of any
-  experimental data on this. An experiment is possible: `bit n, (hl)` copies two bits of W into the
-  XF and YF flags without changing WZ, so code placed at
-  address 0 that runs this right after a reset pulse — which
-  needs hardware control over the memory at the reset vector —
-  would show whether a preloaded value survived. This finding
-  predicts it does. Also proven
-  along the way: both banks of the register file and of the
-  flags, IX and IY, and the exchange flip-flops, keep their
-  values through a reset taken from the halted state.
-
-  Covered by `test_reset_from_halt()` of a plain `./z80sim.py`
-  run.
-
 - A halt executed while an interrupt is already pending never
   enters the halted state: the `~halt` pin stays high
   throughout, and the acceptance follows the halt
@@ -354,35 +359,40 @@ rest of the circuit's internal nodes.
   assert `~halt` high at every sampled half-tick through the
   halt fetch and into the acceptance.
 
-- When an interrupt is accepted at the boundary of `ld a, i`
-  or `ld a, r` — the instructions that copy the interrupt
-  flip-flop IFF2 into the PF flag — the flag reads 0: the acceptance's
-  clearing of the flip-flop wins over the copy. That much
-  matches what testing real NMOS chips established. What
-  testing could not establish: the outcome is deterministic —
-  the circuit produces the 0 no matter which of its gates
-  react first — so the famous unreliability of probing
-  interrupt state this way is entirely about whether an
-  interrupt lands on that boundary, never about which value
-  wins when it does.
+### The bus
 
-  Covered by `test_int_at_ld_a_ir()` of a plain `./z80sim.py`
-  run.
+- During an instruction's internal cycles — the five ticks of
+  `add hl, <rp>`, for instance — the address bus carries the
+  refresh address I:R with all control lines idle, and it
+  keeps carrying it through the extra ticks of extended fetch
+  cycles. Together with the refresh phases of every fetch,
+  this means the value of the I register chooses the addresses
+  hardware sees on the bus for much of the time between
+  transfers — one more reason why moving I into a contended
+  page upsets a ZX Spectrum. Also proven along the way: at
+  every sampled half-tick, the address bus and the control
+  pins are free of internal races — no order of gate reactions
+  can change what they carry.
 
-- The fetch cycle that starts the acceptance of an interrupt —
-  non-maskable, or maskable in mode 1 — reads its byte from
-  the bus like any other fetch, and the byte lands in the
-  internal instruction register on the same schedule, where it
-  then sits untouched through the whole acceptance sequence.
-  It is only never executed. This, again, is invisible to
-  programs and so beyond what testing real chips could show.
+  Derived with `./z80sim.py --probe-bus-templates` and covered
+  by `test_bus_timeline()` of a plain `./z80sim.py` run, which
+  checks the bus at every half-tick of the covered
+  instructions' machine cycles.
 
-  Derived with `./z80sim.py --probe-acceptance-latch`, which
-  follows the register half-tick by half-tick from a halted
-  fetch through the ~nmi acceptance and its pushes; the
-  acceptance tests of a plain `./z80sim.py` run
-  (`test_nmi_from_halt()`, `test_int_im1_from_halt()`) assert
-  the states the acceptance leaves behind.
+- The undocumented `out (c), 0` instruction (ED 71) drives
+  zero onto the data bus on this netlist, as expected of an
+  NMOS Z80 — the CMOS parts are known to drive 0xFF instead,
+  making this one of the few points where the chip families
+  genuinely differ. The byte driven during the port write is
+  checked for every register field, including the exchange
+  flip-flops' routing for the named registers; the sibling
+  ED 70, `in (c)`, sets the flags and stores nowhere, which
+  the complete-state checks establish without any special
+  arrangement.
+
+  Covered by the `out (c), r` and `in r, (c)` sequences of a
+  plain `./z80sim.py` run, whose register fields are fully
+  symbolic and include field 6.
 
 ## Related tickets
 
