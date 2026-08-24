@@ -2757,20 +2757,48 @@ PREFIX_DISP = (
 # tuples grow as the context map is measured; the paired
 # sequences below certify each entry in the plain run.
 SCF_RACE_SUPPRESSORS = (
-    'adc (hl)', 'adc n', 'adc {b, c, d, e, h, l, a}',
-    'or n', 'add (hl)', 'add {b, c, d, e, h, l, a}',
-    'and {b, c, d, e, h, l, a}')
+    'adc (hl)', 'adc n', 'adc {b, c, d, e, h, l, a}', 'add (hl)',
+    'add n', 'add {b, c, d, e, h, l, a}', 'and (hl)', 'and n',
+    'and {b, c, d, e, h, l, a}', 'cpl', 'daa', 'neg/xneg',
+    'or (hl)', 'or n', 'or {b, c, d, e, h, l, a}',
+    'rlca/rrca/rla/rra', 'rrd/rld', 'sbc (hl)', 'sbc n',
+    'sbc {b, c, d, e, h, l, a}', 'sub (hl)', 'sub n',
+    'sub {b, c, d, e, h, l, a}', 'xor (hl)', 'xor n',
+    'xor {b, c, d, e, h, l, a}')
 
 # The measured contexts that leave the four-value race set
 # intact.
 SCF_RACE_KEEPERS = (
-    'call cc, nn', 'ld {b, c, d, e, h, l, a}, n')
+    'call cc, nn', 'call nn', 'djnz d', 'ei/di', 'ex (sp), hl',
+    "ex af, af'", 'ex de, hl', 'exx', 'im/xim n',
+    'in a, (n)/out (n), a', 'inc/dec <rp>', 'jp cc, nn', 'jp hl',
+    'jp nn', 'jr cc, d', 'jr d', 'ld (<rp>), a/ld a, (<rp>)',
+    'ld (hl), n', 'ld (hl), {b, c, d, e, h, l, a}',
+    'ld <rp>, (nn)/ld (nn), <rp>', 'ld <rp>, nn',
+    'ld a, (nn)/ld (nn), a', 'ld hl, (nn)/ld (nn), hl',
+    'ld sp, hl', 'ld {b, c, d, e, h, l, a}, (hl)',
+    'ld {b, c, d, e, h, l, a}, n',
+    'ld {b, c, d, e, h, l, a}, {b, c, d, e, h, l, a}',
+    'ld {i, r}, a/ld a, {i, r}', 'nop', 'out (c), r',
+    'pop <rp2>', 'push <rp2>', 'res (hl)',
+    'res {b, c, d, e, h, l, a}', 'ret', 'ret cc',
+    'reti/retn/xretn', 'rst n', 'set (hl)',
+    'set {b, c, d, e, h, l, a}', 'xnop')
 
 # The families whose flag write forces a directly following
-# scf/ccf to the old accumulator, the forcing not surviving
-# an interposed DD/FD prefix byte: under the prefixed
-# variant, the full four-value race returns.
-SCF_FRAGILE_SUPPRESSORS = ('cp n',)
+# scf/ccf to the accumulator, the forcing not surviving an
+# interposed DD/FD prefix byte: under the prefixed variant
+# the four-value race returns. scf/ccf itself is one: its
+# own fresh F contains A, so the four values collapse to
+# two.
+SCF_FRAGILE_SUPPRESSORS = (
+    'adc/sbc hl, <rp>', 'add hl, <rp>', 'bit (hl)',
+    'bit {b, c, d, e, h, l, a}', 'cp (hl)', 'cp n',
+    'cp {b, c, d, e, h, l, a}', 'cpi/cpd', 'cpir/cpdr',
+    'in r, (c)', 'inc/dec (hl)', 'inc/dec {b, c, d, e, h, l, a}',
+    'ini/ind', 'inir/indr', 'ldi/ldd', 'ldir/lddr', 'otir/otdr',
+    'outi/outd', 'rot (hl)', 'rot {b, c, d, e, h, l, a}',
+    'scf/ccf')
 
 SCF_CONTEXTS = (SCF_RACE_SUPPRESSORS + SCF_RACE_KEEPERS +
                 SCF_FRAGILE_SUPPRESSORS)
@@ -2866,6 +2894,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
         # hardware-facing promise.
         b, a = before[n], after[n]
         xs = [is_active(n).ifelse(x, b) for x in xs]
+        # A spec whose values coincide in this context is the
+        # smaller set -- scf/ccf after scf/ccf collapses to
+        # two values because the fresh F contains A.
+        distinct = []
+        for x in xs:
+            if not any(bools.is_equiv(x, d) for d in distinct):
+                distinct.append(x)
+        xs = distinct
         a = PossibleValues.cast(a)
 
         matched = len(a.entries) == len(xs)
@@ -5524,16 +5560,18 @@ def probe_scf_classes():
             continue
         with Status.do(f'{pred}; scf/ccf'):
             try:
-                s1 = process_instr((pred,), base,
-                                   all_orders=True)
+                # The predecessor executes as a preparation --
+                # single-order, exactly as in the tested
+                # pairs -- and only the scf/ccf settles under
+                # all orders.
+                s1 = process_instr((pred,), base)
                 s2 = process_instr((pred, 'scf/ccf'), s1,
                                    all_orders=True)
             except Exception as e:
                 Status.print(f'{pred}: skipped '
                              f'({type(e).__name__})')
                 continue
-            before = get_effective_states(
-                s1, SAMPLED_NODES, all_orders=True)
+            before = get_effective_states(s1, SAMPLED_NODES)
             after = get_effective_states(
                 s2, SAMPLED_NODES, all_orders=True)
         p = bools.get('is_prefixed_p2')
@@ -5563,6 +5601,13 @@ def probe_scf_classes():
                 'F': (f,),
                 'A|F': (a | f,),
             }
+            # Mirror check(): the expected value lives in the
+            # storage node only where its bank is active;
+            # otherwise the node keeps its before value.
+            bef_node = before[f'reg_f{i}']
+            cands = {name: tuple(bools.ifelse(ex, c, bef_node)
+                                 for c in cand)
+                     for name, cand in cands.items()}
             actual = PossibleValues.cast(after[f'reg_f{i}'])
             if actual.is_single:
                 vals = (actual.single_value,)
@@ -7077,6 +7122,7 @@ def execute_instr(s, id, phase, before, all_orders=False):
 # their own.
 _CLOSED_WORLD_EXCLUDED = frozenset((
     'n1242', 'n1245', 'n1616', 'n1683', 'n701',
+    'p633', 'p1702', 'p1703',
     'n1243', 'n696', 'n729', 'p1844', 'p1853', 'p1854', 'p1880',
     'p1881', 'p1957', 'p1958', 'p1985', 'p1986', 'p2057',
     'p2058', 'p2081', 'p2082', 'p2154', 'p2155', 'p2167',

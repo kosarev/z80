@@ -208,30 +208,39 @@ rest of the circuit's internal nodes.
 
   What the instruction before the `scf`/`ccf` does is not a
   matter of odds, however: it decides whether the race exists
-  at all. For the pairings covered so far:
+  at all. Every possible preceding instruction has been
+  examined, and they divide into exactly three groups:
 
-  - After an instruction that writes the accumulator together
-    with the flags — `adc` and `add` with any operand, `and`
-    with a register operand, `or` with an immediate one — the
-    race disappears entirely: XF and YF copy A's bits, and no
+  - After an instruction that writes the accumulator through
+    the ALU — the eight arithmetic and logical operations in
+    all their operand forms, `cpl`, `daa`, `neg`, the
+    accumulator rotates and `rrd`/`rld` — the race
+    disappears entirely: XF and YF copy A's bits, and no
     order of gate reactions can produce anything else. A DD
-    or FD prefix on the `scf`/`ccf` makes no difference here:
-    the bits copy A either way.
+    or FD prefix on the `scf`/`ccf` makes no difference
+    here: the bits copy A either way.
 
-  - After `call cc, nn` or `ld r, n`, which write neither,
-    the four-value race stands exactly as described above.
+  - After an instruction that writes the flags but not the
+    accumulator — `cp` and `bit` in all forms, `inc`/`dec`
+    of a register or `(hl)`, `in r, (c)`, every block
+    instruction, the `rot` group, and the 16-bit additions —
+    the bits also come out as A, but only when the
+    `scf`/`ccf` follows immediately: with a DD or FD prefix
+    byte between the two instructions, the four-value race
+    is back in full. `scf`/`ccf` itself is in this group,
+    with a twist: its own fresh F already contains A, so the
+    four values collapse to two.
 
-  - `cp n`, which writes the flags but leaves the
-    accumulator, gives the same result as the first group —
-    XF and YF come out as A's bits, nothing else possible —
-    but only when the `scf`/`ccf` follows immediately. If the
-    `scf`/`ccf` carries a DD or FD prefix, so that the prefix
-    fetch sits between the two instructions, the four-value
-    race is back in full.
+  - After anything that leaves the flags alone — loads,
+    jumps, calls and returns, the stack and exchange
+    instructions, `res`/`set`, `ei`/`di`, `nop` — the
+    four-value race stands exactly as described above.
 
   So the deciding factor is not flag writing as such but what
   the last pass through the ALU left behind: where it wrote
-  the accumulator, that fresh value forces the outcome.
+  the accumulator, that fresh value forces the outcome, and
+  it keeps forcing it for one instruction longer than a flag
+  write alone does.
 
   Community research by Patrik Rak established the rule that
   the previous instruction's flag writing selects the
@@ -256,11 +265,11 @@ rest of the circuit's internal nodes.
   instruction before them wrote all the flags, some of them
   (`cpl`, `inc/dec r`) or none (`ld r, r'`).
 
-  Covered by the paired sequences — `adc n; scf/ccf` and
-  kin — of a plain `./z80sim.py` run, each asserting the
-  exact outcome its preceding instruction produces: the
-  single forced value where the accumulator was freshly
-  written, the four-value set otherwise.
+  Covered by the paired sequences of a plain `./z80sim.py`
+  run — every possible preceding instruction followed by
+  `scf`/`ccf` — each asserting the exact outcome its group
+  prescribes; `./z80sim.py --probe-scf-classes` prints the
+  classification.
 
   Covered by the `scf/ccf` sequence of a plain `./z80sim.py`
   run, which asserts the exact outcome set via `check_set()`;
