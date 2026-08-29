@@ -438,14 +438,14 @@ class Instr:
     origin: _SourcePos | None
 
     __opcode: typing.ClassVar[int | None] = None
-    __prefix: typing.ClassVar[int | None] = None
+    __prefix: typing.ClassVar[bytes] = b''
 
     def __init_subclass__(cls, *, opcode: int | None = None,
                           prefix: int | None = None) -> None:
         super().__init_subclass__()
 
         cls.__opcode = opcode
-        cls.__prefix = prefix
+        cls.__prefix = b'' if prefix is None else bytes((prefix,))
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
         self.addr = None
@@ -473,12 +473,7 @@ class Instr:
     def encode(self, addr: int | None = None) -> bytes:
         opcode = self.__opcode
         if opcode is not None:
-            image = []
-            if self.__prefix is not None:
-                image.append(self.__prefix)
-
-            image.append(opcode)
-            return bytes(image)
+            return self.__prefix + bytes((opcode,))
 
         raise Error(f'No encoding for {str(self)!r}.')
 
