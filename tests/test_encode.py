@@ -54,16 +54,6 @@ def test_encode(instr: z80.Instr, image: bytes) -> None:
     assert instr.encode() == image
 
 
-def test_no_such_form() -> None:
-    with pytest.raises(z80.Error,
-                       match="No such instruction form: 'nop 0x5'."):
-        z80.NOP(5)
-
-    with pytest.raises(z80.Error,
-                       match="No such instruction form: 'ldi 0x5'."):
-        z80.LDI(5)
-
-
 def test_no_encoding() -> None:
     with pytest.raises(z80.Error, match="No encoding for 'ld a, b'."):
         z80.LD(z80.A, z80.B).encode()

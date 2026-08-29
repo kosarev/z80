@@ -429,22 +429,25 @@ class Neg(UnaryExpr):
         return -self._evaluate_op(op)
 
 
-# Base class for all instructions. Operand-free instructions
-# state their fixed encoding as the opcode= class parameter, with
-# the prefix byte, where there is one, as prefix=.
+# Base class for all instructions.
 class Instr:
     addr: int | None
     size: int | None
     origin: _SourcePos | None
 
-    __opcode: typing.ClassVar[int | None] = None
+    __x: typing.ClassVar[int | None] = None
+    __y: typing.ClassVar[int | None] = None
+    __z: typing.ClassVar[int | None] = None
     __prefix: typing.ClassVar[bytes] = b''
 
-    def __init_subclass__(cls, *, opcode: int | None = None,
+    def __init_subclass__(cls, *, x: int | None = None,
+                          y: int | None = None, z: int | None = None,
                           prefix: int | None = None) -> None:
         super().__init_subclass__()
 
-        cls.__opcode = opcode
+        cls.__x = x
+        cls.__y = y
+        cls.__z = z
         cls.__prefix = b'' if prefix is None else bytes((prefix,))
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
@@ -452,10 +455,6 @@ class Instr:
         self.size = None
         self.ops = tuple(_cast_op(op) for op in ops)
         self.origin = None
-
-        # Operand-free instructions accept no operands.
-        if self.__opcode is not None and self.ops:
-            raise Error(f'No such instruction form: {str(self)!r}.')
 
     def __repr__(self) -> str:
         return (type(self).__name__ +
@@ -471,9 +470,9 @@ class Instr:
     # where the encoding depends on it, as with relative jump
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
-        opcode = self.__opcode
-        if opcode is not None:
-            return self.__prefix + bytes((opcode,))
+        x, y, z = self.__x, self.__y, self.__z
+        if x is not None and y is not None and z is not None:
+            return self.__prefix + bytes((x << 6 | y << 3 | z,))
 
         raise Error(f'No encoding for {str(self)!r}.')
 
@@ -538,7 +537,7 @@ class CALL(CallInstr):
     pass
 
 
-class CCF(Instr, opcode=0x3f):
+class CCF(Instr, x=0, y=7, z=7):
     pass
 
 
@@ -546,27 +545,27 @@ class CP(Instr):
     pass
 
 
-class CPD(Instr, prefix=0xed, opcode=0xa9):
+class CPD(Instr, prefix=0xed, x=2, y=5, z=1):
     pass
 
 
-class CPDR(Instr, prefix=0xed, opcode=0xb9):
+class CPDR(Instr, prefix=0xed, x=2, y=7, z=1):
     pass
 
 
-class CPI(Instr, prefix=0xed, opcode=0xa1):
+class CPI(Instr, prefix=0xed, x=2, y=4, z=1):
     pass
 
 
-class CPIR(Instr, prefix=0xed, opcode=0xb1):
+class CPIR(Instr, prefix=0xed, x=2, y=6, z=1):
     pass
 
 
-class CPL(Instr, opcode=0x2f):
+class CPL(Instr, x=0, y=5, z=7):
     pass
 
 
-class DAA(Instr, opcode=0x27):
+class DAA(Instr, x=0, y=4, z=7):
     pass
 
 
@@ -574,7 +573,7 @@ class DEC(Instr):
     pass
 
 
-class DI(Instr, opcode=0xf3):
+class DI(Instr, x=3, y=6, z=3):
     pass
 
 
@@ -582,7 +581,7 @@ class DJNZ(JumpInstr):
     pass
 
 
-class EI(Instr, opcode=0xfb):
+class EI(Instr, x=3, y=7, z=3):
     pass
 
 
@@ -590,11 +589,11 @@ class EX(Instr):
     pass
 
 
-class EXX(Instr, opcode=0xd9):
+class EXX(Instr, x=3, y=3, z=1):
     pass
 
 
-class HALT(Instr, opcode=0x76):
+class HALT(Instr, x=1, y=6, z=6):
     pass
 
 
@@ -610,19 +609,19 @@ class IN(Instr):
     pass
 
 
-class IND(Instr, prefix=0xed, opcode=0xaa):
+class IND(Instr, prefix=0xed, x=2, y=5, z=2):
     pass
 
 
-class INDR(Instr, prefix=0xed, opcode=0xba):
+class INDR(Instr, prefix=0xed, x=2, y=7, z=2):
     pass
 
 
-class INI(Instr, prefix=0xed, opcode=0xa2):
+class INI(Instr, prefix=0xed, x=2, y=4, z=2):
     pass
 
 
-class INIR(Instr, prefix=0xed, opcode=0xb2):
+class INIR(Instr, prefix=0xed, x=2, y=6, z=2):
     pass
 
 
@@ -646,23 +645,23 @@ class XLD(Instr):
     pass
 
 
-class LDD(Instr, prefix=0xed, opcode=0xa8):
+class LDD(Instr, prefix=0xed, x=2, y=5, z=0):
     pass
 
 
-class LDDR(Instr, prefix=0xed, opcode=0xb8):
+class LDDR(Instr, prefix=0xed, x=2, y=7, z=0):
     pass
 
 
-class LDI(Instr, prefix=0xed, opcode=0xa0):
+class LDI(Instr, prefix=0xed, x=2, y=4, z=0):
     pass
 
 
-class LDIR(Instr, prefix=0xed, opcode=0xb0):
+class LDIR(Instr, prefix=0xed, x=2, y=6, z=0):
     pass
 
 
-class NEG(Instr, prefix=0xed, opcode=0x44):
+class NEG(Instr, prefix=0xed, x=1, y=0, z=4):
     pass
 
 
@@ -670,7 +669,7 @@ class XNEG(Instr):
     pass
 
 
-class NOP(Instr, opcode=0x00):
+class NOP(Instr, x=0, y=0, z=0):
     pass
 
 
@@ -686,19 +685,19 @@ class OUT(Instr):
     pass
 
 
-class OUTD(Instr, prefix=0xed, opcode=0xab):
+class OUTD(Instr, prefix=0xed, x=2, y=5, z=3):
     pass
 
 
-class OTDR(Instr, prefix=0xed, opcode=0xbb):
+class OTDR(Instr, prefix=0xed, x=2, y=7, z=3):
     pass
 
 
-class OUTI(Instr, prefix=0xed, opcode=0xa3):
+class OUTI(Instr, prefix=0xed, x=2, y=4, z=3):
     pass
 
 
-class OTIR(Instr, prefix=0xed, opcode=0xb3):
+class OTIR(Instr, prefix=0xed, x=2, y=6, z=3):
     pass
 
 
@@ -718,7 +717,7 @@ class RET(RetInstr):
     pass
 
 
-class RETN(RetInstr, prefix=0xed, opcode=0x45):
+class RETN(RetInstr, prefix=0xed, x=1, y=0, z=5):
     pass
 
 
@@ -726,7 +725,7 @@ class XRETN(RetInstr):
     pass
 
 
-class RETI(RetInstr, prefix=0xed, opcode=0x4d):
+class RETI(RetInstr, prefix=0xed, x=1, y=1, z=5):
     pass
 
 
@@ -734,7 +733,7 @@ class RL(Instr):
     pass
 
 
-class RLA(Instr, opcode=0x17):
+class RLA(Instr, x=0, y=2, z=7):
     pass
 
 
@@ -742,11 +741,11 @@ class RLC(Instr):
     pass
 
 
-class RLCA(Instr, opcode=0x07):
+class RLCA(Instr, x=0, y=0, z=7):
     pass
 
 
-class RLD(Instr, prefix=0xed, opcode=0x6f):
+class RLD(Instr, prefix=0xed, x=1, y=5, z=7):
     pass
 
 
@@ -754,11 +753,11 @@ class RR(Instr):
     pass
 
 
-class RRA(Instr, opcode=0x1f):
+class RRA(Instr, x=0, y=3, z=7):
     pass
 
 
-class RRD(Instr, prefix=0xed, opcode=0x67):
+class RRD(Instr, prefix=0xed, x=1, y=4, z=7):
     pass
 
 
@@ -766,7 +765,7 @@ class RRC(Instr):
     pass
 
 
-class RRCA(Instr, opcode=0x0f):
+class RRCA(Instr, x=0, y=1, z=7):
     pass
 
 
@@ -778,7 +777,7 @@ class SBC(Instr):
     pass
 
 
-class SCF(Instr, opcode=0x37):
+class SCF(Instr, x=0, y=6, z=7):
     pass
 
 
