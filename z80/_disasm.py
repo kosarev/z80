@@ -370,6 +370,14 @@ class _UnknownInstrError(Exception):
     pass
 
 
+# Raised where the image does not hold all the bytes of the
+# instruction to build, so its identity is not determined by the
+# available input.
+class IncompleteInstrError(Error):
+    def __init__(self) -> None:
+        super().__init__('Incomplete instruction.')
+
+
 class Z80InstrBuilder:
     __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
         'Aadd': ADD,
@@ -548,8 +556,10 @@ class Z80InstrBuilder:
     def build_instr(self, addr: int, image: bytes) -> Instr:
         original_text, size = Z80Machine._disasm(image)
         if size > len(image):
-            # TODO: Too few bytes to disassemble this instruction.
-            assert 0, image
+            # The decoder consumed padding past the image, so the
+            # bytes run into unknown memory and there is no
+            # complete instruction to build.
+            raise IncompleteInstrError()
 
         # The core produces no text for an index prefix followed
         # by another prefix. The prefix byte is a quantum of its
@@ -1006,8 +1016,14 @@ class _Disasm:
             if len(instr_image) == 0:
                 return
 
-            tag.instr = self.__instr_builder.build_instr(
-                tag.addr, bytes(instr_image))
+            try:
+                tag.instr = self.__instr_builder.build_instr(
+                    tag.addr, bytes(instr_image))
+            except IncompleteInstrError:
+                # The bytes run into unknown memory, so the
+                # address stays data.
+                return
+
             tags.disasm_tag = tag
             self.__apply_ref_tag(tag.addr)
 

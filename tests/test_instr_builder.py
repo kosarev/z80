@@ -82,3 +82,19 @@ def test_prefix_chain(code: bytes, texts: tuple[str, ...]) -> None:
         addr += instr.size
 
     assert addr == len(code)
+
+
+# Images too small to hold their complete instructions.
+_INCOMPLETE_TESTS = (
+    b'',
+    b'\xdd',
+    b'\xfd',
+    b'\x21\x34',
+    b'\xdd\xcb\x05',
+)
+
+
+@pytest.mark.parametrize('code', _INCOMPLETE_TESTS)
+def test_incomplete_instr(code: bytes) -> None:
+    with pytest.raises(z80.IncompleteInstrError):
+        z80.Z80InstrBuilder().build_instr(0, code)
