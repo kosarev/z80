@@ -193,6 +193,10 @@ class Reg(_InstrElement):
     # registers and their halves.
     _prefix: bytes = b''
 
+    # The register's field code in its encodings, ix/iy taking
+    # hl's slot under their prefixes.
+    _code: int | None = None
+
 
 # Registers holding a 16-bit value. Loading one takes an immediate
 # wide enough to be an address, which the 8-bit registers cannot.
@@ -246,7 +250,7 @@ class R(metaclass=Reg):
 
 
 class AF(metaclass=Reg16):
-    pass
+    _code = 3
 
 
 class AF2(metaclass=Reg16):
@@ -254,19 +258,20 @@ class AF2(metaclass=Reg16):
 
 
 class BC(metaclass=Reg16):
-    pass
+    _code = 0
 
 
 class DE(metaclass=Reg16):
-    pass
+    _code = 1
 
 
 class HL(metaclass=Reg16):
-    pass
+    _code = 2
 
 
 class IX(metaclass=IndexReg16):
     _prefix = b'\xdd'
+    _code = 2
 
 
 class IXH(metaclass=IndexReg):
@@ -279,6 +284,7 @@ class IXL(metaclass=IndexReg):
 
 class IY(metaclass=IndexReg16):
     _prefix = b'\xfd'
+    _code = 2
 
 
 class IYH(metaclass=IndexReg):
@@ -914,8 +920,17 @@ class POP(Instr):
     pass
 
 
-class PUSH(Instr):
-    pass
+class PUSH(Instr, x=3, z=5):
+    def __init__(self, rp: Reg) -> None:
+        super().__init__(rp)
+
+        # PUSH rp2[p]
+        if rp in (BC, DE, HL, AF, IX, IY):
+            assert rp._code is not None
+            self._y = rp._code << 1
+            self._prefix = rp._prefix
+        else:
+            raise InvalidInstr(self)
 
 
 class RES(Instr):

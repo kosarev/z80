@@ -93,6 +93,12 @@ _TESTS = (
     (z80.XIM(0xed6e, 0), b'\xed\x6e'),
     (z80.XIM(0xed76, 1), b'\xed\x76'),
     (z80.XIM(0xed7e, 2), b'\xed\x7e'),
+    (z80.PUSH(z80.BC), b'\xc5'),
+    (z80.PUSH(z80.DE), b'\xd5'),
+    (z80.PUSH(z80.HL), b'\xe5'),
+    (z80.PUSH(z80.AF), b'\xf5'),
+    (z80.PUSH(z80.IX), b'\xdd\xe5'),
+    (z80.PUSH(z80.IY), b'\xfd\xe5'),
     (z80.XNOP(0xed00), b'\xed\x00'),
     (z80.XNOP(0xed77), b'\xed\x77'),
     (z80.XNOP(0xed7f), b'\xed\x7f'),
@@ -183,6 +189,9 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.XIM(0xed4e, 1)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.PUSH(z80.SP)
 
     # ED 44 is neg and ED A0 is ldi: assigned, so not xnops.
     with pytest.raises(z80.InvalidInstr):
