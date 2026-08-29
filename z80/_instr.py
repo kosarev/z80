@@ -108,10 +108,12 @@ __all__ = [
     'Add',
     'At',
     'B',
+    'BinaryExpr',
     'C',
     'CallInstr',
     'D',
     'E',
+    'Expr',
     'H',
     'IReg',
     'IndexReg',
@@ -280,7 +282,7 @@ class SP(metaclass=Reg16):
     pass
 
 
-Op: typing.TypeAlias = typing.Union[int, str, Reg, CondFlag, 'At', 'Add']
+Op: typing.TypeAlias = typing.Union[int, str, Reg, CondFlag, 'At', 'Expr']
 
 
 def _str_op(op: Op) -> str:
@@ -288,6 +290,23 @@ def _str_op(op: Op) -> str:
         return f'{op:#x}'
 
     return str(op)
+
+
+# Base class for expression operands.
+class Expr:
+    ops: list[Op]
+
+    def __init__(self, *ops: Op) -> None:
+        self.ops = list(ops)
+
+    def __repr__(self) -> str:
+        return (type(self).__name__ +
+                '(' + ', '.join(repr(op) for op in self.ops) + ')')
+
+
+class BinaryExpr(Expr):
+    def __init__(self, a: Op, b: Op) -> None:
+        super().__init__(a, b)
 
 
 class At:
@@ -302,13 +321,7 @@ class At:
         return f'({_str_op(op)})'
 
 
-class Add:
-    def __init__(self, a: Op, b: Op) -> None:
-        self.ops = [a, b]
-
-    def __repr__(self) -> str:
-        return 'Add({!r}, {!r})'.format(*tuple(self.ops))
-
+class Add(BinaryExpr):
     def __str__(self) -> str:
         a, b = tuple(self.ops)
 
