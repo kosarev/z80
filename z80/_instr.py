@@ -556,15 +556,78 @@ class RetInstr(JumpInstr):
     pass
 
 
-class ADD(Instr):
-    pass
+# The contribution of an alu[y] operand.
+def _encode_alu_op(instr: Instr, op: Op) -> None:
+    # alu[y] r[z]
+    if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
+        assert isinstance(op, Reg) and op._code is not None
+        instr._z = op._code
+        instr._prefix = op._prefix
+    elif isinstance(op, At) and op.ops[0] is HL:
+        instr._z = 6
+    # TODO: Encode alu[y] n and alu[y] (ix/iy + d).
+    elif (isinstance(op, Expr) or
+            (isinstance(op, At) and isinstance(op.ops[0], Add) and
+             op.ops[0].ops[0] in (IX, IY))):
+        pass
+    else:
+        raise InvalidInstr(instr)
 
 
-class ADC(Instr):
-    pass
+# The alu operations, the y= class parameter selecting the
+# operation. Add, adc and sbc stand alone: their 16-bit forms are
+# no alu operations.
+class _Alu(Instr, x=2):
+    def __init__(self, arg: int | Op) -> None:
+        super().__init__(arg)
+        _encode_alu_op(self, self.ops[0])
 
 
-class AND(Instr):
+class ADD(Instr, y=0):
+    def __init__(self, a: Reg | At, b: int | Op) -> None:
+        super().__init__(a, b)
+
+        # ADD HL, rp[p] and the ix/iy forms, whose rp slot 2 is
+        # the destination register itself.
+        if a in (HL, IX, IY):
+            b = self.ops[1]
+            if b in (BC, DE, SP) or b is a:
+                assert isinstance(a, Reg)
+                assert isinstance(b, Reg) and b._code is not None
+                self._x, self._z = 0, 1
+                self._y = b._code << 1 | 1
+                self._prefix = a._prefix
+            else:
+                raise InvalidInstr(self)
+        elif a is A:
+            self._x = 2
+            _encode_alu_op(self, self.ops[1])
+        else:
+            raise InvalidInstr(self)
+
+
+class ADC(Instr, y=1):
+    def __init__(self, a: Reg | At, b: int | Op) -> None:
+        super().__init__(a, b)
+
+        # ADC HL, rp[p]
+        if a is HL:
+            b = self.ops[1]
+            if b in (BC, DE, HL, SP):
+                assert isinstance(b, Reg) and b._code is not None
+                self._prefix = b'\xed'
+                self._x, self._z = 1, 2
+                self._y = b._code << 1 | 1
+            else:
+                raise InvalidInstr(self)
+        elif a is A:
+            self._x = 2
+            _encode_alu_op(self, self.ops[1])
+        else:
+            raise InvalidInstr(self)
+
+
+class AND(_Alu, y=4):
     pass
 
 
@@ -581,7 +644,7 @@ class CCF(Instr, x=0, y=7, z=7):
         super().__init__()
 
 
-class CP(Instr):
+class CP(_Alu, y=7):
     pass
 
 
@@ -908,7 +971,7 @@ class XNOP(Instr, prefix=0xed):
         self._x, self._y, self._z = x, y, z
 
 
-class OR(Instr):
+class OR(_Alu, y=6):
     pass
 
 
@@ -1080,8 +1143,25 @@ class RST(CallInstr, x=3, z=7):
         self._y = addr >> 3
 
 
-class SBC(Instr):
-    pass
+class SBC(Instr, y=3):
+    def __init__(self, a: Reg | At, b: int | Op) -> None:
+        super().__init__(a, b)
+
+        # SBC HL, rp[p]
+        if a is HL:
+            b = self.ops[1]
+            if b in (BC, DE, HL, SP):
+                assert isinstance(b, Reg) and b._code is not None
+                self._prefix = b'\xed'
+                self._x, self._z = 1, 2
+                self._y = b._code << 1
+            else:
+                raise InvalidInstr(self)
+        elif a is A:
+            self._x = 2
+            _encode_alu_op(self, self.ops[1])
+        else:
+            raise InvalidInstr(self)
 
 
 class SCF(Instr, x=0, y=6, z=7):
@@ -1109,11 +1189,11 @@ class SRL(Instr):
     pass
 
 
-class SUB(Instr):
+class SUB(_Alu, y=2):
     pass
 
 
-class XOR(Instr):
+class XOR(_Alu, y=5):
     pass
 
 

@@ -123,6 +123,32 @@ _TESTS = (
     (z80.DEC(z80.SP), b'\x3b'),
     (z80.DEC(z80.IX), b'\xdd\x2b'),
     (z80.DEC(z80.IY), b'\xfd\x2b'),
+    (z80.SUB(z80.B), b'\x90'),
+    (z80.SUB(z80.A), b'\x97'),
+    (z80.SUB(z80.At(z80.HL)), b'\x96'),
+    (z80.SUB(z80.IXH), b'\xdd\x94'),
+    (z80.SUB(z80.IYL), b'\xfd\x95'),
+    (z80.AND(z80.B), b'\xa0'),
+    (z80.AND(z80.At(z80.HL)), b'\xa6'),
+    (z80.XOR(z80.B), b'\xa8'),
+    (z80.XOR(z80.IXH), b'\xdd\xac'),
+    (z80.OR(z80.B), b'\xb0'),
+    (z80.OR(z80.A), b'\xb7'),
+    (z80.CP(z80.B), b'\xb8'),
+    (z80.CP(z80.At(z80.HL)), b'\xbe'),
+    (z80.ADD(z80.A, z80.B), b'\x80'),
+    (z80.ADD(z80.A, z80.At(z80.HL)), b'\x86'),
+    (z80.ADD(z80.A, z80.IXH), b'\xdd\x84'),
+    (z80.ADD(z80.HL, z80.DE), b'\x19'),
+    (z80.ADD(z80.HL, z80.HL), b'\x29'),
+    (z80.ADD(z80.IX, z80.BC), b'\xdd\x09'),
+    (z80.ADD(z80.IX, z80.IX), b'\xdd\x29'),
+    (z80.ADD(z80.IY, z80.SP), b'\xfd\x39'),
+    (z80.ADC(z80.A, z80.B), b'\x88'),
+    (z80.ADC(z80.HL, z80.BC), b'\xed\x4a'),
+    (z80.ADC(z80.HL, z80.HL), b'\xed\x6a'),
+    (z80.SBC(z80.A, z80.B), b'\x98'),
+    (z80.SBC(z80.HL, z80.DE), b'\xed\x52'),
     (z80.XNOP(0xed00), b'\xed\x00'),
     (z80.XNOP(0xed77), b'\xed\x77'),
     (z80.XNOP(0xed7f), b'\xed\x7f'),
@@ -228,6 +254,18 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.DEC(z80.AF)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.SUB(z80.BC)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.ADD(z80.B, z80.C)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.ADD(z80.HL, z80.IX)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.ADC(z80.IX, z80.BC)
 
     # ED 44 is neg and ED A0 is ldi: assigned, so not xnops.
     with pytest.raises(z80.InvalidInstr):
