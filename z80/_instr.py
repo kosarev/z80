@@ -214,31 +214,31 @@ class IndexReg16(IndexReg, Reg16):
 
 
 class A(metaclass=Reg):
-    pass
+    _code = 7
 
 
 class B(metaclass=Reg):
-    pass
+    _code = 0
 
 
 class C(metaclass=Reg):
-    pass
+    _code = 1
 
 
 class D(metaclass=Reg):
-    pass
+    _code = 2
 
 
 class E(metaclass=Reg):
-    pass
+    _code = 3
 
 
 class H(metaclass=Reg):
-    pass
+    _code = 4
 
 
 class L(metaclass=Reg):
-    pass
+    _code = 5
 
 
 class IReg(metaclass=Reg):
@@ -275,11 +275,13 @@ class IX(metaclass=IndexReg16):
 
 
 class IXH(metaclass=IndexReg):
-    pass
+    _prefix = b'\xdd'
+    _code = 4
 
 
 class IXL(metaclass=IndexReg):
-    pass
+    _prefix = b'\xdd'
+    _code = 5
 
 
 class IY(metaclass=IndexReg16):
@@ -288,15 +290,17 @@ class IY(metaclass=IndexReg16):
 
 
 class IYH(metaclass=IndexReg):
-    pass
+    _prefix = b'\xfd'
+    _code = 4
 
 
 class IYL(metaclass=IndexReg):
-    pass
+    _prefix = b'\xfd'
+    _code = 5
 
 
 class SP(metaclass=Reg16):
-    pass
+    _code = 3
 
 
 Op: typing.TypeAlias = typing.Union[str, Reg, CondFlag, 'At', 'Expr']
@@ -727,8 +731,29 @@ class INIR(Instr, prefix=0xed, x=2, y=6, z=2):
         super().__init__()
 
 
-class INC(Instr):
-    pass
+class INC(Instr, x=0):
+    def __init__(self, arg: Reg | At) -> None:
+        super().__init__(arg)
+
+        op = self.ops[0]
+        # INC r[y]
+        if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
+            assert isinstance(op, Reg) and op._code is not None
+            self._y, self._z = op._code, 4
+            self._prefix = op._prefix
+        elif isinstance(op, At) and op.ops[0] is HL:
+            self._y, self._z = 6, 4
+        # INC rp[p]
+        elif op in (BC, DE, HL, SP, IX, IY):
+            assert isinstance(op, Reg) and op._code is not None
+            self._y, self._z = op._code << 1, 3
+            self._prefix = op._prefix
+        # TODO: Encode INC (ix/iy + d).
+        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
+                op.ops[0].ops[0] in (IX, IY)):
+            pass
+        else:
+            raise InvalidInstr(self)
 
 
 class JP(JumpInstr):
