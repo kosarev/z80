@@ -463,9 +463,14 @@ class Instr:
                           prefix: int | None = None) -> None:
         super().__init_subclass__()
 
-        cls._x = x
-        cls._y = y
-        cls._z = z
+        # Omitted parameters inherit the base's fields, as with
+        # subclasses of the private per-pair bases below.
+        if x is not None:
+            cls._x = x
+        if y is not None:
+            cls._y = y
+        if z is not None:
+            cls._z = z
         if prefix is not None:
             cls._prefix = bytes((prefix,))
 
@@ -610,29 +615,42 @@ class DAA(Instr, x=0, y=4, z=7):
         super().__init__()
 
 
-class DEC(Instr, x=0):
+# INC and DEC, told apart by the z= of their register forms, the
+# register-pair forms repeating the choice in q.
+class _IncDec(Instr, x=0):
     def __init__(self, arg: Reg | At) -> None:
         super().__init__(arg)
 
+        z = self._z
+        assert z is not None
+
         op = self.ops[0]
-        # DEC r[y]
+        # INC/DEC r[y]
         if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
             assert isinstance(op, Reg) and op._code is not None
-            self._y, self._z = op._code, 5
+            self._y = op._code
             self._prefix = op._prefix
         elif isinstance(op, At) and op.ops[0] is HL:
-            self._y, self._z = 6, 5
-        # DEC rp[p]
+            self._y = 6
+        # INC/DEC rp[p]
         elif op in (BC, DE, HL, SP, IX, IY):
             assert isinstance(op, Reg) and op._code is not None
-            self._y, self._z = op._code << 1 | 1, 3
+            self._y, self._z = op._code << 1 | (z - 4), 3
             self._prefix = op._prefix
-        # TODO: Encode DEC (ix/iy + d).
+        # TODO: Encode INC/DEC (ix/iy + d).
         elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
                 op.ops[0].ops[0] in (IX, IY)):
             pass
         else:
             raise InvalidInstr(self)
+
+
+class DEC(_IncDec, z=5):
+    pass
+
+
+class INC(_IncDec, z=4):
+    pass
 
 
 class DI(Instr, x=3, y=6, z=3):
@@ -750,31 +768,6 @@ class INI(Instr, prefix=0xed, x=2, y=4, z=2):
 class INIR(Instr, prefix=0xed, x=2, y=6, z=2):
     def __init__(self) -> None:
         super().__init__()
-
-
-class INC(Instr, x=0):
-    def __init__(self, arg: Reg | At) -> None:
-        super().__init__(arg)
-
-        op = self.ops[0]
-        # INC r[y]
-        if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
-            assert isinstance(op, Reg) and op._code is not None
-            self._y, self._z = op._code, 4
-            self._prefix = op._prefix
-        elif isinstance(op, At) and op.ops[0] is HL:
-            self._y, self._z = 6, 4
-        # INC rp[p]
-        elif op in (BC, DE, HL, SP, IX, IY):
-            assert isinstance(op, Reg) and op._code is not None
-            self._y, self._z = op._code << 1, 3
-            self._prefix = op._prefix
-        # TODO: Encode INC (ix/iy + d).
-        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
-                op.ops[0].ops[0] in (IX, IY)):
-            pass
-        else:
-            raise InvalidInstr(self)
 
 
 class JP(JumpInstr):
@@ -962,11 +955,11 @@ class OTIR(Instr, prefix=0xed, x=2, y=6, z=3):
         super().__init__()
 
 
-class POP(Instr, x=3, z=1):
+# PUSH rp2[p] and POP rp2[p], told apart by z.
+class _PushPop(Instr, x=3):
     def __init__(self, rp: Reg) -> None:
         super().__init__(rp)
 
-        # POP rp2[p]
         if rp in (BC, DE, HL, AF, IX, IY):
             assert rp._code is not None
             self._y = rp._code << 1
@@ -975,17 +968,12 @@ class POP(Instr, x=3, z=1):
             raise InvalidInstr(self)
 
 
-class PUSH(Instr, x=3, z=5):
-    def __init__(self, rp: Reg) -> None:
-        super().__init__(rp)
+class POP(_PushPop, z=1):
+    pass
 
-        # PUSH rp2[p]
-        if rp in (BC, DE, HL, AF, IX, IY):
-            assert rp._code is not None
-            self._y = rp._code << 1
-            self._prefix = rp._prefix
-        else:
-            raise InvalidInstr(self)
+
+class PUSH(_PushPop, z=5):
+    pass
 
 
 class RES(Instr):
