@@ -846,5 +846,13 @@ class XOR(Instr):
 # whose whole effect, selecting the index register, the following
 # prefix overwrites -- the last prefix of a chain wins. The operand
 # is the prefix byte.
-class XPREFIX(Instr):
-    pass
+class XPREFIX(Instr, x=3, z=5):
+    def __init__(self, value: Value) -> None:
+        super().__init__(value)
+
+        v = Expr._evaluate_op(self.ops[0])
+        if v not in (0xdd, 0xfd):
+            raise InstrError(self, 'The prefix byte must be '
+                             '0xdd or 0xfd.')
+
+        self._y = 3 if v == 0xdd else 7

@@ -58,6 +58,8 @@ _TESTS = (
     (z80.IM(0), b'\xed\x46'),
     (z80.IM(1), b'\xed\x56'),
     (z80.IM(2), b'\xed\x5e'),
+    (z80.XPREFIX(0xdd), b'\xdd'),
+    (z80.XPREFIX(0xfd), b'\xfd'),
 )
 
 
@@ -80,6 +82,10 @@ def test_no_such_form() -> None:
     with pytest.raises(z80.InstrError,
                        match='The mode must be 0, 1 or 2.'):
         z80.IM(3)
+
+    with pytest.raises(z80.InstrError,
+                       match='The prefix byte must be 0xdd or 0xfd.'):
+        z80.XPREFIX(0x12)
 
 
 def test_no_encoding() -> None:
