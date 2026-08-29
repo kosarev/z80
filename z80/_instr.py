@@ -119,6 +119,7 @@ __all__ = [
     'H',
     'IReg',
     'IndexReg',
+    'Instr',
     'JumpInstr',
     'L',
     'M',
@@ -428,17 +429,33 @@ class Neg(UnaryExpr):
         return -self._evaluate_op(op)
 
 
-# Base class for all instructions.
+# Base class for all instructions. Operand-free instructions
+# state their fixed encoding as the opcode= class parameter, with
+# the prefix byte, where there is one, as prefix=.
 class Instr:
     addr: int | None
     size: int | None
     origin: _SourcePos | None
+
+    __opcode: typing.ClassVar[int | None] = None
+    __prefix: typing.ClassVar[int | None] = None
+
+    def __init_subclass__(cls, *, opcode: int | None = None,
+                          prefix: int | None = None) -> None:
+        super().__init_subclass__()
+
+        cls.__opcode = opcode
+        cls.__prefix = prefix
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
         self.addr = None
         self.size = None
         self.ops = tuple(_cast_op(op) for op in ops)
         self.origin = None
+
+        # Operand-free instructions accept no operands.
+        if self.__opcode is not None and self.ops:
+            raise Error(f'No such instruction form: {str(self)!r}.')
 
     def __repr__(self) -> str:
         return (type(self).__name__ +
@@ -449,6 +466,21 @@ class Instr:
         if self.ops:
             s += ' ' + ', '.join(str(op) for op in self.ops)
         return s
+
+    # The bytes of the instruction. The address is only consulted
+    # where the encoding depends on it, as with relative jump
+    # displacements.
+    def encode(self, addr: int | None = None) -> bytes:
+        opcode = self.__opcode
+        if opcode is not None:
+            image = []
+            if self.__prefix is not None:
+                image.append(self.__prefix)
+
+            image.append(opcode)
+            return bytes(image)
+
+        raise Error(f'No encoding for {str(self)!r}.')
 
 
 # TODO: This only exists because the instruction-building facility
@@ -511,7 +543,7 @@ class CALL(CallInstr):
     pass
 
 
-class CCF(Instr):
+class CCF(Instr, opcode=0x3f):
     pass
 
 
@@ -519,27 +551,27 @@ class CP(Instr):
     pass
 
 
-class CPD(Instr):
+class CPD(Instr, prefix=0xed, opcode=0xa9):
     pass
 
 
-class CPDR(Instr):
+class CPDR(Instr, prefix=0xed, opcode=0xb9):
     pass
 
 
-class CPI(Instr):
+class CPI(Instr, prefix=0xed, opcode=0xa1):
     pass
 
 
-class CPIR(Instr):
+class CPIR(Instr, prefix=0xed, opcode=0xb1):
     pass
 
 
-class CPL(Instr):
+class CPL(Instr, opcode=0x2f):
     pass
 
 
-class DAA(Instr):
+class DAA(Instr, opcode=0x27):
     pass
 
 
@@ -547,7 +579,7 @@ class DEC(Instr):
     pass
 
 
-class DI(Instr):
+class DI(Instr, opcode=0xf3):
     pass
 
 
@@ -555,7 +587,7 @@ class DJNZ(JumpInstr):
     pass
 
 
-class EI(Instr):
+class EI(Instr, opcode=0xfb):
     pass
 
 
@@ -563,11 +595,11 @@ class EX(Instr):
     pass
 
 
-class EXX(Instr):
+class EXX(Instr, opcode=0xd9):
     pass
 
 
-class HALT(Instr):
+class HALT(Instr, opcode=0x76):
     pass
 
 
@@ -583,19 +615,19 @@ class IN(Instr):
     pass
 
 
-class IND(Instr):
+class IND(Instr, prefix=0xed, opcode=0xaa):
     pass
 
 
-class INDR(Instr):
+class INDR(Instr, prefix=0xed, opcode=0xba):
     pass
 
 
-class INI(Instr):
+class INI(Instr, prefix=0xed, opcode=0xa2):
     pass
 
 
-class INIR(Instr):
+class INIR(Instr, prefix=0xed, opcode=0xb2):
     pass
 
 
@@ -619,23 +651,23 @@ class XLD(Instr):
     pass
 
 
-class LDD(Instr):
+class LDD(Instr, prefix=0xed, opcode=0xa8):
     pass
 
 
-class LDDR(Instr):
+class LDDR(Instr, prefix=0xed, opcode=0xb8):
     pass
 
 
-class LDI(Instr):
+class LDI(Instr, prefix=0xed, opcode=0xa0):
     pass
 
 
-class LDIR(Instr):
+class LDIR(Instr, prefix=0xed, opcode=0xb0):
     pass
 
 
-class NEG(Instr):
+class NEG(Instr, prefix=0xed, opcode=0x44):
     pass
 
 
@@ -643,7 +675,7 @@ class XNEG(Instr):
     pass
 
 
-class NOP(Instr):
+class NOP(Instr, opcode=0x00):
     pass
 
 
@@ -659,19 +691,19 @@ class OUT(Instr):
     pass
 
 
-class OUTD(Instr):
+class OUTD(Instr, prefix=0xed, opcode=0xab):
     pass
 
 
-class OTDR(Instr):
+class OTDR(Instr, prefix=0xed, opcode=0xbb):
     pass
 
 
-class OUTI(Instr):
+class OUTI(Instr, prefix=0xed, opcode=0xa3):
     pass
 
 
-class OTIR(Instr):
+class OTIR(Instr, prefix=0xed, opcode=0xb3):
     pass
 
 
@@ -691,7 +723,7 @@ class RET(RetInstr):
     pass
 
 
-class RETN(RetInstr):
+class RETN(RetInstr, prefix=0xed, opcode=0x45):
     pass
 
 
@@ -699,7 +731,7 @@ class XRETN(RetInstr):
     pass
 
 
-class RETI(RetInstr):
+class RETI(RetInstr, prefix=0xed, opcode=0x4d):
     pass
 
 
@@ -707,7 +739,7 @@ class RL(Instr):
     pass
 
 
-class RLA(Instr):
+class RLA(Instr, opcode=0x17):
     pass
 
 
@@ -715,11 +747,11 @@ class RLC(Instr):
     pass
 
 
-class RLCA(Instr):
+class RLCA(Instr, opcode=0x07):
     pass
 
 
-class RLD(Instr):
+class RLD(Instr, prefix=0xed, opcode=0x6f):
     pass
 
 
@@ -727,11 +759,11 @@ class RR(Instr):
     pass
 
 
-class RRA(Instr):
+class RRA(Instr, opcode=0x1f):
     pass
 
 
-class RRD(Instr):
+class RRD(Instr, prefix=0xed, opcode=0x67):
     pass
 
 
@@ -739,7 +771,7 @@ class RRC(Instr):
     pass
 
 
-class RRCA(Instr):
+class RRCA(Instr, opcode=0x0f):
     pass
 
 
@@ -751,7 +783,7 @@ class SBC(Instr):
     pass
 
 
-class SCF(Instr):
+class SCF(Instr, opcode=0x37):
     pass
 
 
