@@ -121,6 +121,7 @@ __all__ = [
     'IndexReg',
     'Instr',
     'InstrError',
+    'InvalidInstr',
     'JumpInstr',
     'L',
     'M',
@@ -494,6 +495,12 @@ class InstrError(Error):
         self.instr = instr
 
 
+# The operands match no form of the instruction.
+class InvalidInstr(InstrError):
+    def __init__(self, instr: Instr) -> None:
+        super().__init__(instr, 'No such instruction form.')
+
+
 # TODO: This only exists because the instruction-building facility
 # does not cover all codes yet; there is no such thing as an unknown
 # instruction otherwise. Replace with an assert once all codes are
@@ -627,7 +634,7 @@ class EX(Instr):
             self._x, self._y, self._z = 3, 4, 3
             self._prefix = b._prefix
         else:
-            raise InstrError(self, 'No such instruction form.')
+            raise InvalidInstr(self)
 
 
 class EXX(Instr, x=3, y=3, z=1):
@@ -692,21 +699,21 @@ class JP(JumpInstr):
         if len(self.ops) == 1 and isinstance(self.ops[0], At):
             r = self.ops[0].ops[0]
             if r not in (HL, IX, IY):
-                raise InstrError(self, 'No such instruction form.')
+                raise InvalidInstr(self)
 
             assert isinstance(r, Reg)
             self._x, self._y, self._z = 3, 5, 1
             self._prefix = r._prefix
             return
 
-        # JP nn and JP cc, nn, their encodings pending.
+        # TODO: Encode JP nn and JP cc, nn.
         if len(self.ops) == 1 and isinstance(self.ops[0], Expr):
             return
         if (len(self.ops) == 2 and isinstance(self.ops[0], CondFlag) and
                 isinstance(self.ops[1], Expr)):
             return
 
-        raise InstrError(self, 'No such instruction form.')
+        raise InvalidInstr(self)
 
 
 class JR(JumpInstr):
@@ -800,7 +807,19 @@ class RES(Instr):
 
 
 class RET(RetInstr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        # RET
+        if not self.ops:
+            self._x, self._y, self._z = 3, 1, 1
+            return
+
+        # TODO: Encode RET cc.
+        if len(self.ops) == 1 and isinstance(self.ops[0], CondFlag):
+            return
+
+        raise InvalidInstr(self)
 
 
 class RETN(RetInstr, prefix=0xed, x=1, y=0, z=5):

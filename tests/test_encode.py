@@ -68,6 +68,7 @@ _TESTS = (
     (z80.JP(z80.At(z80.HL)), b'\xe9'),
     (z80.JP(z80.At(z80.IX)), b'\xdd\xe9'),
     (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
+    (z80.RET(), b'\xc9'),
 )
 
 
@@ -95,19 +96,19 @@ def test_no_such_form() -> None:
                        match='The prefix byte must be 0xdd or 0xfd.'):
         z80.XPREFIX(0x12)
 
-    with pytest.raises(z80.InstrError,
-                       match='No such instruction form.') as exc_info:
+    with pytest.raises(z80.InvalidInstr) as exc_info:
         z80.EX(z80.HL, z80.DE)
 
     assert str(exc_info.value.instr) == 'ex hl, de'
 
-    with pytest.raises(z80.InstrError,
-                       match='No such instruction form.'):
+    with pytest.raises(z80.InvalidInstr):
         z80.JP(z80.At(z80.BC))
 
-    with pytest.raises(z80.InstrError,
-                       match='No such instruction form.'):
+    with pytest.raises(z80.InvalidInstr):
         z80.JP(z80.HL)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.RET(z80.HL)
 
 
 def test_no_encoding() -> None:
