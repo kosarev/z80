@@ -122,10 +122,13 @@ __all__ = [
     'JumpInstr',
     'L',
     'M',
+    'Neg',
     'P',
     'R',
     'RetInstr',
+    'Sub',
     'Symbol',
+    'UnaryExpr',
     'UnknownInstr',
     'Z',
 ]
@@ -335,8 +338,34 @@ class Const(Expr):
 
 
 class BinaryExpr(Expr):
+    _sign: str
+
+    def __init_subclass__(cls, *, sign: str) -> None:
+        super().__init_subclass__()
+        cls._sign = sign
+
     def __init__(self, a: int | Op, b: int | Op) -> None:
         super().__init__(a, b)
+
+    def __str__(self) -> str:
+        a, b = tuple(self.ops)
+
+        # A negative constant operand renders under the opposite
+        # sign; a compound right operand renders parenthesised.
+        sign = self._sign
+        b_str = f'{b}'
+        if isinstance(b, Const) and b.value < 0:
+            sign = '-' if sign == '+' else '+'
+            b_str = f'{Const(-b.value)}'
+        elif isinstance(b, BinaryExpr):
+            b_str = f'({b})'
+
+        return f'{a} {sign} {b_str}'
+
+
+class UnaryExpr(Expr):
+    def __init__(self, op: int | Op) -> None:
+        super().__init__(op)
 
 
 # A named value, possibly not defined yet.
@@ -374,20 +403,29 @@ class At:
         return f'({op})'
 
 
-class Add(BinaryExpr):
-    def __str__(self) -> str:
-        a, b = tuple(self.ops)
-
-        sign = '+'
-        if isinstance(b, Const) and b.value < 0:
-            sign = '-'
-            b = Const(-b.value)
-
-        return f'{a} {sign} {b}'
-
+class Add(BinaryExpr, sign='+'):
     def evaluate(self) -> int:
         a, b = tuple(self.ops)
         return self._evaluate_op(a) + self._evaluate_op(b)
+
+
+class Sub(BinaryExpr, sign='-'):
+    def evaluate(self) -> int:
+        a, b = tuple(self.ops)
+        return self._evaluate_op(a) - self._evaluate_op(b)
+
+
+class Neg(UnaryExpr):
+    def __str__(self) -> str:
+        op, = tuple(self.ops)
+        if isinstance(op, BinaryExpr):
+            return f'-({op})'
+
+        return f'-{op}'
+
+    def evaluate(self) -> int:
+        op, = tuple(self.ops)
+        return -self._evaluate_op(op)
 
 
 # Base class for all instructions.

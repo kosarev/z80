@@ -66,6 +66,37 @@ def test_non_value_evaluation() -> None:
         z80.Add(z80.IX, 5).evaluate()
 
 
+def test_sub() -> None:
+    s = z80.Symbol('main', 0x8000)
+    e = z80.Sub(s, 5)
+    assert isinstance(e, z80.BinaryExpr)
+    assert str(e) == 'main - 0x5'
+    assert repr(e) == "Sub(Symbol('main', 32768), Const(5))"
+    assert e.evaluate() == 0x7ffb
+
+    # A negative constant renders under the opposite sign.
+    assert str(z80.Sub(s, -5)) == 'main + 0x5'
+
+    # A compound right operand renders parenthesised.
+    e = z80.Sub(s, z80.Add(s, 1))
+    assert str(e) == 'main - (main + 0x1)'
+    assert e.evaluate() == -1
+
+
+def test_neg() -> None:
+    s = z80.Symbol('main', 0x8000)
+    n = z80.Neg(s)
+    assert isinstance(n, z80.UnaryExpr)
+    assert isinstance(n, z80.Expr)
+    assert str(n) == '-main'
+    assert repr(n) == "Neg(Symbol('main', 32768))"
+    assert n.evaluate() == -0x8000
+
+    assert str(z80.Neg(5)) == '-0x5'
+    assert str(z80.Neg(z80.Add(s, 1))) == '-(main + 0x1)'
+    assert z80.Neg(z80.Add(s, 1)).evaluate() == -0x8001
+
+
 def test_op_casting() -> None:
     i = z80.LD(z80.A, 5)
     assert repr(i) == 'LD(A, Const(5))'
