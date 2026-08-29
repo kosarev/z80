@@ -664,7 +664,28 @@ class XIM(Instr):
 
 
 class IN(Instr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        # IN (C)
+        if (len(self.ops) == 1 and isinstance(self.ops[0], At) and
+                self.ops[0].ops[0] is C):
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, 6, 0
+            return
+
+        if len(self.ops) == 2:
+            a, b = self.ops
+            # TODO: Encode IN r, (C).
+            if (a in (B, C, D, E, H, L, A) and
+                    isinstance(b, At) and b.ops[0] is C):
+                return
+            # TODO: Encode IN A, (n).
+            if (a is A and isinstance(b, At) and
+                    isinstance(b.ops[0], Expr)):
+                return
+
+        raise InvalidInstr(self)
 
 
 class IND(Instr, prefix=0xed, x=2, y=5, z=2):

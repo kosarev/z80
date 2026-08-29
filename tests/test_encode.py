@@ -69,6 +69,7 @@ _TESTS = (
     (z80.JP(z80.At(z80.IX)), b'\xdd\xe9'),
     (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
     (z80.RET(), b'\xc9'),
+    (z80.IN(z80.At(z80.C)), b'\xed\x70'),
 )
 
 
@@ -109,6 +110,12 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.RET(z80.HL)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.IN(z80.B, z80.At(0x12))
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.IN(z80.At(z80.B))
 
 
 def test_no_encoding() -> None:
