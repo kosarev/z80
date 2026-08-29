@@ -916,8 +916,17 @@ class OTIR(Instr, prefix=0xed, x=2, y=6, z=3):
         super().__init__()
 
 
-class POP(Instr):
-    pass
+class POP(Instr, x=3, z=1):
+    def __init__(self, rp: Reg) -> None:
+        super().__init__(rp)
+
+        # POP rp2[p]
+        if rp in (BC, DE, HL, AF, IX, IY):
+            assert rp._code is not None
+            self._y = rp._code << 1
+            self._prefix = rp._prefix
+        else:
+            raise InvalidInstr(self)
 
 
 class PUSH(Instr, x=3, z=5):
