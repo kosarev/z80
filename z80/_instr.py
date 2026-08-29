@@ -8,6 +8,7 @@
 
 import typing
 
+from ._error import Error
 from ._source import _SourcePos
 
 # The public vocabulary re-exported by the package's __init__. This is the
@@ -111,6 +112,7 @@ __all__ = [
     'BinaryExpr',
     'C',
     'CallInstr',
+    'Const',
     'D',
     'E',
     'Expr',
@@ -123,6 +125,7 @@ __all__ = [
     'P',
     'R',
     'RetInstr',
+    'Symbol',
     'UnknownInstr',
     'Z',
 ]
@@ -297,16 +300,72 @@ class Expr:
     ops: list[Op]
 
     def __init__(self, *ops: Op) -> None:
-        self.ops = list(ops)
+        # Numeric leaves cast to Const nodes automatically, so
+        # trees are closed under Expr modulo the addressing
+        # forms.
+        self.ops = [Const(op) if isinstance(op, int) else op
+                    for op in ops]
 
     def __repr__(self) -> str:
         return (type(self).__name__ +
                 '(' + ', '.join(repr(op) for op in self.ops) + ')')
 
+    def evaluate(self) -> int:
+        raise NotImplementedError()
+
+    # The value of a subexpression. Registers and other non-value
+    # operands can only appear in addressing forms, which are no
+    # subject of expression evaluation.
+    @staticmethod
+    def _evaluate_op(op: Op) -> int:
+        if not isinstance(op, Expr):
+            raise Error(f'{_str_op(op)!r} is not a value.')
+
+        return op.evaluate()
+
+
+# A constant value leaf.
+class Const(Expr):
+    def __init__(self, value: int) -> None:
+        super().__init__()
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f'Const({self.value!r})'
+
+    def __str__(self) -> str:
+        return _str_op(self.value)
+
+    def evaluate(self) -> int:
+        return self.value
+
 
 class BinaryExpr(Expr):
     def __init__(self, a: Op, b: Op) -> None:
         super().__init__(a, b)
+
+
+# A named value, possibly not defined yet.
+class Symbol(Expr):
+    def __init__(self, name: str, value: int | None = None) -> None:
+        super().__init__()
+        self.name = name
+        self.value = value
+
+    def __repr__(self) -> str:
+        if self.value is None:
+            return f'Symbol({self.name!r})'
+
+        return f'Symbol({self.name!r}, {self.value!r})'
+
+    def __str__(self) -> str:
+        return self.name
+
+    def evaluate(self) -> int:
+        if self.value is None:
+            raise Error(f'Undefined symbol {self.name!r}.')
+
+        return self.value
 
 
 class At:
@@ -326,11 +385,15 @@ class Add(BinaryExpr):
         a, b = tuple(self.ops)
 
         sign = '+'
-        if isinstance(b, int) and b < 0:
+        if isinstance(b, Const) and b.value < 0:
             sign = '-'
-            b = -b
+            b = Const(-b.value)
 
         return f'{_str_op(a)} {sign} {_str_op(b)}'
+
+    def evaluate(self) -> int:
+        a, b = tuple(self.ops)
+        return self._evaluate_op(a) + self._evaluate_op(b)
 
 
 # Base class for all instructions.
