@@ -85,6 +85,9 @@ _TESTS = (
     (z80.XNEG(0xed4c), b'\xed\x4c'),
     (z80.XNEG(0xed54), b'\xed\x54'),
     (z80.XNEG(0xed7c), b'\xed\x7c'),
+    (z80.XRETN(0xed55), b'\xed\x55'),
+    (z80.XRETN(0xed5d), b'\xed\x5d'),
+    (z80.XRETN(0xed7d), b'\xed\x7d'),
 )
 
 
@@ -156,6 +159,13 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.XNEG(0xed4d)
+
+    # ED 45 is the true retn and ED 4D is reti.
+    with pytest.raises(z80.InvalidInstr):
+        z80.XRETN(0xed45)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.XRETN(0xed4d)
 
 
 def test_no_encoding() -> None:

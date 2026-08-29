@@ -915,8 +915,18 @@ class RETN(RetInstr, prefix=0xed, x=1, y=0, z=5):
         super().__init__()
 
 
-class XRETN(RetInstr):
-    pass
+class XRETN(RetInstr, prefix=0xed, x=1, z=5):
+    def __init__(self, encoding: Value) -> None:
+        super().__init__(encoding)
+
+        # The duplicate retn encodings: ED 55, 5D, ..., 7D. ED 45
+        # is the true retn and ED 4D is reti.
+        v = Expr._evaluate_op(self.ops[0])
+        y = (v >> 3) & 7
+        if v >> 8 != 0xed or v & 0xc7 != 0x45 or y in (0, 1):
+            raise InvalidInstr(self)
+
+        self._y = y
 
 
 class RETI(RetInstr, prefix=0xed, x=1, y=1, z=5):
