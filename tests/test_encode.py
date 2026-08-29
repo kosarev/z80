@@ -71,6 +71,17 @@ _TESTS = (
     (z80.RET(), b'\xc9'),
     (z80.IN(z80.At(z80.C)), b'\xed\x70'),
     (z80.OUT(z80.At(z80.C), 0), b'\xed\x71'),
+    (z80.LD(z80.A, z80.At(z80.BC)), b'\x0a'),
+    (z80.LD(z80.A, z80.At(z80.DE)), b'\x1a'),
+    (z80.LD(z80.At(z80.BC), z80.A), b'\x02'),
+    (z80.LD(z80.At(z80.DE), z80.A), b'\x12'),
+    (z80.LD(z80.SP, z80.HL), b'\xf9'),
+    (z80.LD(z80.SP, z80.IX), b'\xdd\xf9'),
+    (z80.LD(z80.SP, z80.IY), b'\xfd\xf9'),
+    (z80.LD(z80.IReg, z80.A), b'\xed\x47'),
+    (z80.LD(z80.R, z80.A), b'\xed\x4f'),
+    (z80.LD(z80.A, z80.IReg), b'\xed\x57'),
+    (z80.LD(z80.A, z80.R), b'\xed\x5f'),
 )
 
 
@@ -123,6 +134,18 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.OUT(z80.At(0x12), z80.B)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.IReg, z80.B)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.HL, z80.DE)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.B, z80.HL)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.HL, z80.B)
 
 
 def test_no_encoding() -> None:

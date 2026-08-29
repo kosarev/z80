@@ -742,7 +742,46 @@ class JR(JumpInstr):
 
 
 class LD(Instr):
-    pass
+    def __init__(self, a: Op, b: int | Op) -> None:
+        super().__init__(a, b)
+
+        b = self.ops[1]
+
+        # LD A, (BC)/(DE) and the store counterparts.
+        if a is A and isinstance(b, At) and b.ops[0] is BC:
+            self._x, self._y, self._z = 0, 1, 2
+        elif a is A and isinstance(b, At) and b.ops[0] is DE:
+            self._x, self._y, self._z = 0, 3, 2
+        elif isinstance(a, At) and a.ops[0] is BC and b is A:
+            self._x, self._y, self._z = 0, 0, 2
+        elif isinstance(a, At) and a.ops[0] is DE and b is A:
+            self._x, self._y, self._z = 0, 2, 2
+        # LD SP, HL and the ix/iy forms.
+        elif a is SP and b in (HL, IX, IY):
+            assert isinstance(b, Reg)
+            self._x, self._y, self._z = 3, 7, 1
+            self._prefix = b._prefix
+        # The I and R transfers.
+        elif a is IReg and b is A:
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, 0, 7
+        elif a is R and b is A:
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, 1, 7
+        elif a is A and b is IReg:
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, 2, 7
+        elif a is A and b is R:
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, 3, 7
+        # I and R transfer with A only, and no register-pair
+        # transfers exist beyond the SP forms above.
+        elif (a in (IReg, R) or b in (IReg, R) or
+                (isinstance(a, Reg16) and isinstance(b, Reg)) or
+                (isinstance(a, Reg) and isinstance(b, Reg16))):
+            raise InvalidInstr(self)
+
+        # TODO: Encode the remaining ld forms.
 
 
 class XLD(Instr):
