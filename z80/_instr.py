@@ -792,7 +792,26 @@ class OR(Instr):
 
 
 class OUT(Instr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        if len(self.ops) == 2:
+            a, b = self.ops
+            if isinstance(a, At) and a.ops[0] is C:
+                # OUT (C), 0
+                if isinstance(b, Const) and b.value == 0:
+                    self._prefix = b'\xed'
+                    self._x, self._y, self._z = 1, 6, 1
+                    return
+                # TODO: Encode OUT (C), r.
+                if b in (B, C, D, E, H, L, A):
+                    return
+            # TODO: Encode OUT (n), A.
+            if (isinstance(a, At) and isinstance(a.ops[0], Expr) and
+                    b is A):
+                return
+
+        raise InvalidInstr(self)
 
 
 class OUTD(Instr, prefix=0xed, x=2, y=5, z=3):
