@@ -46,6 +46,15 @@ _TESTS = (
     (z80.CPDR(), b'\xed\xb9'),
     (z80.INDR(), b'\xed\xba'),
     (z80.OTDR(), b'\xed\xbb'),
+    (z80.RST(0x00), b'\xc7'),
+    (z80.RST(0x08), b'\xcf'),
+    (z80.RST(0x10), b'\xd7'),
+    (z80.RST(0x18), b'\xdf'),
+    (z80.RST(0x20), b'\xe7'),
+    (z80.RST(0x28), b'\xef'),
+    (z80.RST(0x30), b'\xf7'),
+    (z80.RST(0x38), b'\xff'),
+    (z80.RST(z80.Symbol('main', 0x28)), b'\xef'),
 )
 
 
@@ -54,6 +63,20 @@ def test_encode(instr: z80.Instr, image: bytes) -> None:
     assert instr.encode() == image
 
 
+def test_no_such_form() -> None:
+    with pytest.raises(z80.InstrError,
+                       match='The target must be one of '
+                             r'0x00, 0x08, \.\.\., 0x38.') as exc_info:
+        z80.RST(0x29)
+
+    assert str(exc_info.value.instr) == 'rst 0x29'
+
+    with pytest.raises(z80.Error, match="Undefined symbol 'main'."):
+        z80.RST(z80.Symbol('main'))
+
+
 def test_no_encoding() -> None:
-    with pytest.raises(z80.Error, match="No encoding for 'ld a, b'."):
+    with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
         z80.LD(z80.A, z80.B).encode()
+
+    assert str(exc_info.value.instr) == 'ld a, b'

@@ -120,6 +120,7 @@ __all__ = [
     'IReg',
     'IndexReg',
     'Instr',
+    'InstrError',
     'JumpInstr',
     'L',
     'M',
@@ -291,6 +292,10 @@ class SP(metaclass=Reg16):
 
 Op: typing.TypeAlias = typing.Union[str, Reg, CondFlag, 'At', 'Expr']
 
+# A value operand: an expression, or a plain integer standing for
+# a constant.
+Value: typing.TypeAlias = typing.Union[int, 'Expr']
+
 
 # How plain integers enter the operand domain.
 def _cast_op(op: int | Op) -> Op:
@@ -435,20 +440,21 @@ class Instr:
     size: int | None
     origin: _SourcePos | None
 
-    __x: typing.ClassVar[int | None] = None
-    __y: typing.ClassVar[int | None] = None
-    __z: typing.ClassVar[int | None] = None
-    __prefix: typing.ClassVar[bytes] = b''
+    _x: int | None = None
+    _y: int | None = None
+    _z: int | None = None
+    _prefix: bytes = b''
 
     def __init_subclass__(cls, *, x: int | None = None,
                           y: int | None = None, z: int | None = None,
                           prefix: int | None = None) -> None:
         super().__init_subclass__()
 
-        cls.__x = x
-        cls.__y = y
-        cls.__z = z
-        cls.__prefix = b'' if prefix is None else bytes((prefix,))
+        cls._x = x
+        cls._y = y
+        cls._z = z
+        if prefix is not None:
+            cls._prefix = bytes((prefix,))
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
         self.addr = None
@@ -470,11 +476,20 @@ class Instr:
     # where the encoding depends on it, as with relative jump
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
-        x, y, z = self.__x, self.__y, self.__z
+        x, y, z = self._x, self._y, self._z
         if x is not None and y is not None and z is not None:
-            return self.__prefix + bytes((x << 6 | y << 3 | z,))
+            return self._prefix + bytes((x << 6 | y << 3 | z,))
 
-        raise Error(f'No encoding for {str(self)!r}.')
+        raise InstrError(self, 'No encoding.')
+
+
+# An error about a specific instruction. The instruction is
+# carried as constructed, for the reporting code to verbalise as
+# needed.
+class InstrError(Error):
+    def __init__(self, instr: Instr, reason: str) -> None:
+        super().__init__(reason)
+        self.instr = instr
 
 
 # TODO: This only exists because the instruction-building facility
@@ -769,8 +784,18 @@ class RRCA(Instr, x=0, y=1, z=7):
     pass
 
 
-class RST(CallInstr):
-    pass
+class RST(CallInstr, x=3, z=7):
+    def __init__(self, target: Value) -> None:
+        super().__init__(target)
+
+        # RST y*8: the y field is the target, which therefore
+        # must be one of the eight encodable addresses.
+        addr = Expr._evaluate_op(self.ops[0])
+        if addr & ~0x38:
+            raise InstrError(self, 'The target must be one of '
+                             '0x00, 0x08, ..., 0x38.')
+
+        self._y = addr >> 3
 
 
 class SBC(Instr):
