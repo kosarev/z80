@@ -685,7 +685,28 @@ class INC(Instr):
 
 
 class JP(JumpInstr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        # JP (HL) and the ix/iy forms.
+        if len(self.ops) == 1 and isinstance(self.ops[0], At):
+            r = self.ops[0].ops[0]
+            if r not in (HL, IX, IY):
+                raise InstrError(self, 'No such instruction form.')
+
+            assert isinstance(r, Reg)
+            self._x, self._y, self._z = 3, 5, 1
+            self._prefix = r._prefix
+            return
+
+        # JP nn and JP cc, nn, their encodings pending.
+        if len(self.ops) == 1 and isinstance(self.ops[0], Expr):
+            return
+        if (len(self.ops) == 2 and isinstance(self.ops[0], CondFlag) and
+                isinstance(self.ops[1], Expr)):
+            return
+
+        raise InstrError(self, 'No such instruction form.')
 
 
 class JR(JumpInstr):

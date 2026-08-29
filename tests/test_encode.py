@@ -65,6 +65,9 @@ _TESTS = (
     (z80.EX(z80.At(z80.SP), z80.HL), b'\xe3'),
     (z80.EX(z80.At(z80.SP), z80.IX), b'\xdd\xe3'),
     (z80.EX(z80.At(z80.SP), z80.IY), b'\xfd\xe3'),
+    (z80.JP(z80.At(z80.HL)), b'\xe9'),
+    (z80.JP(z80.At(z80.IX)), b'\xdd\xe9'),
+    (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
 )
 
 
@@ -97,6 +100,14 @@ def test_no_such_form() -> None:
         z80.EX(z80.HL, z80.DE)
 
     assert str(exc_info.value.instr) == 'ex hl, de'
+
+    with pytest.raises(z80.InstrError,
+                       match='No such instruction form.'):
+        z80.JP(z80.At(z80.BC))
+
+    with pytest.raises(z80.InstrError,
+                       match='No such instruction form.'):
+        z80.JP(z80.HL)
 
 
 def test_no_encoding() -> None:
