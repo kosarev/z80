@@ -659,8 +659,21 @@ class IM(Instr, prefix=0xed, x=1, z=6):
         self._y = 0 if m == 0 else m + 1
 
 
-class XIM(Instr):
-    pass
+class XIM(Instr, prefix=0xed, x=1, z=6):
+    def __init__(self, encoding: Value, mode: Value) -> None:
+        super().__init__(encoding, mode)
+
+        # The duplicate im encodings: ED 4E, 66, 6E, 76 and 7E.
+        # The mode sits in y & 3 the same way the true encodings
+        # have it.
+        v = Expr._evaluate_op(self.ops[0])
+        m = Expr._evaluate_op(self.ops[1])
+        y = (v >> 3) & 7
+        if (v >> 8 != 0xed or v & 0xc7 != 0x46 or y in (0, 2, 3) or
+                m != (0 if y & 3 < 2 else (y & 3) - 1)):
+            raise InvalidInstr(self)
+
+        self._y = y
 
 
 class IN(Instr):

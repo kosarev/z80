@@ -88,6 +88,11 @@ _TESTS = (
     (z80.XRETN(0xed55), b'\xed\x55'),
     (z80.XRETN(0xed5d), b'\xed\x5d'),
     (z80.XRETN(0xed7d), b'\xed\x7d'),
+    (z80.XIM(0xed4e, 0), b'\xed\x4e'),
+    (z80.XIM(0xed66, 0), b'\xed\x66'),
+    (z80.XIM(0xed6e, 0), b'\xed\x6e'),
+    (z80.XIM(0xed76, 1), b'\xed\x76'),
+    (z80.XIM(0xed7e, 2), b'\xed\x7e'),
 )
 
 
@@ -166,6 +171,13 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.XRETN(0xed4d)
+
+    # ED 46 is a true im encoding, and ED 4E means mode 0.
+    with pytest.raises(z80.InvalidInstr):
+        z80.XIM(0xed46, 0)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.XIM(0xed4e, 1)
 
 
 def test_no_encoding() -> None:
