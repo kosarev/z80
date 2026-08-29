@@ -55,6 +55,9 @@ _TESTS = (
     (z80.RST(0x30), b'\xf7'),
     (z80.RST(0x38), b'\xff'),
     (z80.RST(z80.Symbol('main', 0x28)), b'\xef'),
+    (z80.IM(0), b'\xed\x46'),
+    (z80.IM(1), b'\xed\x56'),
+    (z80.IM(2), b'\xed\x5e'),
 )
 
 
@@ -73,6 +76,10 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.Error, match="Undefined symbol 'main'."):
         z80.RST(z80.Symbol('main'))
+
+    with pytest.raises(z80.InstrError,
+                       match='The mode must be 0, 1 or 2.'):
+        z80.IM(3)
 
 
 def test_no_encoding() -> None:

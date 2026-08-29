@@ -612,8 +612,16 @@ class HALT(Instr, x=1, y=6, z=6):
     pass
 
 
-class IM(Instr):
-    pass
+class IM(Instr, prefix=0xed, x=1, z=6):
+    def __init__(self, mode: Value) -> None:
+        super().__init__(mode)
+
+        # IM im[y], the modes sitting at y 0, 2 and 3.
+        m = Expr._evaluate_op(self.ops[0])
+        if m not in (0, 1, 2):
+            raise InstrError(self, 'The mode must be 0, 1 or 2.')
+
+        self._y = 0 if m == 0 else m + 1
 
 
 class XIM(Instr):
