@@ -102,6 +102,7 @@ from ._instr import (
     XNEG,
     XNOP,
     XOR,
+    XPREFIX,
     XRETN,
     A,
     Add,
@@ -550,10 +551,19 @@ class Z80InstrBuilder:
             # TODO: Too few bytes to disassemble this instruction.
             assert 0, image
 
+        # The core produces no text for an index prefix followed
+        # by another prefix. The prefix byte is a quantum of its
+        # own, and the last prefix of a chain wins, so decoding
+        # resumes at the following byte.
+        if original_text == '':
+            assert image[0] in (0xdd, 0xfd), image
+            instr: Instr = XPREFIX(image[0])
+            instr.addr = addr
+            instr.size = 1
+            return instr
+
         try:
             text = original_text.split(maxsplit=1)
-
-            assert len(text) > 0, (original_text, image)
             name = text.pop(0)
 
             if name not in self.__INSTRS:

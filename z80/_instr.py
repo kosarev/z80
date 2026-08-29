@@ -102,6 +102,7 @@ __all__ = [
     'XNEG',
     'XNOP',
     'XOR',
+    'XPREFIX',
     'XRETN',
     'A',
     'Add',
@@ -671,4 +672,12 @@ class SUB(Instr):
 
 
 class XOR(Instr):
+    pass
+
+
+# An index prefix followed by another prefix: a one-byte quantum
+# whose whole effect, selecting the index register, the following
+# prefix overwrites -- the last prefix of a chain wins. The operand
+# is the prefix byte.
+class XPREFIX(Instr):
     pass

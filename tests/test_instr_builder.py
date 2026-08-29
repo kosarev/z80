@@ -54,3 +54,31 @@ def test_instr_builder(code: bytes, text: str) -> None:
         pytest.fail(f'unknown instruction: {instr.text}')
 
     assert str(instr) == text
+
+
+# An index prefix followed by another prefix decodes as a quantum
+# of its own, and the last prefix of the chain wins.
+_PREFIX_CHAIN_TESTS = (
+    (b'\xdd\xdd\x21\x34\x12', ('xprefix 0xdd', 'ld ix, 0x1234')),
+    (b'\xdd\xfd\x21\x34\x12', ('xprefix 0xdd', 'ld iy, 0x1234')),
+    (b'\xfd\xdd\x21\x34\x12', ('xprefix 0xfd', 'ld ix, 0x1234')),
+    (b'\xfd\xfd\x21\x34\x12', ('xprefix 0xfd', 'ld iy, 0x1234')),
+    (b'\xdd\xfd\xdd\x21\x34\x12',
+     ('xprefix 0xdd', 'xprefix 0xfd', 'ld ix, 0x1234')),
+)
+
+
+@pytest.mark.parametrize('code, texts', _PREFIX_CHAIN_TESTS)
+def test_prefix_chain(code: bytes, texts: tuple[str, ...]) -> None:
+    builder = z80.Z80InstrBuilder()
+    addr = 0
+    for text in texts:
+        instr = builder.build_instr(addr, code[addr:])
+        if text.startswith('xprefix'):
+            assert isinstance(instr, z80.XPREFIX)
+
+        assert str(instr) == text
+        assert isinstance(instr.size, int)
+        addr += instr.size
+
+    assert addr == len(code)
