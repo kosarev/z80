@@ -93,6 +93,11 @@ _TESTS = (
     (z80.XIM(0xed6e, 0), b'\xed\x6e'),
     (z80.XIM(0xed76, 1), b'\xed\x76'),
     (z80.XIM(0xed7e, 2), b'\xed\x7e'),
+    (z80.XNOP(0xed00), b'\xed\x00'),
+    (z80.XNOP(0xed77), b'\xed\x77'),
+    (z80.XNOP(0xed7f), b'\xed\x7f'),
+    (z80.XNOP(0xeda4), b'\xed\xa4'),
+    (z80.XNOP(0xedff), b'\xed\xff'),
 )
 
 
@@ -178,6 +183,13 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.XIM(0xed4e, 1)
+
+    # ED 44 is neg and ED A0 is ldi: assigned, so not xnops.
+    with pytest.raises(z80.InvalidInstr):
+        z80.XNOP(0xed44)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.XNOP(0xeda0)
 
 
 def test_no_encoding() -> None:

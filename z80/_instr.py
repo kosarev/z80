@@ -844,8 +844,23 @@ class NOP(Instr, x=0, y=0, z=0):
         super().__init__()
 
 
-class XNOP(Instr):
-    pass
+class XNOP(Instr, prefix=0xed):
+    def __init__(self, encoding: Value) -> None:
+        super().__init__(encoding)
+
+        # The unassigned ED page encodings: the whole x=0 and x=3
+        # quarters, the x=2 quarter outside the block operations,
+        # and ED 77 and ED 7F within the otherwise fully assigned
+        # x=1 quarter.
+        v = Expr._evaluate_op(self.ops[0])
+        x, y, z = (v >> 6) & 3, (v >> 3) & 7, v & 7
+        if not (v >> 8 == 0xed and
+                (x in (0, 3) or
+                 (x == 2 and (z >= 4 or y < 4)) or
+                 (x == 1 and z == 7 and y in (6, 7)))):
+            raise InvalidInstr(self)
+
+        self._x, self._y, self._z = x, y, z
 
 
 class OR(Instr):
