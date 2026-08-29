@@ -110,6 +110,7 @@ from ._instr import (
     B,
     C,
     CallInstr,
+    Const,
     D,
     E,
     H,
@@ -503,7 +504,7 @@ class Z80InstrBuilder:
         'sp': SP,
     }
 
-    def __build_op(self, addr: int, text: str) -> Op:
+    def __build_op(self, addr: int, text: str) -> int | Op:
         if text.startswith('R('):
             text = text[1:]
 
@@ -514,7 +515,7 @@ class Z80InstrBuilder:
         # Base operand.
         # TODO: Have a proper base class for operand objects other than
         # primitive integers and strings.
-        op: Op
+        op: int | Op
         if text in self.__OPS:
             op = self.__OPS[text]
             text = ''
@@ -929,12 +930,12 @@ class _Disasm:
                 tag, 'Jump and call targets are references already.')
 
         ops = instr.ops
-        if (len(ops) != 2 or not isinstance(ops[1], int) or
+        if (len(ops) != 2 or not isinstance(ops[1], Const) or
                 not isinstance(ops[0], Reg16)):
             raise _DisasmError(
                 tag, 'No immediate operand to refer with.')
 
-        return ops[1]
+        return ops[1].value
 
     # Makes the referenced address an instruction, where the
     # reference says it is code. Runs once the tagged instruction
@@ -1070,11 +1071,13 @@ class _Disasm:
             # code; rst targets are encoded in the opcode and
             # reference theirs implicitly.
             jump_target = instr.target
+            target_addr: int | None = None
             if not isinstance(jump_target, At):
-                assert isinstance(jump_target, int)
+                assert isinstance(jump_target, Const)
+                target_addr = jump_target.value
                 if not isinstance(instr, RST):
-                    self.__mark_code_target(jump_target, tag)
-                self.add_tags(_DisasmTag(instr.origin, jump_target))
+                    self.__mark_code_target(target_addr, tag)
+                self.add_tags(_DisasmTag(instr.origin, target_addr))
 
             # Calls are assumed to return, and conditional jumps
             # may fall through.  An unconditional call obeys its
@@ -1088,8 +1091,8 @@ class _Disasm:
                 fallthrough_addr: int | None = next_addr
                 if (isinstance(instr, CallInstr) and
                         not instr.conditional and
-                        not isinstance(jump_target, At)):
-                    conv = self.__callconvs.get(jump_target)
+                        target_addr is not None):
+                    conv = self.__callconvs.get(target_addr)
                     if conv is not None:
                         fallthrough_addr = self.__get_fallthrough_addr(
                             conv, next_addr)
@@ -1248,10 +1251,10 @@ class _Disasm:
         if (isinstance(instr, JumpInstr) and
                 not isinstance(instr, (RetInstr, RST))):
             target = instr.target
-            if isinstance(target, int):
-                name = self.__get_label_name(target)
+            if isinstance(target, Const):
+                name = self.__get_label_name(target.value)
                 if name is not None:
-                    text = text.replace(f'{target:#x}', name)
+                    text = text.replace(f'{target.value:#x}', name)
 
         # Immediate operands are plain numbers unless the source
         # says otherwise; where it does, render them by the label
@@ -1275,13 +1278,13 @@ class _Disasm:
                     continue
 
                 target = op.ops[0]
-                if not isinstance(target, int):
+                if not isinstance(target, Const):
                     continue
 
-                label_tag = self.__tags[target].label_tag
+                label_tag = self.__tags[target.value].label_tag
                 if label_tag is not None:
                     assert isinstance(label_tag, _LabelTag)
-                    text = text.replace(f'({target:#x})',
+                    text = text.replace(f'({target.value:#x})',
                                         f'({label_tag.name})')
 
         return text

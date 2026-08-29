@@ -64,3 +64,13 @@ def test_add_evaluation() -> None:
 def test_non_value_evaluation() -> None:
     with pytest.raises(z80.Error, match="'ix' is not a value."):
         z80.Add(z80.IX, 5).evaluate()
+
+
+def test_op_casting() -> None:
+    i = z80.LD(z80.A, 5)
+    assert repr(i) == 'LD(A, Const(5))'
+    assert str(i) == 'ld a, 0x5'
+
+    m = z80.At(0x1234)
+    assert repr(m) == 'At((Const(4660),))'
+    assert str(m) == '(0x1234)'

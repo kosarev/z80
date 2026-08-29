@@ -285,26 +285,20 @@ class SP(metaclass=Reg16):
     pass
 
 
-Op: typing.TypeAlias = typing.Union[int, str, Reg, CondFlag, 'At', 'Expr']
+Op: typing.TypeAlias = typing.Union[str, Reg, CondFlag, 'At', 'Expr']
 
 
-def _str_op(op: Op) -> str:
-    if isinstance(op, int):
-        return f'{op:#x}'
-
-    return str(op)
+# How plain integers enter the operand domain.
+def _cast_op(op: int | Op) -> Op:
+    return Const(op) if isinstance(op, int) else op
 
 
 # Base class for expression operands.
 class Expr:
     ops: list[Op]
 
-    def __init__(self, *ops: Op) -> None:
-        # Numeric leaves cast to Const nodes automatically, so
-        # trees are closed under Expr modulo the addressing
-        # forms.
-        self.ops = [Const(op) if isinstance(op, int) else op
-                    for op in ops]
+    def __init__(self, *ops: int | Op) -> None:
+        self.ops = [_cast_op(op) for op in ops]
 
     def __repr__(self) -> str:
         return (type(self).__name__ +
@@ -319,7 +313,7 @@ class Expr:
     @staticmethod
     def _evaluate_op(op: Op) -> int:
         if not isinstance(op, Expr):
-            raise Error(f'{_str_op(op)!r} is not a value.')
+            raise Error(f'{str(op)!r} is not a value.')
 
         return op.evaluate()
 
@@ -334,14 +328,14 @@ class Const(Expr):
         return f'Const({self.value!r})'
 
     def __str__(self) -> str:
-        return _str_op(self.value)
+        return f'{self.value:#x}'
 
     def evaluate(self) -> int:
         return self.value
 
 
 class BinaryExpr(Expr):
-    def __init__(self, a: Op, b: Op) -> None:
+    def __init__(self, a: int | Op, b: int | Op) -> None:
         super().__init__(a, b)
 
 
@@ -369,15 +363,15 @@ class Symbol(Expr):
 
 
 class At:
-    def __init__(self, op: Op) -> None:
-        self.ops = [op]
+    def __init__(self, op: int | Op) -> None:
+        self.ops = [_cast_op(op)]
 
     def __repr__(self) -> str:
         return f'At({tuple(self.ops)!r})'
 
     def __str__(self) -> str:
         op, = tuple(self.ops)
-        return f'({_str_op(op)})'
+        return f'({op})'
 
 
 class Add(BinaryExpr):
@@ -389,7 +383,7 @@ class Add(BinaryExpr):
             sign = '-'
             b = Const(-b.value)
 
-        return f'{_str_op(a)} {sign} {_str_op(b)}'
+        return f'{a} {sign} {b}'
 
     def evaluate(self) -> int:
         a, b = tuple(self.ops)
@@ -402,10 +396,10 @@ class Instr:
     size: int | None
     origin: _SourcePos | None
 
-    def __init__(self, *ops: Op, origin: int | None = None) -> None:
+    def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
         self.addr = None
         self.size = None
-        self.ops = ops
+        self.ops = tuple(_cast_op(op) for op in ops)
         self.origin = None
 
     def __repr__(self) -> str:
@@ -415,7 +409,7 @@ class Instr:
     def __str__(self) -> str:
         s = type(self).__name__.lower()
         if self.ops:
-            s += ' ' + ', '.join(_str_op(op) for op in self.ops)
+            s += ' ' + ', '.join(str(op) for op in self.ops)
         return s
 
 
