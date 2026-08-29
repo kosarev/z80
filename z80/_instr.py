@@ -813,8 +813,17 @@ class NEG(Instr, prefix=0xed, x=1, y=0, z=4):
         super().__init__()
 
 
-class XNEG(Instr):
-    pass
+class XNEG(Instr, prefix=0xed, x=1, z=4):
+    def __init__(self, encoding: Value) -> None:
+        super().__init__(encoding)
+
+        # The duplicate neg encodings: ED 4C, 54, ..., 7C.
+        v = Expr._evaluate_op(self.ops[0])
+        y = (v >> 3) & 7
+        if v >> 8 != 0xed or v & 0xc7 != 0x44 or y == 0:
+            raise InvalidInstr(self)
+
+        self._y = y
 
 
 class NOP(Instr, x=0, y=0, z=0):

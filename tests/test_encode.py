@@ -82,6 +82,9 @@ _TESTS = (
     (z80.LD(z80.R, z80.A), b'\xed\x4f'),
     (z80.LD(z80.A, z80.IReg), b'\xed\x57'),
     (z80.LD(z80.A, z80.R), b'\xed\x5f'),
+    (z80.XNEG(0xed4c), b'\xed\x4c'),
+    (z80.XNEG(0xed54), b'\xed\x54'),
+    (z80.XNEG(0xed7c), b'\xed\x7c'),
 )
 
 
@@ -146,6 +149,13 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.LD(z80.HL, z80.B)
+
+    # ED 44 is the true neg, not a duplicate.
+    with pytest.raises(z80.InvalidInstr):
+        z80.XNEG(0xed44)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.XNEG(0xed4d)
 
 
 def test_no_encoding() -> None:
