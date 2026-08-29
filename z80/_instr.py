@@ -188,7 +188,9 @@ class NZ(metaclass=CondFlag):
 
 
 class Reg(_InstrElement):
-    pass
+    # The prefix byte selecting the register, for the index
+    # registers and their halves.
+    _prefix: bytes = b''
 
 
 # Registers holding a 16-bit value. Loading one takes an immediate
@@ -263,7 +265,7 @@ class HL(metaclass=Reg16):
 
 
 class IX(metaclass=IndexReg16):
-    pass
+    _prefix = b'\xdd'
 
 
 class IXH(metaclass=IndexReg):
@@ -275,7 +277,7 @@ class IXL(metaclass=IndexReg):
 
 
 class IY(metaclass=IndexReg16):
-    pass
+    _prefix = b'\xfd'
 
 
 class IYH(metaclass=IndexReg):
@@ -553,7 +555,8 @@ class CALL(CallInstr):
 
 
 class CCF(Instr, x=0, y=7, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class CP(Instr):
@@ -561,27 +564,33 @@ class CP(Instr):
 
 
 class CPD(Instr, prefix=0xed, x=2, y=5, z=1):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class CPDR(Instr, prefix=0xed, x=2, y=7, z=1):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class CPI(Instr, prefix=0xed, x=2, y=4, z=1):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class CPIR(Instr, prefix=0xed, x=2, y=6, z=1):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class CPL(Instr, x=0, y=5, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class DAA(Instr, x=0, y=4, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class DEC(Instr):
@@ -589,7 +598,8 @@ class DEC(Instr):
 
 
 class DI(Instr, x=3, y=6, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class DJNZ(JumpInstr):
@@ -597,19 +607,37 @@ class DJNZ(JumpInstr):
 
 
 class EI(Instr, x=3, y=7, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class EX(Instr):
-    pass
+    def __init__(self, a: Reg | At, b: Reg) -> None:
+        super().__init__(a, b)
+
+        # EX AF, AF'
+        if a is AF and b is AF2:
+            self._x, self._y, self._z = 0, 1, 0
+        # EX DE, HL
+        elif a is DE and b is HL:
+            self._x, self._y, self._z = 3, 5, 3
+        # EX (SP), HL and the ix/iy forms.
+        elif (isinstance(a, At) and a.ops[0] is SP and
+                b in (HL, IX, IY)):
+            self._x, self._y, self._z = 3, 4, 3
+            self._prefix = b._prefix
+        else:
+            raise InstrError(self, 'No such instruction form.')
 
 
 class EXX(Instr, x=3, y=3, z=1):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class HALT(Instr, x=1, y=6, z=6):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class IM(Instr, prefix=0xed, x=1, z=6):
@@ -633,19 +661,23 @@ class IN(Instr):
 
 
 class IND(Instr, prefix=0xed, x=2, y=5, z=2):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class INDR(Instr, prefix=0xed, x=2, y=7, z=2):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class INI(Instr, prefix=0xed, x=2, y=4, z=2):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class INIR(Instr, prefix=0xed, x=2, y=6, z=2):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class INC(Instr):
@@ -669,23 +701,28 @@ class XLD(Instr):
 
 
 class LDD(Instr, prefix=0xed, x=2, y=5, z=0):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class LDDR(Instr, prefix=0xed, x=2, y=7, z=0):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class LDI(Instr, prefix=0xed, x=2, y=4, z=0):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class LDIR(Instr, prefix=0xed, x=2, y=6, z=0):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class NEG(Instr, prefix=0xed, x=1, y=0, z=4):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class XNEG(Instr):
@@ -693,7 +730,8 @@ class XNEG(Instr):
 
 
 class NOP(Instr, x=0, y=0, z=0):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class XNOP(Instr):
@@ -709,19 +747,23 @@ class OUT(Instr):
 
 
 class OUTD(Instr, prefix=0xed, x=2, y=5, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class OTDR(Instr, prefix=0xed, x=2, y=7, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class OUTI(Instr, prefix=0xed, x=2, y=4, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class OTIR(Instr, prefix=0xed, x=2, y=6, z=3):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class POP(Instr):
@@ -741,7 +783,8 @@ class RET(RetInstr):
 
 
 class RETN(RetInstr, prefix=0xed, x=1, y=0, z=5):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class XRETN(RetInstr):
@@ -749,7 +792,8 @@ class XRETN(RetInstr):
 
 
 class RETI(RetInstr, prefix=0xed, x=1, y=1, z=5):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RL(Instr):
@@ -757,7 +801,8 @@ class RL(Instr):
 
 
 class RLA(Instr, x=0, y=2, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RLC(Instr):
@@ -765,11 +810,13 @@ class RLC(Instr):
 
 
 class RLCA(Instr, x=0, y=0, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RLD(Instr, prefix=0xed, x=1, y=5, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RR(Instr):
@@ -777,11 +824,13 @@ class RR(Instr):
 
 
 class RRA(Instr, x=0, y=3, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RRD(Instr, prefix=0xed, x=1, y=4, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RRC(Instr):
@@ -789,7 +838,8 @@ class RRC(Instr):
 
 
 class RRCA(Instr, x=0, y=1, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class RST(CallInstr, x=3, z=7):
@@ -811,7 +861,8 @@ class SBC(Instr):
 
 
 class SCF(Instr, x=0, y=6, z=7):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class SET(Instr):
