@@ -610,8 +610,29 @@ class DAA(Instr, x=0, y=4, z=7):
         super().__init__()
 
 
-class DEC(Instr):
-    pass
+class DEC(Instr, x=0):
+    def __init__(self, arg: Reg | At) -> None:
+        super().__init__(arg)
+
+        op = self.ops[0]
+        # DEC r[y]
+        if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
+            assert isinstance(op, Reg) and op._code is not None
+            self._y, self._z = op._code, 5
+            self._prefix = op._prefix
+        elif isinstance(op, At) and op.ops[0] is HL:
+            self._y, self._z = 6, 5
+        # DEC rp[p]
+        elif op in (BC, DE, HL, SP, IX, IY):
+            assert isinstance(op, Reg) and op._code is not None
+            self._y, self._z = op._code << 1 | 1, 3
+            self._prefix = op._prefix
+        # TODO: Encode DEC (ix/iy + d).
+        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
+                op.ops[0].ops[0] in (IX, IY)):
+            pass
+        else:
+            raise InvalidInstr(self)
 
 
 class DI(Instr, x=3, y=6, z=3):
