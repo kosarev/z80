@@ -897,9 +897,11 @@ class IN(Instr):
                 self._prefix = b'\xed'
                 self._x, self._y, self._z = 1, a._code, 0
                 return
-            # TODO: Encode IN A, (n).
+            # IN A, (n)
             if (a is A and isinstance(b, At) and
                     isinstance(b.ops[0], Expr)):
+                self._x, self._y, self._z = 3, 3, 3
+                self._n = b.ops[0]
                 return
 
         raise InvalidInstr(self)
@@ -1023,9 +1025,21 @@ class LD(Instr):
                 b in (B, C, D, E, H, L, A)):
             assert isinstance(b, Reg) and b._code is not None
             self._x, self._y, self._z = 1, 6, b._code
+        # LD r[y], n
+        elif (a in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL) and
+                isinstance(b, Expr)):
+            assert isinstance(a, Reg) and a._code is not None
+            self._x, self._y, self._z = 0, a._code, 6
+            self._prefix = a._prefix
+            self._n = b
+        # LD (HL), n
+        elif (isinstance(a, At) and a.reg is HL and
+                isinstance(b, Expr)):
+            self._x, self._y, self._z = 0, 6, 6
+            self._n = b
         # TODO: Encode the displaced forms.
         elif ((isinstance(a, At) and a.reg in (IX, IY) and
-                b in (B, C, D, E, H, L, A)) or
+                (b in (B, C, D, E, H, L, A) or isinstance(b, Expr))) or
               (a in (B, C, D, E, H, L, A) and
                 isinstance(b, At) and b.reg in (IX, IY))):
             pass
@@ -1127,9 +1141,11 @@ class OUT(Instr):
                     self._prefix = b'\xed'
                     self._x, self._y, self._z = 1, b._code, 1
                     return
-            # TODO: Encode OUT (n), A.
+            # OUT (n), A
             if (isinstance(a, At) and isinstance(a.ops[0], Expr) and
                     b is A):
+                self._x, self._y, self._z = 3, 2, 3
+                self._n = a.ops[0]
                 return
 
         raise InvalidInstr(self)

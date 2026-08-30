@@ -105,6 +105,13 @@ _TESTS = (
     (z80.LD(z80.IXH, z80.B), b'\xdd\x60'),
     (z80.LD(z80.B, z80.IYL), b'\xfd\x45'),
     (z80.LD(z80.IXH, z80.IXL), b'\xdd\x65'),
+    (z80.LD(z80.B, 0x55), b'\x06\x55'),
+    (z80.LD(z80.A, -1), b'\x3e\xff'),
+    (z80.LD(z80.IXH, 0x55), b'\xdd\x26\x55'),
+    (z80.LD(z80.IYL, 0x55), b'\xfd\x2e\x55'),
+    (z80.LD(z80.At(z80.HL), 0x55), b'\x36\x55'),
+    (z80.IN(z80.A, z80.At(0x12)), b'\xdb\x12'),
+    (z80.OUT(z80.At(0x12), z80.A), b'\xd3\x12'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
     (z80.XNEG(0xed54), b'\xed\x54'),
     (z80.XNEG(0xed7c), b'\xed\x7c'),
@@ -372,6 +379,6 @@ def test_immediates() -> None:
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.LD(z80.B, 5).encode()
+        z80.LD(z80.BC, 0x1234).encode()
 
-    assert str(exc_info.value.instr) == 'ld b, 0x5'
+    assert str(exc_info.value.instr) == 'ld bc, 0x1234'
