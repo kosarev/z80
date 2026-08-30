@@ -132,7 +132,6 @@ __all__ = [
     'Sub',
     'Symbol',
     'UnaryExpr',
-    'UnknownInstr',
     'Z',
 ]
 
@@ -619,26 +618,6 @@ class InstrError(Error):
 class InvalidInstr(InstrError):
     def __init__(self, instr: Instr) -> None:
         super().__init__(instr, 'No such instruction form.')
-
-
-# TODO: This only exists because the instruction-building facility
-# does not cover all codes yet; there is no such thing as an unknown
-# instruction otherwise. Replace with an assert once all codes are
-# supported.
-class UnknownInstr(Instr):
-    text: str | None
-
-    def __init__(self, opcode: int) -> None:
-        super().__init__()
-        self.opcode = opcode
-        self.text = None
-
-    # Unknown instructions are the one kind with no encoding.
-    def encode(self, addr: int | None = None) -> bytes:
-        raise InstrError(self, 'No encoding.')
-
-    def __str__(self) -> str:
-        return f'db {self.opcode:#04x}'
 
 
 # Instructions that may affect control flow.

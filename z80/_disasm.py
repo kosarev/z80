@@ -126,7 +126,6 @@ from ._instr import (
     Reg,
     Reg16,
     RetInstr,
-    UnknownInstr,
     Z,
 )
 from ._machine import Z80Machine
@@ -368,10 +367,6 @@ class _DisasmTag(_Tag):
         self.state = _State() if state is None else state
 
 
-class _UnknownInstrError(Exception):
-    pass
-
-
 # Raised where the image does not hold all the bytes of the
 # instruction to build, so its identity is not determined by the
 # available input.
@@ -534,11 +529,10 @@ class Z80InstrBuilder:
         elif text.startswith('D$'):
             op = addr
             text = text[2:].strip()
-        elif text.startswith(('ix', 'iy')):
+        else:
+            assert text.startswith(('ix', 'iy')), text
             op = self.__OPS[text[:2]]
             text = text[2:].strip()
-        else:
-            raise _UnknownInstrError()
 
         # Offset.
         if text != '' and text[0] in ('+', '-'):
@@ -553,10 +547,9 @@ class Z80InstrBuilder:
 
             if isinstance(op, int):
                 op += offset
-            elif isinstance(op, IndexReg16):
-                op = At(op, offset)
             else:
-                raise _UnknownInstrError()
+                assert isinstance(op, IndexReg16), op
+                op = At(op, offset)
 
         assert text == '', text
 
@@ -582,31 +575,25 @@ class Z80InstrBuilder:
             assert image[0] in (0xdd, 0xfd), image
             return XPREFIX(image[0]), 1
 
-        try:
-            text = original_text.split(maxsplit=1)
-            name = text.pop(0)
+        text = original_text.split(maxsplit=1)
+        name = text.pop(0)
 
-            if name not in self.__INSTRS:
-                raise _UnknownInstrError()
+        # Every byte sequence decodes to a known instruction; the
+        # exhaustive identity test certifies it page by page.
+        assert name in self.__INSTRS, original_text
 
-            # Parse operands.
-            ops = []
-            if text:
-                text = text[0].split(',')
-                while text:
-                    op_text = text.pop(0).strip()
-                    op = self.__build_op(addr, op_text)
+        # Parse operands.
+        ops = []
+        if text:
+            text = text[0].split(',')
+            while text:
+                op_text = text.pop(0).strip()
+                op = self.__build_op(addr, op_text)
 
-                    if op is not None:
-                        ops.append(op)
+                if op is not None:
+                    ops.append(op)
 
-            instr: Instr = self.__INSTRS[name](*ops)
-        except _UnknownInstrError:
-            unknown = UnknownInstr(image[0])
-            unknown.text = original_text
-            return unknown, 1
-
-        return instr, size
+        return self.__INSTRS[name](*ops), size
 
 
 class _TagSet:
@@ -929,9 +916,6 @@ class _Disasm:
     # refers to. Only loads of a 16-bit register can carry one;
     # jump and call targets are references already.
     def __get_ref_target(self, tag: _Tag, instr: Instr) -> int | None:
-        if isinstance(instr, UnknownInstr):
-            return None
-
         if isinstance(instr, JumpInstr):
             raise _DisasmError(
                 tag, 'Jump and call targets are references already.')
@@ -1036,9 +1020,6 @@ class _Disasm:
             self.__apply_ref_tag(tag.addr)
 
         instr = tag.instr
-        if isinstance(instr, UnknownInstr):
-            return
-
         next_addr = tag.addr + tag.size
 
         if isinstance(instr, RetInstr):
@@ -1186,11 +1167,6 @@ class _Disasm:
                 yield _HintTag(instr.origin, addr,
                                'warning: overlapping instruction: '
                                f'{str(instr)!r}')
-
-            if isinstance(instr, UnknownInstr):
-                yield _HintTag(instr.origin, addr,
-                               'warning: unknown instruction: '
-                               f'{instr.text!r}')
 
     # Whether the address gets a derived label: it must be
     # referenced as code, carry no .label tag of its own, start a

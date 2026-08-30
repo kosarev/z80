@@ -462,7 +462,6 @@ def test_relative() -> None:
 
 def _check_identity(builder: z80.Z80InstrBuilder, image: bytes) -> None:
     instr, size = builder.build_instr(0x100, image)
-    assert not isinstance(instr, z80.UnknownInstr), image.hex()
     assert instr.encode(0x100) == image[:size], (image.hex(), str(instr))
 
 
@@ -490,11 +489,3 @@ def test_encode_decode_identity() -> None:
                 _check_identity(builder, image)
 
             _check_identity(builder, bytes((prefix, 0xcb, 0x05, op)))
-
-
-def test_no_encoding() -> None:
-    # With every proper instruction form covered, only unknown
-    # instructions remain unencodable.
-    instr = z80.UnknownInstr(0xed)
-    with pytest.raises(z80.InstrError, match='No encoding.'):
-        instr.encode()

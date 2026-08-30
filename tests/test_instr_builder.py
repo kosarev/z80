@@ -50,9 +50,6 @@ _TESTS = (
 @pytest.mark.parametrize('code, text', _TESTS)
 def test_instr_builder(code: bytes, text: str) -> None:
     instr, _ = z80.Z80InstrBuilder().build_instr(0, code)
-    if isinstance(instr, z80.UnknownInstr):
-        pytest.fail(f'unknown instruction: {instr.text}')
-
     assert str(instr) == text
 
 
