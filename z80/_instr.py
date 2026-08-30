@@ -648,44 +648,42 @@ class ADD(Instr, y=0):
     def __init__(self, a: Reg | At, b: int | Op) -> None:
         super().__init__(a, b)
 
-        # ADD HL, rp[p] and the ix/iy forms, whose rp slot 2 is
-        # the destination register itself.
-        if a in (HL, IX, IY):
-            b = self.ops[1]
-            if b in (BC, DE, SP) or b is a:
-                assert isinstance(a, Reg)
-                assert isinstance(b, Reg) and b._code is not None
+        match self.ops:
+            # ADD HL, rp[p] and the ix/iy forms, whose rp slot 2
+            # is the destination register itself.
+            case (Reg() as dst, Reg() as rp) if (
+                    dst in (HL, IX, IY) and
+                    (rp in (BC, DE, SP) or rp is dst)):
+                assert rp._code is not None
                 self._x, self._z = 0, 1
-                self._y = b._code << 1 | 1
-                self._prefix = a._prefix
-            else:
+                self._y = rp._code << 1 | 1
+                self._prefix = dst._prefix
+            # ADD A, ...
+            case (Reg() as dst, op) if dst is A:
+                self._x = 2
+                _encode_alu_op(self, op)
+            case _:
                 raise InvalidInstr(self)
-        elif a is A:
-            self._x = 2
-            _encode_alu_op(self, self.ops[1])
-        else:
-            raise InvalidInstr(self)
 
 
 class ADC(Instr, y=1):
     def __init__(self, a: Reg | At, b: int | Op) -> None:
         super().__init__(a, b)
 
-        # ADC HL, rp[p]
-        if a is HL:
-            b = self.ops[1]
-            if b in (BC, DE, HL, SP):
-                assert isinstance(b, Reg) and b._code is not None
+        match self.ops:
+            # ADC HL, rp[p]
+            case (Reg() as dst, Reg() as rp) if (
+                    dst is HL and rp in (BC, DE, HL, SP)):
+                assert rp._code is not None
                 self._prefix = b'\xed'
                 self._x, self._z = 1, 2
-                self._y = b._code << 1 | 1
-            else:
+                self._y = rp._code << 1 | 1
+            # ADC A, ...
+            case (Reg() as dst, op) if dst is A:
+                self._x = 2
+                _encode_alu_op(self, op)
+            case _:
                 raise InvalidInstr(self)
-        elif a is A:
-            self._x = 2
-            _encode_alu_op(self, self.ops[1])
-        else:
-            raise InvalidInstr(self)
 
 
 class AND(_Alu, y=4):
@@ -941,34 +939,28 @@ class JP(JumpInstr):
     def __init__(self, *ops: int | Op) -> None:
         super().__init__(*ops)
 
-        # JP (HL) and the ix/iy forms, taking no displacement.
-        if len(self.ops) == 1 and isinstance(self.ops[0], At):
-            op = self.ops[0]
-            if op.reg not in (HL, IX, IY):
+        match self.ops:
+            # JP (HL) and the ix/iy forms, taking no displacement.
+            case (At() as op,):
+                if op.reg not in (HL, IX, IY):
+                    raise InvalidInstr(self)
+
+                assert op.reg is not None and op.disp is not None
+                if op.disp.evaluate() != 0:
+                    raise InvalidInstr(self)
+
+                self._x, self._y, self._z = 3, 5, 1
+                self._prefix = op.reg._prefix
+            # JP nn
+            case (Expr() as nn,):
+                self._x, self._y, self._z = 3, 0, 3
+                self._nn = nn
+            # JP cc[y], nn
+            case (CondFlag() as cc, Expr() as nn):
+                self._x, self._y, self._z = 3, cc._code, 2
+                self._nn = nn
+            case _:
                 raise InvalidInstr(self)
-
-            assert op.reg is not None and op.disp is not None
-            if op.disp.evaluate() != 0:
-                raise InvalidInstr(self)
-
-            self._x, self._y, self._z = 3, 5, 1
-            self._prefix = op.reg._prefix
-            return
-
-        # JP nn
-        if len(self.ops) == 1 and isinstance(self.ops[0], Expr):
-            self._x, self._y, self._z = 3, 0, 3
-            self._nn = self.ops[0]
-            return
-
-        # JP cc[y], nn
-        if (len(self.ops) == 2 and isinstance(self.ops[0], CondFlag) and
-                isinstance(self.ops[1], Expr)):
-            self._x, self._y, self._z = 3, self.ops[0]._code, 2
-            self._nn = self.ops[1]
-            return
-
-        raise InvalidInstr(self)
 
 
 class JR(JumpInstr):
@@ -1218,17 +1210,15 @@ class RET(RetInstr):
     def __init__(self, *ops: int | Op) -> None:
         super().__init__(*ops)
 
-        # RET
-        if not self.ops:
-            self._x, self._y, self._z = 3, 1, 1
-            return
-
-        # RET cc[y]
-        if len(self.ops) == 1 and isinstance(self.ops[0], CondFlag):
-            self._x, self._y, self._z = 3, self.ops[0]._code, 0
-            return
-
-        raise InvalidInstr(self)
+        match self.ops:
+            # RET
+            case ():
+                self._x, self._y, self._z = 3, 1, 1
+            # RET cc[y]
+            case (CondFlag() as cc,):
+                self._x, self._y, self._z = 3, cc._code, 0
+            case _:
+                raise InvalidInstr(self)
 
 
 class RETN(RetInstr, prefix=0xed, x=1, y=0, z=5):
@@ -1354,21 +1344,20 @@ class SBC(Instr, y=3):
     def __init__(self, a: Reg | At, b: int | Op) -> None:
         super().__init__(a, b)
 
-        # SBC HL, rp[p]
-        if a is HL:
-            b = self.ops[1]
-            if b in (BC, DE, HL, SP):
-                assert isinstance(b, Reg) and b._code is not None
+        match self.ops:
+            # SBC HL, rp[p]
+            case (Reg() as dst, Reg() as rp) if (
+                    dst is HL and rp in (BC, DE, HL, SP)):
+                assert rp._code is not None
                 self._prefix = b'\xed'
                 self._x, self._z = 1, 2
-                self._y = b._code << 1
-            else:
+                self._y = rp._code << 1
+            # SBC A, ...
+            case (Reg() as dst, op) if dst is A:
+                self._x = 2
+                _encode_alu_op(self, op)
+            case _:
                 raise InvalidInstr(self)
-        elif a is A:
-            self._x = 2
-            _encode_alu_op(self, self.ops[1])
-        else:
-            raise InvalidInstr(self)
 
 
 class SCF(Instr, x=0, y=6, z=7):
