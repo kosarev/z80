@@ -297,6 +297,9 @@ def test_no_such_form() -> None:
                        match='The bit number must be 0 through 7.'):
         z80.BIT(8, z80.B)
 
+    with pytest.raises(z80.Error, match="'c' is not a value."):
+        z80.BIT(z80.C, z80.B)
+
     with pytest.raises(z80.InvalidInstr):
         z80.BIT(0, z80.IXH)
 

@@ -317,10 +317,17 @@ def _cast_op(op: int | Op) -> Op:
 
 # Base class for expression operands.
 class Expr:
-    ops: list[Op]
+    ops: list['Expr']
 
-    def __init__(self, *ops: int | Op) -> None:
-        self.ops = [_cast_op(op) for op in ops]
+    def __init__(self, *ops: Value) -> None:
+        self.ops = []
+        for op in ops:
+            if isinstance(op, int):
+                op = Const(op)
+            elif not isinstance(op, Expr):
+                raise Error(f'{str(op)!r} is not a value.')
+
+            self.ops.append(op)
 
     def __repr__(self) -> str:
         return (type(self).__name__ +
@@ -363,7 +370,7 @@ class BinaryExpr(Expr):
         super().__init_subclass__()
         cls._sign = sign
 
-    def __init__(self, a: int | Op, b: int | Op) -> None:
+    def __init__(self, a: Value, b: Value) -> None:
         super().__init__(a, b)
 
     def __str__(self) -> str:
@@ -383,7 +390,7 @@ class BinaryExpr(Expr):
 
 
 class UnaryExpr(Expr):
-    def __init__(self, op: int | Op) -> None:
+    def __init__(self, op: Value) -> None:
         super().__init__(op)
 
 
@@ -450,13 +457,13 @@ class At:
 class Add(BinaryExpr, sign='+'):
     def evaluate(self) -> int:
         a, b = tuple(self.ops)
-        return self._evaluate_op(a) + self._evaluate_op(b)
+        return a.evaluate() + b.evaluate()
 
 
 class Sub(BinaryExpr, sign='-'):
     def evaluate(self) -> int:
         a, b = tuple(self.ops)
-        return self._evaluate_op(a) - self._evaluate_op(b)
+        return a.evaluate() - b.evaluate()
 
 
 class Neg(UnaryExpr):
@@ -469,7 +476,7 @@ class Neg(UnaryExpr):
 
     def evaluate(self) -> int:
         op, = tuple(self.ops)
-        return -self._evaluate_op(op)
+        return -op.evaluate()
 
 
 # Base class for all instructions.

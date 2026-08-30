@@ -21,17 +21,17 @@ def test_const() -> None:
 
 def test_add() -> None:
     # Numeric operands cast to Const leaves automatically.
-    e = z80.Add(z80.IX, 5)
+    e = z80.Add(z80.Symbol('main'), 5)
     assert isinstance(e, z80.BinaryExpr)
     assert isinstance(e, z80.Expr)
-    assert str(e) == 'ix + 0x5'
-    assert repr(e) == 'Add(IX, Const(5))'
+    assert str(e) == 'main + 0x5'
+    assert repr(e) == "Add(Symbol('main'), Const(5))"
 
 
-def test_add_negative_offset() -> None:
-    e = z80.Add(z80.IY, -5)
-    assert str(e) == 'iy - 0x5'
-    assert repr(e) == 'Add(IY, Const(-5))'
+def test_add_negative_operand() -> None:
+    e = z80.Add(z80.Symbol('main'), -5)
+    assert str(e) == 'main - 0x5'
+    assert repr(e) == "Add(Symbol('main'), Const(-5))"
 
 
 def test_symbol() -> None:
@@ -59,11 +59,6 @@ def test_add_evaluation() -> None:
     s = z80.Symbol('main', 0x8000)
     assert z80.Add(s, 5).evaluate() == 0x8005
     assert z80.Add(z80.Add(s, 1), -2).evaluate() == 0x7fff
-
-
-def test_non_value_evaluation() -> None:
-    with pytest.raises(z80.Error, match="'ix' is not a value."):
-        z80.Add(z80.IX, 5).evaluate()
 
 
 def test_sub() -> None:
