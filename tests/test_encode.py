@@ -172,6 +172,16 @@ _TESTS = (
     (z80.ADC(z80.HL, z80.HL), b'\xed\x6a'),
     (z80.SBC(z80.A, z80.B), b'\x98'),
     (z80.SBC(z80.HL, z80.DE), b'\xed\x52'),
+    (z80.ADD(z80.A, 0x55), b'\xc6\x55'),
+    (z80.ADC(z80.A, 0x55), b'\xce\x55'),
+    (z80.SUB(0x55), b'\xd6\x55'),
+    (z80.SBC(z80.A, 0x55), b'\xde\x55'),
+    (z80.AND(0x55), b'\xe6\x55'),
+    (z80.XOR(0x55), b'\xee\x55'),
+    (z80.OR(0x55), b'\xf6\x55'),
+    (z80.CP(0x55), b'\xfe\x55'),
+    (z80.CP(-1), b'\xfe\xff'),
+    (z80.SUB(z80.Symbol('mask', 0x0f)), b'\xd6\x0f'),
     (z80.RLC(z80.B), b'\xcb\x00'),
     (z80.RLC(z80.A), b'\xcb\x07'),
     (z80.RLC(z80.At(z80.HL)), b'\xcb\x06'),
@@ -342,6 +352,22 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.XNOP(0xeda0)
+
+
+def test_immediates() -> None:
+    # Immediates evaluate at encoding time, so forward references
+    # construct first and bind later.
+    s = z80.Symbol('mask')
+    instr = z80.SUB(s)
+    with pytest.raises(z80.Error, match="Undefined symbol 'mask'."):
+        instr.encode()
+
+    s.value = 0x0f
+    assert instr.encode() == b'\xd6\x0f'
+
+    with pytest.raises(z80.InstrError,
+                       match='The operand must fit a byte.'):
+        z80.SUB(0x100).encode()
 
 
 def test_no_encoding() -> None:

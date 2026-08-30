@@ -492,6 +492,12 @@ class Instr:
     _z: int | None = None
     _prefix: bytes = b''
 
+    # The immediate byte operand following the opcode. Unlike the
+    # values that select opcode fields, immediates are data, so
+    # they evaluate at encoding time, letting forward references
+    # construct first and bind later.
+    _n: 'Expr | None' = None
+
     def __init_subclass__(cls, *, x: int | None = None,
                           y: int | None = None, z: int | None = None,
                           prefix: int | None = None) -> None:
@@ -529,10 +535,19 @@ class Instr:
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
         x, y, z = self._x, self._y, self._z
-        if x is not None and y is not None and z is not None:
-            return self._prefix + bytes((x << 6 | y << 3 | z,))
+        if x is None or y is None or z is None:
+            raise InstrError(self, 'No encoding.')
 
-        raise InstrError(self, 'No encoding.')
+        image = self._prefix + bytes((x << 6 | y << 3 | z,))
+
+        if self._n is not None:
+            n = self._n.evaluate()
+            if not -0x80 <= n <= 0xff:
+                raise InstrError(self, 'The operand must fit a byte.')
+
+            image += bytes((n & 0xff,))
+
+        return image
 
 
 # An error about a specific instruction. The instruction is
@@ -599,9 +614,12 @@ def _encode_alu_op(instr: Instr, op: Op) -> None:
         instr._prefix = op._prefix
     elif isinstance(op, At) and op.reg is HL:
         instr._z = 6
-    # TODO: Encode alu[y] n and alu[y] (ix/iy + d).
-    elif (isinstance(op, Expr) or
-            (isinstance(op, At) and op.reg in (IX, IY))):
+    # alu[y] n
+    elif isinstance(op, Expr):
+        instr._x, instr._z = 3, 6
+        instr._n = op
+    # TODO: Encode alu[y] (ix/iy + d).
+    elif isinstance(op, At) and op.reg in (IX, IY):
         pass
     else:
         raise InvalidInstr(instr)
