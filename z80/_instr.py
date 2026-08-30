@@ -505,7 +505,8 @@ class Instr:
     _target: 'Expr | None' = None
 
     # The index displacement byte of the (i + d) memory operands,
-    # sitting right after the opcode.
+    # sitting right after the opcode -- except in the ddcb-
+    # prefixed encodings, where it precedes the opcode byte.
     _disp: 'Expr | None' = None
 
     def __init_subclass__(cls, *, x: int | None = None,
@@ -548,15 +549,20 @@ class Instr:
         if x is None or y is None or z is None:
             raise InstrError(self, 'No encoding.')
 
-        image = self._prefix + bytes((x << 6 | y << 3 | z,))
-
+        disp_bytes = b''
         if self._disp is not None:
             disp = self._disp.evaluate()
             if not -0x80 <= disp <= 0x7f:
                 raise InstrError(
                     self, f'The displacement {disp:#x} is out of range.')
 
-            image += (disp & 0xff).to_bytes(1, 'little')
+            disp_bytes = (disp & 0xff).to_bytes(1, 'little')
+
+        opcode = bytes((x << 6 | y << 3 | z,))
+        if self._prefix.endswith(b'\xcb'):
+            image = self._prefix + disp_bytes + opcode
+        else:
+            image = self._prefix + opcode + disp_bytes
 
         if self._n is not None:
             n = self._n.evaluate()
@@ -743,14 +749,34 @@ class _Bit(Instr, prefix=0xcb):
                 self._z = op._code
             elif isinstance(op, At) and op.reg is HL:
                 self._z = 6
-            # TODO: Encode the (ix/iy + d) forms.
-            elif (isinstance(op, At) and op.reg in (IX, IY)):
-                pass
+            # x[y], (i + d)
+            elif isinstance(op, At) and op.reg in (IX, IY):
+                assert op.reg is not None and op.disp is not None
+                self._z = 6
+                self._prefix = op.reg._prefix + self._prefix
+                self._disp = op.disp
             else:
                 raise InvalidInstr(self)
-        # TODO: The ddcb forms carrying the copy-field operand.
+        # The (i + d) forms with the copy-field register in z: for
+        # res and set, the undocumented copy of the memory result
+        # into the register; for bit, ineffective but distinctly
+        # encoded.
         elif len(self.ops) == 3:
-            pass
+            r, bit, op = self.ops
+            b = Expr._evaluate_op(bit)
+            if not 0 <= b <= 7:
+                raise InstrError(self, 'The bit number must be '
+                                 '0 through 7.')
+
+            if (r in (B, C, D, E, H, L, A) and
+                    isinstance(op, At) and op.reg in (IX, IY)):
+                assert isinstance(r, Reg) and r._code is not None
+                assert op.reg is not None and op.disp is not None
+                self._y, self._z = b, r._code
+                self._prefix = op.reg._prefix + self._prefix
+                self._disp = op.disp
+            else:
+                raise InvalidInstr(self)
         else:
             raise InvalidInstr(self)
 
@@ -1186,8 +1212,24 @@ class LD(Instr):
         # TODO: Encode the remaining ld forms.
 
 
-class XLD(Instr):
-    pass
+class XLD(Instr, prefix=0xed, x=1, z=3):
+    def __init__(self, encoding: Value, a: Reg | At, b: Reg | At) -> None:
+        super().__init__(encoding, a, b)
+
+        # The duplicate ld (nn), hl and ld hl, (nn) encodings,
+        # ED 63 and ED 6B.
+        v = Expr._evaluate_op(self.ops[0])
+        dst, src = self.ops[1], self.ops[2]
+        if (v == 0xed63 and isinstance(dst, At) and
+                isinstance(dst.ops[0], Expr) and src is HL):
+            self._y = 4
+            self._nn = dst.ops[0]
+        elif (v == 0xed6b and dst is HL and isinstance(src, At) and
+                isinstance(src.ops[0], Expr)):
+            self._y = 5
+            self._nn = src.ops[0]
+        else:
+            raise InvalidInstr(self)
 
 
 class LDD(Instr, prefix=0xed, x=2, y=5, z=0):
@@ -1367,18 +1409,38 @@ class RETI(RetInstr, prefix=0xed, x=1, y=1, z=5):
 # The rotate and shift operations, the y= class parameter
 # selecting the operation.
 class _Rot(Instr, prefix=0xcb, x=0):
-    def __init__(self, op: Reg | At) -> None:
-        super().__init__(op)
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
 
-        # rot[y] r[z]
-        if op in (B, C, D, E, H, L, A):
-            assert isinstance(op, Reg) and op._code is not None
-            self._z = op._code
-        elif isinstance(op, At) and op.reg is HL:
-            self._z = 6
-        # TODO: Encode rot[y] (ix/iy + d).
-        elif (isinstance(op, At) and op.reg in (IX, IY)):
-            pass
+        if len(self.ops) == 1:
+            op = self.ops[0]
+            # rot[y] r[z]
+            if op in (B, C, D, E, H, L, A):
+                assert isinstance(op, Reg) and op._code is not None
+                self._z = op._code
+            elif isinstance(op, At) and op.reg is HL:
+                self._z = 6
+            # rot[y] (i + d)
+            elif isinstance(op, At) and op.reg in (IX, IY):
+                assert op.reg is not None and op.disp is not None
+                self._z = 6
+                self._prefix = op.reg._prefix + self._prefix
+                self._disp = op.disp
+            else:
+                raise InvalidInstr(self)
+        # rot[y] (i + d), r: the undocumented forms copying the
+        # memory result into the register.
+        elif len(self.ops) == 2:
+            op, copy = self.ops
+            if (isinstance(op, At) and op.reg in (IX, IY) and
+                    copy in (B, C, D, E, H, L, A)):
+                assert op.reg is not None and op.disp is not None
+                assert isinstance(copy, Reg) and copy._code is not None
+                self._z = copy._code
+                self._prefix = op.reg._prefix + self._prefix
+                self._disp = op.disp
+            else:
+                raise InvalidInstr(self)
         else:
             raise InvalidInstr(self)
 

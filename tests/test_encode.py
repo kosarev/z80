@@ -147,6 +147,15 @@ _TESTS = (
     (z80.LD(z80.H, z80.At(z80.IX, 5)), b'\xdd\x66\x05'),
     (z80.LD(z80.At(z80.IY, 5), z80.C), b'\xfd\x71\x05'),
     (z80.LD(z80.At(z80.IX, 5), 0x55), b'\xdd\x36\x05\x55'),
+    (z80.RLC(z80.At(z80.IX, 5)), b'\xdd\xcb\x05\x06'),
+    (z80.SRL(z80.At(z80.IY, -1)), b'\xfd\xcb\xff\x3e'),
+    (z80.RLC(z80.At(z80.IX, 5), z80.B), b'\xdd\xcb\x05\x00'),
+    (z80.RES(z80.C, 2, z80.At(z80.IY, 5)), b'\xfd\xcb\x05\x91'),
+    (z80.SET(z80.C, 0, z80.At(z80.IX, 5)), b'\xdd\xcb\x05\xc1'),
+    (z80.BIT(z80.A, 0, z80.At(z80.IX, 5)), b'\xdd\xcb\x05\x47'),
+    (z80.BIT(3, z80.At(z80.IX, 5)), b'\xdd\xcb\x05\x5e'),
+    (z80.XLD(0xed63, z80.At(0x1234), z80.HL), b'\xed\x63\x34\x12'),
+    (z80.XLD(0xed6b, z80.HL, z80.At(0x1234)), b'\xed\x6b\x34\x12'),
     (z80.IN(z80.A, z80.At(0x12)), b'\xdb\x12'),
     (z80.OUT(z80.At(0x12), z80.A), b'\xd3\x12'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
@@ -342,6 +351,14 @@ def test_no_such_form() -> None:
     with pytest.raises(z80.InvalidInstr):
         z80.XRETN(0xed4d)
 
+    # ED 63 pairs with the store shape only, and ED 6B with the
+    # load.
+    with pytest.raises(z80.InvalidInstr):
+        z80.XLD(0xed63, z80.HL, z80.At(0x1234))
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.XLD(0xed64, z80.At(0x1234), z80.HL)
+
     # ED 46 is a true im encoding, and ED 4E means mode 0.
     with pytest.raises(z80.InvalidInstr):
         z80.XIM(0xed46, 0)
@@ -444,7 +461,8 @@ def test_relative() -> None:
 
 
 def test_no_encoding() -> None:
-    with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.RLC(z80.At(z80.IX, 5)).encode()
-
-    assert str(exc_info.value.instr) == 'rlc (ix + 0x5)'
+    # With every proper instruction form covered, only unknown
+    # instructions remain unencodable.
+    instr = z80.UnknownInstr(0, 0xed)
+    with pytest.raises(z80.InstrError, match='No encoding.'):
+        instr.encode()
