@@ -499,6 +499,11 @@ class Instr:
     _n: 'Expr | None' = None
     _nn: 'Expr | None' = None
 
+    # The pc-relative jump target. Stored absolute; the
+    # displacement byte derives from the instruction address at
+    # encoding time.
+    _target: 'Expr | None' = None
+
     def __init_subclass__(cls, *, x: int | None = None,
                           y: int | None = None, z: int | None = None,
                           prefix: int | None = None) -> None:
@@ -556,6 +561,19 @@ class Instr:
                     self, f'{nn:#x} does not fit a word.')
 
             image += (nn & 0xffff).to_bytes(2, 'little')
+
+        if self._target is not None:
+            if addr is None:
+                raise InstrError(
+                    self, 'The instruction address is unknown.')
+
+            target = self._target.evaluate()
+            disp = target - (addr + len(image) + 1)
+            if not -0x80 <= disp <= 0x7f:
+                raise InstrError(
+                    self, f'The target {target:#x} is out of range.')
+
+            image += (disp & 0xff).to_bytes(1, 'little')
 
         return image
 
@@ -832,7 +850,14 @@ class DI(Instr, x=3, y=6, z=3):
 
 
 class DJNZ(JumpInstr):
-    pass
+    def __init__(self, target: Value) -> None:
+        super().__init__(target)
+
+        # DJNZ d
+        t = self.ops[0]
+        assert isinstance(t, Expr)
+        self._x, self._y, self._z = 0, 2, 0
+        self._target = t
 
 
 class EI(Instr, x=3, y=7, z=3):
@@ -977,7 +1002,20 @@ class JP(JumpInstr):
 
 
 class JR(JumpInstr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        match self.ops:
+            # JR d
+            case (Expr() as target,):
+                self._x, self._y, self._z = 0, 3, 0
+                self._target = target
+            # JR cc[y-4], d
+            case (CondFlag() as cc, Expr() as target) if cc._code < 4:
+                self._x, self._y, self._z = 0, cc._code + 4, 0
+                self._target = target
+            case _:
+                raise InvalidInstr(self)
 
 
 class LD(Instr):

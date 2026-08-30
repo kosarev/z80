@@ -396,8 +396,29 @@ def test_immediates() -> None:
         z80.LD(z80.BC, 0x10000).encode()
 
 
+def test_relative() -> None:
+    assert z80.JR(0x105).encode(0x100) == b'\x18\x03'
+    assert z80.JR(z80.NZ, 0x105).encode(0x100) == b'\x20\x03'
+    assert z80.JR(z80.Z, 0x105).encode(0x100) == b'\x28\x03'
+    assert z80.JR(z80.NC, 0x105).encode(0x100) == b'\x30\x03'
+    assert z80.JR(z80.CF, 0x100).encode(0x100) == b'\x38\xfe'
+    assert z80.DJNZ(0x100).encode(0x100) == b'\x10\xfe'
+
+    with pytest.raises(z80.InstrError,
+                       match='The instruction address is unknown.'):
+        z80.JR(0x105).encode()
+
+    with pytest.raises(z80.InstrError,
+                       match='The target 0x1000 is out of range.'):
+        z80.JR(0x1000).encode(0x100)
+
+    # No jr forms for the po/pe/p/m conditions.
+    with pytest.raises(z80.InvalidInstr):
+        z80.JR(z80.M, 0x105)
+
+
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.JR(0x1234).encode()
+        z80.LD(z80.A, z80.At(0x1234)).encode()
 
-    assert str(exc_info.value.instr) == 'jr 0x1234'
+    assert str(exc_info.value.instr) == 'ld a, (0x1234)'
