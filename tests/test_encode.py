@@ -137,6 +137,16 @@ _TESTS = (
     (z80.LD(z80.At(0x1234), z80.DE), b'\xed\x53\x34\x12'),
     (z80.LD(z80.SP, z80.At(0x1234)), b'\xed\x7b\x34\x12'),
     (z80.LD(z80.At(0x1234), z80.SP), b'\xed\x73\x34\x12'),
+    (z80.INC(z80.At(z80.IX, 5)), b'\xdd\x34\x05'),
+    (z80.INC(z80.At(z80.IX)), b'\xdd\x34\x00'),
+    (z80.DEC(z80.At(z80.IY, -1)), b'\xfd\x35\xff'),
+    (z80.ADD(z80.A, z80.At(z80.IX, 5)), b'\xdd\x86\x05'),
+    (z80.SUB(z80.At(z80.IY, 0)), b'\xfd\x96\x00'),
+    (z80.CP(z80.At(z80.IX, -2)), b'\xdd\xbe\xfe'),
+    (z80.LD(z80.B, z80.At(z80.IX, 5)), b'\xdd\x46\x05'),
+    (z80.LD(z80.H, z80.At(z80.IX, 5)), b'\xdd\x66\x05'),
+    (z80.LD(z80.At(z80.IY, 5), z80.C), b'\xfd\x71\x05'),
+    (z80.LD(z80.At(z80.IX, 5), 0x55), b'\xdd\x36\x05\x55'),
     (z80.IN(z80.A, z80.At(0x12)), b'\xdb\x12'),
     (z80.OUT(z80.At(0x12), z80.A), b'\xd3\x12'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
@@ -424,6 +434,10 @@ def test_relative() -> None:
                        match='The target 0x1000 is out of range.'):
         z80.JR(0x1000).encode(0x100)
 
+    with pytest.raises(z80.InstrError,
+                       match='The displacement 0x100 is out of range.'):
+        z80.INC(z80.At(z80.IX, 0x100)).encode()
+
     # No jr forms for the po/pe/p/m conditions.
     with pytest.raises(z80.InvalidInstr):
         z80.JR(z80.M, 0x105)
@@ -431,6 +445,6 @@ def test_relative() -> None:
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.INC(z80.At(z80.IX, 5)).encode()
+        z80.RLC(z80.At(z80.IX, 5)).encode()
 
-    assert str(exc_info.value.instr) == 'inc (ix + 0x5)'
+    assert str(exc_info.value.instr) == 'rlc (ix + 0x5)'

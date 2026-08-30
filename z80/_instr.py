@@ -504,6 +504,10 @@ class Instr:
     # encoding time.
     _target: 'Expr | None' = None
 
+    # The index displacement byte of the (i + d) memory operands,
+    # sitting right after the opcode.
+    _disp: 'Expr | None' = None
+
     def __init_subclass__(cls, *, x: int | None = None,
                           y: int | None = None, z: int | None = None,
                           prefix: int | None = None) -> None:
@@ -545,6 +549,14 @@ class Instr:
             raise InstrError(self, 'No encoding.')
 
         image = self._prefix + bytes((x << 6 | y << 3 | z,))
+
+        if self._disp is not None:
+            disp = self._disp.evaluate()
+            if not -0x80 <= disp <= 0x7f:
+                raise InstrError(
+                    self, f'The displacement {disp:#x} is out of range.')
+
+            image += (disp & 0xff).to_bytes(1, 'little')
 
         if self._n is not None:
             n = self._n.evaluate()
@@ -646,9 +658,12 @@ def _encode_alu_op(instr: Instr, op: Op) -> None:
     elif isinstance(op, Expr):
         instr._x, instr._z = 3, 6
         instr._n = op
-    # TODO: Encode alu[y] (ix/iy + d).
+    # alu[y] (i + d)
     elif isinstance(op, At) and op.reg in (IX, IY):
-        pass
+        assert op.reg is not None and op.disp is not None
+        instr._z = 6
+        instr._prefix = op.reg._prefix
+        instr._disp = op.disp
     else:
         raise InvalidInstr(instr)
 
@@ -829,9 +844,12 @@ class _IncDec(Instr, x=0):
             assert isinstance(op, Reg) and op._code is not None
             self._y, self._z = op._code << 1 | (z - 4), 3
             self._prefix = op._prefix
-        # TODO: Encode INC/DEC (ix/iy + d).
-        elif (isinstance(op, At) and op.reg in (IX, IY)):
-            pass
+        # INC/DEC (i + d)
+        elif isinstance(op, At) and op.reg in (IX, IY):
+            assert op.reg is not None and op.disp is not None
+            self._y = 6
+            self._prefix = op.reg._prefix
+            self._disp = op.disp
         else:
             raise InvalidInstr(self)
 
@@ -1135,12 +1153,29 @@ class LD(Instr):
             self._prefix = b'\xed'
             self._x, self._y, self._z = 1, b._code << 1, 3
             self._nn = a.ops[0]
-        # TODO: Encode the displaced forms.
-        elif ((isinstance(a, At) and a.reg in (IX, IY) and
-                (b in (B, C, D, E, H, L, A) or isinstance(b, Expr))) or
-              (a in (B, C, D, E, H, L, A) and
-                isinstance(b, At) and b.reg in (IX, IY))):
-            pass
+        # LD r[y], (i + d), the store counterpart, and
+        # LD (i + d), n.
+        elif (a in (B, C, D, E, H, L, A) and
+                isinstance(b, At) and b.reg in (IX, IY)):
+            assert isinstance(a, Reg) and a._code is not None
+            assert b.reg is not None and b.disp is not None
+            self._x, self._y, self._z = 1, a._code, 6
+            self._prefix = b.reg._prefix
+            self._disp = b.disp
+        elif (isinstance(a, At) and a.reg in (IX, IY) and
+                b in (B, C, D, E, H, L, A)):
+            assert isinstance(b, Reg) and b._code is not None
+            assert a.reg is not None and a.disp is not None
+            self._x, self._y, self._z = 1, 6, b._code
+            self._prefix = a.reg._prefix
+            self._disp = a.disp
+        elif (isinstance(a, At) and a.reg in (IX, IY) and
+                isinstance(b, Expr)):
+            assert a.reg is not None and a.disp is not None
+            self._x, self._y, self._z = 0, 6, 6
+            self._prefix = a.reg._prefix
+            self._disp = a.disp
+            self._n = b
         # I and R transfer with A only, and no register-pair
         # transfers exist beyond the SP forms above.
         elif (a in (IReg, R) or b in (IReg, R) or
