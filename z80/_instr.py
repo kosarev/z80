@@ -955,11 +955,17 @@ class JP(JumpInstr):
             self._prefix = op.reg._prefix
             return
 
-        # TODO: Encode JP nn and JP cc, nn.
+        # JP nn
         if len(self.ops) == 1 and isinstance(self.ops[0], Expr):
+            self._x, self._y, self._z = 3, 0, 3
+            self._nn = self.ops[0]
             return
+
+        # JP cc[y], nn
         if (len(self.ops) == 2 and isinstance(self.ops[0], CondFlag) and
                 isinstance(self.ops[1], Expr)):
+            self._x, self._y, self._z = 3, self.ops[0]._code, 2
+            self._nn = self.ops[1]
             return
 
         raise InvalidInstr(self)

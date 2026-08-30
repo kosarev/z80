@@ -69,6 +69,11 @@ _TESTS = (
     (z80.JP(z80.At(z80.IX)), b'\xdd\xe9'),
     (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
     (z80.JP(z80.At(z80.IX, 0)), b'\xdd\xe9'),
+    (z80.JP(0x1234), b'\xc3\x34\x12'),
+    (z80.JP(z80.Symbol('main', 0x8000)), b'\xc3\x00\x80'),
+    (z80.JP(z80.NZ, 0x1234), b'\xc2\x34\x12'),
+    (z80.JP(z80.CF, 0x1234), b'\xda\x34\x12'),
+    (z80.JP(z80.M, 0x1234), b'\xfa\x34\x12'),
     (z80.RET(), b'\xc9'),
     (z80.RET(z80.NZ), b'\xc0'),
     (z80.RET(z80.Z), b'\xc8'),
@@ -389,6 +394,6 @@ def test_immediates() -> None:
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.JP(0x1234).encode()
+        z80.CALL(0x1234).encode()
 
-    assert str(exc_info.value.instr) == 'jp 0x1234'
+    assert str(exc_info.value.instr) == 'call 0x1234'
