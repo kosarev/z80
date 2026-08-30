@@ -562,7 +562,11 @@ class Z80InstrBuilder:
 
         return op
 
-    def build_instr(self, addr: int, image: bytes) -> Instr:
+    # Returns the instruction together with the number of bytes
+    # its decoding consumed -- which exceeds the instruction's own
+    # size where an inert index prefix decodes lossily (#72).
+    def build_instr(self, addr: int,
+                    image: bytes) -> tuple[Instr, int]:
         original_text, size = Z80Machine._disasm(image)
         if size > len(image):
             # The decoder consumed padding past the image, so the
@@ -576,9 +580,7 @@ class Z80InstrBuilder:
         # resumes at the following byte.
         if original_text == '':
             assert image[0] in (0xdd, 0xfd), image
-            instr: Instr = XPREFIX(image[0])
-            instr.size = 1
-            return instr
+            return XPREFIX(image[0]), 1
 
         try:
             text = original_text.split(maxsplit=1)
@@ -598,14 +600,13 @@ class Z80InstrBuilder:
                     if op is not None:
                         ops.append(op)
 
-            instr = self.__INSTRS[name](*ops)
-            instr.size = size
+            instr: Instr = self.__INSTRS[name](*ops)
         except _UnknownInstrError:
-            instr = UnknownInstr(image[0])
-            instr.text = original_text
-            return instr
+            unknown = UnknownInstr(image[0])
+            unknown.text = original_text
+            return unknown, 1
 
-        return instr
+        return instr, size
 
 
 class _TagSet:
@@ -1024,7 +1025,7 @@ class _Disasm:
                 return
 
             try:
-                tag.instr = self.__instr_builder.build_instr(
+                tag.instr, tag.size = self.__instr_builder.build_instr(
                     tag.addr, bytes(instr_image))
             except IncompleteInstrError:
                 # The bytes run into unknown memory, so the
@@ -1038,8 +1039,7 @@ class _Disasm:
         if isinstance(instr, UnknownInstr):
             return
 
-        assert isinstance(instr.size, int)
-        next_addr = tag.addr + instr.size
+        next_addr = tag.addr + tag.size
 
         if isinstance(instr, RetInstr):
             # Conditional returns may fall through.
@@ -1210,8 +1210,7 @@ class _Disasm:
             t = self.__tags[(addr - back) % 0x10000].disasm_tag
             if t is not None:
                 assert isinstance(t, _DisasmTag)
-                size = t.instr.size
-                if isinstance(size, int) and size > back:
+                if t.size > back:
                     return False
 
             if (back < 2 and
@@ -1292,16 +1291,16 @@ class _Disasm:
 
         return text
 
-    def __get_instr_lines(self, instr: Instr, instr_addr: int) -> (
+    def __get_instr_lines(self, instr_tag: _DisasmTag) -> (
             typing.Generator[_AsmLine, None, None]):
+        instr, instr_addr = instr_tag.instr, instr_tag.addr
         command: None | str = self.__get_instr_text(instr, instr_addr)
         addr = instr_addr
         t = self.__tags[addr].byte_tag
         assert isinstance(t, _ByteTag)
         xbytes = [t.value]
 
-        assert isinstance(instr.size, int)
-        end_addr = addr + instr.size
+        end_addr = addr + instr_tag.size
         byte_addr = addr + 1
 
         while addr < end_addr:
@@ -1427,7 +1426,7 @@ class _Disasm:
         disasm_tag = self.__tags[addr].disasm_tag
         if disasm_tag is not None:
             assert isinstance(disasm_tag, _DisasmTag)
-            yield from self.__get_instr_lines(disasm_tag.instr, addr)
+            yield from self.__get_instr_lines(disasm_tag)
         else:
             yield from self.__get_data_lines(addr)
 

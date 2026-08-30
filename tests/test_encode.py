@@ -461,11 +461,9 @@ def test_relative() -> None:
 
 
 def _check_identity(builder: z80.Z80InstrBuilder, image: bytes) -> None:
-    instr = builder.build_instr(0x100, image)
+    instr, size = builder.build_instr(0x100, image)
     assert not isinstance(instr, z80.UnknownInstr), image.hex()
-    assert isinstance(instr.size, int)
-    assert instr.encode(0x100) == image[:instr.size], (
-        image.hex(), str(instr))
+    assert instr.encode(0x100) == image[:size], (image.hex(), str(instr))
 
 
 # Every decodable byte sequence encodes back to itself: the pure-
@@ -486,8 +484,8 @@ def test_encode_decode_identity() -> None:
             # same, the identity cannot hold and the sequence is
             # skipped.
             image = bytes((prefix, op)) + filler
-            plain = builder.build_instr(0x100, image[1:])
-            prefixed = builder.build_instr(0x100, image)
+            plain, _ = builder.build_instr(0x100, image[1:])
+            prefixed, _ = builder.build_instr(0x100, image)
             if str(prefixed) != str(plain):
                 _check_identity(builder, image)
 

@@ -49,7 +49,7 @@ _TESTS = (
 
 @pytest.mark.parametrize('code, text', _TESTS)
 def test_instr_builder(code: bytes, text: str) -> None:
-    instr = z80.Z80InstrBuilder().build_instr(0, code)
+    instr, _ = z80.Z80InstrBuilder().build_instr(0, code)
     if isinstance(instr, z80.UnknownInstr):
         pytest.fail(f'unknown instruction: {instr.text}')
 
@@ -73,13 +73,12 @@ def test_prefix_chain(code: bytes, texts: tuple[str, ...]) -> None:
     builder = z80.Z80InstrBuilder()
     addr = 0
     for text in texts:
-        instr = builder.build_instr(addr, code[addr:])
+        instr, size = builder.build_instr(addr, code[addr:])
         if text.startswith('xprefix'):
             assert isinstance(instr, z80.XPREFIX)
 
         assert str(instr) == text
-        assert isinstance(instr.size, int)
-        addr += instr.size
+        addr += size
 
     assert addr == len(code)
 

@@ -483,7 +483,6 @@ class Neg(UnaryExpr):
 
 # Base class for all instructions.
 class Instr:
-    size: int | None
     origin: _SourcePos | None
 
     _x: int | None = None
@@ -525,7 +524,6 @@ class Instr:
             cls._prefix = bytes((prefix,))
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
-        self.size = None
         self.ops = tuple(_cast_op(op) for op in ops)
         self.origin = None
 
@@ -539,13 +537,27 @@ class Instr:
             s += ' ' + ', '.join(str(op) for op in self.ops)
         return s
 
+    # The size of the encoding, which the shape of the operands
+    # determines at construction; operand values never affect it.
+    @property
+    def size(self) -> int:
+        # Construction either computes the complete field set or
+        # raises, so every constructed instruction encodes.
+        assert self._x is not None
+
+        return (len(self._prefix) + 1 +
+                (self._disp is not None) + (self._n is not None) +
+                2 * (self._nn is not None) +
+                (self._target is not None))
+
     # The bytes of the instruction. The address is only consulted
     # where the encoding depends on it, as with relative jump
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
+        # Construction either computes the complete field set or
+        # raises, so every constructed instruction encodes.
         x, y, z = self._x, self._y, self._z
-        if x is None or y is None or z is None:
-            raise InstrError(self, 'No encoding.')
+        assert x is not None and y is not None and z is not None
 
         disp_bytes = b''
         if self._disp is not None:
@@ -618,9 +630,12 @@ class UnknownInstr(Instr):
 
     def __init__(self, opcode: int) -> None:
         super().__init__()
-        self.size = 1
         self.opcode = opcode
         self.text = None
+
+    # Unknown instructions are the one kind with no encoding.
+    def encode(self, addr: int | None = None) -> bytes:
+        raise InstrError(self, 'No encoding.')
 
     def __str__(self) -> str:
         return f'db {self.opcode:#04x}'
