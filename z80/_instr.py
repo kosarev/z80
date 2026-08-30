@@ -483,7 +483,6 @@ class Neg(UnaryExpr):
 
 # Base class for all instructions.
 class Instr:
-    addr: int | None
     size: int | None
     origin: _SourcePos | None
 
@@ -526,7 +525,6 @@ class Instr:
             cls._prefix = bytes((prefix,))
 
     def __init__(self, *ops: int | Op, origin: int | None = None) -> None:
-        self.addr = None
         self.size = None
         self.ops = tuple(_cast_op(op) for op in ops)
         self.origin = None
@@ -545,9 +543,6 @@ class Instr:
     # where the encoding depends on it, as with relative jump
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
-        if addr is None:
-            addr = self.addr
-
         x, y, z = self._x, self._y, self._z
         if x is None or y is None or z is None:
             raise InstrError(self, 'No encoding.')
@@ -621,9 +616,8 @@ class InvalidInstr(InstrError):
 class UnknownInstr(Instr):
     text: str | None
 
-    def __init__(self, addr: int, opcode: int) -> None:
+    def __init__(self, opcode: int) -> None:
         super().__init__()
-        self.addr = addr
         self.size = 1
         self.opcode = opcode
         self.text = None

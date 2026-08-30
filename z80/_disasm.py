@@ -577,7 +577,6 @@ class Z80InstrBuilder:
         if original_text == '':
             assert image[0] in (0xdd, 0xfd), image
             instr: Instr = XPREFIX(image[0])
-            instr.addr = addr
             instr.size = 1
             return instr
 
@@ -600,10 +599,9 @@ class Z80InstrBuilder:
                         ops.append(op)
 
             instr = self.__INSTRS[name](*ops)
-            instr.addr = addr
             instr.size = size
         except _UnknownInstrError:
-            instr = UnknownInstr(addr, image[0])
+            instr = UnknownInstr(image[0])
             instr.text = original_text
             return instr
 
@@ -1040,9 +1038,8 @@ class _Disasm:
         if isinstance(instr, UnknownInstr):
             return
 
-        assert isinstance(instr.addr, int)
         assert isinstance(instr.size, int)
-        next_addr = instr.addr + instr.size
+        next_addr = tag.addr + instr.size
 
         if isinstance(instr, RetInstr):
             # Conditional returns may fall through.
@@ -1250,7 +1247,7 @@ class _Disasm:
 
         return not any(True for _ in self.__get_inline_comments(addr))
 
-    def __get_instr_text(self, instr: Instr) -> str:
+    def __get_instr_text(self, instr: Instr, instr_addr: int) -> str:
         text = str(instr)
 
         # Render jump and call targets at labelled addresses by
@@ -1267,15 +1264,13 @@ class _Disasm:
         # Immediate operands are plain numbers unless the source
         # says otherwise; where it does, render them by the label
         # of what they point at.
-        instr_addr = instr.addr
-        if isinstance(instr_addr, int):
-            ref_tag = self.__tags[instr_addr].ref_tag
-            if isinstance(ref_tag, _DataRefTag):
-                ref_target = self.__get_ref_target(ref_tag, instr)
-                if ref_target is not None:
-                    ref_name = self.__get_label_name(ref_target)
-                    if ref_name is not None:
-                        text = text.replace(f'{ref_target:#x}', ref_name)
+        ref_tag = self.__tags[instr_addr].ref_tag
+        if isinstance(ref_tag, _DataRefTag):
+            ref_target = self.__get_ref_target(ref_tag, instr)
+            if ref_target is not None:
+                ref_name = self.__get_label_name(ref_target)
+                if ref_name is not None:
+                    text = text.replace(f'{ref_target:#x}', ref_name)
 
         # Likewise for memory operands, whose brackets make the
         # substitution unambiguous. I/O ports look the same but
@@ -1297,11 +1292,10 @@ class _Disasm:
 
         return text
 
-    def __get_instr_lines(self, instr: Instr) -> (
+    def __get_instr_lines(self, instr: Instr, instr_addr: int) -> (
             typing.Generator[_AsmLine, None, None]):
-        command: None | str = self.__get_instr_text(instr)
-        addr = instr.addr
-        assert isinstance(addr, int)
+        command: None | str = self.__get_instr_text(instr, instr_addr)
+        addr = instr_addr
         t = self.__tags[addr].byte_tag
         assert isinstance(t, _ByteTag)
         xbytes = [t.value]
@@ -1326,13 +1320,13 @@ class _Disasm:
             label_tag = self.__tags[addr].label_tag
             if label_tag is not None:
                 yield _AsmLine(command=label_tag, addr=addr,
-                               as_equ=addr != instr.addr)
-            elif addr == instr.addr and self.__has_derived_label(addr):
+                               as_equ=addr != instr_addr)
+            elif addr == instr_addr and self.__has_derived_label(addr):
                 yield _AsmLine(command=_LabelTag(None, addr,
                                                  f'l_{addr:04x}'),
                                addr=addr)
 
-            first_instr_byte = addr == instr.addr
+            first_instr_byte = addr == instr_addr
             inline_comments = list(
                 self.__get_inline_comments(addr, first_instr_byte))
             while len(xbytes) > 0 or len(inline_comments) > 0:
@@ -1433,7 +1427,7 @@ class _Disasm:
         disasm_tag = self.__tags[addr].disasm_tag
         if disasm_tag is not None:
             assert isinstance(disasm_tag, _DisasmTag)
-            yield from self.__get_instr_lines(disasm_tag.instr)
+            yield from self.__get_instr_lines(disasm_tag.instr, addr)
         else:
             yield from self.__get_data_lines(addr)
 
