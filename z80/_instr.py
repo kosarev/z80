@@ -305,7 +305,7 @@ class SP(metaclass=Reg16):
     _code = 3
 
 
-Op: typing.TypeAlias = typing.Union[str, Reg, CondFlag, 'At', 'Expr']
+Op: typing.TypeAlias = typing.Union[Reg, CondFlag, 'At', 'Expr']
 
 # A value operand: an expression, or a plain integer standing for
 # a constant.
