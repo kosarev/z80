@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+#   Z80 CPU Emulator.
+#   https://github.com/kosarev/z80
+#
+#   Copyright (C) 2026 Ivan Kosarev.
+#   mail@ivankosarev.com
+#
+#   Published under the MIT license.
+
+import z80
+
+
+def main():
+    # Instructions are objects that encode themselves, so programs
+    # assemble without spelling opcodes. Symbols name values; the
+    # port could equally be a plain number.
+    port = z80.Symbol('port', 0xfe)
+    store = z80.Symbol('store', 0x8000)
+
+    instrs = []
+    for c in 'Hello!\n':
+        instrs += [z80.LD(z80.A, ord(c)),
+                   z80.OUT(z80.At(port), z80.A)]
+    instrs += [z80.LD(z80.At(store), z80.A), z80.HALT()]
+
+    # Encoding takes the instruction's address, which only the
+    # pc-relative instructions actually consult.
+    code = b''
+    for instr in instrs:
+        code += instr.encode(len(code))
+
+    m = z80.Z80Machine()
+    m.set_memory_block(0x0000, code)
+
+    # On Z80, the high 8 bits of the port address carry the value
+    # of A for 'out (n), a' instructions, so mask them off to get
+    # the port number.
+    def on_output(addr, value):
+        if addr & 0xff == port.value:
+            print(chr(value), end='')
+
+    m.set_output_callback(on_output)
+
+    m.ticks_to_stop = 10_000
+    m.run()
+    assert m.halted
+    assert m.memory[store.value] == ord('\n')
+
+
+if __name__ == "__main__":
+    main()
