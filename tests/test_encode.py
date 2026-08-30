@@ -149,6 +149,16 @@ _TESTS = (
     (z80.ADC(z80.HL, z80.HL), b'\xed\x6a'),
     (z80.SBC(z80.A, z80.B), b'\x98'),
     (z80.SBC(z80.HL, z80.DE), b'\xed\x52'),
+    (z80.RLC(z80.B), b'\xcb\x00'),
+    (z80.RLC(z80.A), b'\xcb\x07'),
+    (z80.RLC(z80.At(z80.HL)), b'\xcb\x06'),
+    (z80.RRC(z80.B), b'\xcb\x08'),
+    (z80.RL(z80.C), b'\xcb\x11'),
+    (z80.RR(z80.D), b'\xcb\x1a'),
+    (z80.SLA(z80.E), b'\xcb\x23'),
+    (z80.SRA(z80.H), b'\xcb\x2c'),
+    (z80.SLL(z80.L), b'\xcb\x35'),
+    (z80.SRL(z80.At(z80.HL)), b'\xcb\x3e'),
     (z80.XNOP(0xed00), b'\xed\x00'),
     (z80.XNOP(0xed77), b'\xed\x77'),
     (z80.XNOP(0xed7f), b'\xed\x7f'),
@@ -266,6 +276,10 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.ADC(z80.IX, z80.BC)
+
+    # No rotates of the index register halves exist.
+    with pytest.raises(z80.InvalidInstr):
+        z80.RLC(z80.IXH)
 
     # ED 44 is neg and ED A0 is ldi: assigned, so not xnops.
     with pytest.raises(z80.InvalidInstr):

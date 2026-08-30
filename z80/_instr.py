@@ -578,8 +578,8 @@ def _encode_alu_op(instr: Instr, op: Op) -> None:
 # operation. Add, adc and sbc stand alone: their 16-bit forms are
 # no alu operations.
 class _Alu(Instr, x=2):
-    def __init__(self, arg: int | Op) -> None:
-        super().__init__(arg)
+    def __init__(self, op: int | Op) -> None:
+        super().__init__(op)
         _encode_alu_op(self, self.ops[0])
 
 
@@ -681,13 +681,12 @@ class DAA(Instr, x=0, y=4, z=7):
 # INC and DEC, told apart by the z= of their register forms, the
 # register-pair forms repeating the choice in q.
 class _IncDec(Instr, x=0):
-    def __init__(self, arg: Reg | At) -> None:
-        super().__init__(arg)
+    def __init__(self, op: Reg | At) -> None:
+        super().__init__(op)
 
         z = self._z
         assert z is not None
 
-        op = self.ops[0]
         # INC/DEC r[y]
         if op in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL):
             assert isinstance(op, Reg) and op._code is not None
@@ -1083,17 +1082,61 @@ class RETI(RetInstr, prefix=0xed, x=1, y=1, z=5):
         super().__init__()
 
 
-class RL(Instr):
+# The rotate and shift operations, the y= class parameter
+# selecting the operation.
+class _Rot(Instr, prefix=0xcb, x=0):
+    def __init__(self, op: Reg | At) -> None:
+        super().__init__(op)
+
+        # rot[y] r[z]
+        if op in (B, C, D, E, H, L, A):
+            assert isinstance(op, Reg) and op._code is not None
+            self._z = op._code
+        elif isinstance(op, At) and op.ops[0] is HL:
+            self._z = 6
+        # TODO: Encode rot[y] (ix/iy + d).
+        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
+                op.ops[0].ops[0] in (IX, IY)):
+            pass
+        else:
+            raise InvalidInstr(self)
+
+
+class RLC(_Rot, y=0):
+    pass
+
+
+class RRC(_Rot, y=1):
+    pass
+
+
+class RL(_Rot, y=2):
+    pass
+
+
+class RR(_Rot, y=3):
+    pass
+
+
+class SLA(_Rot, y=4):
+    pass
+
+
+class SRA(_Rot, y=5):
+    pass
+
+
+class SLL(_Rot, y=6):
+    pass
+
+
+class SRL(_Rot, y=7):
     pass
 
 
 class RLA(Instr, x=0, y=2, z=7):
     def __init__(self) -> None:
         super().__init__()
-
-
-class RLC(Instr):
-    pass
 
 
 class RLCA(Instr, x=0, y=0, z=7):
@@ -1106,10 +1149,6 @@ class RLD(Instr, prefix=0xed, x=1, y=5, z=7):
         super().__init__()
 
 
-class RR(Instr):
-    pass
-
-
 class RRA(Instr, x=0, y=3, z=7):
     def __init__(self) -> None:
         super().__init__()
@@ -1118,10 +1157,6 @@ class RRA(Instr, x=0, y=3, z=7):
 class RRD(Instr, prefix=0xed, x=1, y=4, z=7):
     def __init__(self) -> None:
         super().__init__()
-
-
-class RRC(Instr):
-    pass
 
 
 class RRCA(Instr, x=0, y=1, z=7):
@@ -1170,22 +1205,6 @@ class SCF(Instr, x=0, y=6, z=7):
 
 
 class SET(Instr):
-    pass
-
-
-class SLA(Instr):
-    pass
-
-
-class SLL(Instr):
-    pass
-
-
-class SRA(Instr):
-    pass
-
-
-class SRL(Instr):
     pass
 
 
