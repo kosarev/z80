@@ -111,5 +111,19 @@ def test_at_displacement() -> None:
     m = z80.At(z80.IX, 5)
     assert repr(m) == 'At((IX, Const(5)))'
     assert str(m) == '(ix + 0x5)'
+    assert m.reg is z80.IX
+    assert isinstance(m.disp, z80.Const) and m.disp.value == 5
 
     assert str(z80.At(z80.IY, -5)) == '(iy - 0x5)'
+
+    # (i) means (i + 0); plain addresses have no register.
+    m = z80.At(z80.IX)
+    assert m.reg is z80.IX
+    assert isinstance(m.disp, z80.Const) and m.disp.value == 0
+
+    m = z80.At(0x1234)
+    assert m.reg is None and m.disp is None
+
+    with pytest.raises(z80.Error,
+                       match='Only ix and iy take displacements.'):
+        z80.At(z80.HL, 5)

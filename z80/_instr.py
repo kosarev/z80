@@ -414,8 +414,20 @@ class At:
     # The optional displacement makes the (i + d) memory operand.
     def __init__(self, op: Value | Reg, disp: Value | None = None) -> None:
         self.ops = [_cast_op(op)]
+
+        # The register content with its displacement -- (i)
+        # meaning (i + 0) -- or None for plain-address operands.
+        self.reg: Reg | None = op if isinstance(op, Reg) else None
+        self.disp: Expr | None = None
+        if self.reg is not None:
+            self.disp = Const(0)
+
         if disp is not None:
-            self.ops.append(_cast_op(disp))
+            if op not in (IX, IY):
+                raise Error('Only ix and iy take displacements.')
+
+            self.disp = Const(disp) if isinstance(disp, int) else disp
+            self.ops.append(self.disp)
 
     def __repr__(self) -> str:
         return f'At({tuple(self.ops)!r})'
@@ -576,12 +588,11 @@ def _encode_alu_op(instr: Instr, op: Op) -> None:
         assert isinstance(op, Reg) and op._code is not None
         instr._z = op._code
         instr._prefix = op._prefix
-    elif isinstance(op, At) and op.ops[0] is HL:
+    elif isinstance(op, At) and op.reg is HL:
         instr._z = 6
     # TODO: Encode alu[y] n and alu[y] (ix/iy + d).
     elif (isinstance(op, Expr) or
-            (isinstance(op, At) and len(op.ops) == 2 and
-             op.ops[0] in (IX, IY))):
+            (isinstance(op, At) and op.reg in (IX, IY))):
         pass
     else:
         raise InvalidInstr(instr)
@@ -662,11 +673,10 @@ class _Bit(Instr, prefix=0xcb):
             if op in (B, C, D, E, H, L, A):
                 assert isinstance(op, Reg) and op._code is not None
                 self._z = op._code
-            elif isinstance(op, At) and op.ops[0] is HL:
+            elif isinstance(op, At) and op.reg is HL:
                 self._z = 6
             # TODO: Encode the (ix/iy + d) forms.
-            elif (isinstance(op, At) and len(op.ops) == 2 and
-                    op.ops[0] in (IX, IY)):
+            elif (isinstance(op, At) and op.reg in (IX, IY)):
                 pass
             else:
                 raise InvalidInstr(self)
@@ -746,7 +756,7 @@ class _IncDec(Instr, x=0):
             assert isinstance(op, Reg) and op._code is not None
             self._y = op._code
             self._prefix = op._prefix
-        elif isinstance(op, At) and op.ops[0] is HL:
+        elif isinstance(op, At) and op.reg is HL:
             self._y = 6
         # INC/DEC rp[p]
         elif op in (BC, DE, HL, SP, IX, IY):
@@ -754,8 +764,7 @@ class _IncDec(Instr, x=0):
             self._y, self._z = op._code << 1 | (z - 4), 3
             self._prefix = op._prefix
         # TODO: Encode INC/DEC (ix/iy + d).
-        elif (isinstance(op, At) and len(op.ops) == 2 and
-                op.ops[0] in (IX, IY)):
+        elif (isinstance(op, At) and op.reg in (IX, IY)):
             pass
         else:
             raise InvalidInstr(self)
@@ -794,7 +803,7 @@ class EX(Instr):
         elif a is DE and b is HL:
             self._x, self._y, self._z = 3, 5, 3
         # EX (SP), HL and the ix/iy forms.
-        elif (isinstance(a, At) and a.ops[0] is SP and
+        elif (isinstance(a, At) and a.reg is SP and
                 b in (HL, IX, IY)):
             self._x, self._y, self._z = 3, 4, 3
             self._prefix = b._prefix
@@ -847,7 +856,7 @@ class IN(Instr):
 
         # IN (C)
         if (len(self.ops) == 1 and isinstance(self.ops[0], At) and
-                self.ops[0].ops[0] is C):
+                self.ops[0].reg is C):
             self._prefix = b'\xed'
             self._x, self._y, self._z = 1, 6, 0
             return
@@ -890,15 +899,18 @@ class JP(JumpInstr):
     def __init__(self, *ops: int | Op) -> None:
         super().__init__(*ops)
 
-        # JP (HL) and the ix/iy forms.
+        # JP (HL) and the ix/iy forms, taking no displacement.
         if len(self.ops) == 1 and isinstance(self.ops[0], At):
-            r = self.ops[0].ops[0]
-            if r not in (HL, IX, IY):
+            op = self.ops[0]
+            if op.reg not in (HL, IX, IY):
                 raise InvalidInstr(self)
 
-            assert isinstance(r, Reg)
+            assert op.reg is not None and op.disp is not None
+            if op.disp.evaluate() != 0:
+                raise InvalidInstr(self)
+
             self._x, self._y, self._z = 3, 5, 1
-            self._prefix = r._prefix
+            self._prefix = op.reg._prefix
             return
 
         # TODO: Encode JP nn and JP cc, nn.
@@ -922,13 +934,13 @@ class LD(Instr):
         b = self.ops[1]
 
         # LD A, (BC)/(DE) and the store counterparts.
-        if a is A and isinstance(b, At) and b.ops[0] is BC:
+        if a is A and isinstance(b, At) and b.reg is BC:
             self._x, self._y, self._z = 0, 1, 2
-        elif a is A and isinstance(b, At) and b.ops[0] is DE:
+        elif a is A and isinstance(b, At) and b.reg is DE:
             self._x, self._y, self._z = 0, 3, 2
-        elif isinstance(a, At) and a.ops[0] is BC and b is A:
+        elif isinstance(a, At) and a.reg is BC and b is A:
             self._x, self._y, self._z = 0, 0, 2
-        elif isinstance(a, At) and a.ops[0] is DE and b is A:
+        elif isinstance(a, At) and a.reg is DE and b is A:
             self._x, self._y, self._z = 0, 2, 2
         # LD SP, HL and the ix/iy forms.
         elif a is SP and b in (HL, IX, IY):
@@ -1142,11 +1154,10 @@ class _Rot(Instr, prefix=0xcb, x=0):
         if op in (B, C, D, E, H, L, A):
             assert isinstance(op, Reg) and op._code is not None
             self._z = op._code
-        elif isinstance(op, At) and op.ops[0] is HL:
+        elif isinstance(op, At) and op.reg is HL:
             self._z = 6
         # TODO: Encode rot[y] (ix/iy + d).
-        elif (isinstance(op, At) and len(op.ops) == 2 and
-                op.ops[0] in (IX, IY)):
+        elif (isinstance(op, At) and op.reg in (IX, IY)):
             pass
         else:
             raise InvalidInstr(self)

@@ -68,6 +68,7 @@ _TESTS = (
     (z80.JP(z80.At(z80.HL)), b'\xe9'),
     (z80.JP(z80.At(z80.IX)), b'\xdd\xe9'),
     (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
+    (z80.JP(z80.At(z80.IX, 0)), b'\xdd\xe9'),
     (z80.RET(), b'\xc9'),
     (z80.IN(z80.At(z80.C)), b'\xed\x70'),
     (z80.OUT(z80.At(z80.C), 0), b'\xed\x71'),
@@ -208,6 +209,10 @@ def test_no_such_form() -> None:
 
     with pytest.raises(z80.InvalidInstr):
         z80.JP(z80.HL)
+
+    # (ix + 0) is (ix); a real displacement makes no jp form.
+    with pytest.raises(z80.InvalidInstr):
+        z80.JP(z80.At(z80.IX, 5))
 
     with pytest.raises(z80.InvalidInstr):
         z80.RET(z80.HL)
