@@ -1102,6 +1102,39 @@ class LD(Instr):
             self._x, self._y, self._z = 0, a._code << 1, 1
             self._prefix = a._prefix
             self._nn = b
+        # LD A, (nn) and the store counterpart.
+        elif a is A and isinstance(b, At) and isinstance(b.ops[0], Expr):
+            self._x, self._y, self._z = 0, 7, 2
+            self._nn = b.ops[0]
+        elif isinstance(a, At) and isinstance(a.ops[0], Expr) and b is A:
+            self._x, self._y, self._z = 0, 6, 2
+            self._nn = a.ops[0]
+        # LD HL, (nn), the ix/iy forms and the store counterparts.
+        elif (a in (HL, IX, IY) and isinstance(b, At) and
+                isinstance(b.ops[0], Expr)):
+            assert isinstance(a, Reg)
+            self._x, self._y, self._z = 0, 5, 2
+            self._prefix = a._prefix
+            self._nn = b.ops[0]
+        elif (isinstance(a, At) and isinstance(a.ops[0], Expr) and
+                b in (HL, IX, IY)):
+            assert isinstance(b, Reg)
+            self._x, self._y, self._z = 0, 4, 2
+            self._prefix = b._prefix
+            self._nn = a.ops[0]
+        # The ED-page LD rp[p], (nn) and stores.
+        elif (a in (BC, DE, SP) and isinstance(b, At) and
+                isinstance(b.ops[0], Expr)):
+            assert isinstance(a, Reg) and a._code is not None
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, a._code << 1 | 1, 3
+            self._nn = b.ops[0]
+        elif (isinstance(a, At) and isinstance(a.ops[0], Expr) and
+                b in (BC, DE, SP)):
+            assert isinstance(b, Reg) and b._code is not None
+            self._prefix = b'\xed'
+            self._x, self._y, self._z = 1, b._code << 1, 3
+            self._nn = a.ops[0]
         # TODO: Encode the displaced forms.
         elif ((isinstance(a, At) and a.reg in (IX, IY) and
                 (b in (B, C, D, E, H, L, A) or isinstance(b, Expr))) or

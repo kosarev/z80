@@ -125,6 +125,18 @@ _TESTS = (
     (z80.LD(z80.SP, 0x1234), b'\x31\x34\x12'),
     (z80.LD(z80.IX, 0x1234), b'\xdd\x21\x34\x12'),
     (z80.LD(z80.IY, 0x1234), b'\xfd\x21\x34\x12'),
+    (z80.LD(z80.A, z80.At(0x1234)), b'\x3a\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.A), b'\x32\x34\x12'),
+    (z80.LD(z80.HL, z80.At(0x1234)), b'\x2a\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.HL), b'\x22\x34\x12'),
+    (z80.LD(z80.IX, z80.At(0x1234)), b'\xdd\x2a\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.IY), b'\xfd\x22\x34\x12'),
+    (z80.LD(z80.BC, z80.At(0x1234)), b'\xed\x4b\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.BC), b'\xed\x43\x34\x12'),
+    (z80.LD(z80.DE, z80.At(0x1234)), b'\xed\x5b\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.DE), b'\xed\x53\x34\x12'),
+    (z80.LD(z80.SP, z80.At(0x1234)), b'\xed\x7b\x34\x12'),
+    (z80.LD(z80.At(0x1234), z80.SP), b'\xed\x73\x34\x12'),
     (z80.IN(z80.A, z80.At(0x12)), b'\xdb\x12'),
     (z80.OUT(z80.At(0x12), z80.A), b'\xd3\x12'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
@@ -419,6 +431,6 @@ def test_relative() -> None:
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.LD(z80.A, z80.At(0x1234)).encode()
+        z80.INC(z80.At(z80.IX, 5)).encode()
 
-    assert str(exc_info.value.instr) == 'ld a, (0x1234)'
+    assert str(exc_info.value.instr) == 'inc (ix + 0x5)'
