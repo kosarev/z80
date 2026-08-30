@@ -631,7 +631,48 @@ class AND(_Alu, y=4):
     pass
 
 
-class BIT(Instr):
+# The bit test, reset and set operations, the x= class parameter
+# selecting the operation.
+class _Bit(Instr, prefix=0xcb):
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        # x[y], r[z]
+        if len(self.ops) == 2:
+            bit, op = self.ops
+            b = Expr._evaluate_op(bit)
+            if not 0 <= b <= 7:
+                raise InstrError(self, 'The bit number must be '
+                                 '0 through 7.')
+
+            self._y = b
+            if op in (B, C, D, E, H, L, A):
+                assert isinstance(op, Reg) and op._code is not None
+                self._z = op._code
+            elif isinstance(op, At) and op.ops[0] is HL:
+                self._z = 6
+            # TODO: Encode the (ix/iy + d) forms.
+            elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
+                    op.ops[0].ops[0] in (IX, IY)):
+                pass
+            else:
+                raise InvalidInstr(self)
+        # TODO: The ddcb forms carrying the copy-field operand.
+        elif len(self.ops) == 3:
+            pass
+        else:
+            raise InvalidInstr(self)
+
+
+class BIT(_Bit, x=1):
+    pass
+
+
+class RES(_Bit, x=2):
+    pass
+
+
+class SET(_Bit, x=3):
     pass
 
 
@@ -1038,10 +1079,6 @@ class PUSH(_PushPop, z=5):
     pass
 
 
-class RES(Instr):
-    pass
-
-
 class RET(RetInstr):
     def __init__(self, *ops: int | Op) -> None:
         super().__init__(*ops)
@@ -1202,10 +1239,6 @@ class SBC(Instr, y=3):
 class SCF(Instr, x=0, y=6, z=7):
     def __init__(self) -> None:
         super().__init__()
-
-
-class SET(Instr):
-    pass
 
 
 class SUB(_Alu, y=2):

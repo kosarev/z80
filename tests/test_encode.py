@@ -159,6 +159,13 @@ _TESTS = (
     (z80.SRA(z80.H), b'\xcb\x2c'),
     (z80.SLL(z80.L), b'\xcb\x35'),
     (z80.SRL(z80.At(z80.HL)), b'\xcb\x3e'),
+    (z80.BIT(0, z80.B), b'\xcb\x40'),
+    (z80.BIT(7, z80.A), b'\xcb\x7f'),
+    (z80.BIT(3, z80.At(z80.HL)), b'\xcb\x5e'),
+    (z80.RES(0, z80.B), b'\xcb\x80'),
+    (z80.RES(6, z80.At(z80.HL)), b'\xcb\xb6'),
+    (z80.SET(0, z80.B), b'\xcb\xc0'),
+    (z80.SET(7, z80.A), b'\xcb\xff'),
     (z80.XNOP(0xed00), b'\xed\x00'),
     (z80.XNOP(0xed77), b'\xed\x77'),
     (z80.XNOP(0xed7f), b'\xed\x7f'),
@@ -280,6 +287,13 @@ def test_no_such_form() -> None:
     # No rotates of the index register halves exist.
     with pytest.raises(z80.InvalidInstr):
         z80.RLC(z80.IXH)
+
+    with pytest.raises(z80.InstrError,
+                       match='The bit number must be 0 through 7.'):
+        z80.BIT(8, z80.B)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.BIT(0, z80.IXH)
 
     # ED 44 is neg and ED A0 is ldi: assigned, so not xnops.
     with pytest.raises(z80.InvalidInstr):
