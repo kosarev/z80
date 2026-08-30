@@ -462,7 +462,12 @@ def test_relative() -> None:
 
 def _check_identity(builder: z80.Z80InstrBuilder, image: bytes) -> None:
     instr, size = builder.build_instr(0x100, image)
-    assert instr.encode(0x100) == image[:size], (image.hex(), str(instr))
+    encoding = instr.encode(0x100)
+    assert encoding == image[:size], (image.hex(), str(instr))
+
+    # The size property counts the encoding fields on its own, so
+    # check it against the actual encoding.
+    assert instr.size == len(encoding), (image.hex(), str(instr))
 
 
 # Every decodable byte sequence encodes back to itself: the pure-
