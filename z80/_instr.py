@@ -970,6 +970,45 @@ class LD(Instr):
         elif a is A and b is R:
             self._prefix = b'\xed'
             self._x, self._y, self._z = 1, 3, 7
+        # LD r[y], r[z]
+        elif (a in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL) and
+                b in (B, C, D, E, H, L, A, IXH, IXL, IYH, IYL)):
+            assert isinstance(a, Reg) and isinstance(b, Reg)
+
+            # The index register halves take the h/l slots under
+            # their prefix, and the prefix redirects both slots at
+            # once, so a half never pairs with true H or L, nor
+            # with a half of the other index register.
+            prefix = a._prefix or b._prefix
+            if prefix:
+                for r in a, b:
+                    if r not in (B, C, D, E, A) and r._prefix != prefix:
+                        raise InvalidInstr(self)
+
+            assert a._code is not None and b._code is not None
+            self._x, self._y, self._z = 1, a._code, b._code
+            self._prefix = prefix
+        # The (HL), (HL) slot is halt.
+        elif (isinstance(a, At) and a.reg is HL and
+                isinstance(b, At) and b.reg is HL):
+            raise InvalidInstr(self)
+        # LD r[y], (HL) and the store counterpart. The displaced
+        # forms do not redirect the halves, so true H and L load
+        # fine, and the halves never pair with memory.
+        elif (a in (B, C, D, E, H, L, A) and
+                isinstance(b, At) and b.reg is HL):
+            assert isinstance(a, Reg) and a._code is not None
+            self._x, self._y, self._z = 1, a._code, 6
+        elif (isinstance(a, At) and a.reg is HL and
+                b in (B, C, D, E, H, L, A)):
+            assert isinstance(b, Reg) and b._code is not None
+            self._x, self._y, self._z = 1, 6, b._code
+        # TODO: Encode the displaced forms.
+        elif ((isinstance(a, At) and a.reg in (IX, IY) and
+                b in (B, C, D, E, H, L, A)) or
+              (a in (B, C, D, E, H, L, A) and
+                isinstance(b, At) and b.reg in (IX, IY))):
+            pass
         # I and R transfer with A only, and no register-pair
         # transfers exist beyond the SP forms above.
         elif (a in (IReg, R) or b in (IReg, R) or

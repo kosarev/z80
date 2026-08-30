@@ -88,6 +88,15 @@ _TESTS = (
     (z80.LD(z80.R, z80.A), b'\xed\x4f'),
     (z80.LD(z80.A, z80.IReg), b'\xed\x57'),
     (z80.LD(z80.A, z80.R), b'\xed\x5f'),
+    (z80.LD(z80.B, z80.C), b'\x41'),
+    (z80.LD(z80.A, z80.B), b'\x78'),
+    (z80.LD(z80.H, z80.L), b'\x65'),
+    (z80.LD(z80.B, z80.At(z80.HL)), b'\x46'),
+    (z80.LD(z80.At(z80.HL), z80.B), b'\x70'),
+    (z80.LD(z80.H, z80.At(z80.HL)), b'\x66'),
+    (z80.LD(z80.IXH, z80.B), b'\xdd\x60'),
+    (z80.LD(z80.B, z80.IYL), b'\xfd\x45'),
+    (z80.LD(z80.IXH, z80.IXL), b'\xdd\x65'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
     (z80.XNEG(0xed54), b'\xed\x54'),
     (z80.XNEG(0xed7c), b'\xed\x7c'),
@@ -246,6 +255,17 @@ def test_no_such_form() -> None:
     with pytest.raises(z80.InvalidInstr):
         z80.LD(z80.HL, z80.B)
 
+    # The prefix redirects both h/l slots at once.
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.IXH, z80.L)
+
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.IXH, z80.IYL)
+
+    # The (hl), (hl) slot is halt.
+    with pytest.raises(z80.InvalidInstr):
+        z80.LD(z80.At(z80.HL), z80.At(z80.HL))
+
     # ED 44 is the true neg, not a duplicate.
     with pytest.raises(z80.InvalidInstr):
         z80.XNEG(0xed44)
@@ -318,6 +338,6 @@ def test_no_such_form() -> None:
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.LD(z80.A, z80.B).encode()
+        z80.LD(z80.B, 5).encode()
 
-    assert str(exc_info.value.instr) == 'ld a, b'
+    assert str(exc_info.value.instr) == 'ld b, 0x5'
