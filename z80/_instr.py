@@ -735,7 +735,20 @@ class SET(_Bit, x=3):
 
 
 class CALL(CallInstr):
-    pass
+    def __init__(self, *ops: int | Op) -> None:
+        super().__init__(*ops)
+
+        match self.ops:
+            # CALL nn
+            case (Expr() as nn,):
+                self._x, self._y, self._z = 3, 1, 5
+                self._nn = nn
+            # CALL cc[y], nn
+            case (CondFlag() as cc, Expr() as nn):
+                self._x, self._y, self._z = 3, cc._code, 4
+                self._nn = nn
+            case _:
+                raise InvalidInstr(self)
 
 
 class CCF(Instr, x=0, y=7, z=7):
