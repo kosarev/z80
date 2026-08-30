@@ -870,9 +870,12 @@ class IN(Instr):
 
         if len(self.ops) == 2:
             a, b = self.ops
-            # TODO: Encode IN r, (C).
+            # IN r[y], (C)
             if (a in (B, C, D, E, H, L, A) and
-                    isinstance(b, At) and b.ops[0] is C):
+                    isinstance(b, At) and b.reg is C):
+                assert isinstance(a, Reg) and a._code is not None
+                self._prefix = b'\xed'
+                self._x, self._y, self._z = 1, a._code, 0
                 return
             # TODO: Encode IN A, (n).
             if (a is A and isinstance(b, At) and
@@ -1053,14 +1056,17 @@ class OUT(Instr):
 
         if len(self.ops) == 2:
             a, b = self.ops
-            if isinstance(a, At) and a.ops[0] is C:
+            if isinstance(a, At) and a.reg is C:
                 # OUT (C), 0
                 if isinstance(b, Const) and b.value == 0:
                     self._prefix = b'\xed'
                     self._x, self._y, self._z = 1, 6, 1
                     return
-                # TODO: Encode OUT (C), r.
+                # OUT (C), r[y]
                 if b in (B, C, D, E, H, L, A):
+                    assert isinstance(b, Reg) and b._code is not None
+                    self._prefix = b'\xed'
+                    self._x, self._y, self._z = 1, b._code, 1
                     return
             # TODO: Encode OUT (n), A.
             if (isinstance(a, At) and isinstance(a.ops[0], Expr) and
