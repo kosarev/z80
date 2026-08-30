@@ -153,39 +153,41 @@ class _InstrElement(type):
 
 
 class CondFlag(_InstrElement):
-    pass
+    # The condition's field code in its encodings.
+    _code: int
 
 
 class CF(metaclass=CondFlag):
     _str = 'c'
+    _code = 3
 
 
 class NC(metaclass=CondFlag):
-    pass
+    _code = 2
 
 
 class M(metaclass=CondFlag):
-    pass
+    _code = 7
 
 
 class P(metaclass=CondFlag):
-    pass
+    _code = 6
 
 
 class PE(metaclass=CondFlag):
-    pass
+    _code = 5
 
 
 class PO(metaclass=CondFlag):
-    pass
+    _code = 4
 
 
 class Z(metaclass=CondFlag):
-    pass
+    _code = 1
 
 
 class NZ(metaclass=CondFlag):
-    pass
+    _code = 0
 
 
 class Reg(_InstrElement):
@@ -1165,8 +1167,9 @@ class RET(RetInstr):
             self._x, self._y, self._z = 3, 1, 1
             return
 
-        # TODO: Encode RET cc.
+        # RET cc[y]
         if len(self.ops) == 1 and isinstance(self.ops[0], CondFlag):
+            self._x, self._y, self._z = 3, self.ops[0]._code, 0
             return
 
         raise InvalidInstr(self)
