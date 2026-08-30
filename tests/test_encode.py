@@ -110,6 +110,12 @@ _TESTS = (
     (z80.LD(z80.IXH, 0x55), b'\xdd\x26\x55'),
     (z80.LD(z80.IYL, 0x55), b'\xfd\x2e\x55'),
     (z80.LD(z80.At(z80.HL), 0x55), b'\x36\x55'),
+    (z80.LD(z80.BC, 0x1234), b'\x01\x34\x12'),
+    (z80.LD(z80.DE, 0x1234), b'\x11\x34\x12'),
+    (z80.LD(z80.HL, 0x1234), b'\x21\x34\x12'),
+    (z80.LD(z80.SP, 0x1234), b'\x31\x34\x12'),
+    (z80.LD(z80.IX, 0x1234), b'\xdd\x21\x34\x12'),
+    (z80.LD(z80.IY, 0x1234), b'\xfd\x21\x34\x12'),
     (z80.IN(z80.A, z80.At(0x12)), b'\xdb\x12'),
     (z80.OUT(z80.At(0x12), z80.A), b'\xd3\x12'),
     (z80.XNEG(0xed4c), b'\xed\x4c'),
@@ -373,12 +379,16 @@ def test_immediates() -> None:
     assert instr.encode() == b'\xd6\x0f'
 
     with pytest.raises(z80.InstrError,
-                       match='The operand must fit a byte.'):
+                       match='0x100 does not fit a byte.'):
         z80.SUB(0x100).encode()
+
+    with pytest.raises(z80.InstrError,
+                       match='0x10000 does not fit a word.'):
+        z80.LD(z80.BC, 0x10000).encode()
 
 
 def test_no_encoding() -> None:
     with pytest.raises(z80.InstrError, match='No encoding.') as exc_info:
-        z80.LD(z80.BC, 0x1234).encode()
+        z80.JP(0x1234).encode()
 
-    assert str(exc_info.value.instr) == 'ld bc, 0x1234'
+    assert str(exc_info.value.instr) == 'jp 0x1234'

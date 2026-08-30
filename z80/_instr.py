@@ -492,11 +492,12 @@ class Instr:
     _z: int | None = None
     _prefix: bytes = b''
 
-    # The immediate byte operand following the opcode. Unlike the
-    # values that select opcode fields, immediates are data, so
-    # they evaluate at encoding time, letting forward references
-    # construct first and bind later.
+    # The immediate byte and little-endian word operands following
+    # the opcode. Unlike the values that select opcode fields,
+    # immediates are data, so they evaluate at encoding time,
+    # letting forward references construct first and bind later.
     _n: 'Expr | None' = None
+    _nn: 'Expr | None' = None
 
     def __init_subclass__(cls, *, x: int | None = None,
                           y: int | None = None, z: int | None = None,
@@ -543,9 +544,18 @@ class Instr:
         if self._n is not None:
             n = self._n.evaluate()
             if not -0x80 <= n <= 0xff:
-                raise InstrError(self, 'The operand must fit a byte.')
+                raise InstrError(
+                    self, f'{n:#x} does not fit a byte.')
 
-            image += bytes((n & 0xff,))
+            image += (n & 0xff).to_bytes(1, 'little')
+
+        if self._nn is not None:
+            nn = self._nn.evaluate()
+            if not -0x8000 <= nn <= 0xffff:
+                raise InstrError(
+                    self, f'{nn:#x} does not fit a word.')
+
+            image += (nn & 0xffff).to_bytes(2, 'little')
 
         return image
 
@@ -1037,6 +1047,12 @@ class LD(Instr):
                 isinstance(b, Expr)):
             self._x, self._y, self._z = 0, 6, 6
             self._n = b
+        # LD rp[p], nn
+        elif a in (BC, DE, HL, SP, IX, IY) and isinstance(b, Expr):
+            assert isinstance(a, Reg) and a._code is not None
+            self._x, self._y, self._z = 0, a._code << 1, 1
+            self._prefix = a._prefix
+            self._nn = b
         # TODO: Encode the displaced forms.
         elif ((isinstance(a, At) and a.reg in (IX, IY) and
                 (b in (B, C, D, E, H, L, A) or isinstance(b, Expr))) or
