@@ -105,7 +105,6 @@ from ._instr import (
     XPREFIX,
     XRETN,
     A,
-    Add,
     At,
     B,
     C,
@@ -113,8 +112,9 @@ from ._instr import (
     Const,
     D,
     E,
+    Expr,
     H,
-    IndexReg,
+    IndexReg16,
     Instr,
     IReg,
     JumpInstr,
@@ -123,6 +123,7 @@ from ._instr import (
     Op,
     P,
     R,
+    Reg,
     Reg16,
     RetInstr,
     UnknownInstr,
@@ -510,7 +511,14 @@ class Z80InstrBuilder:
 
         if text.startswith('('):
             assert text[-1] == ')'
-            return At(self.__build_op(addr, text[1:-1]))
+            content = self.__build_op(addr, text[1:-1])
+            # A displaced index register comes back as the whole
+            # memory operand already.
+            if isinstance(content, At):
+                return content
+
+            assert isinstance(content, (int, Expr, Reg))
+            return At(content)
 
         # Base operand.
         # TODO: Have a proper base class for operand objects other than
@@ -545,8 +553,8 @@ class Z80InstrBuilder:
 
             if isinstance(op, int):
                 op += offset
-            elif isinstance(op, IndexReg):
-                op = Add(op, offset)
+            elif isinstance(op, IndexReg16):
+                op = At(op, offset)
             else:
                 raise _UnknownInstrError()
 

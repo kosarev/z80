@@ -105,3 +105,11 @@ def test_op_casting() -> None:
     m = z80.At(0x1234)
     assert repr(m) == 'At((Const(4660),))'
     assert str(m) == '(0x1234)'
+
+
+def test_at_displacement() -> None:
+    m = z80.At(z80.IX, 5)
+    assert repr(m) == 'At((IX, Const(5)))'
+    assert str(m) == '(ix + 0x5)'
+
+    assert str(z80.At(z80.IY, -5)) == '(iy - 0x5)'

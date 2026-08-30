@@ -411,15 +411,28 @@ class Symbol(Expr):
 
 
 class At:
-    def __init__(self, op: int | Op) -> None:
+    # The optional displacement makes the (i + d) memory operand.
+    def __init__(self, op: Value | Reg, disp: Value | None = None) -> None:
         self.ops = [_cast_op(op)]
+        if disp is not None:
+            self.ops.append(_cast_op(disp))
 
     def __repr__(self) -> str:
         return f'At({tuple(self.ops)!r})'
 
     def __str__(self) -> str:
-        op, = tuple(self.ops)
-        return f'({op})'
+        if len(self.ops) == 1:
+            return f'({self.ops[0]})'
+
+        # A negative constant displacement renders under the
+        # opposite sign.
+        a, b = self.ops
+        sign = '+'
+        b_str = f'{b}'
+        if isinstance(b, Const) and b.value < 0:
+            sign, b_str = '-', f'{Const(-b.value)}'
+
+        return f'({a} {sign} {b_str})'
 
 
 class Add(BinaryExpr, sign='+'):
@@ -567,8 +580,8 @@ def _encode_alu_op(instr: Instr, op: Op) -> None:
         instr._z = 6
     # TODO: Encode alu[y] n and alu[y] (ix/iy + d).
     elif (isinstance(op, Expr) or
-            (isinstance(op, At) and isinstance(op.ops[0], Add) and
-             op.ops[0].ops[0] in (IX, IY))):
+            (isinstance(op, At) and len(op.ops) == 2 and
+             op.ops[0] in (IX, IY))):
         pass
     else:
         raise InvalidInstr(instr)
@@ -652,8 +665,8 @@ class _Bit(Instr, prefix=0xcb):
             elif isinstance(op, At) and op.ops[0] is HL:
                 self._z = 6
             # TODO: Encode the (ix/iy + d) forms.
-            elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
-                    op.ops[0].ops[0] in (IX, IY)):
+            elif (isinstance(op, At) and len(op.ops) == 2 and
+                    op.ops[0] in (IX, IY)):
                 pass
             else:
                 raise InvalidInstr(self)
@@ -741,8 +754,8 @@ class _IncDec(Instr, x=0):
             self._y, self._z = op._code << 1 | (z - 4), 3
             self._prefix = op._prefix
         # TODO: Encode INC/DEC (ix/iy + d).
-        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
-                op.ops[0].ops[0] in (IX, IY)):
+        elif (isinstance(op, At) and len(op.ops) == 2 and
+                op.ops[0] in (IX, IY)):
             pass
         else:
             raise InvalidInstr(self)
@@ -1132,8 +1145,8 @@ class _Rot(Instr, prefix=0xcb, x=0):
         elif isinstance(op, At) and op.ops[0] is HL:
             self._z = 6
         # TODO: Encode rot[y] (ix/iy + d).
-        elif (isinstance(op, At) and isinstance(op.ops[0], Add) and
-                op.ops[0].ops[0] in (IX, IY)):
+        elif (isinstance(op, At) and len(op.ops) == 2 and
+                op.ops[0] in (IX, IY)):
             pass
         else:
             raise InvalidInstr(self)
