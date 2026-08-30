@@ -545,6 +545,9 @@ class Instr:
     # where the encoding depends on it, as with relative jump
     # displacements.
     def encode(self, addr: int | None = None) -> bytes:
+        if addr is None:
+            addr = self.addr
+
         x, y, z = self._x, self._y, self._z
         if x is None or y is None or z is None:
             raise InstrError(self, 'No encoding.')

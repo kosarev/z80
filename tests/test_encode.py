@@ -460,6 +460,39 @@ def test_relative() -> None:
         z80.JR(z80.M, 0x105)
 
 
+def _check_identity(builder: z80.Z80InstrBuilder, image: bytes) -> None:
+    instr = builder.build_instr(0x100, image)
+    assert not isinstance(instr, z80.UnknownInstr), image.hex()
+    assert isinstance(instr.size, int)
+    assert instr.encode() == image[:instr.size], (image.hex(), str(instr))
+
+
+# Every decodable byte sequence encodes back to itself: the pure-
+# Python encoder and the C++ core's decoder certify each other.
+def test_encode_decode_identity() -> None:
+    builder = z80.Z80InstrBuilder()
+    filler = b'\x34\x12'
+    for op in range(0x100):
+        if op not in (0xcb, 0xdd, 0xed, 0xfd):
+            _check_identity(builder, bytes((op,)) + filler)
+
+        _check_identity(builder, b'\xcb' + bytes((op,)))
+        _check_identity(builder, b'\xed' + bytes((op,)) + filler)
+
+        for prefix in (0xdd, 0xfd):
+            # An inert index prefix decodes lossily (#72): where
+            # the prefixed and unprefixed sequences decode the
+            # same, the identity cannot hold and the sequence is
+            # skipped.
+            image = bytes((prefix, op)) + filler
+            plain = builder.build_instr(0x100, image[1:])
+            prefixed = builder.build_instr(0x100, image)
+            if str(prefixed) != str(plain):
+                _check_identity(builder, image)
+
+            _check_identity(builder, bytes((prefix, 0xcb, 0x05, op)))
+
+
 def test_no_encoding() -> None:
     # With every proper instruction form covered, only unknown
     # instructions remain unencodable.
