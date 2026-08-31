@@ -10,6 +10,17 @@ import pytest
 
 import z80
 
+
+# The sanctioned creation path for symbols is their context's
+# get_symbol(); a fresh context per symbol serves these tests.
+def _symbol(name: str, value: int | None = None) -> z80.Symbol:
+    symbol = z80.Code().get_symbol(name)
+    if value is not None:
+        symbol.define(value)
+
+    return symbol
+
+
 # The operand-free instructions and their fixed encodings.
 _TESTS = (
     (z80.NOP(), b'\x00'),
@@ -54,7 +65,7 @@ _TESTS = (
     (z80.RST(0x28), b'\xef'),
     (z80.RST(0x30), b'\xf7'),
     (z80.RST(0x38), b'\xff'),
-    (z80.RST(z80.Symbol('main', 0x28)), b'\xef'),
+    (z80.RST(_symbol('main', 0x28)), b'\xef'),
     (z80.IM(0), b'\xed\x46'),
     (z80.IM(1), b'\xed\x56'),
     (z80.IM(2), b'\xed\x5e'),
@@ -70,7 +81,7 @@ _TESTS = (
     (z80.JP(z80.At(z80.IY)), b'\xfd\xe9'),
     (z80.JP(z80.At(z80.IX, 0)), b'\xdd\xe9'),
     (z80.JP(0x1234), b'\xc3\x34\x12'),
-    (z80.JP(z80.Symbol('main', 0x8000)), b'\xc3\x00\x80'),
+    (z80.JP(_symbol('main', 0x8000)), b'\xc3\x00\x80'),
     (z80.JP(z80.NZ, 0x1234), b'\xc2\x34\x12'),
     (z80.JP(z80.CF, 0x1234), b'\xda\x34\x12'),
     (z80.JP(z80.M, 0x1234), b'\xfa\x34\x12'),
@@ -234,7 +245,7 @@ _TESTS = (
     (z80.OR(0x55), b'\xf6\x55'),
     (z80.CP(0x55), b'\xfe\x55'),
     (z80.CP(-1), b'\xfe\xff'),
-    (z80.SUB(z80.Symbol('mask', 0x0f)), b'\xd6\x0f'),
+    (z80.SUB(_symbol('mask', 0x0f)), b'\xd6\x0f'),
     (z80.RLC(z80.B), b'\xcb\x00'),
     (z80.RLC(z80.A), b'\xcb\x07'),
     (z80.RLC(z80.At(z80.HL)), b'\xcb\x06'),
@@ -274,7 +285,7 @@ def test_no_such_form() -> None:
     assert str(exc_info.value.instr) == 'rst 0x29'
 
     with pytest.raises(z80.Error, match="Undefined symbol 'main'."):
-        z80.RST(z80.Symbol('main'))
+        z80.RST(_symbol('main'))
 
     with pytest.raises(z80.InstrError,
                        match='The mode must be 0, 1 or 2.'):
@@ -418,7 +429,7 @@ def test_no_such_form() -> None:
 def test_immediates() -> None:
     # Immediates evaluate at encoding time, so forward references
     # construct first and bind later.
-    s = z80.Symbol('mask')
+    s = _symbol('mask')
     instr = z80.SUB(s)
     with pytest.raises(z80.Error, match="Undefined symbol 'mask'."):
         instr.encode()

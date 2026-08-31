@@ -49,7 +49,7 @@ class Code:
     def get_symbol(self, name: str) -> Symbol:
         symbol = self.__symbols.get(name)
         if symbol is None:
-            symbol = Symbol(name)
+            symbol = Symbol._create(name)
             self.__symbols[name] = symbol
 
         return symbol

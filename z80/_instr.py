@@ -397,10 +397,18 @@ class UnaryExpr(Expr):
 
 # A named value, possibly not defined yet.
 class Symbol(Expr):
-    def __init__(self, name: str, value: int | None = None) -> None:
-        super().__init__()
-        self.name = name
-        self.value = value
+    name: str
+    value: int | None
+
+    # Symbols are interned per name in their symbol-table context,
+    # so creating one directly is never the intention -- go through
+    # Code.get_symbol().
+    @classmethod
+    def _create(cls, name: str, value: int | None = None) -> 'Symbol':
+        symbol = cls()
+        symbol.name = name
+        symbol.value = value
+        return symbol
 
     def __repr__(self) -> str:
         if self.value is None:

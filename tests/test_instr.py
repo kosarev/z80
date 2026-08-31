@@ -11,6 +11,16 @@ import pytest
 import z80
 
 
+# The sanctioned creation path for symbols is their context's
+# get_symbol(); a fresh context per symbol serves these tests.
+def _symbol(name: str, value: int | None = None) -> z80.Symbol:
+    symbol = z80.Code().get_symbol(name)
+    if value is not None:
+        symbol.define(value)
+
+    return symbol
+
+
 def test_const() -> None:
     c = z80.Const(5)
     assert isinstance(c, z80.Expr)
@@ -21,7 +31,7 @@ def test_const() -> None:
 
 def test_add() -> None:
     # Numeric operands cast to Const leaves automatically.
-    e = z80.Add(z80.Symbol('main'), 5)
+    e = z80.Add(_symbol('main'), 5)
     assert isinstance(e, z80.BinaryExpr)
     assert isinstance(e, z80.Expr)
     assert str(e) == 'main + 0x5'
@@ -29,13 +39,13 @@ def test_add() -> None:
 
 
 def test_add_negative_operand() -> None:
-    e = z80.Add(z80.Symbol('main'), -5)
+    e = z80.Add(_symbol('main'), -5)
     assert str(e) == 'main - 0x5'
     assert repr(e) == "Add(Symbol('main'), Const(-5))"
 
 
 def test_symbol() -> None:
-    s = z80.Symbol('main')
+    s = _symbol('main')
     assert isinstance(s, z80.Expr)
     assert str(s) == 'main'
     assert repr(s) == "Symbol('main')"
@@ -43,7 +53,7 @@ def test_symbol() -> None:
 
 
 def test_symbol_evaluation() -> None:
-    s = z80.Symbol('main')
+    s = _symbol('main')
     with pytest.raises(z80.Error, match="Undefined symbol 'main'."):
         s.evaluate()
 
@@ -54,7 +64,7 @@ def test_symbol_evaluation() -> None:
                        match="Symbol 'main' is already defined."):
         s.define(0x9000)
 
-    s2 = z80.Symbol('start', 0x4000)
+    s2 = _symbol('start', 0x4000)
     assert repr(s2) == "Symbol('start', 16384)"
     assert s2.evaluate() == 0x4000
 
@@ -64,13 +74,13 @@ def test_symbol_evaluation() -> None:
 
 
 def test_add_evaluation() -> None:
-    s = z80.Symbol('main', 0x8000)
+    s = _symbol('main', 0x8000)
     assert z80.Add(s, 5).evaluate() == 0x8005
     assert z80.Add(z80.Add(s, 1), -2).evaluate() == 0x7fff
 
 
 def test_sub() -> None:
-    s = z80.Symbol('main', 0x8000)
+    s = _symbol('main', 0x8000)
     e = z80.Sub(s, 5)
     assert isinstance(e, z80.BinaryExpr)
     assert str(e) == 'main - 0x5'
@@ -87,7 +97,7 @@ def test_sub() -> None:
 
 
 def test_neg() -> None:
-    s = z80.Symbol('main', 0x8000)
+    s = _symbol('main', 0x8000)
     n = z80.Neg(s)
     assert isinstance(n, z80.UnaryExpr)
     assert isinstance(n, z80.Expr)

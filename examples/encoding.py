@@ -13,10 +13,14 @@ import z80
 
 def main():
     # Instructions are objects that encode themselves, so programs
-    # assemble without spelling opcodes. Symbols name values; the
-    # port could equally be a plain number.
-    port = z80.Symbol('port', 0xfe)
-    store = z80.Symbol('store', 0x8000)
+    # assemble without spelling opcodes. Symbols live in a Code
+    # context and name values; the port could equally be a plain
+    # number.
+    code = z80.Code()
+    port = code.get_symbol('port')
+    port.define(0xfe)
+    store = code.get_symbol('store')
+    store.define(0x8000)
 
     instrs = []
     for c in 'Hello!\n':
