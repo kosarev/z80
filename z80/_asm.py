@@ -15,6 +15,8 @@ from ._error import Error
 from ._instr import (
     ADC,
     ADD,
+    AF,
+    AF2,
     AND,
     BC,
     BIT,
@@ -128,6 +130,7 @@ class Asm:
     __NAME = re.compile(r'[_a-zA-Z][_0-9a-zA-Z]*$')
 
     __TOKENS = re.compile(
+        r"(af')|"             # The one quote-suffixed name.
         r'([_0-9a-zA-Z]+)|'   # A number or identifier.
         r'\n|'                # An end of line.
         r'.')                 # Or any other single character.
@@ -135,6 +138,7 @@ class Asm:
     __OPS: typing.ClassVar[dict[str, Reg]] = {
         'a': A, 'b': B, 'c': C, 'd': D, 'e': E, 'h': H, 'l': L,
         'bc': BC, 'de': DE, 'hl': HL, 'sp': SP, 'ix': IX, 'iy': IY,
+        'af': AF, "af'": AF2,
     }
 
     __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
