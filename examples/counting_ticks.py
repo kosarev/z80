@@ -8,31 +8,30 @@
 #
 #   Published under the MIT license.
 
-import z80
+from z80 import DJNZ, LD, NOP, B, Code, LabelDef, Z80Machine
 
 
 def main():
-    LD_B_N = 0x06
-    DJNZ = 0x10
-    NOP = 0x00
-
     # A delay loop taking 7 + 99 * 13 + 8 = 1302 ticks, followed
     # by a 4-tick nop.
-    code = bytes([
-        LD_B_N, 100,  # 0x0000: ld b, 100
-        DJNZ, 0xfe,   # 0x0002: djnz 0x0002
-        NOP,          # 0x0004: nop
-    ])
+    code = Code()
+    loop = code.get_symbol('loop')
+    code.add(LD(B, 100),
+             LabelDef(loop),
+             DJNZ(loop),
+             NOP())
+    code.resolve()
+    addr, image = code.encode()[0]
 
-    m = z80.Z80Machine()
-    m.set_memory_block(0x0000, code)
+    m = Z80Machine()
+    m.set_memory_block(addr, image)
 
     # Stop when the loop is done. Mind that reading the offset of
-    # the djnz instruction advances PC to 0x0004, so a breakpoint
+    # the djnz instruction advances PC past it, so a breakpoint
     # there would trigger on the first iteration of the loop --
     # hence the trailing nop and the breakpoint placed past it, at
     # an address PC never reaches until the loop is done.
-    STOP_AT = 0x0005
+    STOP_AT = addr + len(image)
     m.set_breakpoint(STOP_AT)
 
     # Arm the tick limit with a value large enough for the run to

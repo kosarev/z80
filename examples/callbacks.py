@@ -8,29 +8,27 @@
 #
 #   Published under the MIT license.
 
-import z80
+from z80 import LD, OUT, A, At, Code, Z80Machine
 
 
 def main():
-    LD_A_N = 0x3e
-    OUT_N_A = 0xd3
-    LD_NN_A = 0x32
-
     # Send a greeting to port 0xfe, then store the last character
     # at address 0x8000.
-    code = b''
+    code = Code()
     for c in 'Hello!\n':
-        code += bytes([LD_A_N, ord(c), OUT_N_A, 0xfe])
-    code += bytes([LD_NN_A, 0x00, 0x80])
+        code.add(LD(A, ord(c)),
+                 OUT(At(0xfe), A))
+    code.add(LD(At(0x8000), A))
+    _, image = code.encode()[0]
 
-    m = z80.Z80Machine()
+    m = Z80Machine()
 
     # With a read callback set, all memory reads, including
     # instruction fetches, go through it, so the machine's memory
     # may live entirely on the Python side.
     def on_read(addr):
         NOP = 0x00
-        return code[addr] if addr < len(code) else NOP
+        return image[addr] if addr < len(image) else NOP
 
     def on_write(addr, value):
         print(f'write of {value:#04x} at {addr:#06x}')
@@ -47,10 +45,10 @@ def main():
     m.set_output_callback(on_output)
 
     # Stop when the program is done.
-    m.set_breakpoint(len(code))
+    m.set_breakpoint(len(image))
     m.ticks_to_stop = 10_000
     m.run()
-    assert m.pc == len(code)
+    assert m.pc == len(image)
 
 
 if __name__ == "__main__":

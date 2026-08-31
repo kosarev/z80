@@ -8,17 +8,18 @@
 #
 #   Published under the MIT license.
 
-import z80
+from z80 import HALT, INC, A, Code, Z80Machine
 
 
 def main():
-    INC_A = 0x3c
-    HALT = 0x76
+    code = Code()
+    code.add(INC(A),
+             HALT(),
+             INC(A))
+    addr, image = code.encode()[0]
 
-    code = bytes([INC_A, HALT, INC_A])
-
-    m = z80.Z80Machine()
-    m.set_memory_block(0x0000, code)
+    m = Z80Machine()
+    m.set_memory_block(addr, image)
 
     def step():
         m.ticks_to_stop = 1

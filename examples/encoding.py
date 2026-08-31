@@ -23,7 +23,8 @@ def main():
     for c in 'Hello!\n':
         code.add(LD(A, ord(c)),
                  OUT(At(port), A))
-    code.add(LD(At(store), A), HALT())
+    code.add(LD(At(store), A),
+             HALT())
 
     # Lay the instructions out, starting at address 0 by default.
     (addr, image), = code.encode()

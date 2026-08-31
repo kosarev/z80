@@ -8,18 +8,19 @@
 #
 #   Published under the MIT license.
 
-import z80
+from z80 import ADD, HALT, A, B, Code, Z80Machine
 
 
 def main():
-    m = z80.Z80Machine()
+    m = Z80Machine()
 
     # A one-instruction routine that adds the B register to the
     # accumulator and then halts.
-    m.set_memory_block(0x0000, bytes((
-        0x80,   # add a, b
-        0x76,   # halt
-    )))
+    code = Code()
+    code.add(ADD(A, B),
+             HALT())
+    addr, image = code.encode()[0]
+    m.set_memory_block(addr, image)
 
     # Alter the state: seed the operands into the registers and point
     # the program counter at the routine, all from Python.

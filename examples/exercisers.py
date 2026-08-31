@@ -30,7 +30,7 @@ class _CPMLikeMachineMixin:
         self.pc = self._ENTRY
 
         self.set_breakpoint(self._BDOS_CALL)
-        self.set_memory_block(self._BDOS_CALL, b'\xc9')  # ret
+        self.set_memory_block(self._BDOS_CALL, z80.RET().encode())
 
         self.set_breakpoint(self._QUIT)
 
