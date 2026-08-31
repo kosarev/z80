@@ -14,17 +14,20 @@ from ._code import Code, Db, LabelDef
 from ._error import Error
 from ._instr import (
     BC,
+    CALL,
     CF,
     DE,
     HL,
     IX,
     IY,
+    JP,
     JR,
     LD,
     NC,
     NZ,
     PE,
     PO,
+    RET,
     SP,
     A,
     At,
@@ -88,8 +91,11 @@ class Asm:
     }
 
     __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
+        'call': CALL,
+        'jp': JP,
         'jr': JR,
         'ld': LD,
+        'ret': RET,
     }
 
     # Condition names read as conditions only in the condition
