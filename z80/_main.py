@@ -8,6 +8,7 @@
 
 import sys
 
+from ._asm import Asm
 from ._disasm import _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
@@ -26,6 +27,17 @@ def _handle_extra_arguments(args: list[str]) -> None:
         raise Error(f'Extra argument {args[0]!r}.')
 
 
+def _asm(args: list[str]) -> None:
+    filename = _pop_argument(args, 'The source file is not specified.')
+    _handle_extra_arguments(args)
+
+    code = Asm().assemble(_SourceFile(filename))
+    code.resolve()
+
+    # TODO: Write the code out.
+    code.encode()
+
+
 def _disasm(args: list[str]) -> None:
     filename = _pop_argument(args, 'The assembly file is not specified.')
     _handle_extra_arguments(args)
@@ -41,6 +53,10 @@ def _handle_command_line(args: list[str]) -> None:
         raise Error('Nothing to do.')
 
     command = args.pop(0)
+    if command == 'asm':
+        _asm(args)
+        return
+
     if command == 'disasm':
         _disasm(args)
         return
