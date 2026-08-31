@@ -26,7 +26,7 @@ from ._disasm import (
     _Tag,
     _WordTag,
 )
-from ._source import _SourceFile
+from ._source import SourceFile
 from ._token import _Token, _Tokeniser
 
 
@@ -42,7 +42,7 @@ class _DisasmTagParser:
         r'(--)|'                      # The tag comment leader.
         r'.')                         # Or any other single character.
 
-    def __init__(self, source_file: _SourceFile) -> None:
+    def __init__(self, source_file: SourceFile) -> None:
         self.__toks = _Tokeniser(source_file)
         self.__tok = None
 

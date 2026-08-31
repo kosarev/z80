@@ -8,7 +8,7 @@
 
 import re
 
-from ._source import _SourceFile, _SourcePos
+from ._source import SourceFile, _SourcePos
 
 
 class _Token:
@@ -37,7 +37,7 @@ class _Tokeniser:
     __WHITESPACE = re.compile(r'(\ |\t)+')
     __END_OF_LINE = re.compile(r'(\n|$)')
 
-    def __init__(self, source_file: _SourceFile) -> None:
+    def __init__(self, source_file: SourceFile) -> None:
         self.__source_file = source_file
         self.__image = self.__source_file.get_image()
         self.__offset = 0

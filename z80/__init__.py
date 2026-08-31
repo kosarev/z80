@@ -18,7 +18,7 @@ from ._error import Error
 from ._instr import *
 from ._machine import I8080Machine, Z80Machine
 from ._main import main
-from ._source import _SourceFile
+from ._source import SourceFile
 
 __all__ = [
     'DB',
@@ -30,11 +30,11 @@ __all__ = [
     'I8080Machine',
     'IncompleteInstrError',
     'LabelDef',
+    'SourceFile',
     'Z80InstrBuilder',
     'Z80Machine',
     '_Disasm',
     '_DisasmTagParser',
-    '_SourceFile',
     'main',
 ]
 __all__ += _instr.__all__

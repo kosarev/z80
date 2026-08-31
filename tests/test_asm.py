@@ -36,7 +36,7 @@ def test_asm(name: str) -> None:
     error = ''
     try:
         short_path = os.path.join('asm', name)
-        source = z80._SourceFile(short_path, input)
+        source = z80.SourceFile(short_path, input)
         code = z80.Asm().assemble(source)
         code.resolve()
 

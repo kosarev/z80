@@ -10,7 +10,7 @@ import bisect
 
 
 class _SourcePos:
-    def __init__(self, offset: int, file: '_SourceFile') -> None:
+    def __init__(self, offset: int, file: 'SourceFile') -> None:
         self.__offset = offset
         self.__file = file
 
@@ -37,7 +37,7 @@ class _SourcePos:
         return '{}\n{}^\n'.format(line, ' ' * column_no)
 
 
-class _SourceFile:
+class SourceFile:
     def __init__(self, filename: str, image: str | None = None) -> None:
         self.__filename = filename
 

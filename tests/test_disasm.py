@@ -47,7 +47,7 @@ def test_disasm(name: str) -> None:
         d = z80._Disasm()
         error = ''
         try:
-            source = z80._SourceFile(short_path, input)
+            source = z80.SourceFile(short_path, input)
             d.add_tags(*z80._DisasmTagParser(source).parse())
             d.disassemble()
 

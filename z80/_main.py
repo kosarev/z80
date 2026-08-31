@@ -13,7 +13,7 @@ from ._asm import Asm
 from ._disasm import _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
-from ._source import _SourceFile
+from ._source import SourceFile
 
 
 def _pop_argument(args: list[str], error: str) -> str:
@@ -33,7 +33,7 @@ def _asm(args: list[str]) -> None:
     output = args.pop(0) if args else None
     _handle_extra_arguments(args)
 
-    code = Asm().assemble(_SourceFile(filename))
+    code = Asm().assemble(SourceFile(filename))
     code.resolve()
     blocks = code.encode()
 
@@ -60,7 +60,7 @@ def _disasm(args: list[str]) -> None:
     _handle_extra_arguments(args)
 
     d = _Disasm()
-    d.add_tags(*_DisasmTagParser(_SourceFile(filename)).parse())
+    d.add_tags(*_DisasmTagParser(SourceFile(filename)).parse())
     d.disassemble()
     d.save_output(filename)
 

@@ -97,7 +97,7 @@ from ._instr import (
     Reg,
     Z,
 )
-from ._source import _SourceFile
+from ._source import SourceFile
 from ._token import _Token, _Tokeniser
 
 
@@ -397,7 +397,7 @@ class Asm:
 
         self.__code.add(LabelDef(self.__code.get_symbol(lit)))
 
-    def assemble(self, source_file: _SourceFile) -> Code:
+    def assemble(self, source_file: SourceFile) -> Code:
         self.__toks = _Tokeniser(source_file)
         self.__code = Code()
         while True:
