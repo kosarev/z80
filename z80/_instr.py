@@ -411,6 +411,14 @@ class Symbol(Expr):
     def __str__(self) -> str:
         return self.name
 
+    # Binding a value is the one sanctioned mutation of a symbol,
+    # and it happens at most once.
+    def define(self, value: int) -> None:
+        if self.value is not None:
+            raise Error(f'Symbol {self.name!r} is already defined.')
+
+        self.value = value
+
     def evaluate(self) -> int:
         if self.value is None:
             raise Error(f'Undefined symbol {self.name!r}.')

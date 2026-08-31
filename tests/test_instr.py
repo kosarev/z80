@@ -47,12 +47,20 @@ def test_symbol_evaluation() -> None:
     with pytest.raises(z80.Error, match="Undefined symbol 'main'."):
         s.evaluate()
 
-    s.value = 0x8000
+    s.define(0x8000)
     assert s.evaluate() == 0x8000
+
+    with pytest.raises(z80.Error,
+                       match="Symbol 'main' is already defined."):
+        s.define(0x9000)
 
     s2 = z80.Symbol('start', 0x4000)
     assert repr(s2) == "Symbol('start', 16384)"
     assert s2.evaluate() == 0x4000
+
+    with pytest.raises(z80.Error,
+                       match="Symbol 'start' is already defined."):
+        s2.define(0x9000)
 
 
 def test_add_evaluation() -> None:

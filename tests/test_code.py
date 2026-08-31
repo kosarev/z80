@@ -64,3 +64,12 @@ def test_unresolvable_block_address() -> None:
     with pytest.raises(z80.Error,
                        match="Undefined symbol 'nowhere'."):
         code.resolve()
+
+
+def test_duplicate_label() -> None:
+    code = z80.Code()
+    twice = code.get_symbol('twice')
+    code.add(z80.LabelDef(twice), z80.NOP(), z80.LabelDef(twice))
+    with pytest.raises(z80.Error,
+                       match="Symbol 'twice' is already defined."):
+        code.resolve()

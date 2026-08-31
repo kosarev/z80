@@ -87,7 +87,7 @@ class Code:
 
                 for item in block.items:
                     if isinstance(item, LabelDef):
-                        item.symbol.value = addr
+                        item.symbol.define(addr)
                     else:
                         addr += item.size
 
