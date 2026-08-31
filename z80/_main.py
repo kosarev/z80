@@ -6,6 +6,7 @@
 #
 #   Published under the MIT license.
 
+import os
 import sys
 
 from ._asm import Asm
@@ -29,13 +30,29 @@ def _handle_extra_arguments(args: list[str]) -> None:
 
 def _asm(args: list[str]) -> None:
     filename = _pop_argument(args, 'The source file is not specified.')
+    output = args.pop(0) if args else None
     _handle_extra_arguments(args)
 
     code = Asm().assemble(_SourceFile(filename))
     code.resolve()
+    blocks = code.encode()
 
-    # TODO: Write the code out.
-    code.encode()
+    if output is None:
+        root, _ = os.path.splitext(filename)
+        output = root + '.bin'
+
+    # Flatten the blocks into one contiguous image, in their
+    # intake order.
+    image = bytearray()
+    if blocks:
+        base = min(addr for addr, _ in blocks)
+        top = max(addr + len(data) for addr, data in blocks)
+        image = bytearray(top - base)
+        for addr, data in blocks:
+            image[addr - base:addr - base + len(data)] = data
+
+    with open(output, 'wb') as f:
+        f.write(image)
 
 
 def _disasm(args: list[str]) -> None:
