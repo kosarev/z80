@@ -384,7 +384,15 @@ class Asm:
         if self.__NAME.match(lit) is None:
             raise AsmError(tok, 'Invalid construct.')
 
-        self.__skip_token(':', "':' expected after a symbol name.")
+        t = self.__fetch_token()
+        if t == 'equ':
+            self.__code.define_symbol(lit, self.__parse_number())
+            self.__parse_end_of_line()
+            return
+
+        if t != ':':
+            raise AsmError(t, "':' expected after a symbol name.")
+
         self.__code.add(LabelDef(self.__code.get_symbol(lit)))
 
     def assemble(self, source_file: _SourceFile) -> Code:
