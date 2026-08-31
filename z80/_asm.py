@@ -161,9 +161,24 @@ class Asm:
         # A pair spanning the entire operand marks an access form.
         if lit == '(':
             op = self.__parse_op(self.__fetch_token())
-            self.__skip_token(')')
             if isinstance(op, At):
                 raise AsmError(tok, 'Invalid operand.')
+
+            # A sign after the operand starts a displacement.
+            t = self.__fetch_token()
+            if t.literal in ('+', '-'):
+                disp = self.__parse_number()
+                if t == '-':
+                    disp = -disp
+
+                self.__skip_token(')')
+                try:
+                    return At(op, disp)
+                except Error as e:
+                    raise AsmError(tok, e.reason) from e
+
+            if t != ')':
+                raise AsmError(t, "')' expected.")
 
             return At(op)
 
