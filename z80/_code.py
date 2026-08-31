@@ -49,7 +49,33 @@ class DB:
         return image
 
 
-BlockItem: typing.TypeAlias = Instr | LabelDef | DB
+# The directive emitting the values of its operands as
+# little-endian words.
+class DW:
+    def __init__(self, *values: Value) -> None:
+        self.values = tuple(Const(v) if isinstance(v, int) else v
+                            for v in values)
+
+    def __str__(self) -> str:
+        return 'dw ' + ', '.join(str(v) for v in self.values)
+
+    @property
+    def size(self) -> int:
+        return 2 * len(self.values)
+
+    def encode(self, addr: int | None = None) -> bytes:
+        image = b''
+        for value in self.values:
+            v = value.evaluate()
+            if not -0x8000 <= v <= 0xffff:
+                raise Error(f'{v:#x} does not fit a word.')
+
+            image += (v & 0xffff).to_bytes(2, 'little')
+
+        return image
+
+
+BlockItem: typing.TypeAlias = Instr | LabelDef | DB | DW
 
 
 # A run of instructions and directives at an address, which may be
