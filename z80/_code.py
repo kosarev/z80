@@ -25,7 +25,7 @@ class LabelDef:
 
 
 # The directive emitting the values of its operands as bytes.
-class Db:
+class DB:
     def __init__(self, *values: Value) -> None:
         self.values = tuple(Const(v) if isinstance(v, int) else v
                             for v in values)
@@ -49,7 +49,7 @@ class Db:
         return image
 
 
-BlockItem: typing.TypeAlias = Instr | LabelDef | Db
+BlockItem: typing.TypeAlias = Instr | LabelDef | DB
 
 
 # A run of instructions and directives at an address, which may be

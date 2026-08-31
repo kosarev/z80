@@ -10,7 +10,7 @@
 import re
 import typing
 
-from ._code import Code, Db, LabelDef
+from ._code import DB, Code, LabelDef
 from ._error import Error
 from ._instr import (
     ADC,
@@ -327,7 +327,7 @@ class Asm:
 
             values.append(self.__parse_number())
 
-        self.__code.add(Db(*values))
+        self.__code.add(DB(*values))
 
     def __parse_org(self) -> None:
         self.__code.start_block(self.__parse_number())
