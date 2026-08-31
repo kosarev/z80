@@ -88,10 +88,12 @@ from ._instr import (
     Expr,
     H,
     Instr,
+    IReg,
     L,
     M,
     Op,
     P,
+    R,
     Reg,
     Z,
 )
@@ -138,7 +140,7 @@ class Asm:
     __OPS: typing.ClassVar[dict[str, Reg]] = {
         'a': A, 'b': B, 'c': C, 'd': D, 'e': E, 'h': H, 'l': L,
         'bc': BC, 'de': DE, 'hl': HL, 'sp': SP, 'ix': IX, 'iy': IY,
-        'af': AF, "af'": AF2,
+        'af': AF, "af'": AF2, 'i': IReg, 'r': R,
     }
 
     __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {

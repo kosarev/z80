@@ -1209,14 +1209,8 @@ class LD(Instr):
             self._prefix = a.reg._prefix
             self._disp = a.disp
             self._n = b
-        # I and R transfer with A only, and no register-pair
-        # transfers exist beyond the SP forms above.
-        elif (a in (IReg, R) or b in (IReg, R) or
-                (isinstance(a, Reg16) and isinstance(b, Reg)) or
-                (isinstance(a, Reg) and isinstance(b, Reg16))):
+        else:
             raise InvalidInstr(self)
-
-        # TODO: Encode the remaining ld forms.
 
 
 class XLD(Instr, prefix=0xed, x=1, z=3):
