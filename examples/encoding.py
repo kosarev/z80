@@ -22,20 +22,16 @@ def main():
     store = code.get_symbol('store')
     store.define(0x8000)
 
-    instrs = []
     for c in 'Hello!\n':
-        instrs += [z80.LD(z80.A, ord(c)),
-                   z80.OUT(z80.At(port), z80.A)]
-    instrs += [z80.LD(z80.At(store), z80.A), z80.HALT()]
+        code.add(z80.LD(z80.A, ord(c)),
+                 z80.OUT(z80.At(port), z80.A))
+    code.add(z80.LD(z80.At(store), z80.A), z80.HALT())
 
-    # Encoding takes the instruction's address, which only the
-    # pc-relative instructions actually consult.
-    code = b''
-    for instr in instrs:
-        code += instr.encode(len(code))
+    # Lay the instructions out, starting at address 0 by default.
+    (addr, image), = code.encode()
 
     m = z80.Z80Machine()
-    m.set_memory_block(0x0000, code)
+    m.set_memory_block(addr, image)
 
     # On Z80, the high 8 bits of the port address carry the value
     # of A for 'out (n), a' instructions, so mask them off to get
