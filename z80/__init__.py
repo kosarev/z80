@@ -7,6 +7,7 @@
 #   Published under the MIT license.
 
 from . import _instr
+from ._code import Code
 from ._disasm import IncompleteInstrError, Z80InstrBuilder, _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
@@ -19,6 +20,7 @@ from ._main import main
 from ._source import _SourceFile
 
 __all__ = [
+    'Code',
     'Error',
     'I8080Machine',
     'IncompleteInstrError',
