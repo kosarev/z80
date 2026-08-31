@@ -52,6 +52,7 @@ class Asm:
         r'.')                 # Or any other single character.
 
     __toks: _Tokeniser
+    __code: Code
 
     def __fetch_token(self) -> _Token:
         self.__toks.skip_whitespace()
@@ -94,16 +95,16 @@ class Asm:
 
         raise AsmError(tok, 'A number expected.')
 
-    def __parse_org(self, code: Code) -> None:
-        code.start_block(self.__parse_number())
+    def __parse_org(self) -> None:
+        self.__code.start_block(self.__parse_number())
         self.__parse_end_of_line()
 
-    def __parse_line(self, code: Code, tok: _Token) -> None:
+    def __parse_line(self, tok: _Token) -> None:
         lit = tok.literal
         assert lit is not None
 
         if lit == 'org':
-            self.__parse_org(code)
+            self.__parse_org()
             return
 
         # Not a directive or instruction, so a symbol definition.
@@ -111,17 +112,17 @@ class Asm:
             raise AsmError(tok, 'Invalid construct.')
 
         self.__skip_token(':', "':' expected after a symbol name.")
-        code.add(LabelDef(code.get_symbol(lit)))
+        self.__code.add(LabelDef(self.__code.get_symbol(lit)))
 
     def assemble(self, source_file: _SourceFile) -> Code:
         self.__toks = _Tokeniser(source_file)
-        code = Code()
+        self.__code = Code()
         while True:
             tok = self.__fetch_token()
             if tok.literal is None:
                 break
 
             if tok.literal != '\n':
-                self.__parse_line(code, tok)
+                self.__parse_line(tok)
 
-        return code
+        return self.__code
