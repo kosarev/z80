@@ -8,7 +8,7 @@
 #
 #   Published under the MIT license.
 
-import z80
+from z80 import HALT, LD, OUT, A, At, Code, Z80Machine
 
 
 def main():
@@ -16,21 +16,21 @@ def main():
     # assemble without spelling opcodes. Symbols live in a Code
     # context and name values; the port could equally be a plain
     # number.
-    code = z80.Code()
+    code = Code()
     port = code.get_symbol('port')
     port.define(0xfe)
     store = code.get_symbol('store')
     store.define(0x8000)
 
     for c in 'Hello!\n':
-        code.add(z80.LD(z80.A, ord(c)),
-                 z80.OUT(z80.At(port), z80.A))
-    code.add(z80.LD(z80.At(store), z80.A), z80.HALT())
+        code.add(LD(A, ord(c)),
+                 OUT(At(port), A))
+    code.add(LD(At(store), A), HALT())
 
     # Lay the instructions out, starting at address 0 by default.
     (addr, image), = code.encode()
 
-    m = z80.Z80Machine()
+    m = Z80Machine()
     m.set_memory_block(addr, image)
 
     # On Z80, the high 8 bits of the port address carry the value
