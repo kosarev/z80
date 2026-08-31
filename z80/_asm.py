@@ -14,23 +14,34 @@ from ._code import Code, Db, LabelDef
 from ._error import Error
 from ._instr import (
     BC,
+    CF,
     DE,
     HL,
     IX,
     IY,
+    JR,
     LD,
+    NC,
+    NZ,
+    PE,
+    PO,
     SP,
     A,
     At,
     B,
     C,
+    CondFlag,
     D,
     E,
     Expr,
     H,
     Instr,
     L,
+    M,
+    Op,
+    P,
     Reg,
+    Z,
 )
 from ._source import _SourceFile
 from ._token import _Token, _Tokeniser
@@ -77,8 +88,18 @@ class Asm:
     }
 
     __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
+        'jr': JR,
         'ld': LD,
     }
+
+    # Condition names read as conditions only in the condition
+    # slot -- the first operand of these instructions.
+    __CONDS: typing.ClassVar[dict[str, CondFlag]] = {
+        'nz': NZ, 'z': Z, 'nc': NC, 'c': CF,
+        'po': PO, 'pe': PE, 'p': P, 'm': M,
+    }
+
+    __COND_INSTRS = frozenset(('jp', 'jr', 'call', 'ret'))
 
     __toks: _Tokeniser
     __code: Code
@@ -156,10 +177,14 @@ class Asm:
         assert tok.literal is not None
         instr_type = self.__INSTRS[tok.literal]
 
-        ops: list[int | Reg | Expr | At] = []
+        ops: list[int | Op] = []
         t = self.__fetch_token()
         if t.literal not in (None, '\n'):
-            ops.append(self.__parse_op(t))
+            if (tok.literal in self.__COND_INSTRS and
+                    t.literal in self.__CONDS):
+                ops.append(self.__CONDS[t.literal])
+            else:
+                ops.append(self.__parse_op(t))
             while True:
                 t = self.__fetch_token()
                 if t.literal in (None, '\n'):
