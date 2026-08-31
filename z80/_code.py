@@ -42,7 +42,7 @@ class Code:
     def __init__(self) -> None:
         self.__symbols: dict[str, Symbol] = {}
         self.__blocks: list[_Block] = []
-        self.org(0)
+        self.start_block(0)
 
     # Symbols are interned per name, so every reference to a name
     # shares the object its definition binds.
@@ -63,7 +63,7 @@ class Code:
     # expression over labels of other blocks. Blocks may overlap:
     # pages legally share addresses, and packing the produced code
     # into images is a separate concern.
-    def org(self, addr: Value) -> None:
+    def start_block(self, addr: Value) -> None:
         if isinstance(addr, int):
             addr = Const(addr)
 

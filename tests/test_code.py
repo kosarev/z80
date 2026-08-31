@@ -45,9 +45,9 @@ def test_symbolic_block_address() -> None:
     code = z80.Code()
     start = code.get_symbol('start')
     entry = code.get_symbol('entry')
-    code.org(0x8000)
+    code.start_block(0x8000)
     code.add(z80.LabelDef(start), z80.NOP())
-    code.org(z80.Add(start, 0x100))
+    code.start_block(z80.Add(start, 0x100))
     code.add(z80.LabelDef(entry), z80.RET())
     code.resolve()
     assert entry.value == 0x8100
@@ -60,9 +60,9 @@ def test_symbolic_block_address() -> None:
 def test_block_dependency_order() -> None:
     code = z80.Code()
     base = code.get_symbol('base')
-    code.org(z80.Add(base, 2))
+    code.start_block(z80.Add(base, 2))
     code.add(z80.HALT())
-    code.org(0x6000)
+    code.start_block(0x6000)
     code.add(z80.LabelDef(base), z80.NOP())
     code.resolve()
     assert code.encode() == [(0x6002, b'\x76'), (0x6000, b'\x00')]
@@ -70,7 +70,7 @@ def test_block_dependency_order() -> None:
 
 def test_unresolvable_block_address() -> None:
     code = z80.Code()
-    code.org(code.get_symbol('nowhere'))
+    code.start_block(code.get_symbol('nowhere'))
     code.add(z80.NOP())
     with pytest.raises(z80.Error,
                        match="Undefined symbol 'nowhere'."):
