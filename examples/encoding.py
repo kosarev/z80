@@ -17,10 +17,8 @@ def main():
     # context and name values; the port could equally be a plain
     # number.
     code = Code()
-    port = code.get_symbol('port')
-    port.define(0xfe)
-    store = code.get_symbol('store')
-    store.define(0x8000)
+    port = code.define_symbol('port', 0xfe)
+    store = code.define_symbol('store', 0x8000)
 
     for c in 'Hello!\n':
         code.add(LD(A, ord(c)),

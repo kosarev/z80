@@ -17,6 +17,17 @@ def test_symbol_interning() -> None:
     assert code.get_symbol('main') is code.get_symbol('main')
 
 
+def test_define_symbol() -> None:
+    code = z80.Code()
+    port = code.define_symbol('port', 0xfe)
+    assert port is code.get_symbol('port')
+    assert port.evaluate() == 0xfe
+
+    with pytest.raises(z80.Error,
+                       match="Symbol 'port' is already defined."):
+        code.define_symbol('port', 0xff)
+
+
 def test_forward_reference() -> None:
     code = z80.Code()
     loop = code.get_symbol('loop')

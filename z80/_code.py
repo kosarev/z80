@@ -54,6 +54,11 @@ class Code:
 
         return symbol
 
+    def define_symbol(self, name: str, value: int) -> Symbol:
+        symbol = self.get_symbol(name)
+        symbol.define(value)
+        return symbol
+
     # Starts a new block at the given address, which may be an
     # expression over labels of other blocks. Blocks may overlap:
     # pages legally share addresses, and packing the produced code
