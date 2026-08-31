@@ -68,6 +68,24 @@ def test_block_dependency_order() -> None:
     assert code.encode() == [(0x6002, b'\x76'), (0x6000, b'\x00')]
 
 
+# Data directives lay out like instructions, so labels bind past
+# them at their shape-determined offsets.
+def test_db() -> None:
+    code = z80.Code()
+    after = code.get_symbol('after')
+    fill = code.get_symbol('fill')
+    code.add(z80.Db(1, 2, fill), z80.LabelDef(after), z80.NOP())
+    fill.define(0xff)
+    code.resolve()
+    assert after.value == 3
+    assert code.encode() == [(0, b'\x01\x02\xff\x00')]
+
+    code = z80.Code()
+    code.add(z80.Db(0x100))
+    with pytest.raises(z80.Error, match='0x100 does not fit a byte.'):
+        code.encode()
+
+
 def test_unresolvable_block_address() -> None:
     code = z80.Code()
     code.start_block(code.get_symbol('nowhere'))

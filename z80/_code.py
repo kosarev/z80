@@ -24,7 +24,32 @@ class LabelDef:
         return f'{self.symbol}:'
 
 
-BlockItem: typing.TypeAlias = Instr | LabelDef
+# The directive emitting the values of its operands as bytes.
+class Db:
+    def __init__(self, *values: Value) -> None:
+        self.values = tuple(Const(v) if isinstance(v, int) else v
+                            for v in values)
+
+    def __str__(self) -> str:
+        return 'db ' + ', '.join(str(v) for v in self.values)
+
+    @property
+    def size(self) -> int:
+        return len(self.values)
+
+    def encode(self, addr: int | None = None) -> bytes:
+        image = b''
+        for value in self.values:
+            v = value.evaluate()
+            if not -0x80 <= v <= 0xff:
+                raise Error(f'{v:#x} does not fit a byte.')
+
+            image += (v & 0xff).to_bytes(1, 'little')
+
+        return image
+
+
+BlockItem: typing.TypeAlias = Instr | LabelDef | Db
 
 
 # A run of instructions and directives at an address, which may be
@@ -110,7 +135,7 @@ class Code:
             addr = block.addr.evaluate()
             image = b''
             for item in block.items:
-                if isinstance(item, Instr):
+                if not isinstance(item, LabelDef):
                     image += item.encode(addr + len(image))
 
             if image:

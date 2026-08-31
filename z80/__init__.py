@@ -8,7 +8,7 @@
 
 from . import _instr
 from ._asm import Asm, AsmError
-from ._code import Code, LabelDef
+from ._code import Code, Db, LabelDef
 from ._disasm import IncompleteInstrError, Z80InstrBuilder, _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
@@ -24,6 +24,7 @@ __all__ = [
     'Asm',
     'AsmError',
     'Code',
+    'Db',
     'Error',
     'I8080Machine',
     'IncompleteInstrError',

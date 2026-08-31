@@ -10,7 +10,7 @@
 import re
 import typing
 
-from ._code import Code, LabelDef
+from ._code import Code, Db, LabelDef
 from ._error import Error
 from ._source import _SourceFile
 from ._token import _Token, _Tokeniser
@@ -95,6 +95,20 @@ class Asm:
 
         raise AsmError(tok, 'A number expected.')
 
+    def __parse_db(self) -> None:
+        values = [self.__parse_number()]
+        while True:
+            tok = self.__fetch_token()
+            if tok.literal in (None, '\n'):
+                break
+
+            if tok != ',':
+                raise AsmError(tok, "',' expected.")
+
+            values.append(self.__parse_number())
+
+        self.__code.add(Db(*values))
+
     def __parse_org(self) -> None:
         self.__code.start_block(self.__parse_number())
         self.__parse_end_of_line()
@@ -102,6 +116,10 @@ class Asm:
     def __parse_line(self, tok: _Token) -> None:
         lit = tok.literal
         assert lit is not None
+
+        if lit == 'db':
+            self.__parse_db()
+            return
 
         if lit == 'org':
             self.__parse_org()
