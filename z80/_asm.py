@@ -27,6 +27,8 @@ from ._instr import (
     NZ,
     PE,
     PO,
+    POP,
+    PUSH,
     RET,
     SP,
     A,
@@ -95,6 +97,8 @@ class Asm:
         'jp': JP,
         'jr': JR,
         'ld': LD,
+        'pop': POP,
+        'push': PUSH,
         'ret': RET,
     }
 
