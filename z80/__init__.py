@@ -7,6 +7,7 @@
 #   Published under the MIT license.
 
 from . import _instr
+from ._asm import Asm, AsmError
 from ._code import Code, LabelDef
 from ._disasm import IncompleteInstrError, Z80InstrBuilder, _Disasm
 from ._disasm_parser import _DisasmTagParser
@@ -20,6 +21,8 @@ from ._main import main
 from ._source import _SourceFile
 
 __all__ = [
+    'Asm',
+    'AsmError',
     'Code',
     'Error',
     'I8080Machine',
