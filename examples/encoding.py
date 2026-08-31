@@ -32,9 +32,7 @@ def main():
     m = Z80Machine()
     m.set_memory_block(addr, image)
 
-    # On Z80, the high 8 bits of the port address carry the value
-    # of A for 'out (n), a' instructions, so mask them off to get
-    # the port number.
+    # Z80 port addresses are 16-bit, so match the low 8 bits.
     def on_output(addr, value):
         if addr & 0xff == port.value:
             print(chr(value), end='')
