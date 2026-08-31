@@ -10,7 +10,7 @@
 import re
 import typing
 
-from ._code import DB, Code, LabelDef
+from ._code import DB, DW, Code, LabelDef
 from ._error import Error
 from ._instr import (
     ADC,
@@ -249,6 +249,23 @@ class Asm:
 
         raise AsmError(tok, 'A number expected.')
 
+    # Fetches a subsequent token and reads it as a value: a number
+    # or a symbol reference.
+    def __parse_value(self) -> 'int | Expr':
+        tok = self.__fetch_token()
+        lit = tok.literal
+        if lit is not None:
+            if lit[0].isdigit():
+                try:
+                    return int(lit, base=0)
+                except ValueError:
+                    raise AsmError(tok, 'A value expected.') from None
+
+            if self.__NAME.match(lit) is not None:
+                return self.__code.get_symbol(lit)
+
+        raise AsmError(tok, 'A value expected.')
+
     def __parse_op(self, tok: _Token) -> 'int | Reg | Expr | At':
         lit = tok.literal
 
@@ -319,8 +336,8 @@ class Asm:
         except Error as e:
             raise AsmError(tok, e.reason) from e
 
-    def __parse_db(self) -> None:
-        values = [self.__parse_number()]
+    def __parse_values(self) -> 'list[int | Expr]':
+        values = [self.__parse_value()]
         while True:
             tok = self.__fetch_token()
             if tok.literal in (None, '\n'):
@@ -329,9 +346,15 @@ class Asm:
             if tok != ',':
                 raise AsmError(tok, "',' expected.")
 
-            values.append(self.__parse_number())
+            values.append(self.__parse_value())
 
-        self.__code.add(DB(*values))
+        return values
+
+    def __parse_db(self) -> None:
+        self.__code.add(DB(*self.__parse_values()))
+
+    def __parse_dw(self) -> None:
+        self.__code.add(DW(*self.__parse_values()))
 
     def __parse_org(self) -> None:
         self.__code.start_block(self.__parse_number())
@@ -347,6 +370,10 @@ class Asm:
 
         if lit == 'db':
             self.__parse_db()
+            return
+
+        if lit == 'dw':
+            self.__parse_dw()
             return
 
         if lit == 'org':
