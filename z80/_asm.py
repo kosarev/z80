@@ -12,6 +12,26 @@ import typing
 
 from ._code import Code, Db, LabelDef
 from ._error import Error
+from ._instr import (
+    BC,
+    DE,
+    HL,
+    IX,
+    IY,
+    LD,
+    SP,
+    A,
+    At,
+    B,
+    C,
+    D,
+    E,
+    Expr,
+    H,
+    Instr,
+    L,
+    Reg,
+)
 from ._source import _SourceFile
 from ._token import _Token, _Tokeniser
 
@@ -50,6 +70,15 @@ class Asm:
         r'([_0-9a-zA-Z]+)|'   # A number or identifier.
         r'\n|'                # An end of line.
         r'.')                 # Or any other single character.
+
+    __OPS: typing.ClassVar[dict[str, Reg]] = {
+        'a': A, 'b': B, 'c': C, 'd': D, 'e': E, 'h': H, 'l': L,
+        'bc': BC, 'de': DE, 'hl': HL, 'sp': SP, 'ix': IX, 'iy': IY,
+    }
+
+    __INSTRS: typing.ClassVar[dict[str, type[Instr]]] = {
+        'ld': LD,
+    }
 
     __toks: _Tokeniser
     __code: Code
@@ -95,6 +124,57 @@ class Asm:
 
         raise AsmError(tok, 'A number expected.')
 
+    def __parse_op(self, tok: _Token) -> 'int | Reg | Expr | At':
+        lit = tok.literal
+
+        # A pair spanning the entire operand marks an access form.
+        if lit == '(':
+            op = self.__parse_op(self.__fetch_token())
+            self.__skip_token(')')
+            if isinstance(op, At):
+                raise AsmError(tok, 'Invalid operand.')
+
+            return At(op)
+
+        if lit is not None:
+            reg = self.__OPS.get(lit)
+            if reg is not None:
+                return reg
+
+            if lit[0].isdigit():
+                try:
+                    return int(lit, base=0)
+                except ValueError:
+                    raise AsmError(tok, 'Invalid operand.') from None
+
+            if self.__NAME.match(lit) is not None:
+                return self.__code.get_symbol(lit)
+
+        raise AsmError(tok, 'An operand expected.')
+
+    def __parse_instr(self, tok: _Token) -> None:
+        assert tok.literal is not None
+        instr_type = self.__INSTRS[tok.literal]
+
+        ops: list[int | Reg | Expr | At] = []
+        t = self.__fetch_token()
+        if t.literal not in (None, '\n'):
+            ops.append(self.__parse_op(t))
+            while True:
+                t = self.__fetch_token()
+                if t.literal in (None, '\n'):
+                    break
+
+                if t != ',':
+                    raise AsmError(t, "',' expected.")
+
+                ops.append(self.__parse_op(self.__fetch_token()))
+
+        try:
+            self.__code.add(instr_type(*ops))
+        except Error as e:
+            raise AsmError(tok, e.reason) from e
+
     def __parse_db(self) -> None:
         values = [self.__parse_number()]
         while True:
@@ -116,6 +196,10 @@ class Asm:
     def __parse_line(self, tok: _Token) -> None:
         lit = tok.literal
         assert lit is not None
+
+        if lit in self.__INSTRS:
+            self.__parse_instr(tok)
+            return
 
         if lit == 'db':
             self.__parse_db()
