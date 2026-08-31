@@ -7,6 +7,8 @@
 #
 #   Published under the MIT license.
 
+import typing
+
 from ._error import Error
 from ._instr import Const, Expr, Instr, Symbol, Value
 
@@ -22,12 +24,15 @@ class LabelDef:
         return f'{self.symbol}:'
 
 
+BlockItem: typing.TypeAlias = Instr | LabelDef
+
+
 # A run of instructions and directives at an address, which may be
 # an expression over labels of other blocks.
 class _Block:
     def __init__(self, addr: Expr) -> None:
         self.addr = addr
-        self.items: list[Instr | LabelDef] = []
+        self.items: list[BlockItem] = []
 
 
 # The machine-code-level program: the symbol context, the container
@@ -60,7 +65,7 @@ class Code:
         self.__blocks.append(_Block(addr))
 
     # Appends instructions and directives to the current block.
-    def add(self, *items: Instr | LabelDef) -> None:
+    def add(self, *items: BlockItem) -> None:
         self.__blocks[-1].items.extend(items)
 
     # Binds every label to its address. Sizes are shape-determined,
