@@ -22,8 +22,8 @@ def test_forward_reference() -> None:
     loop = code.get_symbol('loop')
     skip = code.get_symbol('skip')
     code.add(z80.JP(skip))
-    code.add(loop, z80.HALT())
-    code.add(skip, z80.JR(loop))
+    code.add(z80.LabelDef(loop), z80.HALT())
+    code.add(z80.LabelDef(skip), z80.JR(loop))
     code.resolve()
     assert loop.value == 3
     assert skip.value == 4
@@ -35,9 +35,9 @@ def test_symbolic_block_address() -> None:
     start = code.get_symbol('start')
     entry = code.get_symbol('entry')
     code.org(0x8000)
-    code.add(start, z80.NOP())
+    code.add(z80.LabelDef(start), z80.NOP())
     code.org(z80.Add(start, 0x100))
-    code.add(entry, z80.RET())
+    code.add(z80.LabelDef(entry), z80.RET())
     code.resolve()
     assert entry.value == 0x8100
     assert code.encode() == [(0x8000, b'\x00'), (0x8100, b'\xc9')]
@@ -52,7 +52,7 @@ def test_block_dependency_order() -> None:
     code.org(z80.Add(base, 2))
     code.add(z80.HALT())
     code.org(0x6000)
-    code.add(base, z80.NOP())
+    code.add(z80.LabelDef(base), z80.NOP())
     code.resolve()
     assert code.encode() == [(0x6002, b'\x76'), (0x6000, b'\x00')]
 

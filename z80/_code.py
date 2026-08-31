@@ -11,12 +11,23 @@ from ._error import Error
 from ._instr import Const, Expr, Instr, Symbol, Value
 
 
-# A run of instructions and label definitions at an address, which
-# may be an expression over labels of other blocks.
+# The directive binding a symbol to the point of the block it
+# appears at. The symbol itself is a value; defining it is an
+# action, hence a directive.
+class LabelDef:
+    def __init__(self, symbol: Symbol) -> None:
+        self.symbol = symbol
+
+    def __str__(self) -> str:
+        return f'{self.symbol}:'
+
+
+# A run of instructions and directives at an address, which may be
+# an expression over labels of other blocks.
 class _Block:
     def __init__(self, addr: Expr) -> None:
         self.addr = addr
-        self.items: list[Instr | Symbol] = []
+        self.items: list[Instr | LabelDef] = []
 
 
 # The machine-code-level program: the symbol context, the container
@@ -48,9 +59,8 @@ class Code:
 
         self.__blocks.append(_Block(addr))
 
-    # Appends instructions to the current block. A bare symbol
-    # defines a label at the point it appears.
-    def add(self, *items: Instr | Symbol) -> None:
+    # Appends instructions and directives to the current block.
+    def add(self, *items: Instr | LabelDef) -> None:
         self.__blocks[-1].items.extend(items)
 
     # Binds every label to its address. Sizes are shape-determined,
@@ -71,8 +81,8 @@ class Code:
                     continue
 
                 for item in block.items:
-                    if isinstance(item, Symbol):
-                        item.value = addr
+                    if isinstance(item, LabelDef):
+                        item.symbol.value = addr
                     else:
                         addr += item.size
 

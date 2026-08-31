@@ -7,7 +7,7 @@
 #   Published under the MIT license.
 
 from . import _instr
-from ._code import Code
+from ._code import Code, LabelDef
 from ._disasm import IncompleteInstrError, Z80InstrBuilder, _Disasm
 from ._disasm_parser import _DisasmTagParser
 from ._error import Error
@@ -24,6 +24,7 @@ __all__ = [
     'Error',
     'I8080Machine',
     'IncompleteInstrError',
+    'LabelDef',
     'Z80InstrBuilder',
     'Z80Machine',
     '_Disasm',
