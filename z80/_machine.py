@@ -481,6 +481,12 @@ class _MachineBase:
     _NO_MARKS = 0
     _BREAKPOINT_MARK = 1 << 0
 
+    # With a read or write callback set, only accesses to
+    # addresses carrying these marks go through it; everything
+    # else takes the native path.
+    READ_MARK = 1 << 1
+    WRITE_MARK = 1 << 2
+
     def mark_addrs(self, addr: int, size: int, marks: int) -> None:
         ...
 

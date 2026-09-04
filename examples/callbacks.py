@@ -23,12 +23,14 @@ def main():
 
     m = Z80Machine()
 
-    # With a read callback set, all memory reads, including
-    # instruction fetches, go through it, so the machine's memory
-    # may live entirely on the Python side.
+    # With a read callback set, reads of read-marked addresses,
+    # instruction fetches included, go through it, so the marked
+    # memory may live entirely on the Python side.
+    m.mark_addrs(0x0000, len(image), Z80Machine.READ_MARK)
+    m.mark_addr(0x8000, Z80Machine.WRITE_MARK)
+
     def on_read(addr):
-        NOP = 0x00
-        return image[addr] if addr < len(image) else NOP
+        return image[addr]
 
     def on_write(addr, value):
         print(f'write of {value:#04x} at {addr:#06x}')

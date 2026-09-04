@@ -148,6 +148,7 @@ def test_write_and_output_callbacks(
 
     m.set_write_callback(lambda addr, value: writes.append((addr, value)))
     m.set_output_callback(lambda addr, value: outputs.append((addr, value)))
+    m.mark_addr(0x8000, m.WRITE_MARK)
 
     # ld a, 0x42; ld (0x8000), a; out (0xfe), a
     # (Same encoding for the i8080 counterparts.)
@@ -175,6 +176,7 @@ def test_read_callback_timing() -> None:
         return 0x00  # nop
 
     m.set_read_callback(read)
+    m.mark_addrs(0x0000, 2, m.READ_MARK)
     m.ticks_to_stop = 8  # Two nops.
     events = m.run()
     assert events == m._TICKS_LIMIT_HIT
@@ -193,6 +195,7 @@ def test_read_callback_exception() -> None:
         raise RuntimeError('boom')
 
     m.set_read_callback(read)
+    m.mark_addr(0x0000, m.READ_MARK)
     with pytest.raises(RuntimeError, match='boom'):
         m.run()
     assert calls == [0x0000]
@@ -203,6 +206,7 @@ def test_read_callback_bad_result() -> None:
     m = z80.Z80Machine()
     m.set_read_callback(
         lambda addr: 'xyzzy')  # type: ignore[arg-type, return-value]
+    m.mark_addr(0x0000, m.READ_MARK)
     with pytest.raises(TypeError, match='must be integer'):
         m.run()
 
@@ -215,8 +219,47 @@ def test_write_callback_exception() -> None:
         raise RuntimeError('boom')
 
     m.set_write_callback(write)
+    m.mark_addr(0x8000, m.WRITE_MARK)
     with pytest.raises(RuntimeError, match='boom'):
         m.run()
+
+
+# Read and write callbacks observe only accesses to addresses
+# carrying the read and write marks; everything else -- fetches
+# included -- takes the native path.
+def test_marked_accesses_only() -> None:
+    m = z80.Z80Machine()
+    reads: list[int] = []
+    writes: list[tuple[int, int]] = []
+
+    def on_read(addr: int) -> int:
+        reads.append(addr)
+        return 0x55
+
+    m.set_read_callback(on_read)
+    m.set_write_callback(lambda addr, value: writes.append((addr, value)))
+    m.mark_addr(0x4000, m.READ_MARK)
+    m.mark_addr(0x8000, m.WRITE_MARK)
+
+    code = z80.Code()
+    code.add(z80.LD(z80.A, z80.At(0x4000)),
+             z80.LD(z80.At(0x8000), z80.A),
+             z80.LD(z80.A, z80.At(0x4001)),
+             z80.LD(z80.At(0x8001), z80.A))
+    addr, image = code.encode()[0]
+    m.set_memory_block(addr, image)
+    m.set_memory_block(0x4001, b'\x77')
+
+    m.ticks_to_stop = 52  # Four 13-tick instructions.
+    m.run()
+
+    # Only the marked read went to Python; the marked write never
+    # reached memory, and the unmarked accesses never reached the
+    # callbacks.
+    assert reads == [0x4000]
+    assert writes == [(0x8000, 0x55)]
+    assert m.memory[0x8000] == 0x00
+    assert m.memory[0x8001] == 0x77
 
 
 def test_input_callback_exception() -> None:

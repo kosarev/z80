@@ -83,6 +83,8 @@ public:
     static const unsigned ticks_per_frame = 100 * 1000;
 
     static const fast_u8 breakpoint_mark = 1u << 0;
+    static const fast_u8 read_mark = 1u << 1;
+    static const fast_u8 write_mark = 1u << 2;
 
     machine() {}
 
@@ -124,7 +126,9 @@ public:
         const fast_u8 default_value = 0xff;
         assert(addr < z80::address_space_size);
 
-        if(!on_read_callback) {
+        // The callback observes only read-marked addresses;
+        // everything else takes the native path.
+        if(!on_read_callback || !is_marked_addr(addr, read_mark)) {
             return state.memory[addr];
         }
 
@@ -164,7 +168,9 @@ public:
     void on_write(fast_u16 addr, fast_u8 n) {
         assert(addr < z80::address_space_size);
 
-        if(!on_write_callback) {
+        // The callback replaces storage for write-marked
+        // addresses; everything else takes the native path.
+        if(!on_write_callback || !is_marked_addr(addr, write_mark)) {
             state.memory[addr] = n;
             return;
         }
