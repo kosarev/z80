@@ -817,11 +817,16 @@ PartialOrders.ALWAYS = PartialOrders.get(TRUE)
 PartialOrders.NEVER = PartialOrders.get(FALSE)
 
 
-class PossibleValues(object):
-    # The set of possible values of a node, each associated with
-    # the partial orders of updates under which the simulation
-    # arrives at that value. Almost everywhere a node has a
-    # single possible value arising under all orders.
+class Bool(object):
+    # The simulator's symbolic boolean value. Like any symbolic
+    # value it covers many executions at once, and besides the
+    # data symbols it may depend on the order in which the gates
+    # update. That dependence is kept out of the expressions:
+    # the value is stored as entries, each an eqbool expression
+    # over data symbols together with the condition over order
+    # facts under which the value is that expression. Almost
+    # everywhere a value does not depend on the order and has a
+    # single entry.
     def __init__(self, entries):
         self.entries = entries
 
@@ -971,7 +976,7 @@ class PossibleValues(object):
         # of the ways of arriving at it, which for heavily
         # redundant merges is the bulk of the work.
         if len(groups) == 1:
-            return PossibleValues(((groups[0][0], PartialOrders.ALWAYS),))
+            return Bool(((groups[0][0], PartialOrders.ALWAYS),))
 
         merged = []
         for v, orders_list in groups:
@@ -992,7 +997,7 @@ class PossibleValues(object):
             merged[0] = merged[0][0], PartialOrders.ALWAYS
 
         merged.sort(key=lambda e: e[1].seq)
-        return PossibleValues(tuple(merged))
+        return Bool(tuple(merged))
 
     @staticmethod
     def is_same(a, b):
@@ -1000,7 +1005,7 @@ class PossibleValues(object):
         # possible values -- are known to be the same. Entries
         # are matched by value, as freshly built sets hold their
         # entries in an unrelated order.
-        if isinstance(a, PossibleValues) or isinstance(b, PossibleValues):
+        if isinstance(a, Bool) or isinstance(b, Bool):
             a, b = __class__.cast(a), __class__.cast(b)
             if len(a.entries) != len(b.entries):
                 return False
@@ -1020,15 +1025,14 @@ class PossibleValues(object):
     def cast(x):
         # A plain value, or a term to make one of, is the set of
         # its single possible value.
-        if isinstance(x, PossibleValues):
+        if isinstance(x, Bool):
             return x
         if not isinstance(x, eqbool.Bool):
             x = bools.get(x)
-        return PossibleValues(((x, PartialOrders.ALWAYS),))
+        return Bool(((x, PartialOrders.ALWAYS),))
 
-    # Sets of possible values compute like plain values: an
-    # operation applies to every consistent combination of the
-    # possible values of its arguments.
+    # An operation applies to every consistent combination of
+    # the entries of its arguments.
     def __invert__(self):
         return __class__.apply(bools.get_inversion, self)
 
@@ -1142,8 +1146,8 @@ def test_orders():
     assert PartialOrders.ALWAYS.combine(PartialOrders.NEVER).is_never()
 
 
-PossibleValues.TRUE = PossibleValues.cast(TRUE)
-PossibleValues.FALSE = PossibleValues.cast(FALSE)
+Bool.TRUE = Bool.cast(TRUE)
+Bool.FALSE = Bool.cast(FALSE)
 
 
 class Bits(object):
@@ -1165,12 +1169,12 @@ class Bits(object):
             bits = tuple(f'{b}{suffix}' if isinstance(b, str) else b
                          for b in bits)
 
-        bits = tuple(PossibleValues.cast(b) for b in bits)
+        bits = tuple(Bool.cast(b) for b in bits)
 
         if width is not None:
             assert len(bits) <= width
             if len(bits) < width:
-                bits += (PossibleValues.FALSE,) * (width - len(bits))
+                bits += (Bool.FALSE,) * (width - len(bits))
 
         self.bits = bits
 
@@ -1242,7 +1246,7 @@ class Bits(object):
         if self.width >= width:
             return self
         return __class__(self.bits +
-                         (PossibleValues.FALSE,) * (width - self.width))
+                         (Bool.FALSE,) * (width - self.width))
 
     @staticmethod
     def zero_extend_to_same_width(*args):
@@ -1262,7 +1266,7 @@ class Bits(object):
 
     def __lshift__(self, n):
         if isinstance(n, int):
-            return __class__((PossibleValues.FALSE,) * n + self.bits)
+            return __class__((Bool.FALSE,) * n + self.bits)
 
         n = __class__.cast(n)
         if n.width == 0:
@@ -1278,7 +1282,7 @@ class Bits(object):
     @staticmethod
     def get_or(*args):
         args = __class__.zero_extend_to_same_width(*args)
-        return __class__(PossibleValues.get_or(*bits)
+        return __class__(Bool.get_or(*bits)
                          for bits in zip(*args))
 
     def __or__(self, other):
@@ -1296,7 +1300,7 @@ class Bits(object):
         a, b = __class__.zero_extend_to_same_width(self, other)
 
         r = []
-        cf = PossibleValues.FALSE
+        cf = Bool.FALSE
         for x, y in zip(a, b):
             t = x ^ y
             r.append(t ^ cf)
@@ -1316,8 +1320,8 @@ class Bits(object):
 
     def __eq__(self, other):
         a, b = __class__.zero_extend_to_same_width(self, other)
-        return PossibleValues.get_and(
-            *(PossibleValues.get_eq(x, y) for x, y in zip(a, b)))
+        return Bool.get_and(
+            *(Bool.get_eq(x, y) for x, y in zip(a, b)))
 
     def __ne__(self, other):
         return ~self.__eq__(other)
@@ -1331,9 +1335,9 @@ class Bits(object):
 
     @staticmethod
     def ifelse(cond, a, b):
-        cond = PossibleValues.cast(cond)
+        cond = Bool.cast(cond)
         a, b = __class__.zero_extend_to_same_width(a, b)
-        return __class__(PossibleValues.ifelse(cond, x, y)
+        return __class__(Bool.ifelse(cond, x, y)
                          for x, y in zip(a, b))
 
     @staticmethod
@@ -1350,14 +1354,14 @@ class Bits(object):
         return __class__(self.bits[n:] + self.bits[:n])
 
     def parity(self):
-        # TODO: Have Bool.get_xor().
-        r = PossibleValues.TRUE
+        # TODO: Have eqbool.Bool.get_xor().
+        r = Bool.TRUE
         for b in self.bits:
             r ^= b
         return r
 
     def is_any(self, *args):
-        return PossibleValues.get_or(*(self == a for a in args))
+        return Bool.get_or(*(self == a for a in args))
 
 
 class Node(object):
@@ -1476,12 +1480,12 @@ class Transistor(object):
             gate, c1, c2 = nodes[gate], nodes[c1], nodes[c2]
             if isinstance(state, (list, tuple)):
                 assert state[0] == 'pv'
-                state = PossibleValues(tuple(
+                state = Bool(tuple(
                     (self.__bools.get(v),
                      PartialOrders.get(self.__bools.get(orders)))
                     for v, orders in state[1:]))
             elif state is not None:
-                state = PossibleValues.cast(self.__bools.get(state))
+                state = Bool.cast(self.__bools.get(state))
 
             t = Transistor(index, gate, c1, c2, state=state)
             gate.gate_of.append(t)
@@ -1707,11 +1711,11 @@ class ObservedStates(object):
     # become visible to an evaluation, and thus where the order
     # of updates manifests itself.
     #
-    # Observations return sets of possible values. For a racing
+    # Observations return Bools. For a racing
     # observation -- one where the observed gate has a pending
     # update differing from the state it is about to replace --
-    # a settling simulated in all orders forks: the observed set
-    # holds the entries of the pending update, each extended
+    # a settling simulated in all orders forks: the observed
+    # Bool holds the entries of the pending update, each extended
     # with the fact 'the observed gate is updated before the
     # evaluated node', together with the entries of the old
     # state, each extended with the fact stated the other way
@@ -1781,7 +1785,7 @@ class ObservedStates(object):
                 state = pending
             else:
                 self.__raced.add(pair)
-                state = PossibleValues.get(tuple(
+                state = Bool.get(tuple(
                     (v, os.combine(self.__fact(g, e)))
                     for v, os in pending.entries) + tuple(
                     (v, os.combine(self.__fact(e, g)))
@@ -1832,8 +1836,8 @@ class Z80Simulator(object):
             self.__trans[index] = t
 
     def get_node_states(self, ids=None):
-        # Every state is sampled as its set of possible values,
-        # a single value being the one-entry case.
+        # Every state is sampled as a Bool, with as many
+        # entries as it has possible values.
         if ids is None:
             ids = (n.id for n in self.__nodes.values())
         return {id: self.get_node_entries(self.__nodes_by_name[id])
@@ -1899,15 +1903,15 @@ class Z80Simulator(object):
 
             p = get_node_pred(n)
             if p is not None:
-                p = PossibleValues.cast(p)
+                p = Bool.cast(p)
                 if is_const(p, TRUE):
                     preds[n] = p
                     return cyclic, p
 
             if n.is_gnd_or_pwr:
                 assert p is None
-                preds[n] = PossibleValues.FALSE
-                return cyclic, PossibleValues.FALSE
+                preds[n] = Bool.FALSE
+                return cyclic, Bool.FALSE
 
             p = [] if p is None else [p]
             stack.append(n)
@@ -1922,11 +1926,11 @@ class Z80Simulator(object):
                                                 stack, preds)
                         cyclic |= cc
 
-                        mp = PossibleValues.apply(
+                        mp = Bool.apply(
                             lambda s, q: s & q, state, pp,
                             budget=budget)
                         if is_const(mp, TRUE):
-                            p = [PossibleValues.TRUE]
+                            p = [Bool.TRUE]
                             break
                         p.append(mp)
 
@@ -1935,9 +1939,9 @@ class Z80Simulator(object):
             r = None
             for x in p:
                 r = x if r is None else \
-                    PossibleValues.apply(bools.get_or, r, x,
-                                         budget=budget)
-            p = PossibleValues.apply(bools.get_or) if r is None else r
+                    Bool.apply(bools.get_or, r, x,
+                               budget=budget)
+            p = Bool.apply(bools.get_or) if r is None else r
             assert stack.pop() == n
 
             if not cyclic:
@@ -1990,14 +1994,14 @@ class Z80Simulator(object):
             n, observed, budget=budget)
 
         if len(n.gate_of) == 0:
-            floating = PossibleValues.cast(
+            floating = Bool.cast(
                 bools.get('<floating-non-gate>'))
         else:
             floating = observed.observe_floating(n)
-        pull = PossibleValues.apply(
+        pull = Bool.apply(
             lambda pd, pu, f: bools.ifelse(pd | pu, ~pd, f),
             pulldown, pullup, floating, budget=budget)
-        return PossibleValues.apply(
+        return Bool.apply(
             lambda g, p, pl: bools.ifelse(g | p, ~g, pl),
             gnd, pwr, pull, budget=budget)
 
@@ -2018,9 +2022,9 @@ class Z80Simulator(object):
         # replaced, an overflowing one by an opaque term.
         new_state = self.__clipped_nodes.get(n)
         if new_state is None:
-            num_clipped = PossibleValues.get_num_clipped()
+            num_clipped = Bool.get_num_clipped()
             new_state = self.get_node_entries(n, new_states, all_orders)
-            if PossibleValues.get_num_clipped() != num_clipped:
+            if Bool.get_num_clipped() != num_clipped:
                 new_state = self.__settle_start_states.get(
                     n, n.gate_of[0].state)
                 Status.print(f'{n} pinned to its settling-start state '
@@ -2031,7 +2035,7 @@ class Z80Simulator(object):
         # No further propagation is necessary if the state of
         # the transistor is known to be same. This includes
         # the case of a floating gate.
-        if PossibleValues.is_same(new_state, old_state):
+        if Bool.is_same(new_state, old_state):
             return False
 
         new_states[n] = new_state
@@ -2050,7 +2054,7 @@ class Z80Simulator(object):
             self.update_scope = f'{self.update_no}'
         else:
             self.update_scope = f'{self.__step_no}.{self.update_no}'
-        PossibleValues.set_clip_scope(self.update_scope)
+        Bool.set_clip_scope(self.update_scope)
         self.__raced_pairs = set()
         self.__clipped_nodes = {}
         self.__settle_start_states = {}
@@ -2085,8 +2089,8 @@ class Z80Simulator(object):
                 # falsely. The opaque terms take the nodes.
                 for n, pinned in self.__clipped_nodes.items():
                     id = f'clipped.{self.update_scope}.{n.index}'
-                    state = PossibleValues.cast(bools.get(id))
-                    if PossibleValues.is_same(state, pinned):
+                    state = Bool.cast(bools.get(id))
+                    if Bool.is_same(state, pinned):
                         continue
                     self.__clipped_nodes[n] = state
                     Status.print(f'{id} <- the state of {n} '
@@ -2098,32 +2102,32 @@ class Z80Simulator(object):
                 return bool(groups)
             for n in list(self.__clipped_nodes):
                 with Status.do(f'verify pin {n}'):
-                    num_clipped = PossibleValues.get_num_clipped()
+                    num_clipped = Bool.get_num_clipped()
                     state = self.get_node_entries(
                         n, all_orders=all_orders,
-                        budget=PossibleValues.UNPIN_BUDGET)
+                        budget=Bool.UNPIN_BUDGET)
 
                     # An oscillating node's fresh evaluation
                     # just wraps its loop once more; committing
                     # it would ping-pong through the waves, so
                     # anything but a confirmed hold turns
                     # opaque.
-                    lost = PossibleValues.get_num_clipped() != num_clipped
+                    lost = Bool.get_num_clipped() != num_clipped
                     if not lost and n in self.__oscillating_nodes:
-                        lost = not PossibleValues.is_same(
+                        lost = not Bool.is_same(
                             state, self.__clipped_nodes[n])
                     if lost:
                         # The value is lost for good.
                         id = f'clipped.{self.update_scope}.{n.index}'
-                        state = PossibleValues.cast(bools.get(id))
-                        if PossibleValues.is_same(
+                        state = Bool.cast(bools.get(id))
+                        if Bool.is_same(
                                 state, self.__clipped_nodes[n]):
                             continue
                         self.__clipped_nodes[n] = state
                         Status.print(f'{id} <- the state of {n} '
                                      f'at {Status.get_context()}',
                                      option='--show-clips')
-                    elif PossibleValues.is_same(
+                    elif Bool.is_same(
                             state, self.__clipped_nodes[n]):
                         # The stand-in verified: the node held.
                         del self.__clipped_nodes[n]
@@ -2234,7 +2238,7 @@ class Z80Simulator(object):
 
     def clear_state(self):
         for t in self.__trans.values():
-            t.state = PossibleValues.FALSE
+            t.state = Bool.FALSE
 
     def reset(self, propagation_delay, waiting_for_m1_delay):
         self.__set_node(self.__nclk, TRUE)
@@ -2515,9 +2519,9 @@ class State(object):
         # Steps are recorded as expressions, so a value entering
         # one must have a single possible value. Several -- an
         # input racing under the orders that produced it -- would
-        # need sets of possible values as pin values and cycle
+        # need Bools with several entries as pin values and cycle
         # conditions, which steps do not support yet.
-        v = PossibleValues.cast(v)
+        v = Bool.cast(v)
         if v.is_single:
             return v.single_value
         Status.clear()
@@ -2546,7 +2550,7 @@ class State(object):
     def update_pin(self, pin, all_orders=False):
         step = ('update_pin', pin)
         if all_orders:
-            step += PossibleValues.BUDGET, self.ALL_ORDERS_VERSION
+            step += Bool.BUDGET, self.ALL_ORDERS_VERSION
         self.__add_step(step)
 
     def set_pin_and_update(self, pin, pull, all_orders=False):
@@ -2582,7 +2586,7 @@ class State(object):
             step = ('conditional_half_tick',
                     __class__.__get_step_value(cond))
         if all_orders:
-            step += PossibleValues.BUDGET, self.ALL_ORDERS_VERSION
+            step += Bool.BUDGET, self.ALL_ORDERS_VERSION
         self.__add_step(step)
 
     def tick(self):
@@ -2848,14 +2852,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
             b, a = at_start[n], at_end[n]
         else:
             b, a = before[n], after[n]
-            x = PossibleValues.ifelse(is_active(n), x, b)
+            x = Bool.ifelse(is_active(n), x, b)
 
         # Actual and expected must be equivalent, conditions
         # included, so a node the instruction itself makes race
         # fails its check: racing nodes state their outcome sets
         # via check_set().
-        a = PossibleValues.cast(a)
-        if PossibleValues.is_same(a, x):
+        a = Bool.cast(a)
+        if Bool.is_same(a, x):
             return CheckToken()
 
         def get_expected_lines():
@@ -2875,23 +2879,23 @@ def test_node(instrs, n, at_start, at_end, before, after,
         # hardware-facing promise.
         b, a = before[n], after[n]
         xs = [v for x in xs
-              for v, _ in PossibleValues.ifelse(is_active(n), x, b).entries]
+              for v, _ in Bool.ifelse(is_active(n), x, b).entries]
         # A spec whose values coincide in this context is the
         # smaller set -- scf/ccf after scf/ccf collapses to
         # two values because the fresh F contains A.
         distinct = []
         for x in xs:
-            if not any(PossibleValues.is_same(x, d) for d in distinct):
+            if not any(Bool.is_same(x, d) for d in distinct):
                 distinct.append(x)
         xs = distinct
-        a = PossibleValues.cast(a)
+        a = Bool.cast(a)
 
         matched = len(a.entries) == len(xs)
         if matched:
             remaining = list(xs)
             for v, _ in a.entries:
                 for j, x in enumerate(remaining):
-                    if PossibleValues.is_same(v, x):
+                    if Bool.is_same(v, x):
                         del remaining[j]
                         break
                 else:
@@ -2918,8 +2922,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
     if opcode.value in (0xcb, 0xed):
         opcode, ticks, cond = cycles[ci + 1]
     opcode = opcode.zero_extended(8)
-    is_prefixed = (PossibleValues.cast(f'is_prefixed_p{len(instrs)}')
-                   if ci else PossibleValues.FALSE)
+    is_prefixed = (Bool.cast(f'is_prefixed_p{len(instrs)}')
+                   if ci else Bool.FALSE)
     prefix_bit = Bits.ifelse(is_prefixed, 1, 0)
 
     AT_HL, A = 6, 7
@@ -2931,7 +2935,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         return x
 
     def phased_bool(x):
-        return PossibleValues.cast(phased(x))
+        return Bool.cast(phased(x))
 
     def bits(id):
         return Bits(before[f'{id}{i}'] for i in range(8))
@@ -2940,19 +2944,19 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1,
                  HALTED_FF, HALTED_FF_B,
                  EX_AF_FF, EXX_FF, EX_DE_FF, '~halt'):
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (EX_DE_FF0, EX_DE_FF1):
             exx = before[EXX_FF]
             return ~exx if n == EX_DE_FF0 else exx
         if n.startswith('reg_'):
             if n[4] in 'wz':
-                return PossibleValues.TRUE
+                return Bool.TRUE
             if n[4:6] in ('pc', 'sp') or n[4] in 'ir':
-                return PossibleValues.TRUE
+                return Bool.TRUE
             if n[4:6] in ('ix', 'iy'):
-                return PossibleValues.TRUE
+                return Bool.TRUE
             if n[4] in 'bcdehl':
-                return PossibleValues.TRUE
+                return Bool.TRUE
             if n[4] in 'af':
                 ex_af = before[EX_AF_FF]
                 is_alt = (n[5] == n[4])
@@ -3102,23 +3106,23 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
     if n in CFF:
         if instr == 'scf/ccf':
-            return check(PossibleValues.ifelse(
-                phased_bool('is_scf'), PossibleValues.TRUE,
+            return check(Bool.ifelse(
+                phased_bool('is_scf'), Bool.TRUE,
                 ~get_active(CF)))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            return check(PossibleValues.ifelse(phased_bool('is_rl'),
-                                               a[7], a[0]))
+            return check(Bool.ifelse(phased_bool('is_rl'),
+                                     a[7], a[0]))
 
     if n in NFF:
         if instr == 'cpl':
-            return check(PossibleValues.TRUE)
+            return check(Bool.TRUE)
         if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
-            return check(PossibleValues.ifelse(
-                phased_bool('is_inc'), PossibleValues.FALSE,
-                PossibleValues.TRUE))
+            return check(Bool.ifelse(
+                phased_bool('is_inc'), Bool.FALSE,
+                Bool.TRUE))
         if instr in ('scf/ccf', 'rlca/rrca/rla/rra', 'add hl, <rp>'):
-            return check(PossibleValues.FALSE)
+            return check(Bool.FALSE)
 
     if n in XFF + YFF:
         i = int(n[-1])
@@ -3142,12 +3146,12 @@ def test_node(instrs, n, at_start, at_end, before, after,
                     return check(a)
                 if (len(instrs) > 1 and
                         instrs[-2] in SCF_FRAGILE_SUPPRESSORS):
-                    p = PossibleValues.cast(f'is_prefixed_p{phase}')
+                    p = Bool.cast(f'is_prefixed_p{phase}')
                     return check_set(
                         a,
-                        PossibleValues.ifelse(p, f, a),
-                        PossibleValues.ifelse(p, a | f, a),
-                        PossibleValues.ifelse(p, a & f, a))
+                        Bool.ifelse(p, f, a),
+                        Bool.ifelse(p, a | f, a),
+                        Bool.ifelse(p, a & f, a))
                 return check_set(a, f, a | f, a & f)
 
             # A single-order run lands on the one value its
@@ -3164,20 +3168,20 @@ def test_node(instrs, n, at_start, at_end, before, after,
             is_add_hl_rp = (x == 0) & q & (z == 1)
             ignores_f = (is_scf_ccf | is_alu_r | is_alu_n | is_inc_dec_r |
                          is_add_hl_rp)
-            return check(PossibleValues.ifelse(ignores_f, a, a | f))
+            return check(Bool.ifelse(ignores_f, a, a | f))
         if instr == 'rlca/rrca/rla/rra':
             a = get_a()
-            return check(PossibleValues.ifelse(phased_bool('is_rl'), a[i - 1],
-                                               a[i + 1]))
+            return check(Bool.ifelse(phased_bool('is_rl'), a[i - 1],
+                                     a[i + 1]))
 
     if n in HFF:
         if instr == 'cpl':
-            return check(PossibleValues.TRUE)
+            return check(Bool.TRUE)
         if instr == 'rlca/rrca/rla/rra':
-            return check(PossibleValues.FALSE)
+            return check(Bool.FALSE)
         if instr == 'scf/ccf':
-            return check(PossibleValues.ifelse(
-                phased_bool('is_scf'), PossibleValues.FALSE,
+            return check(Bool.ifelse(
+                phased_bool('is_scf'), Bool.FALSE,
                 get_active(CF)))
 
     if n.startswith('reg_a'):
@@ -3253,16 +3257,16 @@ def test_node(instrs, n, at_start, at_end, before, after,
             sf, pf = get_active(SF), get_active(PF)
             cf, zf = get_active(CF), get_active(ZF)
             cc = Bits(phased('cc'), width=3)
-            cc = PossibleValues.ifelse(
+            cc = Bool.ifelse(
                 cc[2],
-                PossibleValues.ifelse(
+                Bool.ifelse(
                     cc[1],
-                    PossibleValues.ifelse(cc[0], sf, ~sf),
-                    PossibleValues.ifelse(cc[0], pf, ~pf)),
-                PossibleValues.ifelse(
+                    Bool.ifelse(cc[0], sf, ~sf),
+                    Bool.ifelse(cc[0], pf, ~pf)),
+                Bool.ifelse(
                     cc[1],
-                    PossibleValues.ifelse(cc[0], cf, ~cf),
-                    PossibleValues.ifelse(cc[0], zf, ~zf)))
+                    Bool.ifelse(cc[0], cf, ~cf),
+                    Bool.ifelse(cc[0], zf, ~zf)))
             target = Bits.concat(Bits(phased('r2'), width=8),
                                  Bits(phased('r1'), width=8))
             wz = Bits.ifelse(cc, target, get_wz())
@@ -3281,10 +3285,10 @@ def test_node(instrs, n, at_start, at_end, before, after,
         if instr == 'jr cc, d':
             cc2 = Bits(phased('cc2'), width=2)
             cf, zf = get_active(CF), get_active(ZF)
-            cc2 = PossibleValues.ifelse(
+            cc2 = Bool.ifelse(
                 cc2[1],
-                PossibleValues.ifelse(cc2[0], cf, ~cf),
-                PossibleValues.ifelse(cc2[0], zf, ~zf))
+                Bool.ifelse(cc2[0], cf, ~cf),
+                Bool.ifelse(cc2[0], zf, ~zf))
             d = Bits(phased('r'), width=8)
             target = (get_pc_plus(2) + prefix_bit +
                       d.sign_extended(16))
@@ -3295,8 +3299,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
             r = Bits(phased('r'), width=8)
             in_wz = Bits.concat(a, r) + 1
             out_wz = Bits.concat(a, (r + 1).truncated(8))
-            return check(PossibleValues.ifelse(phased_bool('is_in'), in_wz[i],
-                                               out_wz[i]))
+            return check(Bool.ifelse(phased_bool('is_in'), in_wz[i],
+                                     out_wz[i]))
         if instr == 'rst n':
             wz = (Bits(phased('y'), width=3) << 3).zero_extended(16)
             return check(wz[i])
@@ -3347,7 +3351,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             wz = Bits.ifelse(phased('is_store'), store_wz, load_wz)
             return check(wz[i])
         if instr == 'ld (<rp>), a/ld a, (<rp>)':
-            rp = get_rp(opcode[4:5] + (PossibleValues.FALSE,))
+            rp = get_rp(opcode[4:5] + (Bool.FALSE,))
             load_wz = rp + 1
             lo = Bits(rp.bits[0:8])
             store_wz = Bits.concat(get_a(), (lo + 1).truncated(8))
@@ -3366,16 +3370,16 @@ def test_node(instrs, n, at_start, at_end, before, after,
         sf, pf = get_active(SF), get_active(PF)
         cf, zf = get_active(CF), get_active(ZF)
         cc = Bits(phased('cc'), width=3)
-        return PossibleValues.ifelse(
+        return Bool.ifelse(
             cc[2],
-            PossibleValues.ifelse(
+            Bool.ifelse(
                 cc[1],
-                PossibleValues.ifelse(cc[0], sf, ~sf),
-                PossibleValues.ifelse(cc[0], pf, ~pf)),
-            PossibleValues.ifelse(
+                Bool.ifelse(cc[0], sf, ~sf),
+                Bool.ifelse(cc[0], pf, ~pf)),
+            Bool.ifelse(
                 cc[1],
-                PossibleValues.ifelse(cc[0], cf, ~cf),
-                PossibleValues.ifelse(cc[0], zf, ~zf)))
+                Bool.ifelse(cc[0], cf, ~cf),
+                Bool.ifelse(cc[0], zf, ~zf)))
 
     if (n.startswith('reg_pch') or n.startswith('reg_pcl') or
             n.startswith('reg_sph') or n.startswith('reg_spl')):
@@ -3469,10 +3473,10 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == 'jr cc, d':
                 cc2 = Bits(phased('cc2'), width=2)
                 cf, zf = get_active(CF), get_active(ZF)
-                taken = PossibleValues.ifelse(
+                taken = Bool.ifelse(
                     cc2[1],
-                    PossibleValues.ifelse(cc2[0], cf, ~cf),
-                    PossibleValues.ifelse(cc2[0], zf, ~zf))
+                    Bool.ifelse(cc2[0], cf, ~cf),
+                    Bool.ifelse(cc2[0], zf, ~zf))
                 d = Bits(phased('r'), width=8)
                 t = (get_pc_plus(2) + prefix_bit +
                      d.sign_extended(16)).truncated(16)
@@ -3522,7 +3526,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
                 v = Bits.concat(Bits(phased('rw6'), width=8),
                                 Bits(phased('rw5'), width=8))
-                is_load = PossibleValues.cast(phased('q') + '_b0')
+                is_load = Bool.cast(phased('q') + '_b0')
                 sel = (Bits(phased('p'), width=2) == 3) & is_load
                 return Bits.ifelse(sel, v, sp)
             if instr in ('push <rp2>', 'call nn', 'rst n'):
@@ -3640,7 +3644,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
                     Bits(phased('rp'), width=2) == rp_code, v, cur)
             if instr == 'ld <rp>, (nn)/ld (nn), <rp>':
                 v = Bits(phased('rw6' if hi else 'rw5'), width=8)
-                is_load = PossibleValues.cast(phased('q') + '_b0')
+                is_load = Bool.cast(phased('q') + '_b0')
                 sel = ((Bits(phased('p'), width=2) == rp_code) &
                        is_load)
                 return Bits.ifelse(sel, v, cur)
@@ -3656,7 +3660,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             if instr == 'adc/sbc hl, <rp>' and x in 'hl':
                 hlv, rpv = get_hl(), get_rp(opcode[4:6])
                 cfin = Bits.ifelse(get_active(CF), 1, 0)
-                is_adc = PossibleValues.cast(phased('q') + '_b0')
+                is_adc = Bool.cast(phased('q') + '_b0')
                 s = Bits.ifelse(is_adc, hlv + rpv + cfin,
                                 ((hlv - rpv) ^ 0x10000) - cfin)
                 return half(s.truncated(16))
@@ -3683,12 +3687,12 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 v = Bits.ifelse(is_prefixed, get_at_hl(),
                                 get_r(regf))
                 is_right = yb[0]
-                rot_cf = PossibleValues.ifelse(is_right, v[0], v[7])
-                fill = PossibleValues.ifelse(
+                rot_cf = Bool.ifelse(is_right, v[0], v[7])
+                fill = Bool.ifelse(
                     yb[2],
-                    PossibleValues.ifelse(yb[1], ~is_right,
-                                          is_right & v[7]),
-                    PossibleValues.ifelse(yb[1], get_active(CF), rot_cf))
+                    Bool.ifelse(yb[1], ~is_right,
+                                is_right & v[7]),
+                    Bool.ifelse(yb[1], get_active(CF), rot_cf))
                 rot_v = Bits.ifelse(is_right,
                                     Bits(v.bits[1:8] + (fill,)),
                                     Bits((fill,) + v.bits[0:7]))
@@ -3814,8 +3818,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
         # the side that goes low -- and nothing else touches
         # it.
         if instr == 'halt':
-            return check(PossibleValues.FALSE if n == HALTED_FF
-                         else PossibleValues.TRUE)
+            return check(Bool.FALSE if n == HALTED_FF
+                         else Bool.TRUE)
         return check(before[n])
 
     if n in (IM_LATCH0, IM_LATCH1):
@@ -3838,23 +3842,23 @@ def test_node(instrs, n, at_start, at_end, before, after,
         return check(~before[n])
 
     if n == EX_DE_FF and instr == 'exx':
-        ex_de = PossibleValues.ifelse(before[EXX_FF], before[EX_DE_FF0],
-                                      before[EX_DE_FF1])
+        ex_de = Bool.ifelse(before[EXX_FF], before[EX_DE_FF0],
+                            before[EX_DE_FF1])
         return check(~ex_de)
 
     if instr in ('inc/dec {b, c, d, e, h, l, a}', 'inc/dec (hl)'):
         r = get_r_eff(opcode[3:6])
         r = Bits.ifelse(phased('is_inc'), r + 1, r - 1).truncated(8)
         if n in PFF:
-            return check(PossibleValues.ifelse(phased_bool('is_inc'),
+            return check(Bool.ifelse(phased_bool('is_inc'),
                          r == 0x80, r == 0x7f))
         if n in XFF + YFF:
             i = int(n[-1])
             return check(r[i])
         if n in HFF:
             r4 = r.truncated(4)
-            return check(PossibleValues.ifelse(phased_bool('is_inc'),
-                                               r4 == 0x0, r4 == 0xf))
+            return check(Bool.ifelse(phased_bool('is_inc'),
+                                     r4 == 0x0, r4 == 0xf))
         if n in ZFF:
             return check(r == 0x00)
         if n in SFF:
@@ -3884,21 +3888,21 @@ def test_node(instrs, n, at_start, at_end, before, after,
         r = Bits.ifelse(phased('is_i_reg'), ri, rr)
         v = Bits.ifelse(phased('is_store'), get_a(), r)
         if n in NFF + HFF:
-            return check(PossibleValues.ifelse(
-                phased_bool('is_store'), before[n], PossibleValues.FALSE))
+            return check(Bool.ifelse(
+                phased_bool('is_store'), before[n], Bool.FALSE))
         if n in PFF:
-            return check(PossibleValues.ifelse(phased_bool('is_store'),
-                                               before[n], before[IFF2]))
+            return check(Bool.ifelse(phased_bool('is_store'),
+                                     before[n], before[IFF2]))
         if n in XFF + YFF:
             i = int(n[-1])
-            return check(PossibleValues.ifelse(phased_bool('is_store'),
-                                               before[n], r[i]))
+            return check(Bool.ifelse(phased_bool('is_store'),
+                                     before[n], r[i]))
         if n in ZFF:
-            return check(PossibleValues.ifelse(phased_bool('is_store'),
-                                               before[n], r == 0x00))
+            return check(Bool.ifelse(phased_bool('is_store'),
+                                     before[n], r == 0x00))
         if n in SFF:
-            return check(PossibleValues.ifelse(phased_bool('is_store'),
-                                               before[n], r[7]))
+            return check(Bool.ifelse(phased_bool('is_store'),
+                                     before[n], r[7]))
         if n.startswith('reg_a'):
             i = int(n[-1])
             return check(v[i])
@@ -3908,13 +3912,13 @@ def test_node(instrs, n, at_start, at_end, before, after,
         p = Bits(opcode.bits[4:6])
         if n.startswith('reg_f'):
             i = int(n[-1])
-            return check(PossibleValues.ifelse(
-                p == RP2_AF, PossibleValues.cast(f'lo_p{phase}_b{i}'),
+            return check(Bool.ifelse(
+                p == RP2_AF, Bool.cast(f'lo_p{phase}_b{i}'),
                 before[n]))
         if n.startswith('reg_a'):
             i = int(n[-1])
-            return check(PossibleValues.ifelse(
-                p == RP2_AF, PossibleValues.cast(f'hi_p{phase}_b{i}'),
+            return check(Bool.ifelse(
+                p == RP2_AF, Bool.cast(f'hi_p{phase}_b{i}'),
                 before[n]))
 
     if instr == 'daa':
@@ -3936,8 +3940,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
             return check(r[i])
         if n in HFF:
             a4 = a.truncated(4)
-            return check(PossibleValues.ifelse(nf, hf & (a4 <= 0x5),
-                                               a4 >= 0xa))
+            return check(Bool.ifelse(nf, hf & (a4 <= 0x5),
+                                     a4 >= 0xa))
         if n in ZFF:
             return check(r == 0x00)
         if n in SFF:
@@ -3980,14 +3984,14 @@ def test_node(instrs, n, at_start, at_end, before, after,
             return check(is_sub_sbc_cp)
         if n in PFF:
             overflow = r[8] ^ r[7] ^ a[7] ^ s[7]
-            return check(PossibleValues.ifelse(is_bitwise, r.parity(),
-                                               overflow))
+            return check(Bool.ifelse(is_bitwise, r.parity(),
+                                     overflow))
         if n in XFF + YFF:
             i = int(n[-1])
-            return check(PossibleValues.ifelse(op == CP, s[i], r[i]))
+            return check(Bool.ifelse(op == CP, s[i], r[i]))
         if n in HFF:
-            return check(PossibleValues.ifelse(is_bitwise, op == AND,
-                                               r[4] ^ a[4] ^ s[4]))
+            return check(Bool.ifelse(is_bitwise, op == AND,
+                                     r[4] ^ a[4] ^ s[4]))
         if n in ZFF:
             return check(r.truncated(8) == 0x00)
         if n in SFF:
@@ -4008,7 +4012,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
             i = int(n[-1])
             return check(a[i])
         if n in NFF + HFF:
-            return check(PossibleValues.FALSE)
+            return check(Bool.FALSE)
         if n in PFF:
             return check(a.parity())
         if n in ZFF:
@@ -4021,7 +4025,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         io = Bits(phased('io'), width=8)
         a = Bits.ifelse(y != A, get_a(), io)
         if n in NFF + HFF:
-            return check(PossibleValues.FALSE)
+            return check(Bool.FALSE)
         if n in PFF:
             return check(io.parity())
         if n in XFF + YFF + SFF:
@@ -4038,7 +4042,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         # itself through PC, so the per-instruction semantics
         # are ldi/ldd's.
         if n in NFF + HFF:
-            return check(PossibleValues.FALSE)
+            return check(Bool.FALSE)
         if n in PFF:
             return check((get_bc() - 1).truncated(16) != 0)
         if n in XFF + YFF:
@@ -4052,8 +4056,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # from bit 11 and YF from bit 13 of PC.
                 pc = (get_pc_plus(0) +
                       prefix_bit).truncated(16)
-                x = PossibleValues.ifelse(get_bc() != 1,
-                                          pc[11] if n in XFF else pc[13], x)
+                x = Bool.ifelse(get_bc() != 1,
+                                pc[11] if n in XFF else pc[13], x)
             return check(x)
 
     if instr in ('cpi/cpd', 'cpir/cpdr'):
@@ -4063,7 +4067,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
         a, s = get_a(), Bits(phased('r'), width=8)
         d = a - s
         if n in NFF:
-            return check(PossibleValues.TRUE)
+            return check(Bool.TRUE)
         if n in HFF:
             return check(d[4] ^ a[4] ^ s[4])
         if n in PFF:
@@ -4083,8 +4087,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # from bit 11 and YF from bit 13 of PC.
                 pc = (get_pc_plus(0) +
                       prefix_bit).truncated(16)
-                x = PossibleValues.ifelse((get_bc() != 1) & (a != s),
-                                          pc[11] if n in XFF else pc[13], x)
+                x = Bool.ifelse((get_bc() != 1) & (a != s),
+                                pc[11] if n in XFF else pc[13], x)
             return check(x)
 
     if instr in ('ini/ind', 'inir/indr', 'outi/outd', 'otir/otdr'):
@@ -4113,7 +4117,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # the carry propagates through the low nibble of
                 # the decremented B, stepped down or up by where
                 # bit 7 of the data byte points.
-                x = PossibleValues.ifelse(
+                x = Bool.ifelse(
                     get_b() != 1,
                     k[8] & (b1.truncated(4) ==
                             Bits.ifelse(data[7], 0x0, 0xf)),
@@ -4132,8 +4136,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                                 (b1 - 1).truncated(8),
                                 (b1 + 1).truncated(8)),
                     b1)
-                x = PossibleValues.ifelse(get_b() != 1,
-                                          x ^ ~t.truncated(3).parity(), x)
+                x = Bool.ifelse(get_b() != 1,
+                                x ^ ~t.truncated(3).parity(), x)
             return check(x)
         if n in XFF + YFF:
             x = b1[3] if n in XFF else b1[5]
@@ -4143,8 +4147,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
                 # from bit 11 and YF from bit 13 of PC.
                 pc = (get_pc_plus(0) +
                       prefix_bit).truncated(16)
-                x = PossibleValues.ifelse(get_b() != 1,
-                                          pc[11] if n in XFF else pc[13], x)
+                x = Bool.ifelse(get_b() != 1,
+                                pc[11] if n in XFF else pc[13], x)
             return check(x)
         if n in ZFF:
             return check(b1 == 0x00)
@@ -4154,7 +4158,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
     if instr == 'adc/sbc hl, <rp>':
         hl, rp = get_hl(), get_rp(opcode[4:6])
         cf = Bits.ifelse(get_active(CF), 1, 0)
-        is_adc = PossibleValues.cast(phased('q') + '_b0')
+        is_adc = Bool.cast(phased('q') + '_b0')
         r = Bits.ifelse(is_adc, hl + rp + cf, ((hl - rp) ^ 0x10000) - cf)
         if n in CFF:
             return check(r[16])
@@ -4184,15 +4188,15 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
         # RLC, RRC, RL, RR, SLA, SRA, SLL, SRL
         is_right = y[0]
-        rot_cf = PossibleValues.ifelse(is_right, v[0], v[7])
+        rot_cf = Bool.ifelse(is_right, v[0], v[7])
 
         is_nine_bit = y[1]
         is_shift = y[2]
         cf = get_active(CF)
-        b = PossibleValues.ifelse(
+        b = Bool.ifelse(
             is_shift,
-            PossibleValues.ifelse(is_nine_bit, ~is_right, is_right & v[7]),
-            PossibleValues.ifelse(is_nine_bit, cf, rot_cf))
+            Bool.ifelse(is_nine_bit, ~is_right, is_right & v[7]),
+            Bool.ifelse(is_nine_bit, cf, rot_cf))
 
         rot_r = Bits.ifelse(is_right,
                             Bits(v.bits[1:8] + (b,)),
@@ -4207,17 +4211,17 @@ def test_node(instrs, n, at_start, at_end, before, after,
         op = Bits(opcode[6:8])
 
         if n in CFF:
-            return check(PossibleValues.ifelse(op == ROT, rot_cf, cf))
+            return check(Bool.ifelse(op == ROT, rot_cf, cf))
         if n in NFF:
-            return check(PossibleValues.ifelse(op == ROT, PossibleValues.FALSE,
-                                               (op != BIT) & before[n]))
+            return check(Bool.ifelse(op == ROT, Bool.FALSE,
+                                     (op != BIT) & before[n]))
         if n in HFF:
-            return check(PossibleValues.ifelse(op == ROT, PossibleValues.FALSE,
-                                               (op == BIT) | before[n]))
+            return check(Bool.ifelse(op == ROT, Bool.FALSE,
+                                     (op == BIT) | before[n]))
         if n in PFF:
-            return check(PossibleValues.ifelse(
+            return check(Bool.ifelse(
                 op == BIT, bit_r == 0,
-                PossibleValues.ifelse(op == ROT, rot_r.parity(), before[n])))
+                Bool.ifelse(op == ROT, rot_r.parity(), before[n])))
         if n in XFF + YFF:
             i = int(n[-1])
             # bit takes the two flags from the high byte of the
@@ -4227,33 +4231,33 @@ def test_node(instrs, n, at_start, at_end, before, after,
             ixd = (get_ixy() +
                    Bits(phased('d'),
                         width=8).sign_extended(16)).truncated(16)
-            ptr_xy = PossibleValues.ifelse(
+            ptr_xy = Bool.ifelse(
                 is_prefixed, ixd[8 + i],
-                PossibleValues.ifelse(reg == AT_HL,
-                                      before[f'reg_w{i}'], v[i]))
-            return check(PossibleValues.ifelse(
+                Bool.ifelse(reg == AT_HL,
+                            before[f'reg_w{i}'], v[i]))
+            return check(Bool.ifelse(
                 op == BIT, ptr_xy,
-                PossibleValues.ifelse(op == ROT, rot_r[i], before[n])))
+                Bool.ifelse(op == ROT, rot_r[i], before[n])))
         if n in ZFF:
-            return check(PossibleValues.ifelse(
+            return check(Bool.ifelse(
                 op == BIT, bit_r == 0,
-                PossibleValues.ifelse(op == ROT, rot_r == 0, before[n])))
+                Bool.ifelse(op == ROT, rot_r == 0, before[n])))
         if n in SFF:
-            return check(PossibleValues.ifelse(
+            return check(Bool.ifelse(
                 op == BIT, bit_r[7],
-                PossibleValues.ifelse(op == ROT, rot_r[7], before[n])))
+                Bool.ifelse(op == ROT, rot_r[7], before[n])))
         if n.startswith('reg_a'):
             i = int(n[-1])
-            return check(PossibleValues.ifelse(
+            return check(Bool.ifelse(
                 (op == BIT) | (reg != A), before[n],
-                PossibleValues.ifelse(
+                Bool.ifelse(
                     op == ROT, rot_r[i],
-                    PossibleValues.ifelse(op == RES, res_r[i],
-                                          set_r[i]))))
+                    Bool.ifelse(op == RES, res_r[i],
+                                set_r[i]))))
 
     if n == '~halt':
         # The pin is active low; only halt asserts it.
-        return check(PossibleValues.FALSE if instr == 'halt' else before[n])
+        return check(Bool.FALSE if instr == 'halt' else before[n])
 
     # Test instruction latch nodes.
     if n.startswith('instr'):
@@ -4281,7 +4285,7 @@ def get_effective_states(s, nodes=None, all_orders=False):
 
 
 def verbalise_state_value(v):
-    v = PossibleValues.cast(v)
+    v = Bool.cast(v)
     if v.is_single:
         return [f'    {get_z3_simplified(v.single_value)}']
     lines = [f'    {len(v.entries)} possible values']
@@ -4303,7 +4307,7 @@ def check_sampled_states(what, states, get_expected, under=None):
         raise TestFailure()
 
     def get_single(n, v):
-        pv = PossibleValues.cast(v)
+        pv = Bool.cast(v)
         if not pv.is_single:
             with Status.do('verbalise'):
                 fail(n, ['  not a single value:'] +
@@ -4314,10 +4318,10 @@ def check_sampled_states(what, states, get_expected, under=None):
         expected = get_single(n, get_expected(n))
         actual = get_single(n, states[n])
         if under is None:
-            ok = PossibleValues.is_same(actual, expected)
+            ok = Bool.is_same(actual, expected)
         else:
-            ok = PossibleValues.is_same(under & (actual ^ expected),
-                                        PossibleValues.FALSE)
+            ok = Bool.is_same(under & (actual ^ expected),
+                              Bool.FALSE)
         if ok:
             continue
         with Status.do('verbalise'):
@@ -4358,7 +4362,7 @@ def test_halted_dynamics(base_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
@@ -4389,7 +4393,7 @@ def run_bus_checked_ticks(s, what, rows, all_orders, under=None):
         for j, p in enumerate(_BUS_AB):
             expected[p] = a[j]
         for p, v in zip(_BUS_CTL, pins):
-            expected[p] = PossibleValues.TRUE if v else PossibleValues.FALSE
+            expected[p] = Bool.TRUE if v else Bool.FALSE
         states = s.get_node_states(_BUS_AB + _BUS_CTL)
         check_sampled_states(f'{what} {no // 2}.{no % 2}',
                              states, lambda n: expected[n],
@@ -4462,13 +4466,13 @@ def test_nmi_from_halt(base_state, all_orders=False):
     # ignored, then two three-tick pushes of PC. The state is
     # then sampled through the usual nop settling.
     s = State(base_state)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~nmi'):
         run_halted_m1(s, 'nh1', all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
     with Status.do('halted M1 with ~nmi'):
         s2 = run_halted_m1(s, 'nh2', all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     s.set_db('nf', all_orders)
     fetch, refresh, sp1, sp2a = get_ack_bus_addrs(s2)
     run_bus_checked_ticks(
@@ -4498,14 +4502,14 @@ def test_nmi_from_halt(base_state, all_orders=False):
     def get_expected(n):
         if n == '~halt':
             # The halted state ends.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (HALTED_FF, HALTED_FF_B):
             # Leaving the halted state flips the pair back.
-            return (PossibleValues.TRUE if n == HALTED_FF
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == HALTED_FF
+                    else Bool.FALSE)
         if n == IFF1:
             # Accepting ~nmi disables maskable interrupts.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             # The nop settling fetches from 0x0066, and a
             # sampled pc reads advanced by one.
@@ -4527,7 +4531,7 @@ def test_nmi_from_halt(base_state, all_orders=False):
             # other fetch and it rides through the acceptance
             # unexecuted; by this sample the settling nop has
             # replaced it in the latch.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return s2[n]
 
     check_sampled_states('nmi from halt', after, get_expected)
@@ -4543,10 +4547,10 @@ def test_masked_int_in_halt(base_state, all_orders=False):
     # on that; where IFF1 is set the state proceeds into the
     # acceptance, which its own test will cover.
     s = State(base_state)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~int'):
         s1 = run_halted_m1(s, 'mi1', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     with Status.do('halted M1 with ~int 1'):
         s2 = run_halted_m1(s, 'mi2', all_orders)
     with Status.do('halted M1 with ~int 2'):
@@ -4560,7 +4564,7 @@ def test_masked_int_in_halt(base_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
@@ -4608,13 +4612,13 @@ def probe_acceptance_latch(all_orders=False):
     sample_ticks('first halted', 4)
     s = steady
 
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~nmi'):
         run_halted_m1(s, 'nh1', all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
     s.set_db('nh2', all_orders)
     sample_ticks('halted', 4)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     s.set_db('nf', all_orders)
     sample_ticks('acceptance', 5)
     sample_ticks('push', 3 + 3)
@@ -4679,9 +4683,9 @@ def test_wait_states(base_state, all_orders=False):
     for no, (a, *pins) in enumerate(rows):
         t, ht = no // 2, no % 2
         if (t, ht) == (1, 0):
-            s.set_pin_and_update('~wait', PossibleValues.FALSE, all_orders)
+            s.set_pin_and_update('~wait', Bool.FALSE, all_orders)
         if (t, ht) == (3, 0):
-            s.set_pin_and_update('~wait', PossibleValues.TRUE, all_orders)
+            s.set_pin_and_update('~wait', Bool.TRUE, all_orders)
         with s.status(f'waited fetch {t}.{ht}'):
             s.half_tick(all_orders=all_orders)
         s.cache()
@@ -4689,7 +4693,7 @@ def test_wait_states(base_state, all_orders=False):
         for j, p in enumerate(_BUS_AB):
             expected[p] = a[j]
         for p, v in zip(_BUS_CTL, pins):
-            expected[p] = PossibleValues.TRUE if v else PossibleValues.FALSE
+            expected[p] = Bool.TRUE if v else Bool.FALSE
         states = s.get_node_states(_BUS_AB + _BUS_CTL)
         check_sampled_states(f'waited fetch bus {t}.{ht}',
                              states, lambda n: expected[n])
@@ -4722,22 +4726,22 @@ def test_bus_grant(base_state, all_orders=False):
                       sampled_bits(st, 'reg_pcl'))
     refresh = Bits.concat(sampled_bits(st, 'reg_i'),
                           sampled_bits(st, 'reg_r'))
-    float_ab = Bits(PossibleValues.cast(f'pull.{p}') for p in _BUS_AB)
-    TRI = tuple(PossibleValues.cast(f'pull.{p}')
+    float_ab = Bits(Bool.cast(f'pull.{p}') for p in _BUS_AB)
+    TRI = tuple(Bool.cast(f'pull.{p}')
                 for p in ('~mreq', '~rd', '~wr', '~iorq'))
 
     def granted(busak):
         # ab and the transfer strobes floating; ~m1 and ~rfsh
         # driven high; ~busak as given.
-        return ((float_ab, PossibleValues.TRUE) + TRI +
-                (PossibleValues.TRUE, busak))
+        return ((float_ab, Bool.TRUE) + TRI +
+                (Bool.TRUE, busak))
 
     def driven(a, m1, mreq, rd, wr, iorq, rfsh):
-        return ((a, PossibleValues.TRUE if m1 else PossibleValues.FALSE)
-                + tuple(PossibleValues.TRUE if v else PossibleValues.FALSE
+        return ((a, Bool.TRUE if m1 else Bool.FALSE)
+                + tuple(Bool.TRUE if v else Bool.FALSE
                         for v in (mreq, rd, wr, iorq))
-                + (PossibleValues.TRUE if rfsh else PossibleValues.FALSE,
-                   PossibleValues.TRUE))
+                + (Bool.TRUE if rfsh else Bool.FALSE,
+                   Bool.TRUE))
 
     rows = (
         driven(pcv, 0, 0, 0, 1, 1, 1),) * 3 + (
@@ -4745,19 +4749,19 @@ def test_bus_grant(base_state, all_orders=False):
         driven(refresh, 1, 0, 1, 1, 1, 0),
         driven(refresh, 1, 0, 1, 1, 1, 0),
         driven(refresh, 1, 1, 1, 1, 1, 0)) + (
-        granted(PossibleValues.FALSE),) * 7 + (
-        granted(PossibleValues.TRUE),
+        granted(Bool.FALSE),) * 7 + (
+        granted(Bool.TRUE),
         driven((pcv + 1).truncated(16), 0, 1, 1, 1, 1, 1))
 
     CTL = ('~m1', '~mreq', '~rd', '~wr', '~iorq', '~rfsh',
            '~busak')
     s = State(base_state)
-    s.set_pin_and_update('~busrq', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~busrq', Bool.FALSE, all_orders)
     s.set_db(0x00, all_orders)
     for no, (a, *pins) in enumerate(rows):
         t, ht = no // 2, no % 2
         if (t, ht) == (6, 0):
-            s.set_pin_and_update('~busrq', PossibleValues.TRUE, all_orders)
+            s.set_pin_and_update('~busrq', Bool.TRUE, all_orders)
         with s.status(f'bus grant {t}.{ht}'):
             s.half_tick(all_orders=all_orders)
         s.cache()
@@ -4807,11 +4811,11 @@ def test_special_reset(base_state, all_orders=False):
         for k in range(offset):
             with s.status('pre'):
                 s.half_tick(all_orders=all_orders)
-        s.set_pin_and_update('~reset', PossibleValues.FALSE, all_orders)
+        s.set_pin_and_update('~reset', Bool.FALSE, all_orders)
         for k in range(width):
             with s.status('pulse'):
                 s.half_tick(all_orders=all_orders)
-        s.set_pin_and_update('~reset', PossibleValues.TRUE, all_orders)
+        s.set_pin_and_update('~reset', Bool.TRUE, all_orders)
         for k in range(24):
             with s.status('after'):
                 s.half_tick(all_orders=all_orders)
@@ -4829,17 +4833,17 @@ def test_special_reset(base_state, all_orders=False):
             if n.startswith('reg_pcl'):
                 return pc[int(n[-1])]
             if n[4:-1] == 'i' and n.startswith('reg_i'):
-                return PossibleValues.FALSE if i_cleared else st0[n]
+                return Bool.FALSE if i_cleared else st0[n]
             if n.startswith('reg_r'):
                 return r[int(n[-1])]
             if n in (IFF1, IFF2):
-                return (PossibleValues.FALSE if iffs_cleared
-                        else PossibleValues.TRUE)
+                return (Bool.FALSE if iffs_cleared
+                        else Bool.TRUE)
             if n in (IM_LATCH0, IM_LATCH1):
-                return PossibleValues.FALSE if iffs_cleared else st0[n]
+                return Bool.FALSE if iffs_cleared else st0[n]
             if n.startswith('instr'):
                 # Nops throughout.
-                return PossibleValues.FALSE
+                return Bool.FALSE
             return st0[n]
 
         check_sampled_states(what, st, get_expected)
@@ -4878,12 +4882,12 @@ def test_int_sampling_instant(base_state, all_orders=False):
         s.set_db(0x00, all_orders)
         for k in range(8):
             if k == offset:
-                s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+                s.set_pin_and_update('~int', Bool.FALSE, all_orders)
             if k == offset + 1:
-                s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+                s.set_pin_and_update('~int', Bool.TRUE, all_orders)
             with s.status(f'int pulse half-tick {k}'):
                 s.half_tick(all_orders=all_orders)
-        s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+        s.set_pin_and_update('~int', Bool.TRUE, all_orders)
         return s
 
     with Status.do('accepted at half-tick 5'):
@@ -4910,7 +4914,7 @@ def test_int_sampling_instant(base_state, all_orders=False):
 
     def get_expected(n):
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -4926,7 +4930,7 @@ def test_int_sampling_instant(base_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return st0[n]
 
     check_sampled_states('~int at the sampling instant',
@@ -4993,7 +4997,7 @@ def test_prefix_chains(base_state, all_orders=False):
             if n.startswith('instr'):
                 # The settling nop's byte, loaded by the
                 # sample point.
-                return PossibleValues.FALSE
+                return Bool.FALSE
             return before[n]
 
         check_sampled_states(what, after, get_expected)
@@ -5055,11 +5059,11 @@ def probe_node_ids(all_orders=False):
     with Status.do('iff nodes'):
         s = State(process_instr(('halt',), base,
                                 all_orders=all_orders))
-        s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+        s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
         run_halted_m1(s, 'nh1', all_orders)
-        s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+        s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
         run_halted_m1(s, 'nh2', all_orders)
-        s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+        s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
         s.set_db('nf', all_orders)
         for t in range(5 + 3 + 3):
             for ht in (0, 1):
@@ -5270,7 +5274,7 @@ def probe_closed_world(all_orders=False):
         changed = []
         for n in ext:
             b, a = before[n], after[n]
-            if not a.is_single or not PossibleValues.is_same(b, a):
+            if not a.is_single or not Bool.is_same(b, a):
                 changed.append(n)
         Status.print(f'{instr}: {len(changed)} changed: ' +
                      ' '.join(changed))
@@ -5303,7 +5307,7 @@ def probe_writeback(all_orders=False):
 
             def matches(v, f):
                 return (v.is_single and f.is_single and
-                        PossibleValues.is_same(v, f))
+                        Bool.is_same(v, f))
 
             by_k = {}
             for n in sorted(SAMPLED_NODES):
@@ -5343,29 +5347,29 @@ def probe_special_reset(all_orders=False):
 
     def desc16(v, base16):
         for k in range(8):
-            if all(PossibleValues.is_same(a, b) for a, b in zip(
+            if all(Bool.is_same(a, b) for a, b in zip(
                     v.bits, Bits.cast(k, width=16).bits)):
                 return f'={k}'
         for k in range(8):
-            if all(PossibleValues.is_same(a, b) for a, b in zip(
+            if all(Bool.is_same(a, b) for a, b in zip(
                     v.bits,
                     ((base16 + k).truncated(16)).bits)):
                 return f'base+{k}'
         return '?'
 
     def desc_bits(v, kept):
-        if all(PossibleValues.is_same(b, PossibleValues.FALSE)
+        if all(Bool.is_same(b, Bool.FALSE)
                for b in v.bits):
             return 'cleared'
-        if all(PossibleValues.is_same(a, b)
+        if all(Bool.is_same(a, b)
                for a, b in zip(v.bits, kept.bits)):
             return 'kept'
         return '?'
 
     def desc_bool(v, kept):
-        if PossibleValues.is_same(v, PossibleValues.FALSE):
+        if Bool.is_same(v, Bool.FALSE):
             return 'cleared'
-        if PossibleValues.is_same(v, kept):
+        if Bool.is_same(v, kept):
             return 'kept'
         return '?'
 
@@ -5378,12 +5382,12 @@ def probe_special_reset(all_orders=False):
                 for k in range(o):
                     with s.status('pre'):
                         s.half_tick(all_orders=all_orders)
-                s.set_pin_and_update('~reset', PossibleValues.FALSE,
+                s.set_pin_and_update('~reset', Bool.FALSE,
                                      all_orders)
                 for k in range(w):
                     with s.status('pulse'):
                         s.half_tick(all_orders=all_orders)
-                s.set_pin_and_update('~reset', PossibleValues.TRUE,
+                s.set_pin_and_update('~reset', Bool.TRUE,
                                      all_orders)
                 for k in range(24):
                     with s.status('after'):
@@ -5395,12 +5399,12 @@ def probe_special_reset(all_orders=False):
             rlo = sampled_bits(st, 'reg_r', width=7)
             rk = '?'
             for k in range(8):
-                if all(PossibleValues.is_same(a, b) for a, b in zip(
+                if all(Bool.is_same(a, b) for a, b in zip(
                         rlo.bits,
                         Bits.cast(k, width=7).bits)):
                     rk = f'={k}'
                     break
-                if all(PossibleValues.is_same(a, b) for a, b in zip(
+                if all(Bool.is_same(a, b) for a, b in zip(
                         rlo.bits,
                         ((r0lo + k).truncated(7)).bits)):
                     rk = f'base+{k}'
@@ -5411,8 +5415,8 @@ def probe_special_reset(all_orders=False):
 
             iv = desc_bits(sampled_bits(st, 'reg_i'),
                            sampled_bits(st0, 'reg_i'))
-            f1 = desc_bool(single(st, IFF1), PossibleValues.TRUE)
-            f2 = desc_bool(single(st, IFF2), PossibleValues.TRUE)
+            f1 = desc_bool(single(st, IFF1), Bool.TRUE)
+            f2 = desc_bool(single(st, IFF2), Bool.TRUE)
             imv = desc_bool(single(st, IM_LATCH0),
                             single(st0, IM_LATCH0))
             wzv = desc_bits(
@@ -5498,7 +5502,7 @@ def probe_context_carriers():
                 continue
             r = ref.get(n)
             if (r is None or not v.is_single or not r.is_single or
-                    not PossibleValues.is_same(r, v)):
+                    not Bool.is_same(r, v)):
                 diff.add(n)
     Status.print(f'{len(ref)} nodes; {len(diff)} differ '
                  f'across contexts, {len(ref) - len(diff)} '
@@ -5511,7 +5515,7 @@ def probe_context_carriers():
         for n, v in raw.items():
             e = eff.get(n)
             if (e is None or not v.is_single or not e.is_single or
-                    not PossibleValues.is_same(v, e)):
+                    not Bool.is_same(v, e)):
                 out.add(n)
         return out
 
@@ -5560,15 +5564,15 @@ def probe_scf_classes():
             before = get_effective_states(s1, SAMPLED_NODES)
             after = get_effective_states(
                 s2, SAMPLED_NODES, all_orders=True)
-        p = PossibleValues.cast('is_prefixed_p2')
+        p = Bool.cast('is_prefixed_p2')
         verdicts = []
         for i in (3, 5):
             ex = before[EX_AF_FF]
-            a = PossibleValues.ifelse(
+            a = Bool.ifelse(
                 ex,
                 before[f'reg_a{i}'],
                 before[f'reg_aa{i}'])
-            f = PossibleValues.ifelse(
+            f = Bool.ifelse(
                 ex,
                 before[f'reg_f{i}'],
                 before[f'reg_ff{i}'])
@@ -5576,9 +5580,9 @@ def probe_scf_classes():
                 'A': (a,),
                 'four-set': (a, f, a | f, a & f),
                 'A-unless-prefixed': (
-                    a, PossibleValues.ifelse(p, f, a),
-                    PossibleValues.ifelse(p, a | f, a),
-                    PossibleValues.ifelse(p, a & f, a)),
+                    a, Bool.ifelse(p, f, a),
+                    Bool.ifelse(p, a | f, a),
+                    Bool.ifelse(p, a & f, a)),
                 'F': (f,),
                 'A|F': (a | f,),
             }
@@ -5586,10 +5590,10 @@ def probe_scf_classes():
             # storage node only where its bank is active;
             # otherwise the node keeps its before value.
             bef_node = before[f'reg_f{i}']
-            cands = {name: tuple(PossibleValues.ifelse(ex, c, bef_node)
+            cands = {name: tuple(Bool.ifelse(ex, c, bef_node)
                                  for c in cand)
                      for name, cand in cands.items()}
-            actual = PossibleValues.cast(after[f'reg_f{i}'])
+            actual = Bool.cast(after[f'reg_f{i}'])
             if actual.is_single:
                 vals = (actual.single_value,)
             else:
@@ -5601,7 +5605,7 @@ def probe_scf_classes():
                 left = list(cand)
                 for v in vals:
                     for j, c in enumerate(left):
-                        if PossibleValues.is_same(v, c):
+                        if Bool.is_same(v, c):
                             del left[j]
                             break
                     else:
@@ -5668,7 +5672,7 @@ def probe_bus_templates(all_orders=False):
                          sampled_bits(st, 'reg_pcl'))
         sp = Bits.concat(sampled_bits(st, 'reg_sph'),
                          sampled_bits(st, 'reg_spl'))
-        cands = {'float': Bits(PossibleValues.cast(f'pull.{p}') for p in AB)}
+        cands = {'float': Bits(Bool.cast(f'pull.{p}') for p in AB)}
         for k in range(-1, 6):
             cands[f'pc{k:+}' if k else 'pc'] = (
                 (pc + (0x10000 + k)).truncated(16))
@@ -5697,7 +5701,7 @@ def probe_bus_templates(all_orders=False):
 
     def match(bits, cands):
         names = [name for name, c in cands.items()
-                 if all(PossibleValues.is_same(a, b)
+                 if all(Bool.is_same(a, b)
                         for a, b in zip(bits, c))]
         if names:
             return '/'.join(names)
@@ -5707,9 +5711,9 @@ def probe_bus_templates(all_orders=False):
                     ')')
 
     def render_pin(v):
-        if PossibleValues.is_same(v, PossibleValues.TRUE):
+        if Bool.is_same(v, Bool.TRUE):
             return '1'
-        if PossibleValues.is_same(v, PossibleValues.FALSE):
+        if Bool.is_same(v, Bool.FALSE):
             return '0'
         with Status.do('verbalise'):
             return get_z3_simplified(v)
@@ -5796,17 +5800,17 @@ def probe_bus_templates(all_orders=False):
     # table address, vector bit 0 included, is the open
     # question.
     s = State(process_instr(('halt',), base, all_orders=all_orders))
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     drive(s, 'pre-nmi halted M1', 'ha1', 4, cands)
-    s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
     drive(s, 'nmi-edge halted M1', 'ha2', 4, cands)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     drive(s, 'nmi ack M1', 'ha3', 5, cands)
     drive(s, 'nmi push 1', 'ha4', 3, cands)
     drive(s, 'nmi push 2', 'ha5', 3, cands)
 
     s = State(base)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     for byte, name in ((0xed, 'im 2 ED'), (0x5e, 'im 2 op'),
                        (0xfb, 'ei'), (0x00, 'shadow nop')):
         s.set_db(byte, all_orders)
@@ -5814,7 +5818,7 @@ def probe_bus_templates(all_orders=False):
             for ht in (0, 1):
                 with s.status(f'{name} tick {t}.{ht}'):
                     s.half_tick(all_orders=all_orders)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     io_cands2 = dict(cands)
     iv = Bits('pv', width=8)
     i_reg = sampled_bits(base.get_node_states(SAMPLED_NODES),
@@ -5822,7 +5826,7 @@ def probe_bus_templates(all_orders=False):
     io_cands2['i:v'] = Bits.concat(i_reg, iv)
     io_cands2['i:v+1'] = (Bits.concat(i_reg, iv) + 1).truncated(16)
     drive(s, 'im2 last nop', 0x00, 4, io_cands2)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     drive(s, 'im2 ack M1', 'pv', 7, io_cands2)
     drive(s, 'im2 push 1', 'pw1', 3, io_cands2)
     drive(s, 'im2 push 2', 'pw2', 3, io_cands2)
@@ -5867,10 +5871,10 @@ def run_im_ei_nop_halt_prep(symbolised_state, upto, all_orders):
     # named as the family executions used to name them.
     s = State(symbolised_state)
     y = Bits('y_p1', width=3)
-    im_op = Bits((PossibleValues.FALSE, PossibleValues.TRUE,
-                  PossibleValues.TRUE) + tuple(y.bits) +
-                 (PossibleValues.TRUE, PossibleValues.FALSE))
-    ei_op = Bits.ifelse(PossibleValues.cast('is_ei_p2'),
+    im_op = Bits((Bool.FALSE, Bool.TRUE,
+                  Bool.TRUE) + tuple(y.bits) +
+                 (Bool.TRUE, Bool.FALSE))
+    ei_op = Bits.ifelse(Bool.cast('is_ei_p2'),
                         Bits.cast(0xfb, width=8),
                         Bits.cast(0xf3, width=8))
     prep = (((0xed, 4), (im_op, 4)), ((ei_op, 4),),
@@ -5893,16 +5897,16 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
 
     y = Bits('y_p1', width=3)
     is_im1 = y[1] & ~y[0]
-    accepts = PossibleValues.cast('is_ei_p2') & is_im1
+    accepts = Bool.cast('is_ei_p2') & is_im1
 
     s = State(s)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~int'):
         run_halted_m1(s, 'ia1', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     with Status.do('halted M1 with ~int'):
         s2 = run_halted_m1(s, 'ia2', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     # The acknowledge byte is symbolic exactly in the mode-1
     # branch, where it is to be proven ignored; the other modes
     # see a nop -- executing an arbitrary symbolic byte under
@@ -5937,14 +5941,14 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
     def get_expected(n):
         if n == '~halt':
             # The halted state ends.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (HALTED_FF, HALTED_FF_B):
             # Leaving the halted state flips the pair back.
-            return (PossibleValues.TRUE if n == HALTED_FF
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == HALTED_FF
+                    else Bool.FALSE)
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             # The nop settling fetches from 0x0038, and a
             # sampled pc reads advanced by one.
@@ -5966,7 +5970,7 @@ def test_int_im1_from_halt(symbolised_state, all_orders=False):
             # byte rides through the acceptance unexecuted; by
             # this sample the settling nop has replaced it in
             # the latch.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return s2[n]
 
     check_sampled_states('im 1 ~int from halt', after, get_expected,
@@ -5989,20 +5993,20 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
 
     y = Bits('y_p1', width=3)
     is_im2 = y[1] & y[0]
-    accepts = PossibleValues.cast('is_ei_p2') & is_im2
+    accepts = Bool.cast('is_ei_p2') & is_im2
 
     def in_mode_2(id):
         return Bits.ifelse(is_im2, Bits(id, width=8),
                            Bits.cast(0x00, width=8))
 
     s = State(s)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~int'):
         run_halted_m1(s, 'ia1', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     with Status.do('halted M1 with ~int'):
         s2 = run_halted_m1(s, 'ia2', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
 
     fetch, refresh, sp1, sp2a = get_ack_bus_addrs(s2)
     # The table address: I paired with the vector as supplied,
@@ -6048,14 +6052,14 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
     def get_expected(n):
         if n == '~halt':
             # The halted state ends.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (HALTED_FF, HALTED_FF_B):
             # Leaving the halted state flips the pair back.
-            return (PossibleValues.TRUE if n == HALTED_FF
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == HALTED_FF
+                    else Bool.FALSE)
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             # The settling nop fetches from the handler
             # address, and a sampled pc reads advanced by one.
@@ -6075,7 +6079,7 @@ def test_int_im2_from_halt(symbolised_state, all_orders=False):
         if n.startswith('instr'):
             # The settling nop's byte, loaded by the sample
             # point.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return s2[n]
 
     check_sampled_states('im 2 ~int from halt', after, get_expected,
@@ -6098,21 +6102,21 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
 
     y = Bits('y_p1', width=3)
     is_im0 = ~y[1]
-    accepts = PossibleValues.cast('is_ei_p2') & is_im0
+    accepts = Bool.cast('is_ei_p2') & is_im0
 
     ry = Bits('ry', width=3)
-    rst = Bits((PossibleValues.TRUE,) * 3 + tuple(ry.bits) +
-               (PossibleValues.TRUE,) * 2)
+    rst = Bits((Bool.TRUE,) * 3 + tuple(ry.bits) +
+               (Bool.TRUE,) * 2)
     ack = Bits.ifelse(is_im0, rst, Bits.cast(0x00, width=8))
 
     s = State(s)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     with Status.do('halted M1 before ~int'):
         run_halted_m1(s, 'ia1', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     with Status.do('halted M1 with ~int'):
         s2 = run_halted_m1(s, 'ia2', all_orders)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(ack, all_orders)
     for t in range(7 + 3 + 3):
         for ht in (0, 1):
@@ -6134,14 +6138,14 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
     def get_expected(n):
         if n == '~halt':
             # The halted state ends.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (HALTED_FF, HALTED_FF_B):
             # Leaving the halted state flips the pair back.
-            return (PossibleValues.TRUE if n == HALTED_FF
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == HALTED_FF
+                    else Bool.FALSE)
         if n in (IFF1, IFF2):
             # A maskable acceptance disables both flip-flops.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             # The settling nop fetches from the RST target, and
             # a sampled pc reads advanced by one.
@@ -6161,7 +6165,7 @@ def test_int_im0_from_halt(symbolised_state, all_orders=False):
         if n.startswith('instr'):
             # The settling nop's byte, loaded by the sample
             # point.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return s2[n]
 
     check_sampled_states('im 0 ~int from halt', after, get_expected,
@@ -6174,9 +6178,9 @@ def prepped_base_expected(base, n):
     # so 'unchanged' relative to such a baseline means the
     # prepared mode for the latch, not the sampled value.
     if n == IM_LATCH0:
-        return PossibleValues.cast('y_p1_b0')
+        return Bool.cast('y_p1_b0')
     if n == IM_LATCH1:
-        return PossibleValues.cast('y_p1_b1')
+        return Bool.cast('y_p1_b1')
     return base[n]
 
 
@@ -6204,24 +6208,24 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
                     check_sampled_states(
                         f'{what} ~halt at {t}.{ht}',
                         s.get_node_states(('~halt',)),
-                        lambda n: PossibleValues.TRUE)
+                        lambda n: Bool.TRUE)
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     if int_pending_over_ei:
         run_m1(0x00)
-        s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+        s.set_pin_and_update('~int', Bool.FALSE, all_orders)
         run_m1(0xfb)  # ei
     else:
         run_m1(0xfb)  # ei
         run_m1(0x00)
-        s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+        s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     run_m1(0x76, sample_halt=True)  # halt
     s.cache()
 
     y = Bits('y_p1', width=1 + 2)
     accepts = y[1] & ~y[0]
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(Bits.ifelse(accepts, Bits(ack_db, width=8),
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
@@ -6233,7 +6237,7 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
                 check_sampled_states(
                     f'{what} ~halt at ack {t}.{ht}',
                     s.get_node_states(('~halt',)),
-                    lambda n: PossibleValues.TRUE)
+                    lambda n: Bool.TRUE)
     s.cache()
     after = get_effective_states(s, SAMPLED_NODES,
                                  all_orders=all_orders)
@@ -6250,9 +6254,9 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6268,7 +6272,7 @@ def run_ei_halt_edge(symbolised_state, what, int_pending_over_ei,
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states(what, after, get_expected, under=accepts)
@@ -6310,9 +6314,9 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
                 with s.status(f'boundary int tick {t}.{ht}'):
                     s.half_tick(all_orders=all_orders)
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     run_m1(0x00)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     run_m1(0xfb)  # ei
     run_m1(0x00)  # the shadow's one instruction
     s.cache()
@@ -6320,7 +6324,7 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
     y = Bits('y_p1', width=3)
     accepts = y[1] & ~y[0]
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(Bits.ifelse(accepts, Bits('bf1', width=8),
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
@@ -6344,9 +6348,9 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6362,7 +6366,7 @@ def test_int_at_boundary(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~int at a boundary', after, get_expected,
@@ -6386,9 +6390,9 @@ def test_int_at_prefix_gap(symbolised_state, all_orders=False):
     ret = (pc0 + 2).truncated(16)
 
     y = Bits('y_p1', width=3)
-    accepts = PossibleValues.cast('is_ei_p2') & y[1] & ~y[0]
+    accepts = Bool.cast('is_ei_p2') & y[1] & ~y[0]
 
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     s.set_db(0xdd, all_orders)
     for t in range(4):
         for ht in (0, 1):
@@ -6403,8 +6407,8 @@ def test_int_at_prefix_gap(symbolised_state, all_orders=False):
             check_sampled_states(
                 f'prefix gap ~iorq {t}.{ht}',
                 s.get_node_states(('~iorq',)),
-                lambda n: PossibleValues.TRUE, under=accepts)
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+                lambda n: Bool.TRUE, under=accepts)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(Bits.ifelse(accepts, Bits('gi1', width=8),
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
@@ -6438,9 +6442,9 @@ def test_int_at_prefix_gap(symbolised_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6456,7 +6460,7 @@ def test_int_at_prefix_gap(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~int at a prefix gap', after,
@@ -6485,10 +6489,10 @@ def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
     for t in range(4):
         for ht in (0, 1):
             if (t, ht) == (2, 0):
-                s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+                s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
             with s.status(f'nmi gap dd {t}.{ht}'):
                 s.half_tick(all_orders=all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     s.set_db(0x00, all_orders)  # the prefixed instruction
     for t in range(4):
         for ht in (0, 1):
@@ -6513,7 +6517,7 @@ def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
     with Status.do('prefix cell after acceptance'):
         check_sampled_states(
             'nmi gap prefix cell',
-            s.get_node_states(('n1242',)), lambda n: PossibleValues.TRUE)
+            s.get_node_states(('n1242',)), lambda n: Bool.TRUE)
     after = get_effective_states(s, SAMPLED_NODES,
                                  all_orders=all_orders)
 
@@ -6529,13 +6533,13 @@ def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n == IFF1:
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n == IFF2:
             # Surviving as the witness that the acceptance was
             # the non-maskable one.
-            return PossibleValues.cast('is_ei_p2')
+            return Bool.cast('is_ei_p2')
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6551,7 +6555,7 @@ def test_nmi_at_prefix_gap(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~nmi at a prefix gap', after,
@@ -6577,10 +6581,10 @@ def test_nmi_at_prefix_chain(symbolised_state, all_orders=False):
     for t in range(4):
         for ht in (0, 1):
             if (t, ht) == (2, 0):
-                s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+                s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
             with s.status(f'nmi chain dd1 {t}.{ht}'):
                 s.half_tick(all_orders=all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     for no, byte in ((2, 0xdd), (3, 0xdd)):
         s.set_db(byte, all_orders)
         for t in range(4):
@@ -6623,11 +6627,11 @@ def test_nmi_at_prefix_chain(symbolised_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n == IFF1:
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n == IFF2:
-            return PossibleValues.cast('is_ei_p2')
+            return Bool.cast('is_ei_p2')
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6643,7 +6647,7 @@ def test_nmi_at_prefix_chain(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~nmi across a prefix chain', after,
@@ -6672,10 +6676,10 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
                 with s.status(f'{what} tick {t}.{ht}'):
                     s.half_tick(all_orders=all_orders)
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     run_cycle('ei', 0xfb, 4)
     run_cycle('shadow nop', 0x00, 4)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
     run_cycle('ldir ED', 0xed, 4)
     run_cycle('ldir opcode', 0xb0, 4)
     run_cycle('ldir read', 'br', 3)
@@ -6692,10 +6696,10 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
                            sampled_bits(base, f'reg_{lo}'))
 
     repeats = pair_bits('b', 'c') != 1
-    repeats = PossibleValues.ifelse(exx, repeats, pair_bits('bb', 'cc') != 1)
+    repeats = Bool.ifelse(exx, repeats, pair_bits('bb', 'cc') != 1)
     accepts = (y[1] & ~y[0]) & repeats
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(Bits.ifelse(accepts, Bits('bi1', width=8),
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
@@ -6713,9 +6717,9 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
         new = (pair - 1) if dec else (pair + 1)
         new = new.truncated(16)
         for i in range(8):
-            changed[f'reg_{hi}{i}'] = PossibleValues.ifelse(
+            changed[f'reg_{hi}{i}'] = Bool.ifelse(
                 active, new[i + 8], pair[i + 8])
-            changed[f'reg_{lo}{i}'] = PossibleValues.ifelse(
+            changed[f'reg_{lo}{i}'] = Bool.ifelse(
                 active, new[i], pair[i])
 
     step_pair('b', 'c', exx, dec=True)
@@ -6731,13 +6735,13 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
     base_pc = Bits.concat(sampled_bits(base, 'reg_pch'),
                           sampled_bits(base, 'reg_pcl'))
     ldir_addr = (base_pc + 2).truncated(16)
-    new_flags = {NF_BIT: PossibleValues.FALSE, PF_BIT: PossibleValues.TRUE,
-                 XF_BIT: ldir_addr[11], HF_BIT: PossibleValues.FALSE,
+    new_flags = {NF_BIT: Bool.FALSE, PF_BIT: Bool.TRUE,
+                 XF_BIT: ldir_addr[11], HF_BIT: Bool.FALSE,
                  YF_BIT: ldir_addr[13]}
     for i, v in new_flags.items():
-        changed[f'reg_f{i}'] = PossibleValues.ifelse(
+        changed[f'reg_f{i}'] = Bool.ifelse(
             ex_af, v, base[f'reg_f{i}'])
-        changed[f'reg_ff{i}'] = PossibleValues.ifelse(
+        changed[f'reg_ff{i}'] = Bool.ifelse(
             ex_af, base[f'reg_ff{i}'], v)
 
     sp = Bits.concat(sampled_bits(base, 'reg_sph'),
@@ -6755,9 +6759,9 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
         if n in changed:
             return changed[n]
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6773,7 +6777,7 @@ def test_int_between_ldir_repeats(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~int between ldir repeats', after,
@@ -6802,11 +6806,11 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
                 with s.status(f'{what} tick {t}.{ht}'):
                     s.half_tick(all_orders=all_orders)
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     run_cycle('ei', 0xfb, 4)
     run_cycle('shadow nop', 0x00, 4)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
-    is_lar = PossibleValues.cast('is_lar')
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
+    is_lar = Bool.cast('is_lar')
     run_cycle('ld a, {i, r} ED', 0xed, 4)
     run_cycle('ld a, {i, r} opcode',
               Bits.ifelse(is_lar, Bits.cast(0x5f, width=8),
@@ -6817,7 +6821,7 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
     accepts = y[1] & ~y[0]
     ex_af = base[EX_AF_FF]
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
     s.set_db(Bits.ifelse(accepts, Bits('li1', width=8),
                          Bits.cast(0x00, width=8)), all_orders)
     for t in range(7 + 3 + 3):
@@ -6839,24 +6843,24 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
     copied = Bits.ifelse(is_lar, r_at_copy, i_reg)
     changed = {}
     for j in range(8):
-        changed[f'reg_a{j}'] = PossibleValues.ifelse(
+        changed[f'reg_a{j}'] = Bool.ifelse(
             ex_af, copied[j],
             base[f'reg_a{j}'])
-        changed[f'reg_aa{j}'] = PossibleValues.ifelse(
+        changed[f'reg_aa{j}'] = Bool.ifelse(
             ex_af,
             base[f'reg_aa{j}'],
             copied[j])
-    new_flags = {NF_BIT: PossibleValues.FALSE, HF_BIT: PossibleValues.FALSE,
+    new_flags = {NF_BIT: Bool.FALSE, HF_BIT: Bool.FALSE,
                  # The lore under test: the acceptance's
                  # clearing of IFF2 wins over the copy to PF.
-                 PF_BIT: PossibleValues.FALSE,
+                 PF_BIT: Bool.FALSE,
                  XF_BIT: copied[3], YF_BIT: copied[5],
                  ZF_BIT: copied == 0, SF_BIT: copied[7]}
     for j, v in new_flags.items():
-        changed[f'reg_f{j}'] = PossibleValues.ifelse(
+        changed[f'reg_f{j}'] = Bool.ifelse(
             ex_af, v,
             base[f'reg_f{j}'])
-        changed[f'reg_ff{j}'] = PossibleValues.ifelse(
+        changed[f'reg_ff{j}'] = Bool.ifelse(
             ex_af,
             base[f'reg_ff{j}'], v)
 
@@ -6875,9 +6879,9 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
         if n in changed:
             return changed[n]
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (IFF1, IFF2):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6893,7 +6897,7 @@ def test_int_at_ld_a_ir(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~int at ld a, {i, r}', after,
@@ -6918,15 +6922,15 @@ def test_nmi_over_int_priority(symbolised_state, all_orders=False):
                 with s.status(f'{what} tick {t}.{ht}'):
                     s.half_tick(all_orders=all_orders)
 
-    s.set_pin_and_update('~int', PossibleValues.TRUE, all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~int', Bool.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     run_cycle('ei', 0xfb, 4)
-    s.set_pin_and_update('~int', PossibleValues.FALSE, all_orders)
-    s.set_pin_and_update('~nmi', PossibleValues.FALSE, all_orders)
+    s.set_pin_and_update('~int', Bool.FALSE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.FALSE, all_orders)
     run_cycle('shadow nop', 0x00, 4)
     s.cache()
 
-    s.set_pin_and_update('~nmi', PossibleValues.TRUE, all_orders)
+    s.set_pin_and_update('~nmi', Bool.TRUE, all_orders)
     s.set_db('pf1', all_orders)
     for t in range(5 + 3 + 3):
         for ht in (0, 1):
@@ -6948,13 +6952,13 @@ def test_nmi_over_int_priority(symbolised_state, all_orders=False):
 
     def get_expected(n):
         if n == '~halt':
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n == IFF1:
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n == IFF2:
             # Still set: only ~nmi accepted; a maskable
             # acceptance would have cleared it.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n.startswith('reg_pch'):
             return pc[int(n[-1]) + 8]
         if n.startswith('reg_pcl'):
@@ -6970,7 +6974,7 @@ def test_nmi_over_int_priority(symbolised_state, all_orders=False):
         if n.startswith('reg_r') and n[-1] != '7':
             return r_lo[int(n[-1])]
         if n.startswith('instr'):
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return prepped_base_expected(base, n)
 
     check_sampled_states('~nmi over ~int priority', after,
@@ -6995,29 +6999,29 @@ def test_reset_from_halt(base_state, all_orders=False):
     def get_expected(n):
         if n == '~halt':
             # The halted state ends.
-            return PossibleValues.TRUE
+            return Bool.TRUE
         if n in (HALTED_FF, HALTED_FF_B):
             # Leaving the halted state flips the pair back.
-            return (PossibleValues.TRUE if n == HALTED_FF
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == HALTED_FF
+                    else Bool.FALSE)
         if n in (IFF1, IFF2, IM_LATCH0, IM_LATCH1):
             # Reset also restarts the interrupt mode at 0.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         if n.startswith('reg_pc') or n[4:-1] == 'i':
             # The settling nop fetches from address 0, and a
             # sampled pc reads advanced by one; I restarts at
             # zero.
-            return (PossibleValues.TRUE if n == 'reg_pcl0'
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == 'reg_pcl0'
+                    else Bool.FALSE)
         if n.startswith('reg_r'):
             # R restarts at zero; the sampling nop's increment
             # lands within the sampled ticks.
-            return (PossibleValues.TRUE if n == 'reg_r0'
-                    else PossibleValues.FALSE)
+            return (Bool.TRUE if n == 'reg_r0'
+                    else Bool.FALSE)
         if n.startswith('instr'):
             # The settling nop's byte, loaded by the sample
             # point.
-            return PossibleValues.FALSE
+            return Bool.FALSE
         return s2[n]
 
     check_sampled_states('reset from halt', after, get_expected)
@@ -7043,9 +7047,9 @@ def get_cond_as_expr(cond, phase, before):
                 Bits(before[f'reg_cc{i}'] for i in range(8)))
         return Bits.concat(b, c) != 1
     if cond == 'is_prefixed':
-        return PossibleValues.cast(f'is_prefixed_p{phase}')
+        return Bool.cast(f'is_prefixed_p{phase}')
     if cond == 'not_prefixed':
-        return ~PossibleValues.cast(f'is_prefixed_p{phase}')
+        return ~Bool.cast(f'is_prefixed_p{phase}')
     if cond == 'bc != 1 && a != r':
         b = Bits.ifelse(
                 before[EXX_FF],
@@ -7067,22 +7071,22 @@ def get_cond_as_expr(cond, phase, before):
             Bits(before[f'reg_ff{i}'] for i in range(8)))
     if cond == 'cc':
         cc = Bits(f'cc_p{phase}', width=3)
-        return PossibleValues.ifelse(
+        return Bool.ifelse(
             cc[2],
-            PossibleValues.ifelse(
+            Bool.ifelse(
                 cc[1],
-                PossibleValues.ifelse(cc[0], f[SF_BIT], ~f[SF_BIT]),
-                PossibleValues.ifelse(cc[0], f[PF_BIT], ~f[PF_BIT])),
-            PossibleValues.ifelse(
+                Bool.ifelse(cc[0], f[SF_BIT], ~f[SF_BIT]),
+                Bool.ifelse(cc[0], f[PF_BIT], ~f[PF_BIT])),
+            Bool.ifelse(
                 cc[1],
-                PossibleValues.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
-                PossibleValues.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
+                Bool.ifelse(cc[0], f[CF_BIT], ~f[CF_BIT]),
+                Bool.ifelse(cc[0], f[ZF_BIT], ~f[ZF_BIT])))
     if cond == 'cc2':
         cc2 = Bits(f'cc2_p{phase}', width=2)
-        return PossibleValues.ifelse(
+        return Bool.ifelse(
             cc2[1],
-            PossibleValues.ifelse(cc2[0], f[CF_BIT], ~f[CF_BIT]),
-            PossibleValues.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
+            Bool.ifelse(cc2[0], f[CF_BIT], ~f[CF_BIT]),
+            Bool.ifelse(cc2[0], f[ZF_BIT], ~f[ZF_BIT]))
     assert 0, cond
 
 
@@ -7213,7 +7217,7 @@ def process_instr(instrs, base_state, *, test=False, all_orders=False):
     cw_end = s.get_node_states(cw_nodes)
     cw_bad = []
     for n in cw_nodes:
-        if PossibleValues.is_same(cw_end[n], cw_start[n]):
+        if Bool.is_same(cw_end[n], cw_start[n]):
             continue
         cw_bad.append(n)
     if cw_bad:
@@ -7238,7 +7242,7 @@ def build_reset_state():
             # As we are not currently interested in investigating
             # these effects, let's start from inactive ~clk as it
             # seems it is expected to be in hardware implementations.
-            s.set_pin_pull(pin, PossibleValues.TRUE)
+            s.set_pin_pull(pin, Bool.TRUE)
         else:
             s.set_pin_pull(pin, f'pull.{pin}')
     with s.status('power up'):
@@ -7337,7 +7341,7 @@ def get_z3_simplified(b, rename_term=None):
     # Verbalises an eqbool value via z3's simplification tactics
     # -- the sole use of z3 in this simulator. A set of possible
     # values verbalises value by value, with the conditions.
-    if isinstance(b, PossibleValues):
+    if isinstance(b, Bool):
         if not b.is_single:
             return ' / '.join(
                 f'{get_z3_simplified(v, rename_term)} under '
@@ -7662,8 +7666,8 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     family_prefixed = spec[0][0] == 'm1p'
     pref_b = Bits.ifelse(
-        (PossibleValues.cast('is_prefixed_p1') if family_prefixed
-         else PossibleValues.FALSE),
+        (Bool.cast('is_prefixed_p1') if family_prefixed
+         else Bool.FALSE),
         1, 0)
 
     def resolve_at(cyc_index, a):
@@ -7708,12 +7712,12 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                                  sampled_bits(eff, 'reg_ixl'))
                 iy = Bits.concat(sampled_bits(eff, 'reg_iyh'),
                                  sampled_bits(eff, 'reg_iyl'))
-                ixy = Bits.ifelse(PossibleValues.cast('is_iy_p1'), iy, ix)
+                ixy = Bits.ifelse(Bool.cast('is_iy_p1'), iy, ix)
                 if instr in PREFIX_DISP:
                     d8 = Bits(phased('d'), width=8)
                     ixy = (ixy +
                            d8.sign_extended(16)).truncated(16)
-                return Bits.ifelse(PossibleValues.cast('is_prefixed_p1'),
+                return Bits.ifelse(Bool.cast('is_prefixed_p1'),
                                    ixy, hl)
             return hl
         if a == 'de':
@@ -7816,7 +7820,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         under = (get_cond_as_expr(cond, 1, eff)
                  if cond is not None else None)
         if kind == 'io_v':
-            is_in = PossibleValues.cast(phased('is_in'))
+            is_in = Bool.cast(phased('is_in'))
             template = ((('cur', 1, 1, 1, 1, 1, 1),) +
                         (('cur', 1, 1, ~is_in, is_in, 0, 1),) * 5 +
                         (('cur', 1, 1, 1, 1, 1, 1),) +
@@ -7824,9 +7828,9 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         elif kind == 'rw_v':
             t = _BUS_RW_STORE[instr]
             if t.startswith('~'):
-                store = ~PossibleValues.cast(phased(t[1:]) + '_b0')
+                store = ~Bool.cast(phased(t[1:]) + '_b0')
             else:
-                store = PossibleValues.cast(phased(t))
+                store = Bool.cast(phased(t))
             template = ((('cur', 1, 0, store, 1, 1, 1),) * 2 +
                         (('cur', 1, 0, store, ~store, 1, 1),) * 2 +
                         (('cur', 1, 1, 1, 1, 1, 1),) +
@@ -7841,7 +7845,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 w = pref_b
             elif kind == 'm1n':
                 w = Bits.ifelse(
-                    PossibleValues.cast('is_prefixed_p1'), 0, 1)
+                    Bool.cast('is_prefixed_p1'), 0, 1)
             else:
                 w = 1
             m1_index = (m1_index + w).truncated(3)
@@ -7858,22 +7862,22 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 tk = resolve_at(j, spec[j][1])
                 if tk is None:
                     tk = cur if cur is not None else held
-                m1v = (PossibleValues.FALSE if spec[j][0] in _BUS_FETCH_KINDS
-                       else PossibleValues.TRUE)
+                m1v = (Bool.FALSE if spec[j][0] in _BUS_FETCH_KINDS
+                       else Bool.TRUE)
                 arms.append((cycles[j][2], tk, m1v))
                 if cycles[j][2] is None:
                     break
-            nxt, next_m1 = nottaken_next, PossibleValues.FALSE
+            nxt, next_m1 = nottaken_next, Bool.FALSE
             for jcond, tk, m1v in reversed(arms):
                 if jcond is None:
                     nxt, next_m1 = tk, m1v
                 else:
                     c = get_cond_as_expr(jcond, 1, eff)
                     nxt = Bits.ifelse(c, tk, nxt)
-                    next_m1 = PossibleValues.ifelse(c, m1v, next_m1)
+                    next_m1 = Bool.ifelse(c, m1v, next_m1)
         else:
             nxt = taken_next
-            next_m1 = PossibleValues.FALSE
+            next_m1 = Bool.FALSE
         s.set_db(d, all_orders)
         for t in range(ticks):
             for ht in (0, 1):
@@ -7894,7 +7898,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                     expected[p] = a[j]
                 for p, v in pins.items():
                     if isinstance(v, int):
-                        v = PossibleValues.TRUE if v else PossibleValues.FALSE
+                        v = Bool.TRUE if v else Bool.FALSE
                     expected[p] = v
                 states = s.get_node_states(AB + CTL)
                 check_sampled_states(
@@ -8286,7 +8290,7 @@ class TestedInstrs(object):
         yield 'ld (<rp>), a/ld a, (<rp>)', (
             fp(),
             f(xpqz(0, pp,
-                   Bits((~PossibleValues.cast(phased('is_store')),)), 2)),
+                   Bits((~Bool.cast(phased('is_store')),)), 2)),
             rw3())
 
         yield 'jp nn', (fp(), f(0xc3), r3('lo'), r3('hi'))
@@ -8465,7 +8469,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     # Symbolise non-persistent nodes.
     for id in s.get_node_states():
         if id not in persistent_nodes:
-            # s.set_node_state(id, PossibleValues.cast(id))
+            # s.set_node_state(id, Bool.cast(id))
             assert 0
     s.power_up()
     s.cache()
@@ -8488,7 +8492,7 @@ def identify_instr_state_nodes(s, instr, persistent_nodes):
     for id, state in s.get_node_states().items():
         if id not in persistent_nodes:
             continue
-        if PossibleValues.is_same(state, persistent_nodes[id]):
+        if Bool.is_same(state, persistent_nodes[id]):
             continue
         # Status.print(f'Found state node: {id}')
         del persistent_nodes[id]
