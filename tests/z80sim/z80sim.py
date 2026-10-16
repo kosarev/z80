@@ -5551,10 +5551,10 @@ def probe_scf_classes():
             continue
         with Status.do(f'{pred}; scf/ccf'):
             try:
-                # The predecessor executes as a preparation --
-                # single-order, exactly as in the tested
-                # pairs -- and only the scf/ccf settles under
-                # all orders.
+                # The predecessor executes as a preparation,
+                # single-order -- unlike in the tested pairs --
+                # and only the scf/ccf settles under all
+                # orders.
                 s1 = process_instr((pred,), base)
                 s2 = process_instr((pred, 'scf/ccf'), s1,
                                    all_orders=True)
@@ -7185,7 +7185,10 @@ def process_instr(instrs, base_state, *, test=False, all_orders=False):
 
     s = State(base_state)
     at_start = s.get_node_states(SAMPLED_NODES)
-    before = get_effective_states(s, SAMPLED_NODES)
+    # A preceding instruction hands over its effective state the
+    # way its own test samples it.
+    before = get_effective_states(s, SAMPLED_NODES,
+                                  all_orders=all_orders and phase > 1)
     if test:
         cw_nodes = get_closed_world_nodes(s)
         cw_start = s.get_node_states(cw_nodes)
@@ -7962,8 +7965,13 @@ def test_instr_seq(seq, all_orders=False):
     try:
         state = build_symbolised_state()
         with Status.do('; '.join(seq)):
+            # The preceding instructions settle under all orders
+            # too -- the very settlings their own tests cached --
+            # so the tested one starts from everything they can
+            # hand over.
             for i in range(len(seq) - 1):
-                state = process_instr(seq[:i + 1], state)
+                state = process_instr(seq[:i + 1], state,
+                                      all_orders=all_orders)
             process_instr(seq, state, test=True, all_orders=all_orders)
             if len(seq) == 1 and seq[0] in BUS_SPECS:
                 test_bus_timeline(seq[0], state, all_orders)
