@@ -7642,13 +7642,19 @@ _BUS_COND_NEXTS = {
 }
 
 
-def test_bus_timeline(instr, base_state, all_orders=False):
-    # Replays the instruction's settlings -- the steps are
+def test_bus_timeline(instrs, base_state, all_orders=False):
+    # Replays the last instruction's settlings -- the steps are
     # identical to the tested run's, so everything comes from
     # the cache -- sampling the address bus and the control
     # pins at every half-tick against the measured templates
     # and the family's cycle addresses.
+    phase = len(instrs)
+    instr = instrs[-1]
     spec = BUS_SPECS[instr]
+
+    def phased(id):
+        return f'{id}_p{phase}'
+
     raw = base_state.get_node_states(SAMPLED_NODES)
     eff = get_effective_states(base_state, SAMPLED_NODES,
                                all_orders=all_orders)
@@ -7670,7 +7676,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
 
     family_prefixed = spec[0][0] == 'm1p'
     pref_b = Bits.ifelse(
-        (Bool.cast('is_prefixed_p1') if family_prefixed
+        (Bool.cast(phased('is_prefixed')) if family_prefixed
          else Bool.FALSE),
         1, 0)
 
@@ -7700,9 +7706,6 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     a_reg = Bits.ifelse(ex_af, sampled_bits(eff, 'reg_a'),
                         sampled_bits(eff, 'reg_aa'))
 
-    def phased(id):
-        return f'{id}_p1'
-
     def resolve(a):
         if a.startswith('pc'):
             off = int(a[2:]) if len(a) > 2 else 0
@@ -7716,12 +7719,12 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                                  sampled_bits(eff, 'reg_ixl'))
                 iy = Bits.concat(sampled_bits(eff, 'reg_iyh'),
                                  sampled_bits(eff, 'reg_iyl'))
-                ixy = Bits.ifelse(Bool.cast('is_iy_p1'), iy, ix)
+                ixy = Bits.ifelse(Bool.cast(phased('is_iy')), iy, ix)
                 if instr in PREFIX_DISP:
                     d8 = Bits(phased('d'), width=8)
                     ixy = (ixy +
                            d8.sign_extended(16)).truncated(16)
-                return Bits.ifelse(Bool.cast('is_prefixed_p1'),
+                return Bits.ifelse(Bool.cast(phased('is_prefixed')),
                                    ixy, hl)
             return hl
         if a == 'de':
@@ -7751,7 +7754,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
         if a == 'jpcc-next':
             t = Bits.concat(Bits(phased('hi'), width=8),
                             Bits(phased('lo'), width=8))
-            cc = get_cond_as_expr('cc', 1, eff)
+            cc = get_cond_as_expr('cc', phase, eff)
             return Bits.ifelse(cc, t,
                                (pc + 3 + pref_b).truncated(16))
         if a == 'reti-target':
@@ -7809,7 +7812,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     else:
         taken_next = nottaken_next = instr_next
 
-    cycles = TestedInstrs.get_cycles(instr, 1)
+    cycles = TestedInstrs.get_cycles(instr, phase)
     assert len(cycles) == len(spec), instr
 
     AB = tuple(f'ab{i}' for i in range(16))
@@ -7821,7 +7824,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
     held = None
     for cyc, ((d, ticks, cond), (kind, addr)) in enumerate(
             zip(cycles, spec)):
-        under = (get_cond_as_expr(cond, 1, eff)
+        under = (get_cond_as_expr(cond, phase, eff)
                  if cond is not None else None)
         if kind == 'io_v':
             is_in = Bool.cast(phased('is_in'))
@@ -7849,7 +7852,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 w = pref_b
             elif kind == 'm1n':
                 w = Bits.ifelse(
-                    Bool.cast('is_prefixed_p1'), 0, 1)
+                    Bool.cast(phased('is_prefixed')), 0, 1)
             else:
                 w = 1
             m1_index = (m1_index + w).truncated(3)
@@ -7876,7 +7879,7 @@ def test_bus_timeline(instr, base_state, all_orders=False):
                 if jcond is None:
                     nxt, next_m1 = tk, m1v
                 else:
-                    c = get_cond_as_expr(jcond, 1, eff)
+                    c = get_cond_as_expr(jcond, phase, eff)
                     nxt = Bits.ifelse(c, tk, nxt)
                     next_m1 = Bool.ifelse(c, m1v, next_m1)
         else:
@@ -7973,8 +7976,8 @@ def test_instr_seq(seq, all_orders=False):
                 state = process_instr(seq[:i + 1], state,
                                       all_orders=all_orders)
             process_instr(seq, state, test=True, all_orders=all_orders)
-            if len(seq) == 1 and seq[0] in BUS_SPECS:
-                test_bus_timeline(seq[0], state, all_orders)
+            if seq[-1] in BUS_SPECS:
+                test_bus_timeline(seq, state, all_orders)
             if seq == ('ld <rp>, nn',):
                 test_prefix_chains(state, all_orders)
             if seq == ('nop',):
