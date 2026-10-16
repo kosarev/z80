@@ -8464,7 +8464,12 @@ def test_instructions():
         # predecessor in every context class.
         seqs += list(CONTEXT_SUSPECT_PAIRS)
         if has_opt('--two-instr-seqs'):
-            seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
+            # A halted CPU never executes what follows the halt;
+            # the halt tests cover what it does instead.
+            seqs += [(i1, i2) for i1 in instrs for i2 in instrs
+                     if i1 != 'halt']
+        # The pairs above repeat the certified ones.
+        seqs = list(dict.fromkeys(seqs))
 
     # Options only filter what runs; they never affect the
     # order, which is test_instr_seqs()'s own.
