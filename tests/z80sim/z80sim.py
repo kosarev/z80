@@ -2088,74 +2088,37 @@ class Z80Simulator(object):
         self.__update_groups_of([n], all_orders)
 
     def half_tick(self, *, cond=None, all_orders=False):
-        if self.__memory is not None and self.clk:
-            if self.mreq and not self.rfsh and not self.iorq:
-                if self.m1 and self.rd and self.t2:
-                    self.dbus = self.__memory[int(self.abus)]
-
         if cond is None:
             cond = TRUE
 
-        nclk = bools.ifelse(cond, ~self.nclk, self.nclk)
-        self.__set_node(self.__nclk, nclk, all_orders)
-
-        # self.__print_state()
-
-    def __tick(self):
-        self.half_tick()
-        self.half_tick()
+        nclk = self.get_node_state(self.__nclk)
+        self.__set_node(self.__nclk, bools.ifelse(cond, ~nclk, nclk),
+                        all_orders)
 
     def clear_state(self):
         for t in self.__trans.values():
             t.state = FALSE
 
-    __DEFAULT_RESET_PROPAGATION_DELAY = 31
+    def reset(self, propagation_delay, waiting_for_m1_delay):
+        self.__set_node(self.__nclk, TRUE)
 
-    def reset(self, propagation_delay=__DEFAULT_RESET_PROPAGATION_DELAY,
-              waiting_for_m1_delay=None):
-        self.nclk = TRUE
-
-        self.nreset = FALSE
-        self.nbusrq = TRUE
-        self.nint = TRUE
-        self.nnmi = TRUE
-        self.nwait = TRUE
+        self.__set_node(self.__nreset, FALSE)
+        for n in (self.__nbusrq, self.__nint, self.__nnmi,
+                  self.__nwait):
+            self.__set_node(n, TRUE)
 
         # Propagate the reset signal.
         for _ in range(propagation_delay):
             self.half_tick()
 
-        self.nreset = TRUE
+        self.__set_node(self.__nreset, TRUE)
 
         # Wait for the first active ~m1, which is essentially an
         # indication that the reset process is completed.
-        if waiting_for_m1_delay is None:
-            count = 0
-            while self.__nm1.state:
-                self.half_tick()
-                count += 1
-            if '--show-waiting-for-m1-delay' in sys.argv:
-                print('waiting-for-m1 delay:', count)
-        else:
-            for _ in range(waiting_for_m1_delay):
-                self.half_tick()
+        for _ in range(waiting_for_m1_delay):
+            self.half_tick()
 
-    def __init__(self, *, memory=None, skip_reset=None, image=None):
-        if image is None:
-            s = State()
-            s.clear_state()
-            s.power_up()
-
-            if not skip_reset:
-                s.reset(__class__.__DEFAULT_RESET_PROPAGATION_DELAY,
-                        waiting_for_m1_delay=None)
-
-            s.cache()
-            image = s.image
-        else:
-            # For custom images, leave them as-is.
-            assert skip_reset is None
-
+    def __init__(self, *, image):
         (node_storage, bools,
          node_names, nodes, trans) = image
 
@@ -2209,143 +2172,9 @@ class Z80Simulator(object):
 
         self.__nbusrq = self.__nodes_by_name['~busrq']
         self.__nint = self.__nodes_by_name['~int']
-        self.__niorq = self.__nodes_by_name['~iorq']
-        self.__nm1 = self.__nodes_by_name['~m1']
-        self.__nmreq = self.__nodes_by_name['~mreq']
         self.__nnmi = self.__nodes_by_name['~nmi']
-        self.__nrd = self.__nodes_by_name['~rd']
         self.__nreset = self.__nodes_by_name['~reset']
-        self.__nrfsh = self.__nodes_by_name['~rfsh']
         self.__nwait = self.__nodes_by_name['~wait']
-
-        self.__t1 = self.__nodes_by_name['t1']
-        self.__t2 = self.__nodes_by_name['t2']
-        self.__t3 = self.__nodes_by_name['t3']
-        self.__t4 = self.__nodes_by_name['t4']
-        self.__t5 = self.__nodes_by_name['t5']
-        self.__t6 = self.__nodes_by_name['t6']
-
-        if memory is None:
-            self.__memory = None
-        else:
-            self.__memory = bytearray(0x10000)
-            self.__memory[:len(memory)] = memory
-
-    @property
-    def nclk(self):
-        return self.get_node_state(self.__nclk)
-
-    @nclk.setter
-    def nclk(self, state):
-        self.__set_node(self.__nclk, state)
-
-    @property
-    def clk(self):
-        return ~self.nclk
-
-    @property
-    def niorq(self):
-        return self.__niorq.state
-
-    @property
-    def iorq(self):
-        return ~self.niorq
-
-    @property
-    def nm1(self):
-        return self.__nm1.state
-
-    @property
-    def m1(self):
-        return ~self.__nm1.state
-
-    @property
-    def nmreq(self):
-        return self.__nmreq.state
-
-    @property
-    def mreq(self):
-        return ~self.nmreq
-
-    @property
-    def nreset(self):
-        return self.__nreset.state
-
-    @nreset.setter
-    def nreset(self, state):
-        self.__set_node(self.__nreset, state)
-
-    @property
-    def nrfsh(self):
-        return self.__nrfsh.state
-
-    @property
-    def rfsh(self):
-        return ~self.nrfsh
-
-    @property
-    def nbusrq(self):
-        return self.__nbusrq.state
-
-    @nbusrq.setter
-    def nbusrq(self, state):
-        self.__set_node(self.__nbusrq, state)
-
-    @property
-    def nint(self):
-        return self.__nint.state
-
-    @nint.setter
-    def nint(self, state):
-        self.__set_node(self.__nint, state)
-
-    @property
-    def nnmi(self):
-        return self.__nnmi.state
-
-    @nnmi.setter
-    def nnmi(self, state):
-        self.__set_node(self.__nnmi, state)
-
-    @property
-    def nrd(self):
-        return self.__nrd.state
-
-    @property
-    def rd(self):
-        return ~self.nrd
-
-    @property
-    def nwait(self):
-        return self.__nwait.state
-
-    @nwait.setter
-    def nwait(self, state):
-        self.__set_node(self.__nwait, state)
-
-    @property
-    def t1(self):
-        return self.__t1.state
-
-    @property
-    def t2(self):
-        return self.__t2.state
-
-    @property
-    def t3(self):
-        return self.__t3.state
-
-    @property
-    def t4(self):
-        return self.__t4.state
-
-    @property
-    def t5(self):
-        return self.__t5.state
-
-    @property
-    def t6(self):
-        return self.__t6.state
 
     def get_node(self, id):
         return self.__nodes_by_name[id]
@@ -2356,37 +2185,6 @@ class Z80Simulator(object):
     def read_nodes(self, id, width=8):
         return Bits(self.get_node_state(self.__nodes_by_name[f'{id}{i}'])
                     for i in range(width))
-
-    def __write_bits(self, name, value, width=8):
-        for i in range(width):
-            self.__set_node(self.__nodes_by_name[name + str(i)],
-                            bool((value >> i) & 0x1))
-
-    @property
-    def abus(self):
-        return self.read_nodes('ab', 16)
-
-    @property
-    def dbus(self):
-        return self.read_nodes('db')
-
-    @dbus.setter
-    def dbus(self, n):
-        self.__write_bits('db', n)
-
-    @property
-    def a(self):
-        return self.read_nodes('reg_a')
-
-    @property
-    def r(self):
-        return self.read_nodes('reg_r')
-
-    @property
-    def pc(self):
-        lo = self.read_nodes('reg_pcl')
-        hi = self.read_nodes('reg_pch')
-        return (hi << 8) | lo
 
     def set_pin_pull(self, pin, pull):
         assert pin in _PINS
@@ -2404,46 +2202,15 @@ class Z80Simulator(object):
                                     for n in self.__gnd_pwr
                                     for t in n.conn_of)
 
-    def dump(self):
-        with open('z80.dump', mode='w') as f:
-            for t in sorted(self.__trans.values()):
-                print(t, file=f)
-
     def dump_nodes(self):
         with open('z80sim-nodes.dump', 'w') as f:
             for n in sorted(self.__nodes.values()):
-                print(n, n.state, file=f)
+                print(n, self.get_node_entries(n), file=f)
 
     def dump_trans(self):
         with open('z80sim-trans.dump', 'w') as f:
             for t in sorted(self.__trans.values()):
                 print(t, t.state, file=f)
-
-    def __print_state(self):
-        print(f'PC {self.pc}, '
-              f'A {self.a}, '
-              f'R {self.r}, '
-              f'clk {self.clk}, '
-              f'abus {self.abus}, '
-              f'dbus {self.dbus}, '
-              f'm1 {self.m1}, '
-              f't1 {self.t1}, '
-              f't2 {self.t2}, '
-              f't3 {self.t3}, '
-              f't4 {self.t4}, '
-              f't5 {self.t5}, '
-              f't6 {self.t6}, '
-              f'rfsh {self.rfsh}, '
-              f'rd {self.rd}, '
-              f'mreq {self.mreq}')
-
-    # TODO
-    def do_something(self):
-        for i in range(30 * 10):
-            if i > 0 and self.m1 and self.t1:
-                print()
-
-            self.half_tick()
 
 
 class State(object):
@@ -8725,53 +8492,12 @@ def build_symbolic_states():
     s.report('after-symbolising')
 
 
-def test_computing_node_values():
-    # With the old function computing node values the LSB of the
-    # address bus was always to 0 at the fourth half-tick of
-    # fetch cycles. Make sure with the new logic the address bus
-    # maintains the right value.
-    s = Z80Simulator(memory=[])
-    while s.abus == 0x0000:
-        s.half_tick()
-    while s.abus == 0x0001:
-        s.half_tick()
-    assert s.abus == 0x0002
-
-    Status.print('Tests passed.')
-    Status.clear()
-
-
-def play_sandbox():
-    memory = [
-        # 0x76,  # halt
-        0xd3,  # di
-        # 0xc5,  # nop
-        0x05,  # dec b
-        0x0f,  # rrca
-        0xf6, 0x40,  # or 0x40
-        0xc5,  # push bc
-        0x7e,  # ld a, (hl)
-        0xfe, 0x0d,  # cp 0x0d
-    ]
-    s = Z80Simulator(memory=memory)
-    s.dump()
-    s.do_something()
-
-
 def main():
     test_bools()
     test_orders()
 
     if '--print-start-time' in sys.argv:
         Status.print('started')
-
-    if '--test' in sys.argv:
-        test_computing_node_values()
-        return
-
-    if '--play-sandbox' in sys.argv:
-        play_sandbox()
-        return
 
     if '--identify-state-nodes' in sys.argv:
         identify_state_nodes()
