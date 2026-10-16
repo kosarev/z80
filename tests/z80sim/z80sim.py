@@ -8461,6 +8461,7 @@ def test_instructions():
 
     Status.clear()
     print('OK' if ok else 'FAILED')
+    return ok
 
 
 def identify_instr_state_nodes(s, instr, persistent_nodes):
@@ -8629,7 +8630,8 @@ def main():
 
     build_symbolic_states()
 
-    test_instructions()
+    if not test_instructions():
+        sys.exit(1)
 
 
 if __name__ == "__main__":
