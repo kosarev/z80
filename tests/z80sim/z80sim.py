@@ -767,9 +767,19 @@ class PossibleValues(object):
 
     __num_clipped = 0
 
+    # Clip terms are named after the settling that clips, as
+    # update events are, and counted within it.
+    __clip_scope = None
+    __num_scope_clips = 0
+
     @staticmethod
     def get_num_clipped():
         return __class__.__num_clipped
+
+    @staticmethod
+    def set_clip_scope(scope):
+        __class__.__clip_scope = scope
+        __class__.__num_scope_clips = 0
 
     @staticmethod
     def clip(num_values):
@@ -799,12 +809,16 @@ class PossibleValues(object):
         # __update_gate_state pins the node to one per-settling
         # term, or its state would never compare same and the
         # settling could not converge.
-        # TODO: The names count from process start, so images
-        # cached by different runs may reuse a name for a
-        # different clipped set; content-derived names would
-        # remove the caveat.
+        # The names carry the settling's update scope, so images
+        # cached by different runs never reuse a name for a
+        # different clipped set within one step list.
         __class__.__num_clipped += 1
-        id = f'clipped{__class__.__num_clipped}'
+        __class__.__num_scope_clips += 1
+        if __class__.__clip_scope is None:
+            id = f'clipped{__class__.__num_clipped}'
+        else:
+            id = (f'clipped@{__class__.__clip_scope}.'
+                  f'{__class__.__num_scope_clips}')
         Status.print(f'{id} <- {num_values} possible values '
                      f'at {Status.get_context()}',
                      option='--show-clips')
@@ -1570,11 +1584,11 @@ class ObservedStates(object):
     # states and derive different conditions every trip, and the
     # settling never converges.
     def __init__(self, new_states, evaluated=None, all_orders=False,
-                 update_no=None, raced=None):
+                 update_scope=None, raced=None):
         self.__new_states = new_states
         self.__evaluated = evaluated
         self.__all_orders = all_orders
-        self.__update_no = update_no
+        self.__update_scope = update_scope
         self.__raced = raced
         self.__observed = {}
 
@@ -1583,7 +1597,7 @@ class ObservedStates(object):
         # group update, so facts surviving a group update are
         # never confused with facts about later updates of the
         # same nodes.
-        s = self.__update_no
+        s = self.__update_scope
         return PartialOrders.get_fact(f'u{s}.{before.index}',
                                       f'u{s}.{after.index}')
 
@@ -1833,7 +1847,7 @@ class Z80Simulator(object):
             new_states = {}
         observed = ObservedStates(new_states, evaluated=n,
                                   all_orders=all_orders,
-                                  update_no=self.update_no,
+                                  update_scope=self.update_scope,
                                   raced=self.__raced_pairs)
         gnd, pwr, pullup, pulldown = self.__get_node_preds(
             n, observed, budget=budget)
@@ -1895,6 +1909,11 @@ class Z80Simulator(object):
         # fresh chance for every competing pair to be asked its
         # order question.
         self.update_no += 1
+        if self.__step_no is None:
+            self.update_scope = f'{self.update_no}'
+        else:
+            self.update_scope = f'{self.__step_no}.{self.update_no}'
+        PossibleValues.set_clip_scope(self.update_scope)
         self.__raced_pairs = set()
         self.__clipped_nodes = {}
         self.__settle_start_states = {}
@@ -1928,7 +1947,7 @@ class Z80Simulator(object):
                 # stay: an unverified start value could certify
                 # falsely. The opaque terms take the nodes.
                 for n, pinned in self.__clipped_nodes.items():
-                    id = f'clipped.{self.update_no}.{n.index}'
+                    id = f'clipped.{self.update_scope}.{n.index}'
                     state = PossibleValues.cast(bools.get(id))
                     if PossibleValues.is_same(state, pinned):
                         continue
@@ -1958,7 +1977,7 @@ class Z80Simulator(object):
                             state, self.__clipped_nodes[n])
                     if lost:
                         # The value is lost for good.
-                        id = f'clipped.{self.update_no}.{n.index}'
+                        id = f'clipped.{self.update_scope}.{n.index}'
                         state = PossibleValues.cast(bools.get(id))
                         if PossibleValues.is_same(
                                 state, self.__clipped_nodes[n]):
@@ -2059,6 +2078,11 @@ class Z80Simulator(object):
             Status.print(n, pull)
         n.pull = pull
 
+    def begin_step(self, step_no):
+        # Scopes the update events of the step's settlings.
+        self.__step_no = step_no
+        self.update_no = 0
+
     def __set_node(self, n, pull, all_orders=False):
         self.__set_node_pull(n, pull)
         self.__update_groups_of([n], all_orders)
@@ -2139,8 +2163,17 @@ class Z80Simulator(object):
         node_storage = Node.Storage(bools, image=node_storage)
         trans_storage = Transistor.Storage(bools)
 
-        # Counts group updates; scopes their update events.
+        # Counts group updates; scopes their update events. The
+        # image carries no count, so a simulator resuming from a
+        # cached image would restart it and reuse names facts in
+        # the image may already carry. Settlings run as steps are
+        # therefore scoped by the step's index in the step list
+        # -- the same whichever image the replay starts from --
+        # and counted within the step; directly driven
+        # simulators, outside any step, count on their own.
         self.update_no = 0
+        self.__step_no = None
+        self.update_scope = None
 
         # The competing pairs whose order questions the current
         # settling has already asked.
@@ -2541,6 +2574,7 @@ class State(object):
         return Z80Simulator(image=self.image).get_node_states(ids)
 
     def __apply_step(self, sim, step):
+        sim.begin_step(step[0])
         kind = step[1]
         if kind == 'clear_state':
             _, _, = step
@@ -2591,7 +2625,7 @@ class State(object):
     # settled state contains -- states computed under different
     # budgets or semantics must never share a cache entry.
     # Plain images are unaffected by either.
-    ALL_ORDERS_VERSION = 7
+    ALL_ORDERS_VERSION = 8
 
     def update_pin(self, pin, all_orders=False):
         step = ('update_pin', pin)
@@ -7471,7 +7505,7 @@ def run_all_orders(instr):
 
     def rename_event(t):
         def rename(event):
-            s, index = event.removeprefix('u').split('.')
+            s, index = event.removeprefix('u').rsplit('.', 1)
             return f'{sim.get_node_id(int(index))}@{s}'
 
         before, after = t.split('<')
