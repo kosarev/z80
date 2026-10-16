@@ -121,7 +121,8 @@ for i in range(8):
 # stops before it starts.
 OPTIONS = {
     # What to run.
-    '--only': (str, 'test just the given instruction family'),
+    '--only': (str, "test just the given sequence, e.g. 'scf/ccf' "
+                    "or 'nop; scf/ccf'"),
     '--two-instr-seqs': (None, 'also test every ordered pair of '
                                'families'),
     '--new-only': (None, 'test only sequences with no recorded pass'),
@@ -8432,23 +8433,27 @@ def test_instructions():
 
     instrs = TestedInstrs.get_instrs()
 
-    # For iterating on a single family: --only=<instr> tests
-    # just that sequence, pass records untouched aside.
+    # For iterating on a single sequence: --only tests just
+    # that, given the way sequences are reported, e.g.
+    # 'nop; scf/ccf'.
     only = get_opt('--only')
     if only is not None:
-        assert only in instrs, only
-        instrs = (only,)
-
-    seqs = [(i,) for i in instrs]
-    if only is None:
+        seqs = [tuple(only.split('; '))]
+        for i in seqs[0]:
+            if i not in instrs:
+                print(f'{sys.argv[0]}: unknown instruction: {i}',
+                      file=sys.stderr)
+                sys.exit(2)
+    else:
+        seqs = [(i,) for i in instrs]
         # The scf/ccf context pairs: the context map's
         # certified sequences.
         seqs += [(i, 'scf/ccf') for i in SCF_CONTEXTS]
         # The flag consumers, proven blind to their
         # predecessor in every context class.
         seqs += list(CONTEXT_SUSPECT_PAIRS)
-    if has_opt('--two-instr-seqs'):
-        seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
+        if has_opt('--two-instr-seqs'):
+            seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
 
     # Options only filter what runs; they never affect the
     # order, which is test_instr_seqs()'s own.
