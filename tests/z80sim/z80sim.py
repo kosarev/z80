@@ -116,21 +116,114 @@ for i in range(8):
         SAMPLED_NODES.add(f'reg_{r}{i}')
 
 
-def get_opt(id, type):
-    for a in sys.argv:
+# Every command-line option, with the type of its value -- None
+# for a flag -- and what it does. A run given any other option
+# stops before it starts.
+OPTIONS = {
+    # What to run.
+    '--only': (str, 'test just the given instruction family'),
+    '--two-instr-seqs': (None, 'also test every ordered pair of '
+                               'families'),
+    '--new-only': (None, 'test only sequences with no recorded pass'),
+    '--single-order': (None, 'simulate the default order of updates '
+                             'only'),
+    '--threads': (int, 'the number of concurrent test workers'),
+    '--worker-memory': (float, 'the memory cap for a test worker, in '
+                               'GiB'),
+    '--seed': (int, 'shuffle the default order of updates'),
+    '--no-symbolising': (None, 'build the start state without '
+                               'symbolising it'),
+
+    # Probes.
+    '--identify-state-nodes': (None, 'identify state nodes by '
+                                     'simulation'),
+    '--probe-acceptance-latch': (None, 'the instruction latch through '
+                                       'the ~nmi acceptance fetch'),
+    '--probe-bus-templates': (None, 'the bus through representative '
+                                    'machine cycles'),
+    '--probe-closed-world': (None, 'the state nodes changing across '
+                                   'covered instructions'),
+    '--probe-context-carriers': (None, 'the nodes that can carry '
+                                       'context to the next '
+                                       'instruction'),
+    '--probe-context-suspects': (None, 'the flag consumers in their '
+                                       'predecessor contexts'),
+    '--probe-latch-cells': (None, 'the storage structure of the state '
+                                  'nodes'),
+    '--probe-node-ids': (None, 'identification candidates for state '
+                               'nodes'),
+    '--probe-scf-classes': (None, 'the scf/ccf predecessor '
+                                  'classification'),
+    '--probe-scf-contexts': (None, 'scf/ccf after every covered '
+                                   'family'),
+    '--probe-special-reset': (None, 'short ~reset pulses within a '
+                                    'fetch'),
+    '--probe-writeback': (None, 'when tested nodes reach their final '
+                                'values'),
+
+    # Reported states.
+    '--after-clearing-state': (None, 'report the state after '
+                                     'clearing'),
+    '--after-updating-all-nodes': (None, 'report the state after '
+                                         'powering up'),
+    '--after-reset': (None, 'report the state after reset'),
+    '--after-nop': (None, 'report the state after a nop'),
+    '--after-ld-a-i8': (None, 'report the state after ld a, n'),
+    '--after-symbolising': (None, 'report the symbolised start '
+                                  'state'),
+    '--dump-nodes': (None, 'with a reported state, dump the nodes to '
+                           'z80sim-nodes.dump'),
+    '--dump-trans': (None, 'with a reported state, dump the '
+                           'transistors to z80sim-trans.dump'),
+
+    # Diagnostics.
+    '--print-start-time': (None, 'print when the run starts'),
+    '--profile': (None, 'time the run'),
+    '--show-clips': (None, 'show clipped possible values'),
+    '--show-loaded-state': (None, 'show the cached states loaded'),
+    '--show-set-nodes': (None, 'show pin pulls as they are set'),
+    '--no-before-after-expected': (None, 'leave out the values in '
+                                         'failure reports'),
+}
+
+
+def has_opt(id):
+    assert OPTIONS[id][0] is None, id
+    return id in sys.argv[1:]
+
+
+def get_opt(id):
+    type = OPTIONS[id][0]
+    assert type is not None, id
+    for a in sys.argv[1:]:
         if a.startswith(id + '='):
             return type(a.split('=', maxsplit=1)[1])
     return None
 
 
-SEED = get_opt('--seed', int)
+def check_opts():
+    for a in sys.argv[1:]:
+        id, is_valued, _ = a.partition('=')
+        if id not in OPTIONS:
+            error = 'unknown option'
+        elif OPTIONS[id][0] is None and is_valued:
+            error = 'option takes no value'
+        elif OPTIONS[id][0] is not None and not is_valued:
+            error = 'option takes a value'
+        else:
+            continue
+        print(f'{sys.argv[0]}: {error}: {a}', file=sys.stderr)
+        sys.exit(2)
+
+
+SEED = get_opt('--seed')
 
 # The number of concurrent test workers; the run is
 # single-threaded when not given.
-THREADS = get_opt('--threads', int)
+THREADS = get_opt('--threads')
 
 # The memory cap for concurrent test workers, in GiB.
-WORKER_MEMORY = get_opt('--worker-memory', float)
+WORKER_MEMORY = get_opt('--worker-memory')
 
 
 class MemoryCapReached(Exception):
@@ -164,7 +257,7 @@ class Status(object):
     __tty = sys.stderr.isatty()
     __last_log_time = None
 
-    __profile = '--profile' in sys.argv
+    __profile = has_opt('--profile')
     if __profile:
         print(platform.python_implementation(), ' '.join(sys.argv))
 
@@ -221,7 +314,7 @@ class Status(object):
 
     @staticmethod
     def print(*args, option=None):
-        if option is not None and option not in sys.argv:
+        if option is not None and not has_opt(option):
             return
         if __class__.__suppression_count != 0:
             return
@@ -260,7 +353,7 @@ class Status(object):
     def do(p, option=None):
         class S:
             def __enter__(self):
-                self.__show = (option is None or option in sys.argv)
+                self.__show = option is None or has_opt(option)
                 if self.__show:
                     Status.enter(p)
 
@@ -2118,7 +2211,7 @@ class Z80Simulator(object):
 
     def __set_node_pull(self, n, pull):
         pull = bools.cast(pull)
-        if '--show-set-nodes' in sys.argv:
+        if has_opt('--show-set-nodes'):
             Status.print(n, pull)
         n.pull = pull
 
@@ -2321,7 +2414,7 @@ class State(object):
         if state is None:
             return None
 
-        if '--show-loaded-state' in sys.argv:
+        if has_opt('--show-loaded-state'):
             Status.print(cache.get_path())
 
         stored_steps, image = state
@@ -2548,7 +2641,7 @@ class State(object):
         if self.__cache_all_reportable_states:
             self.cache()
 
-        if f'--{id}' not in sys.argv:
+        if not has_opt(f'--{id}'):
             return
 
         self.cache()
@@ -2599,10 +2692,10 @@ class State(object):
         #       pins leak to the state after reset.
         # TODO: ~busrq (?)
 
-        if '--dump-nodes' in sys.argv:
+        if has_opt('--dump-nodes'):
             s.dump_nodes()
 
-        if '--dump-trans' in sys.argv:
+        if has_opt('--dump-trans'):
             s.dump_trans()
 
         Status.clear()
@@ -2734,7 +2827,7 @@ def test_node(instrs, n, at_start, at_end, before, after,
 
         emit('')
         emit('FAILED: ' + '; '.join(instrs) + f' {n_name}')
-        if '--no-before-after-expected' not in sys.argv:
+        if not has_opt('--no-before-after-expected'):
             # A racing node's outcome is a set, verbalised value
             # by value with the order condition it arises under.
             with Status.do('verbalise'):
@@ -7210,7 +7303,7 @@ def build_symbolised_state():
     )
 
     s = build_reset_state()
-    if '--no-symbolising' not in sys.argv:
+    if not has_opt('--no-symbolising'):
         if SEED is not None:
             random.seed(SEED)
 
@@ -8331,13 +8424,13 @@ def test_instructions():
     # sets via check_set(). With --single-order only the default
     # order is simulated, against the expectations describing
     # its deterministic outcomes.
-    all_orders = '--single-order' not in sys.argv
+    all_orders = not has_opt('--single-order')
 
     instrs = TestedInstrs.get_instrs()
 
     # For iterating on a single family: --only=<instr> tests
     # just that sequence, pass records untouched aside.
-    only = get_opt('--only', str)
+    only = get_opt('--only')
     if only is not None:
         assert only in instrs, only
         instrs = (only,)
@@ -8350,12 +8443,12 @@ def test_instructions():
         # The flag consumers, proven blind to their
         # predecessor in every context class.
         seqs += list(CONTEXT_SUSPECT_PAIRS)
-    if '--two-instr-seqs' in sys.argv:
+    if has_opt('--two-instr-seqs'):
         seqs += [(i1, i2) for i1 in instrs for i2 in instrs]
 
     # Options only filter what runs; they never affect the
     # order, which is test_instr_seqs()'s own.
-    if '--new-only' in sys.argv:
+    if has_opt('--new-only'):
         seqs = [s for s in seqs
                 if get_instr_seq_time_stamp('passed', s,
                                             all_orders) == 0]
@@ -8457,73 +8550,75 @@ def build_symbolic_states():
 
 
 def main():
+    check_opts()
+
     test_bools()
     test_orders()
 
-    if '--print-start-time' in sys.argv:
+    if has_opt('--print-start-time'):
         Status.print('started')
 
-    if '--identify-state-nodes' in sys.argv:
+    if has_opt('--identify-state-nodes'):
         identify_state_nodes()
         return
 
-    if '--probe-acceptance-latch' in sys.argv:
+    if has_opt('--probe-acceptance-latch'):
         probe_acceptance_latch(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-bus-templates' in sys.argv:
+    if has_opt('--probe-bus-templates'):
         probe_bus_templates(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-node-ids' in sys.argv:
+    if has_opt('--probe-node-ids'):
         probe_node_ids(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-latch-cells' in sys.argv:
+    if has_opt('--probe-latch-cells'):
         probe_latch_cells()
         Status.clear()
         return
 
-    if '--probe-closed-world' in sys.argv:
+    if has_opt('--probe-closed-world'):
         probe_closed_world(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-writeback' in sys.argv:
+    if has_opt('--probe-writeback'):
         probe_writeback(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-special-reset' in sys.argv:
+    if has_opt('--probe-special-reset'):
         probe_special_reset(
-            all_orders='--single-order' not in sys.argv)
+            all_orders=not has_opt('--single-order'))
         Status.clear()
         return
 
-    if '--probe-scf-contexts' in sys.argv:
+    if has_opt('--probe-scf-contexts'):
         probe_scf_contexts()
         Status.clear()
         return
 
-    if '--probe-scf-classes' in sys.argv:
+    if has_opt('--probe-scf-classes'):
         probe_scf_classes()
         Status.clear()
         return
 
-    if '--probe-context-suspects' in sys.argv:
+    if has_opt('--probe-context-suspects'):
         probe_context_suspects()
         Status.clear()
         return
 
-    if '--probe-context-carriers' in sys.argv:
+    if has_opt('--probe-context-carriers'):
         probe_context_carriers()
         Status.clear()
         return
