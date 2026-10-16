@@ -2223,9 +2223,6 @@ class Z80Simulator(object):
     def get_node(self, id):
         return self.__nodes_by_name[id]
 
-    def get_node_id(self, index):
-        return self.__nodes[index].id
-
     def read_nodes(self, id, width=8):
         return Bits(self.get_node_state(self.__nodes_by_name[f'{id}{i}'])
                     for i in range(width))
@@ -2738,9 +2735,8 @@ def test_node(instrs, n, at_start, at_end, before, after,
         emit('')
         emit('FAILED: ' + '; '.join(instrs) + f' {n_name}')
         if '--no-before-after-expected' not in sys.argv:
-            # Verbalised the way the reporting mode does it: a
-            # racing node's outcome is a set, each value with
-            # the order condition it arises under.
+            # A racing node's outcome is a set, verbalised value
+            # by value with the order condition it arises under.
             with Status.do('verbalise'):
                 emit(f'  before: {get_z3_simplified(b)}')
                 if a.is_single:
@@ -7293,108 +7289,6 @@ def get_z3_simplified(b, rename_term=None):
     return str(e)
 
 
-def run_all_orders(instr):
-    # Executes the given instruction on a live simulator in
-    # all-orders mode, starting from the symbolised state, then
-    # reports the possible values of the flag and register
-    # nodes. Unlike the usual step replay, this never loads
-    # cached states for the executed steps.
-    global SEED
-
-    state = build_symbolised_state()
-    state.cache()
-
-    phase = 1
-    cycles = TestedInstrs.get_cycles(instr, phase)
-
-    def execute(sim, all_orders):
-        def set_db(d):
-            if isinstance(d, str):
-                d = Bits(d, width=8)
-            else:
-                d = Bits.cast(d, width=8)
-            for i, b in enumerate(d):
-                sim.set_pin_pull(f'db{i}', b)
-                sim.update_pin(f'db{i}', all_orders)
-
-        def run_cycle(what, d, ticks):
-            with Status.do(f'{what} set db'):
-                set_db(d)
-            for t in range(ticks):
-                for ht in (0, 1):
-                    with Status.do(f'{what} tick {t}.{ht}'):
-                        sim.half_tick(all_orders=all_orders)
-
-        for cycle_no, (d, ticks, cond) in enumerate(cycles):
-            # TODO: Support conditional ticks.
-            assert cond is None, (instr, cond)
-            run_cycle(f'cycle {cycle_no}', d, ticks)
-
-        # Let the values settle into their nodes, the same way
-        # get_effective_states() does.
-        run_cycle('settle', 0x00, 3)
-
-    with Status.do('build simulator'):
-        sim = Z80Simulator(image=state.image)
-    execute(sim, all_orders=True)
-
-    def rename_event(t):
-        def rename(event):
-            s, index = event.removeprefix('u').rsplit('.', 1)
-            return f'{sim.get_node_id(int(index))}@{s}'
-
-        before, after = t.split('<')
-        return f'{rename(before)} < {rename(after)}'
-
-    NODES = tuple(f'{r}{i}'
-                  for r in ('reg_f', 'reg_ff', 'reg_a', 'reg_aa')
-                  for i in range(8))
-
-    results = {}
-    for id in NODES:
-        pv = sim.get_node_entries(sim.get_node(id), {})
-        results[id] = pv
-        with Status.do(f'verbalise {id}'):
-            if pv.is_single:
-                line = f'{id}: {get_z3_simplified(pv.single_value)}'
-            else:
-                lines = [f'{id}: {len(pv.entries)} possible values']
-                for no, (v, orders) in enumerate(pv.entries):
-                    lines.append(f'  {no}) {get_z3_simplified(v)}')
-                    lines.append('    under ' + get_z3_simplified(
-                        orders.e, rename_event))
-                line = '\n'.join(lines)
-        Status.clear()
-        print(line)
-
-    # Every single-order execution must land on one of the
-    # possible values -- including the order of --seed=568 known
-    # to yield an XF outcome differing from the default order's,
-    # the original evidence of issue #51.
-    orig_seed = SEED
-    for seed in None, 1, 2, 3, 568:
-        SEED = seed
-        if seed is not None:
-            random.seed(seed)
-        with Status.do(f'seed {seed}'):
-            s = Z80Simulator(image=state.image)
-            execute(s, all_orders=False)
-
-            takes = []
-            for id in NODES:
-                v = s.get_node_state(s.get_node(id))
-                matches = [no for no, (u, _)
-                           in enumerate(results[id].entries)
-                           if PossibleValues.is_same(u, v)]
-                assert len(matches) == 1, (seed, id)
-                if not results[id].is_single:
-                    takes.append(f'{id} {matches[0]})')
-        Status.clear()
-        print(f'seed {seed}: single-order results are all among '
-              f'the possible values; ' + ', '.join(takes))
-    SEED = orig_seed
-
-
 # The measured per-cycle-kind bus templates, per half-tick:
 # the address role and the ~m1/~mreq/~rd/~wr/~iorq/~rfsh
 # levels. 'cur' is the cycle's own address, 'ir' the refresh
@@ -8632,11 +8526,6 @@ def main():
     if '--probe-context-carriers' in sys.argv:
         probe_context_carriers()
         Status.clear()
-        return
-
-    all_orders_instr = get_opt('--all-orders', str)
-    if all_orders_instr is not None:
-        run_all_orders(all_orders_instr)
         return
 
     build_symbolic_states()

@@ -297,9 +297,7 @@ rest of the circuit's internal nodes.
   classification.
 
   Covered by the `scf/ccf` sequence of a plain `./z80sim.py`
-  run, which asserts the exact outcome set via `check_set()`;
-  `./z80sim.py --all-orders=scf/ccf` reports the racing nodes,
-  their outcomes and the order conditions each arises under.
+  run, which asserts the exact outcome set via `check_set()`.
 
 - The undocumented flag behaviour of the block instructions
   (`ldi`/`ldd`, `cpi`/`cpd`, `ini`/`ind`, `outi`/`outd` and
