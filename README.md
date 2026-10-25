@@ -602,6 +602,10 @@ above.
   -- a MiSTer FPGA core for an imagined Fix-It Felix Jr. arcade
   board.
 
+* [xyz](https://github.com/retro-vault/xyz)
+  -- an operating system for the ZX Spectrum 48K with its own
+  compiler suite and GUI.
+
 * [zx](https://github.com/kosarev/zx)
   -- a ZX Spectrum emulator in Python and C++.
 
