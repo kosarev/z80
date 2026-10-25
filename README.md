@@ -53,6 +53,7 @@ Fast and flexible Z80/i8080 emulator.
 * [The root module](#the-root-module)
 * [State modules](#state-modules)
 * [Using it from Python](#using-it-from-python)
+* [Projects using it](#projects-using-it)
 * [Feedback](#feedback)
 
 
@@ -564,6 +565,16 @@ The machine object also exposes `m.bc`, `m.hl`, `m.sp`, the `halted`
 flag, and handler callbacks (`set_read_callback()`,
 `set_output_callback()`, ...), mirroring the C++ handlers described
 above.
+
+
+## Projects using it
+
+* [Q1 Lite emulator](https://q1-lite-emulator.readthedocs.io/en/latest/)
+  -- an emulator of the Q1 Lite (Q1 Microlite) personal
+  computer.
+
+* [ID-7000 emulator](https://id-7000-emulator.readthedocs.io/en/latest/)
+  -- an emulator of the Danish DDE ID-7000.
 
 
 ## Feedback
