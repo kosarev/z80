@@ -580,6 +580,28 @@ above.
   -- a Z80 and 8-bit ISA bus computer architecture with a Python
   emulator.
 
+* [SimCoupé](https://github.com/simonowen/simcoupe)
+  -- a SAM Coupé emulator.
+
+* [SamCoupeWeb](https://github.com/anomixer/SamCoupeWeb)
+  -- a web-native SAM Coupé emulator based on SimCoupé.
+
+* [TheSeventiesBoard](https://github.com/bastetfurry/TheSeventiesBoard)
+  -- a board and software to emulate 70s machines on an RP2040.
+
+* [nyukomatic](https://github.com/alexanderk23/nyukomatic)
+  -- a ZX Spectrum live-coding tool.
+
+* [Retro Toolkit](https://github.com/drunkfly/retrotoolkit)
+  -- a compiler and development environment for retro machines.
+
+* [TRS80-Miner2049](https://github.com/jeffadickson/TRS80-Miner2049)
+  -- a port of Miner 2049er to the TRS-80 Model III.
+
+* [Fix-It Felix Arcade for MiSTer](https://github.com/niknakniknak/FixItFelixArcadeForMister)
+  -- a MiSTer FPGA core for an imagined Fix-It Felix Jr. arcade
+  board.
+
 * [zx](https://github.com/kosarev/zx)
   -- a ZX Spectrum emulator in Python and C++.
 
