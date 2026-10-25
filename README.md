@@ -576,6 +576,10 @@ above.
 * [ID-7000 emulator](https://id-7000-emulator.readthedocs.io/en/latest/)
   -- an emulator of the Danish DDE ID-7000.
 
+* [ZISA-X](https://github.com/SyntheticDreams/zisa-x)
+  -- a Z80 and 8-bit ISA bus computer architecture with a Python
+  emulator.
+
 * [zx](https://github.com/kosarev/zx)
   -- a ZX Spectrum emulator in Python and C++.
 
