@@ -576,6 +576,15 @@ above.
 * [ID-7000 emulator](https://id-7000-emulator.readthedocs.io/en/latest/)
   -- an emulator of the Danish DDE ID-7000.
 
+* [zx](https://github.com/kosarev/zx)
+  -- a ZX Spectrum emulator in Python and C++.
+
+* [cpm80](https://github.com/kosarev/cpm80)
+  -- a CP/M-80 2.2 emulator with a Python API.
+
+* [orion128](https://github.com/kosarev/orion128)
+  -- an Orion 128 emulator.
+
 
 ## Feedback
 
